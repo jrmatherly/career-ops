@@ -63,6 +63,7 @@ Tags in the listing: `[merge]` (parents are in the range; not expanded) and `[pi
 5. Run `--dry-run-merge`. A clean result with all-ADOPT verdicts is the fast path. Conflicting files should be the `~` files the ADAPT verdicts already name; a surprise conflict means a deviation nobody recorded, so record it first.
 6. Write every verdict with file-level evidence to the dated decision log (template below).
 7. On a branch: `git merge careerops/main`, resolve any conflicts, apply the SKIP reverts, then the validation batch below. Push only when the user asks.
+   Also sync upstream's tags with the merge: `git fetch careerops 'refs/tags/*:refs/tags/*' && git push origin --tags`. The fork was created without them, and `upgrade-tests.mjs --pr-gate` (the `Upgrade regression gate` job in `test.yml`) fails with "No release tag is an ancestor of HEAD" when the newest `career-ops-v*` tag is missing; `update-system.mjs`'s release channel reads the same tags.
 8. `--advance <tip-sha>` with the tip SHA from the listing you reviewed (a fresh fetch may have moved on) and commit `.upstream-review/` with the merge. After the push, `--github` should read `behind_by=0` for the branch.
 
 For a large window (more than about 20 commits), dispatch one reviewer subagent per area with the SHAs, the marker output, and steps 2 to 4. Synthesize into one log.
