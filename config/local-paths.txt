@@ -8,3 +8,4 @@
 .claude/agents/
 .githooks/
 .serena/
+.upstream-review/
