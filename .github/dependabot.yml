@@ -1,17 +1,8 @@
+# Fork-only scope: npm and Go pins arrive through the upstream sync
+# (/upstream-review); only the SHA-pinned GitHub Actions need their own bumps.
+# Version updates are off on forks until enabled in Settings → Code security.
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  - package-ecosystem: "gomod"
-    directory: "/dashboard"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
