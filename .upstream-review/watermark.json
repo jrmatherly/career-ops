@@ -7,6 +7,6 @@
   "lastReviewedSha": "48f397672f348b8ca21aa75ec470bc7ee1bf52a9",
   "lastReviewedShaShort": "48f39767",
   "lastReviewedDate": "2026-11-05",
-  "note": "forkPointSha = merge-base of our main and careerops/main, the last upstream commit our tree carries wholesale (v1.39.0 + 1). lastReviewedSha = the last upstream commit reviewed; advance it with .claude/skills/upstream-review/scripts/upstream-review.sh --advance <tip-sha>. forkPointSha is an ancestor of our HEAD; lastReviewedSha is not (its commits arrive by cherry-pick, never by merge), so the driver's range is always lastReviewedSha..careerops/main.",
+  "note": "forkPointSha = merge-base of our main and careerops/main, the last upstream commit our tree carries wholesale (v1.39.0 + 1). lastReviewedSha = the last upstream commit reviewed; advance it with .claude/skills/upstream-review/scripts/upstream-review.sh --advance <tip-sha>. Sync is merge-first (see the skill): after a merge the merge-base moves to the upstream tip and lastReviewedSha is an ancestor of HEAD; after a cherry-pick it is not. The driver's range is always lastReviewedSha..careerops/main and it computes the merge-base itself.",
   "lastAdvancedAt": "2026-11-05T18:44:01Z"
 }
