@@ -1,4 +1,4 @@
-name: 'CodeQL Analysis'
+name: "🔍 CodeQL Analysis"
 on:
   push:
     branches: [main]
@@ -12,33 +12,38 @@ permissions:
   contents: read
   security-events: write
 
+# Cancel superseded runs: a newer push to the same branch or PR replaces the running one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
-    name: Analyze
+    name: "🔍 Analyze ${{ matrix.language }}"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         language: ['javascript-typescript', 'go']
     steps:
-      - name: Checkout
+      - name: "⬇️ Checkout"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Initialize CodeQL
+      - name: "🔍 Initialize CodeQL"
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
 
-      - name: Setup Go
+      - name: "🐹 Set up Go"
         if: matrix.language == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: dashboard/go.mod
           cache-dependency-path: dashboard/go.sum
 
-      - name: Build Go
+      - name: "🏗️ Build Go"
         if: matrix.language == 'go'
         # go build skips *_test.go, so CodeQL's traced build never saw test
         # files (tool status showed Go at 13/26 files scanned). Compiling the
@@ -49,11 +54,11 @@ jobs:
           go build ./...
           go test -run '^$' ./...
 
-      - name: Autobuild
+      - name: "🏗️ Autobuild"
         if: matrix.language != 'go'
         uses: github/codeql-action/autobuild@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
 
-      - name: Perform CodeQL Analysis
+      - name: "🔍 Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: '/language:${{ matrix.language }}'

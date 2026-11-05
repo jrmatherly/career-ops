@@ -1,4 +1,4 @@
-name: Depends on
+name: "🔗 Depends on"
 
 # Required check that fails while a PR listed under a `Depends on` heading is still open (#3880).
 # Ordering used to live in a reviewer's memory: #3528 merged while #3513, which it describes as
@@ -31,22 +31,24 @@ permissions:
 
 jobs:
   depends-on:
-    name: depends-on
+    name: "🔗 depends-on"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: "⬇️ Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # On pull_request the default checkout is the merge commit carrying fork code. Force main.
           ref: main
           persist-credentials: false
           sparse-checkout: .github/scripts
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: "🟢 Set up Node"
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       # The checkout is `main`, so on the PR that introduces this check the script is
       # not there yet. Missing means pass, which is also the right failure mode later:
       # a check whose implementation went missing should not block every PR in the repo.
-      - name: depends-on
+      - name: "🔗 depends-on"
         run: |
           if [ ! -f .github/scripts/depends-on.mjs ]; then
             echo "depends-on.mjs is not on main yet. Passing."

@@ -1,4 +1,4 @@
-name: No user data in PRs
+name: "🔒 No user data in PRs"
 
 # Hard-blocks any PR that adds or modifies user-layer (private data) files.
 # These live ONLY on the candidate's machine per DATA_CONTRACT.md and must never
@@ -19,11 +19,18 @@ permissions:
   contents: read
   pull-requests: read
 
+# Cancel superseded runs: a newer push to the same branch or PR replaces the running one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   guard:
+    name: "🔒 Guard user-layer files"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - name: "🔒 Check changed files against the user layer"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const { owner, repo } = context.repo;

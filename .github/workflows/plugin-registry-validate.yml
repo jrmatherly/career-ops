@@ -1,4 +1,4 @@
-name: 'Plugin registry validate'
+name: "🧩 Plugin registry validate"
 
 # Runs on PRs that touch the curated plugin registry. Uses `pull_request` (NOT
 # pull_request_target), read-only permissions, and NO secrets — so cloning +
@@ -20,12 +20,13 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate registry entries
+    name: "🧩 Validate registry entries"
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 so the "One plugin per PR" diff below has the base
       # branch's history + merge-base available (a shallow checkout truncates it).
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: "⬇️ Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           # The job only reads a public repository, and the PR controls code
@@ -38,26 +39,28 @@ jobs:
       # and imports its helpers relative to itself, so the base copy of every
       # module it loads comes with it). Keep this step after the PR checkout:
       # checkout cleans the workspace, and would delete base/.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: "⬇️ Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.base_ref }}
           path: base
           persist-credentials: false
 
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: "🟢 Set up Node"
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
 
       # Deterministic shape gate (no network).
-      - name: Validate registry shape
+      - name: "🧩 Validate registry shape"
         run: node base/validate-plugin-registry.mjs
 
       # Deep gate: clone each entry at its pinned SHA + static-validate + audit.
       # No secrets are present in this job; nothing the plugin ships is executed.
-      - name: Clone + audit each registry entry
+      - name: "🔎 Clone + audit each registry entry"
         run: node base/validate-plugin-registry.mjs --deep
 
-      - name: One plugin per PR
+      - name: "1️⃣ One plugin per PR"
         # base_ref goes through env, never ${{ }}-spliced into the script —
         # anything expanded inside run: is literal shell code (template injection).
         env:
