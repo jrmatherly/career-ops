@@ -2,7 +2,7 @@
 name: upstream-review
 description: Review what changed in upstream career-ops-hq/career-ops (main) since our last review and decide what to cherry-pick into this fork without disturbing our deviations. Use for "sync from upstream", "what changed upstream", "review upstream commits", "did career-ops update", "bring upstream commit X in", "check upstream for new features", a session-start update-available notice, or any periodic upstream check. Encodes the fork's cherry-pick-not-merge rule, the watermark driver, the per-file divergence markers, the validation batch and the deviations we keep.
 argument-hint: "[--stat | --urls | --show <sha> | --diverged | --advance <sha>]"
-allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/upstream-review.sh *) Bash(git show *) Bash(git log *) Bash(git diff *) Bash(git rev-parse *) Bash(git cherry-pick *) Bash(npm run lint) Bash(node validate-system-paths-coverage.mjs) Bash(node test-all.mjs *) Bash(node .githooks/pre-commit.mjs) Read Grep Glob
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/upstream-review.sh *) Bash(git show *) Bash(git log *) Bash(git diff *) Bash(git rev-parse *) Bash(git cherry-pick *) Bash(npm run lint) Bash(npm test) Bash(npm run typecheck) Bash(node validate-system-paths-coverage.mjs) Bash(node test-all.mjs *) Bash(node .githooks/pre-commit.mjs) Read Grep Glob
 ---
 
 # Upstream review
@@ -65,6 +65,7 @@ npm run lint
 node validate-system-paths-coverage.mjs  # a new upstream file lands in SYSTEM_PATHS with its commit; a fork file needs config/local-paths.txt
 node test-all.mjs --quick
 (cd dashboard && go test ./...)          # only when the batch touched dashboard/ or templates/states.yml
+(cd web && npm test && npm run typecheck) # only when the batch touched web/ (its suite is not in test-all; needs `npm --prefix web ci` once)
 git diff --name-only <sha-before-batch>..HEAD -- .claude .githooks .upstream-review config/local-paths.txt .gitignore
 ```
 

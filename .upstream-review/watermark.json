@@ -4,9 +4,9 @@
   "upstreamBranch": "main",
   "forkPointSha": "f770ec6f8f429c1132c8e949bf9e00dc1014a9de",
   "forkPointDate": "2026-11-05",
-  "lastReviewedSha": "f770ec6f8f429c1132c8e949bf9e00dc1014a9de",
-  "lastReviewedShaShort": "f770ec6f",
+  "lastReviewedSha": "48f397672f348b8ca21aa75ec470bc7ee1bf52a9",
+  "lastReviewedShaShort": "48f39767",
   "lastReviewedDate": "2026-11-05",
   "note": "forkPointSha = merge-base of our main and careerops/main, the last upstream commit our tree carries wholesale (v1.39.0 + 1). lastReviewedSha = the last upstream commit reviewed; advance it with .claude/skills/upstream-review/scripts/upstream-review.sh --advance <tip-sha>. Both are ancestors of our HEAD until the day we merge instead of cherry-pick, which this repo does not do.",
-  "lastAdvancedAt": "2026-11-05T18:40:00Z"
+  "lastAdvancedAt": "2026-11-05T18:44:01Z"
 }

@@ -145,7 +145,7 @@ echo "  commits to review:   $COUNT"
 [ "$COUNT" -eq 0 ] && { echo "Up to date."; exit 0; }
 
 # Upstream commits whose patch id already exists on our side (earlier cherry-picks).
-PICKED="$(g rev-list --cherry-mark --right-only --no-merges "HEAD...$TIP" | awk '/^=/{print substr($1,2)}')"
+PICKED=" $(g rev-list --cherry-mark --right-only --no-merges "HEAD...$TIP" | awk '/^=/{print substr($1,2)}' | tr '\n' ' ') "
 
 g log --reverse --date=short --pretty='%H%x09%h%x09%ad%x09%p%x09%s' "$RANGE" |
 while IFS=$'\t' read -r full short date parents subj; do
