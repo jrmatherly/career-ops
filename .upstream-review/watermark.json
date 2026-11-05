@@ -4,9 +4,9 @@
   "upstreamBranch": "main",
   "forkPointSha": "f770ec6f8f429c1132c8e949bf9e00dc1014a9de",
   "forkPointDate": "2026-11-05",
-  "lastReviewedSha": "92c1d88d39ac2d9785bf1b6ebe7f81bc9332cd61",
-  "lastReviewedShaShort": "92c1d88d",
+  "lastReviewedSha": "cd3793734fcd57693ddd97a20ccf0d3298b7d47e",
+  "lastReviewedShaShort": "cd379373",
   "lastReviewedDate": "2026-11-05",
   "note": "forkPointSha = merge-base of our main and careerops/main, the last upstream commit our tree carries wholesale (v1.39.0 + 1). lastReviewedSha = the last upstream commit reviewed; advance it with .claude/skills/upstream-review/scripts/upstream-review.sh --advance <tip-sha>. Sync is merge-first (see the skill): after a merge the merge-base moves to the upstream tip and lastReviewedSha is an ancestor of HEAD; after a cherry-pick it is not. The driver's range is always lastReviewedSha..careerops/main and it computes the merge-base itself.",
-  "lastAdvancedAt": "2026-11-05T19:02:34Z"
+  "lastAdvancedAt": "2026-11-05T21:07:00Z"
 }
