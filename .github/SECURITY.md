@@ -4,7 +4,7 @@
 
 **Do NOT open a public issue for security vulnerabilities.**
 
-Instead, please email **hi@santifer.io** with:
+Instead, please email **support@matherly.net** with:
 
 1. Description of the vulnerability
 2. Steps to reproduce
@@ -12,6 +12,8 @@ Instead, please email **hi@santifer.io** with:
 4. Suggested fix (if any)
 
 You will receive a response within 72 hours. We will work with you to understand and address the issue before any public disclosure.
+
+This repository is a fork of [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops). If the issue is in code shared with upstream, please also report it through [upstream's security policy](https://github.com/career-ops-hq/career-ops/security/policy) so every user of career-ops gets the fix, not only this fork.
 
 ## Scope
 
@@ -34,4 +36,4 @@ Security issues in the following are in scope:
 
 ## Disclosure Policy
 
-We follow coordinated disclosure. Once a fix is released, we will credit the reporter (unless they prefer anonymity) in the release notes.
+We follow coordinated disclosure. Once a fix lands, we will credit the reporter (unless they prefer anonymity) in the fix's commit message; this fork publishes no release notes of its own.
