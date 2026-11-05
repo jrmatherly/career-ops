@@ -9,7 +9,8 @@ import { CV_UPLOAD_ACCEPT, cvUploadError, MAX_CV_UPLOAD_BYTES } from "../../src/
 // skip when that install is absent; a broken web install must still fail.
 let skipPdf = false;
 try {
-  import.meta.resolve("pdfjs-dist/legacy/build/pdf.mjs");
+  // `void` keeps `import.meta` off the statement start, which CodeQL's JS parser rejects.
+  void import.meta.resolve("pdfjs-dist/legacy/build/pdf.mjs");
 } catch (error) {
   if (error.code !== "ERR_MODULE_NOT_FOUND" || existsSync(new URL("../../node_modules", import.meta.url))) throw error;
   skipPdf = "web dependencies are not installed (PDF extraction runs in web CI)";

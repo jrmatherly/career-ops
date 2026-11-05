@@ -31,17 +31,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: "🔍 Initialize CodeQL"
-        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
-        with:
-          languages: ${{ matrix.language }}
-
+      # Before init: CodeQL wraps the Go binary on PATH at init time to trace the
+      # build, so a Go installed afterwards is untraced (tool status warning).
       - name: "🐹 Set up Go"
         if: matrix.language == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: dashboard/go.mod
           cache-dependency-path: dashboard/go.sum
+
+      - name: "🔍 Initialize CodeQL"
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
 
       - name: "🏗️ Build Go"
         if: matrix.language == 'go'
