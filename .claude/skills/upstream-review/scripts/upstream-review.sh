@@ -23,6 +23,8 @@
 #
 # A commit whose patch already exists on our side (cherry-picked earlier) is tagged [picked]:
 # git's --cherry-mark compares patch ids, so it is found even when the message changed.
+# A commit that is already an ancestor of HEAD (a merge landed before the review) is tagged
+# [merged]: classify it anyway, since the decision log is the record, and revert it if SKIP.
 #
 # Markers in --stat compare our HEAD with the commit's own parent (the pre-image a merge or cherry-pick merges from):
 #   =   our file equals the pre-image        merges or cherry-picks cleanly for this file
@@ -189,6 +191,8 @@ g log --reverse --date=short --pretty='%H%x09%h%x09%ad%x09%p%x09%s' "$RANGE" |
 while IFS=$'\t' read -r full short date parents subj; do
   tag=""; case "$parents" in *" "*) tag="  [merge]";; esac
   case "$PICKED" in *" $full "*) tag="$tag  [picked]";; esac
+  # Already an ancestor of HEAD: a merge brought it in before the review classified it.
+  g merge-base --is-ancestor "$full" HEAD && tag="$tag  [merged]"
   echo
   echo "* $short  $date  $subj$tag"
   [ "$cmd" = "--urls" ] && echo "    $GH_WEB/$full"
