@@ -3,6 +3,9 @@ name: Tests
 on:
   pull_request:
     branches: [main]
+  # Fork: work lands on branches and on main without a PR, so run on every push too.
+  push:
+  workflow_dispatch:
   # The merge queue builds a temporary merge commit per group and needs the
   # same required checks to report on it; without this trigger every queued
   # PR would wait forever on `test (...)`.
@@ -10,10 +13,12 @@ on:
 
 # merge_group runs carry the base repo's GITHUB_TOKEN (write-capable by
 # default, unlike a fork pull_request) while executing code that came from a
-# fork. Nothing in this workflow needs to write, and no other secret is
-# referenced here, so the token is pinned read-only and never persisted.
+# fork. Nothing in this workflow writes, and no other secret is referenced
+# here, so the token is pinned read-only and never persisted. packages: read
+# lets the Docker jobs pull the pre-built cv-visual image from GHCR.
 permissions:
   contents: read
+  packages: read
 
 # A force-push supersedes the running matrix; cancel it instead of letting
 # stale legs occupy runners (3 jobs per push at this repo's PR volume).
@@ -87,8 +92,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build the canonical CV rendering environment
-        run: docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the canonical CV rendering environment (build it if GHCR has none yet)
+        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
+        # fresh fork or an unpublished Dockerfile change green.
+        run: |
+          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
+            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          else
+            docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
+          fi
       - name: Check every CV template and PDF page
         run: |
           docker run --rm --init --ipc=host --platform linux/amd64 \
@@ -123,8 +141,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build the canonical CV rendering environment
-        run: docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the canonical CV rendering environment (build it if GHCR has none yet)
+        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
+        # fresh fork or an unpublished Dockerfile change green.
+        run: |
+          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
+            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          else
+            docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
+          fi
       - name: Run the suites that need Chromium or a TeX engine
         run: |
           docker run --rm --init --ipc=host --platform linux/amd64 \

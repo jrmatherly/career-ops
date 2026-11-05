@@ -3,7 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: career-ops:local
+    # Published by .github/workflows/docker-image.yml; `docker compose build` still builds it locally.
+    image: ghcr.io/jrmatherly/career-ops:latest
     container_name: career-ops
     working_dir: /app
     # Long-running shell so `docker compose exec` is instant.

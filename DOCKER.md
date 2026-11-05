@@ -20,6 +20,14 @@ through `./cops`, for example `./cops pdf output/cv.html output/cv.pdf`.
 Batch mode (`batch/batch-runner.sh`) starts a worker CLI for every offer, so it
 can't run inside the container at all.
 
+## Pre-built images (this fork)
+
+`.github/workflows/docker-image.yml` publishes `ghcr.io/jrmatherly/career-ops`
+(this `Dockerfile`, linux/amd64 and arm64) and `ghcr.io/jrmatherly/career-ops-cv-visual`
+(the CI rendering image) on every push to `main` that touches them. `docker compose pull`
+fetches the dev image instead of building it; `./cops rebuild` still builds locally.
+The base image is Microsoft's Playwright image, pinned by digest in both Dockerfiles.
+
 ## Prerequisites
 
 - Docker Engine 24+ with the Compose plugin (`docker compose version`)

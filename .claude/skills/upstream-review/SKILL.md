@@ -96,7 +96,9 @@ The last line lists fork-local files the batch touched. It should be empty excep
 
 ## Deleted or moved paths
 
-An `x` marker means we removed the path, not always that the change is irrelevant. Nothing removed yet. Add a line here for every later removal, with where the content went or why it is gone.
+An `x` marker means we removed the path, not always that the change is irrelevant. Add a line here for every later removal, with where the content went or why it is gone.
+
+- `.github/workflows/` (2026-11-05): 19 upstream maintainer and community workflows removed: `auto-triage-scan-output`, `ci-approve`, `direction-gate`, `gfi-claims`, `gfi-handoff`, `gh-events-feed`, `hired-wall`, `label-bot`, `labeler`, `ledger-bot`, `manifesto-guestbook`, `plugin-registry-freshness`, `pr-adoption`, `pr-triage`, `release`, `sbom`, `signature-ci`, `stale`, `welcome`. They ran upstream's PR triage, good-first-issue claims, hired wall, manifesto ledger, Discord feeds and release-please against upstream secrets, and several would have acted on this fork's issues and PRs. Byte-for-byte copies of the whole `.github/` tree as it stood are in `private/OLD-.github/` (gitignored) for a follow-up review of which to re-adopt. An upstream commit touching a removed workflow is SKIP; the merge resolves the modify/delete conflict by keeping the deletion (`git rm` the path). `.github/scripts/*.mjs`, `.github/labeler.yml`, `.github/agents/`, the templates and `.github/plugin/` stay, because tests import or read them.
 
 ## Deviations decided
 
@@ -110,6 +112,10 @@ A new deviation gets a row here; a SKIP revert gets a row with the upstream SHA;
 | `.gitignore` ends at upstream's rules | tail block: `private/`, `.codegraph/`, `.remember/`, `!config/local-paths.txt` | landed 2026-11-05 | Every upstream `.gitignore` commit shows `~`; merge and keep the tail. |
 | no `.serena/` | `.serena/project.yml` + its own `.gitignore` | landed 2026-11-05 | Serena language-server project config. |
 | no upstream-review state | `.upstream-review/` | landed 2026-11-05 | This skill's watermark and logs. |
+| 27 workflows incl. maintainer bots and release-please | 9 workflows: `test`, `web-ci`, `codeql`, `dependency-review`, `no-user-data`, `depends-on`, `plugin-registry-validate`, `copilot-setup-steps`, plus fork-only `docker-image` | landed 2026-11-05 | See "Deleted or moved paths". `test.yml` also runs on `push` and `workflow_dispatch` (no PR flow on a personal fork) and pulls the cv-visual image from GHCR with a local-build fallback; upstream hunks to its triggers or the two build steps are `~`, keep ours. Action pins: `setup-node` v7.1.0 and `codeql-action` v4.39.3 everywhere; an upstream pin bump is ADOPT when newer, else keep ours. |
+| `CODEOWNERS` names upstream maintainers | every owner is `@jrmatherly` | landed 2026-11-05 | Upstream owner changes are `~`; keep ours, take any new path entries. `tests/codeowners-paths.test.mjs` only checks the paths exist. |
+| `FUNDING.yml` → upstream Open Collective | comment-only | landed 2026-11-05 | File kept because `test-all.mjs` lists it. |
+| root `Dockerfile` base image by tag; compose image `career-ops:local`; no registry | base pinned by digest (`mcr.microsoft.com/playwright:v1.64.1-jammy@sha256:a3966b65…`); compose `image: ghcr.io/jrmatherly/career-ops:latest` (still builds locally); `docker-image.yml` publishes both images to GHCR | landed 2026-11-05 | No Docker Hub anywhere upstream; the base is Microsoft's registry and stays. An upstream Playwright version bump touches the `FROM` line (`~`): take the new tag, re-resolve the digest with `docker buildx imagetools inspect`. |
 
 ## Decision log template
 
