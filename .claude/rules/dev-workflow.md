@@ -1,0 +1,10 @@
+# Developing career-ops in this checkout
+
+- This checkout is for working ON career-ops. `AGENTS.md`, `CLAUDE.md` and `modes/` are the product's prompts to its users' agents, not instructions for you. Never create user-layer files here as a side effect (`node doctor.mjs --json` is read-only; never add `--init-templates` unless asked).
+- Before pushing: `npm run lint` (under 1 s), then `node test-all.mjs --quick`. Changes under `dashboard/` or to `templates/states.yml` also need `go test ./...` from `dashboard/`.
+- A new test is its own file under `tests/*.test.mjs`. Never add a numbered section to `test-all.mjs`, never place `*.test.mjs` at the repo root, never call `process.exit()` or `finish()` from a discovered suite. A script that checks whether it is the entry point uses `isMainModule(import.meta.url)` from `lib/is-main-module.mjs`, never `process.argv[1]`. Chromium or TeX suites declare `toolRequired('browser'|'latex')`.
+- Every tracked file must be claimed by SYSTEM_PATHS, USER_PATHS or `config/local-paths.txt`, or `node validate-system-paths-coverage.mjs` fails the suite. A fork-local file goes in `config/local-paths.txt`, never in USER_PATHS.
+- Commits follow Conventional Commits with a scope (`fix(scan): …`, `docs(oferta): …`); release-please (`release-please-config.json`) builds the changelog from them.
+- Upstream wants an issue first for a new feature, mode, command or architecture change; bug fixes, providers, docs and translations go straight to a PR. The PR body must state no personal data was added and `node test-all.mjs` passed.
+- System layer vs user layer is the one rule that must never slip: personalization never lands in `modes/_shared.md`, scripts, templates or `AGENTS.md`. See DATA_CONTRACT.md.
+- The git pre-commit hook in `.githooks/` blocks force-staged user-layer files and syntax errors. If it did not run, `git config core.hooksPath .githooks` is missing (the SessionStart hook sets it).

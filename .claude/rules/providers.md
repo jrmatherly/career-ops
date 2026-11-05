@@ -1,0 +1,11 @@
+---
+paths:
+  - "providers/**"
+---
+
+# Adding or changing a scanner provider
+
+- Read `providers/ADDING_A_PROVIDER.md` first. Before any code, the source must clear the Source Indexing Policy in `CONTRIBUTING.md` (employer-attributed, free, one source per provider, full inventory, `robots.txt` checked per path).
+- Mirror an existing provider of the same shape (ATS API, feed, server-rendered HTML); the type catalog is `providers/_types.js`.
+- No registration: `providers/_registry.mjs` loads every module in the directory.
+- Every provider has `tests/providers/{name}.test.mjs`; the shared SSRF and guard suites in `tests/providers/` run against it too.

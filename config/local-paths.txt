@@ -1,0 +1,9 @@
+# local-paths.txt — files this fork owns, that upstream does not ship.
+# Read by update-system.mjs (never written on `apply`) and by
+# validate-system-paths-coverage.mjs (not reported as orphans).
+# Tracked and un-ignored on purpose (see `!config/local-paths.txt` in .gitignore),
+# so the fork's CI sees the same declaration (#2991, #4128).
+
+.claude/rules/
+.claude/agents/
+.githooks/

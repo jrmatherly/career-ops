@@ -292,3 +292,12 @@ data/interview-prep/
 .next/
 web/.next/
 web/out/
+
+private/
+.codegraph/
+.remember/
+
+# Fork-local layer declaration: tracked and NOT ignored, so the coverage guard
+# sees it in CI too (config/local-paths.example.txt, #2991). Keep after upstream's rule.
+!config/local-paths.txt
+
