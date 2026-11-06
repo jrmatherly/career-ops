@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Claude Code SessionStart hook (startup only). Two deterministic chores:
-//  1. point git at the fork's pre-commit hook once per clone;
+//  1. point git at the fork's pre-commit hook once per clone (local scope; says
+//     when that shadows a global core.hooksPath, warns on a foreign local one);
 //  2. run the release update check AGENTS.md asks for on the first message,
 //     printing only when an update exists (SessionStart stdout enters context).
 // Always exits 0: a failed chore must not block the session.
@@ -11,10 +12,18 @@ import { fileURLToPath } from 'node:url';
 const root = process.env.CLAUDE_PROJECT_DIR || join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 try {
-  const current = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: root, encoding: 'utf-8' });
-  if (current.status !== 0 || !current.stdout.trim()) {
-    const set = spawnSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root, encoding: 'utf-8' });
-    if (set.status === 0) console.log('Set git core.hooksPath to .githooks for this clone: the pre-commit hook now blocks force-staged user-layer files and syntax errors.');
+  const git = (...args) => spawnSync('git', ['config', ...args], { cwd: root, encoding: 'utf-8' });
+  // The local scope wins in git, so it is the one that decides whether this clone is guarded.
+  const local = git('--local', '--get', 'core.hooksPath').stdout.trim();
+  if (!local) {
+    // "<scope>\t<value>" from whichever scope supplies the value today, if any.
+    const [scope, shadowed] = git('--show-scope', '--get', 'core.hooksPath').stdout.trim().split('\t');
+    if (git('core.hooksPath', '.githooks').status === 0) {
+      const note = shadowed ? ` (this clone now uses .githooks instead of the ${scope} core.hooksPath "${shadowed}")` : '';
+      console.log(`Set git core.hooksPath to .githooks for this clone: the pre-commit hook now blocks newly added user-layer files and syntax errors.${note}`);
+    }
+  } else if (local !== '.githooks') {
+    console.log(`WARNING: git core.hooksPath is "${local}" in this clone's local config, so the fork's pre-commit guard in .githooks is not active here.`);
   }
 } catch { /* git missing or not a repo: nothing to do */ }
 

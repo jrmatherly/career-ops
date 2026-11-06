@@ -3,7 +3,9 @@
 // .claude/rules/dev-workflow.md: the syntax hook flags only an invalid .mjs
 // inside the project, and the pre-commit hook refuses a newly added (or renamed-in)
 // gitignored (user-layer) file while letting a clean index, a staged deletion
-// and an edit to a tracked-but-ignored file through.
+// and an edit to a tracked-but-ignored file through; the session-start hook sets
+// core.hooksPath locally, says when that shadows a global value, and warns on a
+// foreign local one.
 import { spawnSync } from 'child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -14,6 +16,8 @@ console.log('\nclaude hooks — syntax hook and pre-commit guard');
 
 const CHECK = join(ROOT, '.claude', 'hooks', 'check-mjs.mjs');
 const PRECOMMIT = join(ROOT, '.githooks', 'pre-commit.mjs');
+const SESSION_START = join(ROOT, '.claude', 'hooks', 'session-start.mjs');
+const ok = (cond, msg) => (cond ? pass(msg) : fail(msg));
 
 function runHook(script, payload, env = {}) {
   return spawnSync(NODE, [script], {
@@ -105,6 +109,23 @@ try {
   r = spawnSync(NODE, [hook], { cwd: repo, encoding: 'utf-8' });
   if (r.status === 1 && r.stderr.includes('cv.md')) pass('pre-commit refuses a rename onto a gitignored name');
   else fail(`pre-commit expected exit 1 naming cv.md on a rename, got ${r.status}: ${r.stderr}`);
+
+  // session-start sets core.hooksPath in the LOCAL scope. The env keeps git away
+  // from the developer's own config; update-system.mjs is absent in the fixture,
+  // so the hook's update check fails and stays silent as its catch intends.
+  const hookEnv = { ...process.env, HOME: work, GIT_CONFIG_NOSYSTEM: '1', CLAUDE_PROJECT_DIR: repo };
+  const localHooksPath = () => git('config', '--local', '--get', 'core.hooksPath').stdout.trim();
+  r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });
+  ok(/Set git core.hooksPath/.test(r.stdout) && localHooksPath() === '.githooks', 'session-start sets the local hooksPath');
+
+  writeFileSync(join(work, 'gitconfig'), '[core]\n\thooksPath = /tmp/husky\n');
+  git('config', '--local', '--unset', 'core.hooksPath');
+  r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: { ...hookEnv, GIT_CONFIG_GLOBAL: join(work, 'gitconfig') } });
+  ok(/Set git core.hooksPath/.test(r.stdout) && /instead of the global core.hooksPath "\/tmp\/husky"/.test(r.stdout) && localHooksPath() === '.githooks', 'session-start overrides a global hooksPath locally and says so');
+
+  git('config', '--local', 'core.hooksPath', '.husky');
+  r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });
+  ok(/WARNING: git core.hooksPath is "\.husky"/.test(r.stdout) && localHooksPath() === '.husky', 'session-start warns on a foreign local hooksPath and does not change it');
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
