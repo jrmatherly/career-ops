@@ -14,7 +14,7 @@ Cuando el candidato pegue una **URL** (no texto de la JD), confirmar que la ofer
 2. Clasificar la publicación:
    - **Evidencia de oferta activa:** título/rol + descripción real o ruta de candidatura/apply
    - **Evidencia de oferta cerrada:** expirada/cerrada/"ya no acepta candidaturas", JD ausente con solo nav/footer tras descartar contenido aún cargando o inaccesible, redirección a página genérica, o 404/410
-3. Si la oferta parece cerrada, **detenerse antes del Bloque A**: informar al candidato que el enlace está muerto, y si la entrada provino de `data/pipeline.md`, marcarla `- [x] ~~Empresa | Rol~~ — oferta nieaktywna`. No generar evaluación, report ni CV.
+3. Si la oferta parece cerrada, **detenerse antes del Bloque A**: informar al candidato que el enlace está muerto, y si la entrada provino de `data/pipeline.md`, marcarla `- [x] ~~{URL} | Empresa | Rol~~ — oferta expirada`. No generar evaluación, report ni CV.
 4. Si el candidato pegó texto de la JD (sin URL), la disponibilidad no se puede verificar — anotarlo y continuar.
 
 No continuar al Bloque A hasta que esta verificación se resuelva. La captura obtenida aquí se reutiliza en las señales de frescura del Bloque G.

@@ -125,7 +125,7 @@ async function testDeadPostingOutcome() {
     );
 
     if (result.processed && result.outcome === 'dead-posting'
-      && result.line === '- [x] ~~Acme Corp | Senior Engineer~~ — oferta nieaktywna') {
+      && result.line === '- [x] ~~https://example.com/job | Acme Corp | Senior Engineer~~ — posting expired') {
       pass('dead-posting marker resolves the pipeline entry without a score');
     } else {
       fail(`dead-posting marker returned unexpected result: ${JSON.stringify(result)}`);
@@ -151,7 +151,7 @@ async function testDeadPostingOutcome() {
     const urlOnly = '- [ ] https://example.com/job';
     const closed = await processOffer(mockBrowser, urlOnly, 2,
       async () => '---DEAD_POSTING---', async () => ({ result: 'expired' }));
-    if (closed.line === '- [x] ~~https://example.com/job~~ — oferta nieaktywna') {
+    if (closed.line === '- [x] ~~https://example.com/job~~ — posting expired') {
       pass('URL-only closed posting preserves its source URL');
     } else { fail(`lost source URL: ${closed.line}`); }
     for (const verdict of ['active', 'uncertain']) {

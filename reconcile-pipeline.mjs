@@ -230,9 +230,11 @@ function reconcile() {
     for (let i = procStart + 1; i < procEnd; i++) {
       const m = lines[i].match(/^- \[x\]\s+(.+)$/i);
       if (!m) continue;
-      // "[num](path) | url | company | role | score | PDF x" — url is field 2
+      // "[num](path) | url | company | role | score | PDF x" — url is field 2,
+      // except in an expired entry ("~~url | company | role~~ — …" or "~~url~~ — …").
       const parts = m[1].split('|').map(s => s.trim());
-      if (parts[1]) procUrls.add(urlKey(parts[1]));
+      const url = parts[0].startsWith('~~') ? parts[0].slice(2).split('~~')[0] : parts[1];
+      if (url) procUrls.add(urlKey(url));
     }
   }
 
