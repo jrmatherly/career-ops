@@ -501,7 +501,6 @@ A single-string `modes_dir` (today's default, ~90% of users) behaves exactly as 
 | Wants to update the system | `update` |
 | Wants to queue a request for later / check the inbox between sessions | `agent-inbox` — append-only checklist drained next session; nothing auto-submits |
 | Wants to add a finished project, paper, or role to the CV | `add` — source-grounded preview, confirm-before-write; dedup + insertion via `add-entry.mjs` |
-| Calibrating an application for a European software-engineering market | `eu-swe` — regional calibration (`modes/regional/eu-swe.md`) |
 
 ### CV Source of Truth
 
