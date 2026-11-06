@@ -21,8 +21,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Classify the change
+    # Answers one question for the jobs below: does this PR change only docs?
+    # A job of its own so that one diff decides for all of them. Its failure is
+    # not a way to lose checks: they read an empty answer as "not docs-only".
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The test merge and its parents: the first parent is the PR's base.
+          fetch-depth: 2
+          persist-credentials: false
+      - id: classify
+        run: node .github/scripts/docs-only-change.mjs
+
   test:
-    name: "🧪 test (${{ matrix.os }})"
+    needs: changes
+    # !cancelled() and not the implicit success(): a failed or skipped `changes`
+    # must still run this job, or the required checks would never pass.
+    # No `name:` on this job: tests/docs-only-change.test.mjs asserts it is unset.
+    if: ${{ !cancelled() }}
     strategy:
       # One OS failing must not cancel the evidence from the others —
       # a platform-specific failure is exactly what this matrix exists to isolate.
@@ -35,14 +58,25 @@ jobs:
     # but its inline sections and the install steps have no limit of their
     # own. The slowest leg (macOS) takes about 11 minutes.
     timeout-minutes: 30
+    # A docs-only PR runs the suite on Ubuntu only (#6402). The other two legs
+    # stay in the matrix and skip their steps, because these three check names
+    # are required, and a job-level `if` cannot read `matrix` to skip just them.
+    # Ubuntu keeps the whole suite: about 45 test files read docs-type files, and
+    # the inline sections of test-all.mjs scan every tracked file.
+    env:
+      SKIP_LEG: ${{ needs.changes.outputs.docs_only == 'true' && matrix.os != 'ubuntu-latest' }}
     steps:
+      - name: Skip this leg (docs-only change)
+        if: env.SKIP_LEG == 'true'
+        run: echo "Docs-only change. The suite runs on the Ubuntu leg, so this leg has nothing to add."
       # The repo is committed with LF; Windows runners default to autocrlf,
       # which would rewrite every text file on checkout and make regexes that
       # rely on `.` (no \r) fail in ways the other platforms never see.
       - name: "🪟 Force LF checkout on Windows"
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && env.SKIP_LEG != 'true'
         run: git config --global core.autocrlf false
       - name: "⬇️ Checkout"
+        if: env.SKIP_LEG != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Test code must not find a token in .git/config.
@@ -56,16 +90,20 @@ jobs:
       # tests/node-floor.test.mjs fails if this drifts from NODE_MIN.
       # Bare name on purpose: tests/node-floor.test.mjs matches `- name: Set up the Node floor`.
       - name: Set up the Node floor (22.13) for syntax compatibility
+        if: env.SKIP_LEG != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.13'
       - name: "🧹 Lint (syntax check)"
+        if: env.SKIP_LEG != 'true'
         run: npm run lint
       - name: "🟢 Set up Node 24 for the test suite"
+        if: env.SKIP_LEG != 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: "🐹 Set up Go"
+        if: env.SKIP_LEG != 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: dashboard/go.mod
@@ -76,10 +114,13 @@ jobs:
       # download on three OSes would buy only the few suites that launch a
       # browser, and those skip here and run in the tool-suites job instead.
       - name: "📦 Install dependencies"
+        if: env.SKIP_LEG != 'true'
         run: npm install --ignore-scripts
       - name: "🧪 Run the test suite"
+        if: env.SKIP_LEG != 'true'
         run: node test-all.mjs --quick
       - name: "🐹 Go dashboard tests"
+        if: env.SKIP_LEG != 'true'
         run: go test ./...
         working-directory: dashboard
 
@@ -88,6 +129,11 @@ jobs:
     # Not a required check: a red run blocks nothing here (the fork has no
     # merge queue). It still runs on every push and PR, where a red result is
     # seen (#5723).
+    needs: changes
+    # Skipped for a docs-only PR too: nothing this job checks depends on what a
+    # docs file says (#6402). !cancelled() so that a failed `changes` still runs
+    # the job.
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     # About 3 minutes, image build included. Limited for the test job's reason.
     timeout-minutes: 20
@@ -137,6 +183,9 @@ jobs:
     # tool into a failure instead of a skip. A job of its own rather than a
     # step in cv-visual, so its result has its own check. Not a required
     # check.
+    needs: changes
+    # Skipped on a docs-only PR for the reason given on cv-visual.
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     # Image build plus the TeX bundle download. Limited for the test job's reason.
     timeout-minutes: 20
@@ -168,6 +217,9 @@ jobs:
             sh -c 'npm install --ignore-scripts --package-lock=false && node install-latex-engine.mjs && node test-all.mjs --needs browser,latex'
   upgrade-gate:
     name: "⬆️ Upgrade regression gate"
+    needs: changes
+    # Skipped on a docs-only PR for the reason given on cv-visual.
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     # About 3 minutes. Limited for the test job's reason.
     timeout-minutes: 20
@@ -208,6 +260,9 @@ jobs:
     # Informative by design: the root has no tracked lockfile (ranges resolve
     # at install time), so a newly published advisory in a third-party range
     # must not turn required checks red on unrelated PRs (#5897).
+    needs: changes
+    # Skipped on a docs-only PR for the reason given on cv-visual.
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
