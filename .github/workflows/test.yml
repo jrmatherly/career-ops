@@ -23,10 +23,11 @@ concurrency:
 jobs:
   changes:
     name: Classify the change
-    # Answers one question for the jobs below: does this PR change only docs?
+    # Answers one question for the jobs below: does this change touch only docs?
+    # Fork: it classifies a PR's test merge or a push's before..sha range.
     # A job of its own so that one diff decides for all of them. Its failure is
     # not a way to lose checks: they read an empty answer as "not docs-only".
-    if: github.event_name == 'pull_request'
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -38,7 +39,9 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - id: classify
-        run: node .github/scripts/docs-only-change.mjs
+        run: node .github/scripts/docs-only-push.mjs
+        env:
+          DOCS_ONLY_BEFORE: ${{ github.event.before }}
 
   test:
     needs: changes
