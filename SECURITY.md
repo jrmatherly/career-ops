@@ -4,7 +4,7 @@
 
 **Do NOT open a public issue for security vulnerabilities.**
 
-Instead, please email **support@matherly.net** with:
+Instead, use [GitHub's private vulnerability reporting](https://github.com/jrmatherly/career-ops/security/advisories/new) on this repository, or email **support@matherly.net**, with:
 
 1. Description of the vulnerability
 2. Steps to reproduce

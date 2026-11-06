@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Git commit-msg hook for this fork: the subject must be a Conventional Commit
-// with a scope (`fix(scan): …`), which release-please reads for the changelog.
+// with a scope (`fix(scan): …`), so a commit can be offered upstream, where
+// release-please reads it; the fork itself cuts no releases.
 // Merges, reverts and fixup!/squash! subjects pass. git merge runs this hook;
 // git cherry-pick does not, and --no-verify remains the escape.
 import { spawnSync } from 'node:child_process';

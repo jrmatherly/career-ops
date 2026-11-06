@@ -24,7 +24,8 @@ can't run inside the container at all.
 
 `.github/workflows/docker-image.yml` publishes `ghcr.io/jrmatherly/career-ops`
 (this `Dockerfile`, linux/amd64 and arm64) and `ghcr.io/jrmatherly/career-ops-cv-visual`
-(the CI rendering image) on every push to `main` that touches them. `docker compose pull`
+(the CI rendering image) on a push to `main` that touches them, on a `v*` tag, or by hand
+(`gh workflow run docker-image.yml --ref main`). `docker compose pull`
 fetches the dev image instead of building it; `./cops rebuild` still builds locally.
 The base image is Microsoft's Playwright image, pinned by digest in both Dockerfiles.
 
@@ -38,7 +39,7 @@ The base image is Microsoft's Playwright image, pinned by digest in both Dockerf
 ```bash
 # from project root
 ./cops up           # pulls ghcr.io/jrmatherly/career-ops:latest and starts the container (./cops rebuild builds locally)
-./cops doctor       # confirms node + playwright + chromium + go are present
+./cops doctor       # confirms node + playwright + chromium are present
 ```
 
 That's it. Container stays running in the background. Re-runs are instant.
@@ -120,6 +121,12 @@ Career-ops updates work the same as native:
 ./cops update:check
 ./cops update
 ```
+
+**Not on this fork's own checkout.** `./cops update` runs `update-system.mjs apply`,
+which replaces system files from upstream's release tarball and would freeze or
+overwrite the fork's deviations. In the checkout that develops this fork, sync
+through the `/upstream-review` skill instead (`.claude/skills/upstream-review/SKILL.md`).
+`./cops update` is fine inside a container that only runs the tool.
 
 If `package.json` deps change, run `./cops rebuild` once. It rebuilds the image
 and recreates the `node_modules` volume from it, so the container picks up the

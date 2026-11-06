@@ -1,5 +1,6 @@
 # CODEOWNERS — auto-requests maintainer review on sensitive paths.
-# Last matching pattern wins. See MAINTAINERS.md for the team and GOVERNANCE.md for the ladder.
+# Last matching pattern wins. MAINTAINERS.md and GOVERNANCE.md describe upstream's team and ladder;
+# see FORK.md for how this fork is run.
 #
 # Scope principle: gate what CI can't catch (a bad change here passes the
 # tests silently) + the catastrophic updater + governance docs. Code that
@@ -71,17 +72,15 @@
 /web/ @jrmatherly
 
 # ── Area owners ────────────────────────────────────────────────────────────
-# Not red lines: these are the day-to-day areas, routed to whoever has been
-# carrying them. Test-suite infrastructure and the Go dashboard both fall to
-# @jrmatherly, who built most of what is in them (the test-all split into
-# six suites, the provider-contract suites, and the dashboard's tracker work).
-# `test-all.mjs` itself stays out on purpose: it is the harness every other
-# check runs through, so it keeps the wider review.
+# Not red lines: these are the day-to-day areas. On this fork every area
+# routes to the fork owner; the code in them is upstream's, written by
+# upstream's contributors. `test-all.mjs` itself stays out on purpose: it is
+# the harness every other check runs through.
 /tests/     @jrmatherly
 /dashboard/ @jrmatherly
 # Scanner providers and their contract suites are one reviewable unit: the
 # module and its test land together, and the review that matters on a fetch
-# surface (host allowlisting, redirects, SSRF, parsing pinned with concrete
-# assertions) is the one he has been doing on every provider PR (2-sep).
+# surface is host allowlisting, redirects, SSRF, and parsing pinned with
+# concrete assertions.
 /providers/       @jrmatherly
 /tests/providers/ @jrmatherly

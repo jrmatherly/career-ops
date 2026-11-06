@@ -1,5 +1,11 @@
 # Maintainers
 
+> **This is a fork.** The people and process below are upstream's
+> ([career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops)),
+> kept here unchanged. `jrmatherly/career-ops` has one maintainer, no review
+> gate and no issue tracker; its `protect-main` ruleset only blocks deletion and
+> force-push. See [FORK.md](FORK.md).
+
 This file lists who maintains career-ops and how contributors grow into review and maintenance roles. It exists so the project doesn't depend on any single person and so the path forward is legible to everyone.
 
 ## Current maintainers

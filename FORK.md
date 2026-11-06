@@ -24,7 +24,15 @@ fails when a diverged path has no row in the table.
 
 ## Where to contribute
 
-Bug reports, features and pull requests go to
+Bug reports, features and pull requests for the product go to
 [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops).
-Issues and pull requests are not used on this fork. Security reports for the
-fork's own files follow [`SECURITY.md`](SECURITY.md).
+Issues and pull requests are not used on this fork, and `CONTRIBUTING.md`'s
+bots, `/assign` claims and adoption ladder run upstream only. A problem with
+something only this fork has (its hooks, workflows, GHCR images) goes to
+support@matherly.net. Security reports for the fork's own files follow
+[`SECURITY.md`](SECURITY.md).
+
+`MAINTAINERS.md`, `CONTRIBUTORS.md`, `SIGNATURES.md` and `HIRED.md` are
+upstream's ledgers, carried unchanged (plus a fork banner on the first) and
+refreshed only when upstream is merged in. Fork design notes live under
+`docs/superpowers/`.
