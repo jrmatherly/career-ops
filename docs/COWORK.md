@@ -32,7 +32,7 @@ Cowork mounts your career-ops folder and the agent reads the same instruction fi
 
 The zero-token scan needs outbound DNS and HTTPS to the job-board hosts. If the sandbox filters them, every company fails with `fetch failed`, so run `scan.mjs` through the local shell, as for Playwright (see the [FAQ](FAQ.md)).
 
-That Playwright caveat is the only real difference from the CLI experience. Two more small notes from verification: run `npm install` in a terminal before starting (Cowork's local shell can't reach npm), and if a stray `reports/.reserve-*` sentinel file survives a run (Cowork's file bridge can't delete files), it's harmless — the allocator garbage-collects stale sentinels after 4 hours.
+That Playwright caveat is the only real difference from the CLI experience. Two more small notes from verification: run `npm install` in a terminal before starting (Cowork's local shell can't reach npm), and if a stray `reports/NNN-RESERVED.md` sentinel file survives a run (Cowork's file bridge can't delete files), it's harmless — the allocator garbage-collects stale sentinels after 4 hours.
 
 ## Credit where due
 

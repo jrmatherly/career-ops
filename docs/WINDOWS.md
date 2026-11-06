@@ -107,7 +107,7 @@ Without it, PDF generation fails while every other part of the pipeline works â€
 
 ## 6. Skill entrypoints appear as plain text files
 
-Windows does not create symlinks by default, so the CLI skill entrypoints (`.claude/skills/`, `.opencode/skills/`, ...) check out as pointer files. This is handled automatically by the installer and updater â€” see [FAQ #1](FAQ.md). No `mklink` and no Developer Mode needed.
+Windows does not create symlinks by default, so the CLI skill entrypoints (`.claude/skills/`, `.opencode/skills/`, ...) check out as pointer files. `npx @santifer/career-ops init` repairs them, and on an existing checkout `node doctor.mjs` prints the repair command. See [FAQ #1](FAQ.md). No `mklink` and no Developer Mode needed.
 
 ## 7. Scheduling on Windows
 

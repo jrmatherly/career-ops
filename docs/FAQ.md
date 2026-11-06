@@ -6,11 +6,11 @@ Common questions from the community, answered in one place. For setup details se
 
 ## 1. Skills aren't loading on Windows — symlink error on install
 
-Windows does not create symlinks by default, so Git checks out the CLI skill entrypoints (`.claude/skills/`, `.opencode/skills/`, etc.) as plain pointer files instead of real symlinks. The installer and updater both detect this automatically: run `node update-system.mjs apply --confirm` (or `npx @santifer/career-ops init` on a fresh install) and the `materializeSkillEntrypoints` step will replace the pointer files with the full canonical skill content. From a linked Git worktree, `apply` makes this repair in your `main` checkout; run `git merge main` in the worktree to pick it up (new worktrees get it automatically). With `CAREER_OPS_UPDATE_IN_WORKTREE=1` set, `apply` repairs only that worktree's branch instead, and `main` stays unrepaired. No manual `mklink` or Developer Mode changes are needed.
+Windows does not create symlinks by default, so Git checks out the CLI skill entrypoints (`.claude/skills/`, `.opencode/skills/`, etc.) as plain pointer files instead of real symlinks. Run `node doctor.mjs`: it names the pointer files and prints a command that replaces them with the full canonical skill content, with no update needed. `npx @santifer/career-ops init` makes the same repair on a fresh install. `node update-system.mjs apply --confirm` makes it too, but only when an update is actually applied, so it does nothing for a checkout that is already up to date. From a linked Git worktree, `apply` makes this repair in your `main` checkout; run `git merge main` in the worktree to pick it up (new worktrees get it automatically). With `CAREER_OPS_UPDATE_IN_WORKTREE=1` set, `apply` repairs only that worktree's branch instead, and `main` stays unrepaired. No manual `mklink` or Developer Mode changes are needed.
 
 ## 2. What is the difference between `scan` and `scan:full`?
 
-`npm run scan` is the standard portal scanner — it reads the companies you have configured in `portals.yml`, hits their ATS APIs (Greenhouse, Ashby, Lever, PrevueAPS) directly, and consumes zero LLM tokens. Use it for your regular daily or weekly discovery run. `npm run scan:full` inverts the direction: instead of scanning only your curated list, it walks public ATS company directories. Pass `--history-seeds` when you also want it to derive board seeds from posting URLs already present in your local tracker and `data/scan-history.tsv`; those history files remain local and are read-only inputs. Fresh postings are still filtered through your `title_filter` / `location_filter`, so you catch roles from companies you haven't manually added to `portals.yml`. Run `scan:full` when you want broader discovery beyond your tracked list.
+`npm run scan` is the standard portal scanner — it reads the companies you have configured in `portals.yml`, hits their ATS APIs (Greenhouse, Ashby, Lever and many more; see [SUPPORTED_JOB_BOARDS.md](SUPPORTED_JOB_BOARDS.md)) directly, and consumes zero LLM tokens. Use it for your regular daily or weekly discovery run. `npm run scan:full` inverts the direction: instead of scanning only your curated list, it walks public ATS company directories. Pass `--history-seeds` when you also want it to derive board seeds from posting URLs already present in your local tracker and `data/scan-history.tsv`; those history files remain local and are read-only inputs. Fresh postings are still filtered through your `title_filter` / `location_filter`, so you catch roles from companies you haven't manually added to `portals.yml`. Run `scan:full` when you want broader discovery beyond your tracked list.
 
 ## 3. How do I avoid hitting token or rate limits during a batch run?
 
@@ -29,7 +29,9 @@ Yes — career-ops is fully AI-agnostic and works with any AI coding CLI or stan
 When the scanner shows a warning like:
 
 ```
-⚠ Possible cross-listing: Acme Corp / Senior AI Engineer ↔ TalentBridge / Senior AI Engineer (similarity 0.96)
+⚠️  Possible cross-listings (same JD text, different company) — warn only, nothing was dropped:
+  - TalentBridge — Senior AI Engineer
+    ≈ 96% of Acme Corp — Senior AI Engineer (seen 2026-10-01)
 ```
 
 it means the job description text of two listings from **different companies** is nearly identical — typically because a recruitment agency has re-posted a direct employer's role with the employer name removed or replaced.
@@ -42,11 +44,11 @@ it means the job description text of two listings from **different companies** i
 2. Choose ONE channel to apply through. Applying direct is usually safer; applying via an agency can be useful if the agency has a relationship with the hiring manager.
 3. If the two listings turn out to be genuinely different roles that happen to share boilerplate text (e.g. a generic engineering role template), the warning is a false positive — you can ignore it and apply to both.
 
-**Technical note:** the scanner computes a 64-bit SimHash fingerprint of each JD body and stores it in the 8th column of `data/scan-history.tsv` (`jd_fingerprint`). Fingerprints are computed locally from text already returned by the ATS API — no extra network request is made. Postings without a usable description never receive a fingerprint and are never flagged. See [docs/SCRIPTS.md](SCRIPTS.md#cross-listing-detection) for the full column reference.
+**Technical note:** the scanner computes a 64-bit SimHash fingerprint of each JD body and stores it in the 8th column of `data/scan-history.tsv` (`fingerprint`). Fingerprints are computed locally from text already returned by the ATS API — no extra network request is made. Postings without a usable description never receive a fingerprint and are never flagged. See [docs/SCRIPTS.md](SCRIPTS.md#cross-listing-detection) for the full column reference.
 
 ## 6. Can I use my own CV template?
 
-Yes. Set `cv.template` (and/or `cover_letter.template`) in `config/profile.yml` to the kebab-case name of a template file in `templates/` — a value of `modern` resolves to `templates/cv-template.modern.html` (cover letters use `templates/cover-letter-template.<name>.html`). Leave the field unset and career-ops falls back to the built-in default template (`templates/cv-template.html`). You can also pick a template per generation just by asking (e.g. "use the modern template"). See the commented `cv.template` / `cover_letter.template` fields in `config/profile.example.yml` for the full reference.
+Yes. Set `cv.template` (and/or `cover_letter.template`) in `config/profile.yml` to the kebab-case name of a template. Built-in names resolve from `templates/`, so a value of `modern` resolves to `templates/cv-template.modern.html` (cover letters use `cover-letter-template.<name>.html`). Put your own copy in `data/templates/cv-template.<name>.html`, not in `templates/`, which an update overwrites. Leave the field unset and career-ops falls back to the built-in default template (`templates/cv-template.html`). You can also pick a template per generation just by asking (e.g. "use the modern template"). See the commented `cv.template` / `cover_letter.template` fields in `config/profile.example.yml` for the full reference.
 
 ## Can every CV be one page?
 
@@ -91,7 +93,7 @@ From `templates/states.yml`: `Discarded` is "discarded by candidate or offer clo
 
 ## Is there only one CV template?
 
-No. `templates/` has `cv-template.html`, `cv-template.tex` (LaTeX/Overleaf), `cv-template.zh-minimal.html`, `resume-template.html`, `cover-letter-template.html`, plus `templates/sections/`. See also "Can I use my own CV template?" above.
+No. `templates/` has several HTML CV templates (`cv-template.<name>.html`), LaTeX/Overleaf templates (`cv-template.tex`, `cv-template.cjk.tex`), `resume-template.html`, `cover-letter-template.html`, plus `templates/sections/`. See also "Can I use my own CV template?" above.
 
 ## Why does Chrome open during some scans but not others?
 
@@ -111,7 +113,7 @@ No. Everything is files in your checkout, and there is no cloud component. Peopl
 
 ## How do I get an issue assigned to me?
 
-Comment on it and we'll assign it (this is in CONTRIBUTING.md). A PR with no prior issue is welcome for bug fixes, zero-auth scanner providers, docs and translations. Issue-first applies only to new features, new modes and architecture changes.
+Comment `/assign` on a `good first issue` and it is yours, with no maintainer step (see CONTRIBUTING.md). A PR with no prior issue is welcome for bug fixes, zero-auth scanner providers, docs and translations. Issue-first applies only to new features, new modes and architecture changes.
 
 ## Can I use career-ops without a terminal?
 

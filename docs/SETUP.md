@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- An AI coding CLI — [Claude Code](https://claude.ai/code), Codex, Qwen Code, OpenCode, Pi, Oh My Pi, GitHub Copilot CLI, Antigravity CLI, Grok Build CLI, or Hermes Agent (see [Supported CLIs](SUPPORTED_CLIS.md))
-- [Node.js](https://nodejs.org) 22.13+ and `git` (`npx` ships with Node — the installer refuses to run without them). 22.13 is the first release where `node:sqlite`, used by the tracker index (see [tracker](SCRIPTS.md#tracker)), needs no flag
+- An AI coding CLI, such as [Claude Code](https://claude.ai/code) or Codex. [Supported CLIs](SUPPORTED_CLIS.md) lists every one
+- [Node.js](https://nodejs.org) 22.13+ on the 22 line, or 23.4+, and `git` (`npx` ships with Node — the installer refuses to run without them). 22.13 and 23.4 are the first releases where `node:sqlite`, used by the tracker index (see [tracker](SCRIPTS.md#tracker)), needs no flag
 - (Optional) Go 1.26+ (for the dashboard TUI)
 
 ## Quick Start
@@ -58,7 +58,7 @@ npx @santifer/career-ops init
 
 ```bash
 cd career-ops
-claude   # or codex / qwen / opencode / agy / grok
+claude   # or the command for your CLI, see SUPPORTED_CLIS.md
 ```
 
 **On first launch, career-ops walks you through setup by chatting** — it asks for your CV, your details (name, target roles, salary), and sets up the job scanner with pre-configured companies. Nothing to edit by hand: just answer its questions. Then paste a job offer URL or description and it evaluates it, writes a report, generates a tailored PDF, and tracks it.
@@ -116,7 +116,7 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contribution guidelines a
 
 ### PDF rendering (one-time)
 
-PDFs are rendered with a headless Chromium. Install it once per machine:
+PDFs are rendered with a headless Chromium. `npm install` downloads it unless `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set. Run this only if that download failed:
 
 ```bash
 npx playwright install chromium
@@ -152,6 +152,7 @@ Set this flag **only when the configured proxy itself blocks connections to priv
 ## Verify Setup
 
 ```bash
+node doctor.mjs              # Check readiness (Node, dependencies, Chromium, skill entrypoints, your setup files)
 node cv-sync-check.mjs      # Check configuration
 node verify-pipeline.mjs     # Check pipeline integrity
 ```

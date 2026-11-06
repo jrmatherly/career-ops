@@ -10,17 +10,19 @@ Career-ops is AI-agnostic and runs on several command-line agent tools. The core
 | OpenCode | `OPENCODE.md` | Interactive: `opencode` (then `/career-ops`). Headless/Batch: `opencode run "prompt"` |
 | Pi | `AGENTS.md` | Interactive: `pi` (then `/skill:career-ops`). Headless/Batch: `pi -a -p "prompt"` |
 | Antigravity CLI | `AGENTS.md` | Interactive: `agy` (then `/career-ops`). Headless/Batch: `agy -p "prompt"` |
-| Grok Build CLI | `AGENTS.md` | Interactive: `grok` (then `/career-ops`). Headless/Batch: `grok -p "prompt"` (add `--yolo` to auto-approve tool executions) |
-| Qwen | `AGENTS.md` | Interactive: `qwen`. Headless/Batch: `qwen -p "prompt"` |
-| Kimi | `KIMI.md` | Interactive: `kimi` |
+| Grok Build CLI | `AGENTS.md` | Interactive: `grok` (then `/career-ops`). Headless/Batch: `grok -p "prompt"`. A blanket auto-approve flag grants every tool, so a headless worker needs its own permission handling (see "Headless worker permissions" in `AGENTS.md`) |
+| Qwen | `AGENTS.md` | Interactive: `qwen` (the career-ops skill is discovered from `.qwen/skills/career-ops/`). Headless/Batch: `qwen -p "prompt"` |
+| Kimi | `KIMI.md` | Interactive: `kimi` (the career-ops skill is discovered from `.kimi/skills/career-ops/`) |
 | GitHub Copilot CLI | `AGENTS.md` | Headless/Batch: `copilot -p "prompt"` |
 | Gemini | `GEMINI.md` | Legacy wrapper redirecting to `AGENTS.md` (transitioned to Antigravity CLI). |
 | Hermes Agent | `AGENTS.md` | Interactive: `hermes` (then ask for a career-ops task). Web read-only workers: `hermes chat -q "prompt" --oneshot -Q --no-restore-cwd`. Batch ranking: unsupported. |
 | Oh My Pi | `.omp/AGENTS.md` | Interactive: `omp` (then `/skill:career-ops`). Headless/Batch: `omp -p "prompt"` |
 
+Record the CLI you use with `node remember-cli.mjs <cli>`, so `doctor.mjs`, `rank-pipeline.mjs` and the web UI use it. Accepted ids: `claude`, `codex`, `opencode`, `pi`, `antigravity` (not `agy`), `grok`, `qwen`, `kimi`, `copilot`, `gemini`, `hermes`, `omp`.
+
 ## Hermes Agent
 
-Hermes runs the same pipeline as every other CLI here. Trust the checkout once with `hermes skills trust` before interactive use. The web UI uses Hermes's one-shot mode (`hermes chat -q ... --oneshot -Q --no-restore-cwd`) only for explicitly non-writing workers; evaluation and portal-repair workers reject it because no verified Hermes permission adapter exists. Batch ranking does not support Hermes. Hermes project-context scanning still applies; see [`docs/HERMES.md`](HERMES.md) for its rules and limitations.
+Hermes runs the same pipeline as every other CLI here. Trust the checkout once with `hermes skills trust` before interactive use. The web UI uses Hermes's one-shot mode (`hermes chat -q ... --oneshot -Q --no-restore-cwd`) only for workers that do not write. Evaluate, research, PDF and cover workers accept it. Write-capable workers (today `fix-portal`) refuse it because no verified Hermes permission adapter exists. Batch ranking does not support Hermes. Hermes project-context scanning still applies; see [`docs/HERMES.md`](HERMES.md) for its rules and limitations.
 
 ## Pi
 

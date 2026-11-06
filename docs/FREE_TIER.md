@@ -50,7 +50,7 @@ limits (subject to change):
 | Output tokens       | ~100 K                 |
 
 Limits reset at midnight Pacific Time. If you hit a cap the CLI returns
-a rate-limit error; career-ops will pause and suggest retrying tomorrow.
+a rate-limit error. Rerun after the reset.
 
 ## Batch Mode Behavior
 
@@ -61,16 +61,15 @@ a rate-limit error; career-ops will pause and suggest retrying tomorrow.
   agy -p "evaluate <URL>"
   ```
 
-- With free-tier limits, keep `--parallel 1` to avoid burning through
-  your daily quota on parallel requests.
-- Large batches (50+ offers) will likely span multiple days. Use
-  `--start-from` to resume where you left off.
+- Large batches (50+ offers) will likely span multiple days. Run a few
+  offers per day. `--parallel 1` and `--start-from` are `batch-runner.sh`
+  flags and do not apply to `agy` workers run by hand.
 
 ## What Works Without Paying
 
 | Feature                 | Free tier | Notes                            |
 |-------------------------|-----------|----------------------------------|
-| Offer evaluation (A-F)  | ✅        | Full scoring pipeline            |
+| Offer evaluation (A-G)  | ✅        | Full scoring pipeline            |
 | Report generation (.md) | ✅        | Markdown reports                 |
 | Portal scanning         | ✅        | Zero-token — hits APIs directly  |
 | PDF generation          | ✅        | Uses local Playwright, no tokens |

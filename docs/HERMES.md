@@ -18,7 +18,7 @@ cd career-ops
 npm install
 ```
 
-Optional, only needed if you want the generated CV and cover letter PDFs:
+`npm install` also downloads Chromium, which the CV and cover letter PDFs need. Run this only if that download failed:
 
 ```bash
 npx playwright install chromium
@@ -61,7 +61,7 @@ Once you are in the folder, plain language is enough:
 
 | You say | What happens |
 |---|---|
-| "evaluate this posting: <link>" | Full A–H evaluation of the posting against `cv.md`, written to `reports/`, plus a row in the tracker |
+| "evaluate this posting: <link>" | A–G evaluation (plus H for strong matches) of the posting against `cv.md`, written to `reports/`, plus a row in the tracker |
 | "scan for new jobs" | Runs the zero-token portal scanner. Needs `portals.yml` to exist |
 | "tailor my resume for report 001" | Builds a CV aimed at that posting and renders it to PDF |
 | "write a cover letter for #1" | Drafts the letter from the evaluation report |
@@ -105,7 +105,7 @@ The web UI can run Hermes in one-shot mode for explicitly non-writing workers:
 hermes chat -q "<prompt>" --oneshot -Q --no-restore-cwd
 ```
 
-This returns one plain-text answer without resuming an unrelated session. The worker inherits Hermes's configured tools, approvals, memory, and project-context rules. In the web UI, Hermes is supported only for explicitly non-writing workers such as research and PDF drafting; career-ops rejects Hermes for evaluation and portal-repair workers because no verified Hermes permission adapter exists. Hermes is not supported by batch ranking (`--cli hermes` exits with an error); batch ranking remains a separate workflow and writes only its own guarded annotations. Do not use Hermes for unattended mutation workflows.
+This returns one plain-text answer without resuming an unrelated session. The worker inherits Hermes's configured tools, approvals, memory, and project-context rules. In the web UI, Hermes is supported only for workers that do not write: evaluate, research, PDF and cover. career-ops refuses Hermes for write-capable workers (today `fix-portal`) because no verified Hermes permission adapter exists. Hermes is not supported by batch ranking (`--cli hermes` exits with an error); batch ranking remains a separate workflow and writes only its own guarded annotations. Do not use Hermes for unattended mutation workflows.
 
 The interactive workflow remains available for tasks that benefit from session continuity.
 
@@ -120,4 +120,4 @@ The interactive workflow remains available for tasks that benefit from session c
 
 ## What the agent will never do
 
-career-ops prepares, you decide. No Hermes session will submit an application, send an email, or click anything on your behalf.
+career-ops prepares, you decide. No Hermes session will submit an application or send an email for you. It stops before Submit.
