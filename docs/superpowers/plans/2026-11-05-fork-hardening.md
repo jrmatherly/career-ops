@@ -33,7 +33,7 @@
 
 ## Bundle A: safety
 
-### Task A1: Protect `main` against force-push and deletion (finding 1)
+### Task 1 (A1): Protect `main` against force-push and deletion (finding 1)
 
 **Files:**
 - Modify: nothing in the repo. GitHub repo setting via `gh api`.
@@ -73,7 +73,7 @@ git add .claude/skills/upstream-review/SKILL.md
 git commit -m "docs(fork): record the protect-main ruleset"
 ```
 
-### Task A2: Grade only new additions in the pre-commit guard (finding 2, 19)
+### Task 2 (A2): Grade only new additions in the pre-commit guard (finding 2, 19)
 
 **Files:**
 - Modify: `.githooks/pre-commit.mjs:11` (`ignoredStagedFiles`)
@@ -135,7 +135,7 @@ git add .githooks/pre-commit.mjs tests/claude-hooks.test.mjs .claude/rules/dev-w
 git commit -m "fix(hooks): grade only newly added files in the pre-commit user-layer guard"
 ```
 
-### Task A3: Make the rules file say what is true (findings 3, 8, and the worktree-wide syntax check)
+### Task 3 (A3): Make the rules file say what is true (findings 3, 8, and the worktree-wide syntax check)
 
 **Files:**
 - Modify: `.claude/rules/dev-workflow.md:6,10` and append one bullet.
@@ -166,7 +166,7 @@ git add .claude/rules/dev-workflow.md
 git commit -m "docs(fork): ban the updater in dev-workflow.md and correct the local-paths rule"
 ```
 
-### Task A4: Set `core.hooksPath` in the local scope, say when it shadows a global one, warn on a foreign local value (finding 9, 19)
+### Task 4 (A4): Set `core.hooksPath` in the local scope, say when it shadows a global one, warn on a foreign local value (finding 9, 19)
 
 **Files:**
 - Modify: `.claude/hooks/session-start.mjs:13-19`
@@ -227,7 +227,7 @@ git add .claude/hooks/session-start.mjs tests/claude-hooks.test.mjs
 git commit -m "fix(hooks): set core.hooksPath locally even under a global one, warn on a foreign local value"
 ```
 
-### Task A5: Run the user-layer guard on pushes to `main` (finding 7)
+### Task 5 (A5): Run the user-layer guard on pushes to `main` (finding 7)
 
 **Files:**
 - Modify: `.github/workflows/no-user-data.yml:14-16` (triggers) and `:36-40` (file listing)
@@ -277,7 +277,7 @@ git commit -m "ci(no-user-data): guard pushes to main, not only pull requests"
 
 ## Bundle B: upstream-sync machinery
 
-### Task B1: Make `--github` report on `main` (finding 4)
+### Task 6 (B1): Make `--github` report on `main` (finding 4)
 
 **Files:**
 - Modify: `.claude/skills/upstream-review/scripts/upstream-review.sh:119-120`
@@ -306,7 +306,7 @@ git add .claude/skills/upstream-review/scripts/upstream-review.sh
 git commit -m "fix(upstream-review): print the main compare line when run from main"
 ```
 
-### Task B2: Make `--advance` and the watermark write safe, and the header true (finding 5)
+### Task 7 (B2): Make `--advance` and the watermark write safe, and the header true (finding 5)
 
 **Files:**
 - Modify: `.claude/skills/upstream-review/scripts/upstream-review.sh:36,143-149,154-165`
@@ -362,7 +362,7 @@ git add .claude/skills/upstream-review/scripts/upstream-review.sh tests/upstream
 git commit -m "fix(upstream-review): refuse backward or unlogged advances, write the watermark atomically"
 ```
 
-### Task B3: Keep the deviations table honest with a test (finding 6, 21)
+### Task 8 (B3): Keep the deviations table honest with a test (finding 6, 21)
 
 **Files:**
 - Create: `tests/fork-deviations-covered.test.mjs`
@@ -410,7 +410,7 @@ git commit -m "test(fork): fail when the deviations table misses an upstream dif
 
 ## Bundle C: hygiene
 
-### Task C1: Test the Go floor CI installs (finding 10)
+### Task 9 (C1): Test the Go floor CI installs (finding 10)
 
 **Files:**
 - Modify: `.github/workflows/test.yml:74`, `.github/workflows/copilot-setup-steps.yml:35`
@@ -420,7 +420,7 @@ git commit -m "test(fork): fail when the deviations table misses an upstream dif
 - [ ] **Step 3: Verify, live.** After push, the `test (ubuntu-latest)` job log shows `go version go1.26`.
 - [ ] **Step 4: Commit.** `git commit -m "ci(test): install the Go floor from go.mod"`
 
-### Task C2: Tell visitors this is a fork (findings 11, 15)
+### Task 10 (C2): Tell visitors this is a fork (findings 11, 15)
 
 **Files:**
 - Create: `FORK.md`
@@ -431,7 +431,7 @@ git commit -m "test(fork): fail when the deviations table misses an upstream dif
 - [ ] **Step 3: Verify, unit.** Run: `node validate-system-paths-coverage.mjs && git check-ignore -v .claude/skill-stack.json | grep -q '^.gitignore' && node tests/fork-deviations-covered.test.mjs`. Expected: OK, a `.gitignore:` line, all `✅`.
 - [ ] **Step 4: Commit.** `git commit -m "docs(fork): add FORK.md and ignore the generated skill-stack files"`
 
-### Task C3: CI and image hardening (findings 12, 13, 14, 16, 20)
+### Task 11 (C3): CI and image hardening (findings 12, 13, 14, 16, 20)
 
 **Files:**
 - Modify: `.github/workflows/codeql.yml:27`, `.github/workflows/docker-image.yml:77-86`, `.github/workflows/test.yml:9-12`, `.github/CODEOWNERS:14-16`, `DOCKER.md:40`, SKILL.md row 117 and row 123
@@ -445,7 +445,7 @@ git commit -m "test(fork): fail when the deviations table misses an upstream dif
 - [ ] **Step 7: Verify, live.** After push: CodeQL run shows three analyses (`gh api 'repos/jrmatherly/career-ops/code-scanning/analyses?per_page=3' --jq '.[].category'` includes `/language:actions`); `docker buildx imagetools inspect ghcr.io/jrmatherly/career-ops:latest --format '{{json .SBOM}}'` is not `{}`.
 - [ ] **Step 8: Commit.** `git commit -m "ci(fork): scan workflows with CodeQL, attest SBOM and provenance, drop the dead merge_group trigger"`
 
-### Task C4: Enforce the commit convention and fix pr-ready (findings 17, 18)
+### Task 12 (C4): Enforce the commit convention and fix pr-ready (findings 17, 18)
 
 **Files:**
 - Create: `.githooks/commit-msg`, `.githooks/commit-msg.mjs`

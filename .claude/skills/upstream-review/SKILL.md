@@ -121,6 +121,7 @@ A new deviation gets a row here; a SKIP revert gets a row with the upstream SHA;
 | `SECURITY.md`, `.github/SECURITY.md`, `SUPPORT.md`, `CODE_OF_CONDUCT.md` route reports to `hi@santifer.io` | `support@matherly.net`; SECURITY.md also points shared-code issues at upstream's policy and credits in the commit, not release notes | landed 2026-11-05 | Contact lines only; an upstream rewording of the surrounding text is ADOPT, keep our address. `TRADEMARK.md`, `funding.json`, `package.json` author and the plugin manifests keep upstream's contact: they name the author and trademark owner, not this fork's maintainer. |
 | `FUNDING.yml` → upstream Open Collective | comment-only | landed 2026-11-05 | File kept because `test-all.mjs` lists it. |
 | root `Dockerfile` base image by tag; compose image `career-ops:local`; no registry | base pinned by digest (`mcr.microsoft.com/playwright:v1.64.1-jammy@sha256:a3966b65…`); compose `image: ghcr.io/jrmatherly/career-ops:latest` (still builds locally); `docker-image.yml` publishes both images to GHCR | landed 2026-11-05 | No Docker Hub anywhere upstream; the base is Microsoft's registry and stays. An upstream Playwright version bump touches the `FROM` line (`~`): take the new tag, re-resolve the digest with `docker buildx imagetools inspect`. |
+| no rulesets | branch ruleset `protect-main` blocks deletion and force-push on `main`, nothing else | landed 2026-11-05 | Repo setting, not a file; `gh api repos/jrmatherly/career-ops/rulesets`. Direct pushes still work. |
 
 ## Decision log template
 
