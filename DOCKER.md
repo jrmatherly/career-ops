@@ -37,7 +37,7 @@ The base image is Microsoft's Playwright image, pinned by digest in both Dockerf
 
 ```bash
 # from project root
-./cops up           # builds image (first run takes a few minutes) and starts container
+./cops up           # pulls ghcr.io/jrmatherly/career-ops:latest and starts the container (./cops rebuild builds locally)
 ./cops doctor       # confirms node + playwright + chromium + go are present
 ```
 

@@ -80,6 +80,8 @@ jobs:
           file: ${{ matrix.file }}
           platforms: ${{ matrix.platforms }}
           push: true
+          provenance: mode=max
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}

@@ -11,9 +11,9 @@
 # so the list broadens for the first time. The split is deliberate: the blocks
 # below stay single-owner because they are the ones CI cannot catch and where
 # a quiet mistake is expensive; the areas at the bottom move to the person who
-# has been their de facto expert for months. Area ownership routes review, it
-# does not bypass it: branch protection still requires an approval on every
-# PR, for every owner, including this file's.
+# has been their de facto expert for months. Area ownership routes review;
+# nothing enforces it on this fork (no branch protection beyond the
+# protect-main ruleset, which only blocks deletion and force-push).
 
 # Repo docs & governance
 /README*.md            @jrmatherly
