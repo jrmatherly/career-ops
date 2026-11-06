@@ -116,8 +116,8 @@ github_view() {
   our_repo="${origin#https://github.com/}"; our_repo="${our_repo#git@github.com:}"; our_repo="${our_repo%.git}"
   branch="$(g rev-parse --abbrev-ref HEAD)"
   echo "GitHub fork compare (counts commits, not patches: a cherry-pick still reads as behind until merged)"
-  for ref in main "$branch"; do
-    [ "$ref" = main ] && [ "$branch" = main ] && continue
+  refs=main; [ "$branch" = main ] || refs="main $branch"
+  for ref in $refs; do
     printf '  %-28s ' "$UP_REPO:$BRANCH...$ref"
     gh api "repos/$our_repo/compare/${UP_REPO%%/*}:$BRANCH...$ref" \
       --jq '"status=\(.status) ahead_by=\(.ahead_by) behind_by=\(.behind_by)"' 2>/dev/null || echo "(compare failed; branch not pushed?)"
