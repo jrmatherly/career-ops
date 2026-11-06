@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 22+ `.mjs` scripts and `node:test`-free suite files under `tests/` (the `pass`/`fail` helpers from `tests/helpers.mjs`), bash for `upstream-review.sh`, GitHub Actions YAML, `gh` CLI for repo settings.
 
-**Spec:** `docs/superpowers/specs/2026-11-05-fork-hardening-audit.md` (finding numbers below refer to its table).
+**Spec:** `docs/superpowers/specs/completed/2026-11-05-fork-hardening-audit.md` (finding numbers below refer to its table).
 
 ## Global Constraints
 
