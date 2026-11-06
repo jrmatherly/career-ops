@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Analyse the **interviewer's side** of session transcripts to surface structural red flags about a company before the candidate accepts an offer or re-applies. Complements `patterns` (tracker-level win/loss) and `#960` / `realign-targeting` (candidate-side answer clustering).
+Analyse the **interviewer's side** of session transcripts to surface structural red flags about a company before the candidate accepts an offer or re-applies. Complements `patterns` (tracker-level win/loss, and matching interview answers to best-fit roles).
 
 This mode answers: *"Even if I win this process — is this company safe to join?"*
 
@@ -28,27 +28,23 @@ Expected transcript filename convention (from #956):
 Check: does `interview-prep/sessions/` contain at least **1** file?
 
 If not:
-> "No session transcripts found yet. Run `/career-ops interview` on a role after your next interview to generate a debrief, then come back to check for red flags."
+> "No session transcripts found yet. Run `/career-ops interview/debrief` after your next interview to generate a debrief, then come back to check for red flags."
 
 Exit gracefully.
 
 ## Step 1 — Discover Sessions
 
-List all `.md` files in `interview-prep/sessions/`. Parse each filename using the `YYYY-MM-DD` date segment as the anchor:
+List all `.md` files in `interview-prep/sessions/`. Read `company`, `role`, `round` and `date` from each file's YAML front matter, the fields `weekly-digest.mjs` reads (see `interview-prep/sessions/README.md`). Fall back to the filename only for a file with no parseable front matter:
 
 ```
 {company-slug}-{role-slug}-{round}-{YYYY-MM-DD}.md
-         ↑            ↑        ↑          ↑
- everything     segment    round      date anchor
- before round   immediately label      (trailing)
-                before round
 ```
 
 - `YYYY-MM-DD` is the anchor — find the date, work left from it.
-- `round` = segment immediately before the date anchor.
+- `round` = the longest value from the README's round enum that ends the segment before the date. Rounds can be hyphenated (`hiring-manager`, `system-design`), so splitting on the last hyphen alone reads `hiring-manager` as round `manager`.
 - `company+role` = everything before `round`.
 
-Example: `acme-corp-swe-hr-2024-01-15.md` → company=`acme-corp`, role=`swe`, round=`hr`, date=`2024-01-15`.
+Example: `acme-corp-swe-hiring-manager-2024-01-15.md` → company=`acme-corp`, role=`swe`, round=`hiring-manager`, date=`2024-01-15`.
 
 Group files by `{company-slug}`. For each company group, note:
 - Number of rounds on file
@@ -74,7 +70,7 @@ Record which signals are present per session. Do not infer — only flag what is
 
 ## Step 2b — Detect Scope/Compensation Mismatch (requires JD text)
 
-This is a **separate, fifth dimension** — distinct from the four interviewer-behaviour signals above. It doesn't measure how the interviewer conducted the session; it measures whether what they *asked about* matches what the company *posted and priced* the role at. It only runs if the user has supplied the original JD text (see Inputs). If not supplied, skip this step entirely — it does not block or degrade Steps 2–6.
+This is a **separate, unscored dimension** — distinct from the four interviewer-behaviour signals above and from the fifth scored signal in Step 2c. It doesn't measure how the interviewer conducted the session; it measures whether what they *asked about* matches what the company *posted and priced* the role at. It only runs if the user has supplied the original JD text (see Inputs). If not supplied, skip this step entirely — it does not block or degrade Steps 2–6.
 
 Check, per session:
 
@@ -266,6 +262,6 @@ Company          Rounds   Level
 - **No new dependencies** — prompt-level analysis over local files.
 - **Privacy** — reads only local, gitignored session files. Nothing leaves the machine.
 - **Not a Glassdoor replacement** — analyses this candidate's live experience in this process, not crowd-sourced opinion.
-- **Candidate-side analysis is out of scope** — use `realign-targeting` (#960) for that.
+- **Candidate-side analysis is out of scope** — use `patterns` (matching interview answers to best-fit roles) for that.
 - **Protected-grounds detection (Step 2c) is not legal advice** — a private post-interview awareness aid. It never drafts complaints, never asserts violations, never contacts anyone, and never infers interviewer sentiment or intent — topic match + verbatim quote + legal context from `templates/protected-grounds.yml` only. Transcript analysis only, consistent with this mode's existing design — no live-interview interruption. Jurisdictions without a table row are skipped, never guessed.
 - **Scope/Compensation Mismatch (Step 2b) is descriptive, not actionable-in-the-moment** — by the time it's detected, the interview that produced it is already over, so it can't protect the candidate in that specific round. It's written to the company-level file as a record: if a later round with the same company happens, or the candidate considers re-applying, this is the place to check first. It is not fed automatically into `interview-prep/{company}-{role}.md` or any future prep step — the candidate re-reads it manually, the same way every other output of this mode is advisory-only.

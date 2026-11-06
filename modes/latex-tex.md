@@ -37,7 +37,7 @@ latex:
 **Locked Sections:** If `cv.locked_sections` is defined in `profile.yml`, NEVER remove, shorten, or paraphrase those sections during CV generation or tailoring. They must appear verbatim. (Note: Programmatic validation of locked sections is enforced in the HTML/PDF pipeline; it is not yet covered in the LaTeX pipeline.)
 
 1. Resolve source `.tex` path (see above)
-2. Run: `node extract-latex-content.mjs <source.tex> --out /tmp/cv-slots-{company}.json`
+2. Run: `node extract-latex-content.mjs <source.tex> --out /tmp/cv-slots[-{report}]-{company}.json`
 3. If `supported: false` → show `error` + `hint`; do not proceed
 4. Read JD (from context, report, or ask user)
 5. Tailor **only** the `slots[].text` values for JD fit (same ethics as `modes/latex.md` / `pdf`):
@@ -45,7 +45,7 @@ latex:
    - Reorder bullets by relevance (reorder patch list order if needed; patch ids stay stable)
    - Inject keywords into existing achievements — **NEVER invent skills**
    - If `cv.md` exists, cross-check claims against it; omit anything not backed by in-scope sources
-6. Write patches file:
+6. Write the patches file to `/tmp/cv-patches[-{report}]-{company}.json` (include `-{report}` whenever a report number exists, as in `modes/latex.md` step 11):
 
 ```json
 {
@@ -56,8 +56,8 @@ latex:
 }
 ```
 
-7. Run: `node patch-latex-content.mjs <source.tex> /tmp/cv-patches-{company}.json output/cv-{candidate}-{company}-{YYYY-MM-DD}.tex`
-8. Run: `node generate-latex.mjs output/cv-{candidate}-{company}-{YYYY-MM-DD}.tex output/cv-{candidate}-{company}-{YYYY-MM-DD}.pdf --compile-only --source <source.tex>`
+7. Run: `node patch-latex-content.mjs <source.tex> /tmp/cv-patches[-{report}]-{company}.json output/cv-{candidate}[-{report}]-{company}-{YYYY-MM-DD}.tex`
+8. Run: `node generate-latex.mjs output/cv-{candidate}[-{report}]-{company}-{YYYY-MM-DD}.tex output/cv-{candidate}[-{report}]-{company}-{YYYY-MM-DD}.pdf --compile-only --source <source.tex>`
    - This runs the CV fact gate on the patched `.tex` before compiling, when `cv.md` exists. `--source <source.tex>` counts the user's own hand-tuned `.tex` as evidence alongside `cv.md` and `article-digest.md`, since it is user-authored. A blocked document is not compiled; the JSON report carries `factCheck.verdict: "block"` and the unsupported claims. Fix the patch text and re-run steps 7–8. Never pass `--skip-fact-check` unless the user explicitly asks for it.
 9. Report: family, slot count, patched count, `.tex` path, `.pdf` path (or compile error)
 
@@ -84,4 +84,4 @@ Same as `modes/latex.md` and `modes/pdf.md`:
 | Mode | Input | Output |
 |------|-------|--------|
 | `latex` | `cv.md` | career-ops `templates/cv-template.tex` → `.tex` + PDF |
-| `latex-tex` | user's `resume.tex` | same template shape, tailored prose only → `.tex` + PDF |
+| `latex-tex` | user's `resume.tex` | the user's own layout, tailored prose only → `.tex` + PDF |

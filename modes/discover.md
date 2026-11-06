@@ -3,8 +3,9 @@
 ## Purpose
 
 Take a list of companies and resolve each to a scannable ATS board by probing
-the public JSON APIs career-ops already supports — Greenhouse, Ashby, Lever, and
-Workday — via the existing `providers/` layer. Zero LLM tokens, zero auth. A
+the public JSON APIs career-ops already supports — Greenhouse, Ashby, Lever, a
+long tail of slug vendors (see `--vendors` below), and Workday from a hint — via
+the existing `providers/` layer. Zero LLM tokens, zero auth. A
 company "resolves" when a vendor's board exists AND currently lists ≥1 job.
 Confirmed entries are appended to `portals.yml` `tracked_companies` (deduped,
 idempotent, comment-preserving). Companies that don't resolve — JS-rendered
@@ -110,9 +111,10 @@ Parse the JSON envelope:
 
 | Key | Contents |
 |-----|----------|
-| `metadata` | Counts (`resolved`, `unresolved`, `duplicatesSkipped`, `fresh`, `freshWritten`), `written` flag, `previewOnly`, `portalsPath`, `warnings` |
+| `metadata` | Counts (`resolved`, `unresolved`, `duplicatesSkipped`, `blacklistedSkipped`, `fresh`, `freshWritten`), `written` flag, `previewOnly`, `portalsPath`, `warnings` |
 | `resolved` | Per company: `name`, `vendor`, `slug`, `careers_url`, `api` (Greenhouse only), `provider` (Workday only), `jobCount` |
 | `unresolved` | Per company: `name`, `triedVendors`, `reason`, and (when present) `emptyBoards`, `errors`, `skippedUnsafeSlug`, `unsupportedSlugShape`, `website` |
+| `blacklisted` | Per company skipped by `data/blacklist.md`: `name`, `entry`, `reason` |
 | `pendingEntries` | The rendered YAML block — present whenever nothing was written (i.e. on a preview run, the default) so the user can paste it manually |
 
 **Default is preview.** Always show the user the `pendingEntries` / resolved
@@ -125,7 +127,9 @@ careers_url) and the unresolved list with reasons. Call out:
 
 - **Empty-but-live boards** (`emptyBoards`): the board exists but lists 0 jobs
   right now. Not written by default (the goal is boards with open roles). Offer
-  to re-run later, or force-add if they want it tracked regardless.
+  to re-run later. If they want it tracked regardless, add its `emptyBoards`
+  `careers_url` to `portals.yml` by hand once they confirm: discover-ats has no
+  flag that writes an empty board.
 - **Workday**: if a company you know uses Workday came back unresolved with the
   "add a hint" reason, grab its careers URL (one click from the company's jobs
   page → the `<tenant>.wd<N>.myworkdayjobs.com/<site>` address bar) and add it as

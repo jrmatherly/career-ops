@@ -25,7 +25,7 @@ Each worker is a headless child process with a clean 200K token context. The con
 
 Read `spend_tier` from `config/profile.yml` (see `modes/_shared.md` -- Spend Tier section; defaults to `standard` if absent).
 
-- **`standard` or `premium` tier:** Before a worker runs the full A-F evaluation on a JD, run a cheap pre-screen pass using the tier's economy-equivalent model (see the mapping table in `modes/_shared.md`) against the candidate's North Star archetypes (`modes/_profile.md`). If the JD is an obvious mismatch (wrong domain, wrong seniority band, disqualifying location/visa conflict), skip the full evaluation: mark the job `skipped` in `batch-state.tsv` with a one-line reason, and move to the next job.
+- **`standard` or `premium` tier:** This gate is a conductor step (Mode A). `batch-runner.sh` (Mode B) runs no pre-screen: its only `skipped` rows come from a dealbreaker hit and `--min-score` (see the discard log below). Before a worker runs the full A-F evaluation on a JD, the conductor runs a cheap pre-screen pass using the tier's economy-equivalent model (see the mapping table in `modes/_shared.md`) against the candidate's North Star archetypes (`modes/_profile.md`). If the JD is an obvious mismatch (wrong domain, wrong seniority band, disqualifying location/visa conflict), skip the full evaluation: mark the job `skipped` in `batch-state.tsv` with a one-line reason, and move to the next job.
 - **`economy` tier:** No gate. The tier is already the cheapest available -- running a pre-screen on top of it adds latency without saving spend. Every job goes straight to the full evaluation.
 - This gate only applies to batch/pipeline processing. It never applies to a single interactive evaluation (the user already decided the JD is worth a look by pasting/sharing it).
 
@@ -106,8 +106,13 @@ Options:
 - `--resume-paused` — resume jobs paused after a Claude session/rate limit
 - `--start-from N` — start from ID N
 - `--limit N` — max number of jobs to process in this run (positive integer; `0` is rejected, omit the flag for no limit)
-- `--parallel N` — N workers in parallel (`claude` only; other CLIs always use one worker)
+- `--parallel N` — N workers in parallel (`claude` only, default 3; other CLIs always use one worker)
 - `--max-retries N` — attempts per job (default: 2)
+- `--min-score N` — record jobs scoring below N as `skipped`, not completed (default: 0 = off)
+- `--skip-pdf` — skip PDF generation (PDF ❌ in the tracker)
+- `--model NAME` — model for the worker CLI
+- `--status` — show batch progress and a per-job table, then exit
+- `batch/batch-runner.sh --help` lists the rest (`--company`, `--mode`, `--worker-timeout`, `--thin-action`, `--watch`, …)
 - `--rate-limit-sleep N` — seconds to wait before retrying a transient rate-limited worker (default: 300; use 0 to pause the batch immediately)
 
 ## batch-state.tsv Format

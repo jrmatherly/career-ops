@@ -14,9 +14,10 @@ searching for yet — then, only after explicit confirmation, writes the accepte
 keywords into `title_filter.positive` so the very next `scan` casts the wider net.
 
 **Adding is not enough on its own.** A list that can only grow keeps whatever
-it started as, and on day zero it starts as `templates/portals.example.yml` —
-37 keywords describing the market the tool was built for, copied because
-`doctor` says to copy them. Nothing downstream can then tell "the user chose
+it started as. Onboarding writes it through `onboard-write.mjs` from the roles
+the user named, but a `portals.yml` copied by hand from
+`templates/portals.example.yml` starts with 37 keywords describing the market
+the tool was built for. Nothing downstream can then tell "the user chose
 these" from "the user never looked", and the wrong ones survive every future
 run of this mode. So this mode can also propose REMOVALS, under the rules in
 *Retiring a keyword* below. The user confirms both halves of the diff; nothing
@@ -71,10 +72,12 @@ list — this system optimizes for quality, not quantity.
 ## Filters (apply BEFORE showing suggestions)
 
 1. **Dedup against existing coverage.** Mirror the matcher semantics in
-   `scan.mjs` (`buildTitleFilter` / `compileKeyword`): the scanner lowercases
-   both sides and keeps a job when any positive keyword is a
-   case-insensitive substring of the title (2–3 letter keywords match on word
-   boundaries instead). So drop any candidate title that an existing positive
+   `title-keywords.mjs` (`buildTitleFilter` / `compilePositiveKeyword`, which
+   `scan.mjs` uses): the scanner lowercases both sides and keeps a job when any
+   positive keyword is a case-insensitive substring of the title (2–3 letter
+   keywords match on word boundaries instead). A `word:` or `stem:` prefix
+   changes that edge rule, and an `a + b` entry matches only when every term
+   does. So drop any candidate title that an existing positive
    keyword already substring-matches — it is already covered, and suggesting
    it adds zero new recall.
 2. **Deal-breaker filter.** Never suggest titles that violate the
@@ -112,7 +115,8 @@ When the user accepts one or more suggestions:
    removals, write the additions; never treat a yes to one as a yes to both.
 7. `portals.yml` (user layer) is **the only file this mode writes by
    default**. This mode proposes no negative keywords — precision guards for
-   noisy keywords are deferred to #1353's seniority-tier helper.
+   noisy keywords belong to `skip_tiers` in `portals.yml`, which the scanner's
+   seniority-tier classifier (`classify-tier.mjs`, #1353) reads.
 8. **Separately-confirmed exception:** accepted titles can additionally become
    `fit: adjacent` archetypes in `config/profile.yml` (an existing schema
    field — see `config/profile.example.yml`). Mention that this is possible,
@@ -157,8 +161,8 @@ Two cases, and they are told apart by what the current list is:
 
 1. **The list is still byte-identical to the shipped example.**
    `title_filter.positive` matches `templates/portals.example.yml`, which is
-   evidence it was never edited — `doctor` copies the template, so an untouched
-   install lands exactly here. But it is an **inference, not a record**:
+   evidence it was never edited — a hand copy of the template lands exactly
+   here, since `onboard-write.mjs` writes the user's own roles instead. But it is an **inference, not a record**:
    `portals.yml` stores keywords, never who put them there. So state it as an
    inference the user can correct — *"this list is still identical to the
    shipped example, so I am reading it as defaults rather than your choices;
@@ -215,7 +219,6 @@ a `-` at the start of a line.
   unchanged.
 - `config/profile.yml` or `modes/_profile.md` missing → **hard stop**: do not
   generate suggestions. Point at onboarding (`node doctor.mjs --json`) and
-  stop, then re-run this mode once both files exist — the same
-  fix-first-then-re-run behavior as a missing `portals.yml` above.
+  stop, then re-run this mode once both files exist.
   Deal-breakers live in `modes/_profile.md` — suggestions generated without
   them can propose exactly what the user excluded.

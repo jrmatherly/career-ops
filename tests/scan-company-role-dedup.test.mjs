@@ -126,7 +126,7 @@ const KEY = companyRoleDedupKey('Anduril', 'Strategic Finance');
     // modes/pipeline.md → liveness sweep step 3.
     ['- [x] ~~https://jobs.example.com/posting/5 | Acme Corp | Backend Engineer~~ — posting expired (liveness sweep)',
       null, 'expired entry with a URL seeds no pair'],
-    // modes/oferta.md → liveness gate; modes/auto-pipeline.md → Step 0.5 / 0.6.
+    // Legacy line shape: modes/oferta.md and modes/auto-pipeline.md now keep the URL inside the strikethrough.
     ['- [x] ~~Acme Corp | Data Engineer~~ — oferta nieaktywna',
       null, 'expired entry without a URL seeds no pair'],
   ];

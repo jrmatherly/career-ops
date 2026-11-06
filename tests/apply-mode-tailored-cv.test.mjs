@@ -34,16 +34,10 @@ ok('Step 4b resolves the bundle by computing its path',
 ok('Step 4b still knows about the flat-layout manifest', has('data/pdf-index.tsv'),
   'the fallback for an application with no bundle is gone');
 
-// The two negatives. Both strings were in modes/apply.md before the rewrite, so
-// neither passes vacuously: an earlier draft resolved the CV through a
-// document-kind column data/pdf-index.tsv does not have, and claimed a cover
-// letter for one report is a separate row when the writer replaces the row.
-ok('Step 4b claims no document-kind column', !has('whose `kind` is `cv`'),
-  'generate-pdf.mjs writes no kind column, so that lookup cannot succeed');
-
-ok('Step 4b does not claim a cover letter gets its own manifest row',
-  !has('a cover letter for the same report is its own'),
-  'updatePDFManifest drops earlier rows for a report, so the cover letter REPLACES the CV row');
+// generate-pdf.mjs keys the manifest on (report, kind) since #3959, so a report's
+// cover letter is its own row and the CV lookup has to pick the `cv` row.
+ok('Step 4b picks the manifest row whose kind is cv', has('whose `kind` is `cv`'),
+  'without the kind filter the last row for a report can be the cover letter');
 
 ok('the tailored CV outranks cv.md', has('the tailored CV wins'),
   'the precedence rule is what stops the form reading as two resumes spliced together');

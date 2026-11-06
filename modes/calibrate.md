@@ -11,7 +11,7 @@ Run the deterministic calibration report and present it. This mode closes the le
 
 1. Run the script:
    ```bash
-   node calibrate.mjs --json
+   node calibrate.mjs
    ```
 2. If it exits with "No tracker found" or the verdict is `insufficient`, say so plainly and point the user at `/outcome`: the loop needs recorded outcomes before it can say anything. Do not pad the gap with speculation.
 3. Present, in this order:

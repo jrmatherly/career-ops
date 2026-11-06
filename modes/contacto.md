@@ -1,4 +1,4 @@
-# Mode: contacto -- Outreach messages
+# Mode: contacto — Outreach messages
 
 > Apply `voice-dna.md` (if present) to every generated message — full guardrail, conversational voice included (Tier 1 + Tier 2). See `_writing.md` → Voice DNA.
 
@@ -23,7 +23,8 @@ short message; otherwise run the LinkedIn power move below.
 0. **Check for a warm lead before searching cold (#4691).** Before any
    WebSearch, run `node contact-lookup.mjs --company "{company}" --summary`
    against `data/contacts.tsv`. This is the saved-contacts phonebook —
-   written by a prior `contacto` run or by `add` from an earlier,
+   written by a prior `contacto` run, by `contact-extract.mjs` from a recruiter
+   reply, or by `debrief-sync.mjs` after a debrief, from an earlier,
    *different-role* application — and a real prior relationship there beats
    a cold search every time.
 
@@ -117,9 +118,8 @@ short message; otherwise run the LinkedIn power move below.
      time-respecting move -- hedging here reads as if the candidate forgot
      the relationship happened.
 
-5. **Versions**:
-   - EN (default)
-   - ES (if Spanish company)
+5. **Version**: one, in `language.output` (AGENTS.md → "Output Language vs
+   Market Modes").
 
 6. **Alternative targets**, if the search happened to confirm any others: one line
    each (who they are, and the single reason to try them). Omit this section
@@ -199,8 +199,8 @@ that there is **no contact discovery**.
      **Default 150** when the key is absent. The message MUST fit — count and trim.
    - **Lead with a specific value proposition** (the single strongest match point),
      not an introduction. Punchy sentences, not paragraphs.
-   - **Language:** match the JD / platform language (e.g. Simplified Chinese for
-     BOSS Zhipin). Character count applies to the output language.
+   - **Language:** `language.output`, whatever the JD / platform language.
+     Character count applies to the output language.
 
 5. **No-fluff policy (hard):** remove filler and replace it with a concrete value
    prop. Ban phrases like "I'm looking for a job", "I'm passionate about",

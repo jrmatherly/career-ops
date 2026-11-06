@@ -60,7 +60,7 @@ Fetch public sources linked in the user's `config/profile.yml` (e.g., GitHub use
 |------------|------------|
 | a code project / repo / tool | `Projects` |
 | a paper / publication / preprint | `Publications` (create if absent) |
-| an internship / job / role | `Work Experience` |
+| an internship / job / role | the CV's existing experience heading, exactly as written (`Experience`, `Work Experience`, ...); `Work Experience` if none |
 | a talk / course / certification | `Education` (or ask if unclear) |
 
 ## Payload schema (input to `add-entry.mjs`)
@@ -111,7 +111,7 @@ node github-evidence.mjs --json
 
 - **Exit 0** → it wrote `output/github-evidence-{YYYY-MM-DD}.md` and `.json` and printed the JSON on stdout. Work from the JSON. If `commitSearch.status` is `failed` or `partial`, tell the user in one line (from `commitSearch.detail`) that commit counts are incomplete; the PR evidence is unaffected.
 - **Exit 3** (`"status": "gh-unavailable"`: `gh` is not installed or not logged in) or **exit 2** (a GitHub query failed) → tell the user in one line and continue with the zero-key steps exactly as before. Do not ask for a token, do not call the GitHub API another way, do not retry with other credentials.
-- **Exit 1** → `candidate.github` is missing or malformed; handle it as in Input steps 2–4.
+- **Exit 1** → `candidate.github` is missing or malformed (handle it as in Input steps 2–4), `config/profile.yml` is not valid YAML, or `--since` is not a `YYYY-MM-DD` date on or before today. The stderr line says which; for the last two, tell the user and continue with the zero-key steps.
 
 It reuses the user's existing `gh auth` (no new token), is read-only, and reads PR and repository metadata: PR title, state, repository, stars, visibility, plus commit counts and dates. It never reads source code and never writes `cv.md` or `article-digest.md`. README reading is a separate opt-in: set `github_evidence.read_readmes: true` in `config/profile.yml`. The `private_allowlist` controls which private repos may be considered; it does not enable README reading. Both settings default off/empty, so `github-evidence.mjs` reads no README unless the user explicitly enables it. These settings do not control the zero-key scan above, which still reads public READMEs through WebFetch.
 

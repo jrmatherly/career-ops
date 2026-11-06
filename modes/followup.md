@@ -1,4 +1,4 @@
-# Mode: followup -- Follow-up Cadence Tracker
+# Mode: followup — Follow-up Cadence Tracker
 
 > **Read `voice-dna.md` (if present) and apply it to every generated email/LinkedIn draft.** This mode is standalone — it does NOT load `_shared.md`, so read `voice-dna.md` directly. Follow-up drafts are conversational, so apply the full guardrail: banned words/phrases/patterns, no em-dashes, no negative parallelisms (§3-4) AND conversational voice — contractions, varied rhythm, direct "I"/"you" (§1-2). Never drop or soften a real metric from `cv.md` for style.
 
@@ -38,7 +38,7 @@ Parse the JSON output. It contains:
 |-----|----------|
 | `metadata` | Analysis date, total tracked, actionable count, overdue/urgent/cold/waiting counts |
 | `entries` | Per-application: company, role, status, days since application, follow-up count, urgency, next follow-up date, extracted contacts, report path |
-| `cadenceConfig` | Cadence rules (applied: 7 days, responded/assessment: 3 days, interview: 1 day) |
+| `cadenceConfig` | Resolved cadence: `applied_first` 7, `applied_subsequent` 7, `applied_max_followups` 2, `responded_initial` 1, `responded_subsequent` 3, `interview_thankyou` 1 (days unless a count) |
 
 If no actionable entries, tell the user:
 > "No active applications to follow up on. Apply to some roles first with `/career-ops` and come back when they're aging."
@@ -243,4 +243,4 @@ After showing all drafts, summarize:
 | Assessment | 1 day (assessment invite/submission) | Every 3 days | No limit |
 | Interview | 1 day after (thank-you) | Every 3 days | No limit |
 
-These defaults can be overridden via `node followup-cadence.mjs --applied-days N`.
+These defaults can be overridden per key in `config/profile.yml` → `followup_cadence` (`applied_first_days`, `applied_subsequent_days`, `applied_max_followups`, `responded_initial_days`, `responded_subsequent_days`, `interview_thankyou_days`). `node followup-cadence.mjs --applied-days N` overrides `applied_first` only, for one run.

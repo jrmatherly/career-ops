@@ -1,4 +1,4 @@
-# Mode: retro
+# Mode: retro — Turn session corrections into proposed rules
 
 Turn the user's corrections from this session into at most five proposed rules. `learn.mjs` checks each one, and only the ids the user accepts reach `modes/_custom.md` or `modes/_profile.md`. Run this mode when the user asks ("let's do a retro", "remember this next time") or accepts the offer at the end of a session.
 
