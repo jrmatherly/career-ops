@@ -1,0 +1,4 @@
+#!/bin/sh
+# Enabled per clone with: git config core.hooksPath .githooks
+# (.claude/hooks/session-start.mjs does this for Claude Code sessions.)
+exec node "$(git rev-parse --show-toplevel)/.githooks/commit-msg.mjs" "$1"

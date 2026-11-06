@@ -5,7 +5,7 @@
 // gitignored (user-layer) file while letting a clean index, a staged deletion
 // and an edit to a tracked-but-ignored file through; the session-start hook sets
 // core.hooksPath locally, says when that shadows a global value, and warns on a
-// foreign local one.
+// foreign local one; the commit-msg hook enforces Conventional Commits with a scope.
 import { spawnSync } from 'child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -17,6 +17,7 @@ console.log('\nclaude hooks — syntax hook and pre-commit guard');
 const CHECK = join(ROOT, '.claude', 'hooks', 'check-mjs.mjs');
 const PRECOMMIT = join(ROOT, '.githooks', 'pre-commit.mjs');
 const SESSION_START = join(ROOT, '.claude', 'hooks', 'session-start.mjs');
+const COMMIT_MSG = join(ROOT, '.githooks', 'commit-msg.mjs');
 const ok = (cond, msg) => (cond ? pass(msg) : fail(msg));
 
 function runHook(script, payload, env = {}) {
@@ -126,6 +127,18 @@ try {
   git('config', '--local', 'core.hooksPath', '.husky');
   r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });
   ok(/WARNING: git core.hooksPath is "\.husky"/.test(r.stdout) && localHooksPath() === '.husky', 'session-start warns on a foreign local hooksPath and does not change it');
+
+  // commit-msg enforces Conventional Commits with a scope on the first subject line.
+  const subject = (text) => {
+    const file = join(work, 'COMMIT_EDITMSG');
+    writeFileSync(file, text);
+    return spawnSync(NODE, [COMMIT_MSG, file], { cwd: repo, encoding: 'utf-8' });
+  };
+  ok(subject('feat(scan): x\n').status === 0, 'commit-msg accepts type(scope): summary');
+  r = subject('update stuff\n');
+  ok(r.status === 1 && /commit subject must be/.test(r.stderr), 'commit-msg refuses a subject without type and scope');
+  ok(subject("Merge branch 'careerops/main'\n").status === 0, 'commit-msg accepts a merge commit');
+  ok(subject('  fix(a): leading space\n').status === 0, 'commit-msg trims the subject before matching');
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
