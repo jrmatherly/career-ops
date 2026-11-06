@@ -75,6 +75,17 @@ try {
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://x.bamboohr.com/careers/5',
   );
 
+  // hibob.parseHibobJobAds — for…of over jobAdDetails; id feeds the posting URL.
+  const { parseHibobJobAds } = await load('hibob.mjs');
+  check(
+    'hibob.parseHibobJobAds',
+    () => parseHibobJobAds(
+      { jobAdDetails: [{ id: `${LONE}bad`, title: 'Bad Id' }, { id: 'a5', title: 'Good Id' }] },
+      'https://x.careers.hibob.com', 'X',
+    ),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://x.careers.hibob.com/jobs/a5',
+  );
+
   // keka.parseKekaResponse — for…of over the top-level jobs array.
   const { parseKekaResponse } = await load('keka.mjs');
   check(
@@ -344,6 +355,14 @@ try {
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://recruiting.paylocity.com/Recruiting/Jobs/Details/101',
   );
 
+  // remote-com.parseRemoteJobs — for…of over jobs[]; public_id feeds the posting URL.
+  const { parseRemoteJobs } = await load('remote-com.mjs');
+  check(
+    'remote-com.parseRemoteJobs',
+    () => parseRemoteJobs({ jobs: [{ title: 'Bad Id', public_id: `${LONE}bad` }, { title: 'Good Id', public_id: 'good-1' }] }),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://apply.remote.com/jobs/good-1',
+  );
+
   // trakstar.parseTrakstarPage — an off-host hosted_url is rebuilt from the
   // opening id, so a lone surrogate in that id drops one row.
   const { parseTrakstarPage } = await load('trakstar.mjs');
@@ -358,6 +377,20 @@ try {
       'acme',
     ).jobs,
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://acme.hire.trakstar.com/jobs/good1/',
+  );
+
+  // aldi-nord.parseQueryResponse — for…of over results[]; slugTitle and postingId feed the posting URL.
+  const { parseQueryResponse } = await load('aldi-nord.mjs');
+  check(
+    'aldi-nord.parseQueryResponse',
+    () => parseQueryResponse(
+      { total: 2, hasNextPage: false, results: [
+        { postingId: `${LONE}1`, slugTitle: 'bad-id', title: 'Bad Id' },
+        { postingId: '101', slugTitle: 'good-id', title: 'Good Id' },
+      ] },
+      { host: 'www.aldi-nord.de', detailPath: '/karriere/detail/', locale: 'de-DE', company: 'Acme' },
+    ).jobs,
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://www.aldi-nord.de/karriere/detail/good-id-101.html',
   );
 } catch (e) {
   fail(`per-provider surrogate tests crashed: ${e.message}`);
@@ -387,6 +420,7 @@ try {
   // One provider per line, in alphabetical order: PRs that add different
   // providers then touch different lines, which reduces merge conflicts.
   const CONVERTED = [
+    'aldi-nord.mjs',
     'alibaba.mjs',
     'apple.mjs',
     'arbeitsagentur.mjs',
@@ -397,6 +431,7 @@ try {
     'dover.mjs',
     'feishu-jobs.mjs',
     'garena.mjs',
+    'hibob.mjs',
     'jibeapply.mjs',
     'kalibrr.mjs',
     'keka.mjs',
@@ -407,6 +442,7 @@ try {
     'phenom.mjs',
     'platsbanken.mjs',
     'polymer.mjs',
+    'remote-com.mjs',
     'techinasia.mjs',
     'thehub.mjs',
     'tkms.mjs',
