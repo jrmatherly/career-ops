@@ -53,6 +53,9 @@ jobs:
         with:
           # Test code (fork code, in a merge_group) must not find a token in .git/config.
           persist-credentials: false
+          # tests/fork-deviations-covered.test.mjs diffs HEAD against the last reviewed
+          # upstream commit, which a depth-1 checkout does not have.
+          fetch-depth: 0
       # The declared floor (lib/node-floor.mjs, package.json engines). Exact on
       # purpose: a bare '22' resolves to the newest 22.x and tests nothing.
       # Renovate is told to leave node-version in this file alone (renovate.json);
