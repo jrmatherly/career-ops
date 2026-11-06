@@ -85,10 +85,9 @@ jobs:
 
   cv-visual:
     name: "🖼️ CV visual regression"
-    # Not a required check, so the merge queue never waits on it: a red queue
-    # run blocks nothing (14 failed in Oct-2026 and every one of those PRs
-    # merged on that same attempt). It still runs on every PR, where a red
-    # result is seen before the PR is queued (#5723).
+    # Not a required check: a red run blocks nothing here (the fork has no
+    # merge queue). It still runs on every push and PR, where a red result is
+    # seen (#5723).
     runs-on: ubuntu-latest
     # About 3 minutes, image build included. Limited for the test job's reason.
     timeout-minutes: 20
@@ -137,7 +136,7 @@ jobs:
     # that declare those tools (tests/required-tools.mjs) and turns a missing
     # tool into a failure instead of a skip. A job of its own rather than a
     # step in cv-visual, so its result has its own check. Not a required
-    # check, so the merge queue would gain nothing from running it again.
+    # check.
     runs-on: ubuntu-latest
     # Image build plus the TeX bundle download. Limited for the test job's reason.
     timeout-minutes: 20
@@ -169,7 +168,6 @@ jobs:
             sh -c 'npm install --ignore-scripts --package-lock=false && node install-latex-engine.mjs && node test-all.mjs --needs browser,latex'
   upgrade-gate:
     name: "⬆️ Upgrade regression gate"
-    # Skipped in the merge queue for cv-visual's reason above.
     runs-on: ubuntu-latest
     # About 3 minutes. Limited for the test job's reason.
     timeout-minutes: 20

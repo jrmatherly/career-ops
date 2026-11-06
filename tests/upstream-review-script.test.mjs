@@ -88,7 +88,7 @@ if (spawnSync('jq', ['--version'], { encoding: 'utf-8' }).status !== 0) {
     writeFileSync(join(stateDir, 'reviews', '2026-01-03-review.md'), `# review\n\nWindow: \`${B.slice(0, 7)}..${C}\`\n`);
     r = run('--advance', C);
     ok(r.status === 0 && readWatermark() === C && readdirSync(stateDir).sort().join() === 'reviews,watermark.json',
-      `advance writes the watermark atomically (got ${r.status}: ${r.stderr.trim()})`);
+      `advance writes the watermark atomically (exit ${r.status})`);
 
     if (process.platform === 'win32') {
       // The fake jq is a sh shim found through a POSIX PATH; bash on Windows reports MSYS paths realpath cannot follow.
@@ -106,12 +106,12 @@ if (spawnSync('jq', ['--version'], { encoding: 'utf-8' }).status !== 0) {
       writeWatermark(B);
       r = spawnSync('bash', [SCRIPT, '--advance', C], { cwd: fx, encoding: 'utf-8', env: { ...env, PATH: `${shim}:${process.env.PATH}` } });
       ok(r.status === 1 && /jq failed/.test(r.stderr) && readWatermark() === B && readdirSync(stateDir).sort().join() === 'reviews,watermark.json',
-        `advance fails loudly when jq fails and leaves the watermark alone (got ${r.status}: ${r.stderr.trim().split('\n').pop()})`);
+        `advance fails loudly when jq fails and leaves the watermark alone (exit ${r.status}: ${r.stderr.trim().split('\n').pop()})`);
     }
 
     r = run('--dry-run-merge');
     ok(r.status === 1 && /README\.md/.test(r.stdout),
-      `dry-run-merge exits 1 and names the conflicting file (got ${r.status}: ${r.stdout.trim()} ${r.stderr.trim()})`);
+      `dry-run-merge exits 1 and names the conflicting file (exit ${r.status})`);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

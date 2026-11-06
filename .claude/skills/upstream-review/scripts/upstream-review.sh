@@ -161,7 +161,7 @@ case "$cmd" in
     NEWSHA="$(g rev-parse -q --verify "$2^{commit}")" || die "not a commit: $2"
     g merge-base --is-ancestor "$NEWSHA" "$TIP" || die "$2 is not on $REMOTE/$BRANCH"
     NEWSHORT="$(g rev-parse --short "$NEWSHA")"
-    g merge-base --is-ancestor "$WATERMARK" "$NEWSHA" || die "watermark would move backward: $NEWSHORT is an ancestor of $(g rev-parse --short "$WATERMARK")"
+    g merge-base --is-ancestor "$WATERMARK" "$NEWSHA" || die "watermark would move backward: current $(g rev-parse --short "$WATERMARK") is not an ancestor of $NEWSHORT"
     grep -rlq -- "$NEWSHORT" "$(dirname "$STATE")/reviews" 2>/dev/null || die "no decision log mentions $NEWSHORT; write .upstream-review/reviews/<date>-review.md first"
     NEWDATE="$(g log -1 --date=short --pretty=%ad "$NEWSHA")"
     NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

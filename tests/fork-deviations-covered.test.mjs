@@ -5,7 +5,8 @@
 //
 // The diff is taken from the merge-base of HEAD and lastReviewedSha, not from
 // the SHA itself: after a cherry-pick-only sync that SHA is not an ancestor of
-// HEAD, and a diff against it would list upstream-only changes as ours.
+// HEAD, and a diff against it would list upstream-only changes as ours. A path is
+// covered by its full path or a parent directory with its slash, never by basename.
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -39,7 +40,7 @@ if (git('cat-file', '-e', `${lastReviewedSha}^{commit}`).status !== 0) {
     .map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
 
   const covered = (path) => {
-    if (named.has(path) || named.has(path.split('/').pop())) return true;
+    if (named.has(path)) return true;
     const parts = path.split('/');
     return parts.slice(0, -1).some((_, i) => named.has(`${parts.slice(0, i + 1).join('/')}/`));
   };

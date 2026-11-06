@@ -129,7 +129,7 @@ jobs:
 
             if (bad.length) {
               core.setFailed(
-                'This PR adds/modifies user-layer (private data) files. These live ONLY on your ' +
+                'This change adds/modifies user-layer (private data) files. These live ONLY on your ' +
                 'machine per DATA_CONTRACT.md and must never be committed — use examples/ for ' +
                 'sample data.\nOffending files:\n  ' + bad.join('\n  ')
               );

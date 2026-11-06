@@ -23,7 +23,7 @@ export function ignoredStagedFiles(root) {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const hits = ignoredStagedFiles(root);
 if (hits.length) {
-  console.error(`pre-commit: refusing to commit gitignored (user-layer) files:\n  ${hits.join('\n  ')}\nUnstage them with: git restore --staged -- ${hits.join(' ')}`);
+  console.error(`pre-commit: refusing to commit gitignored (user-layer) files:\n  ${hits.join('\n  ')}\nUnstage them with: git restore --staged -- ${hits.map((h) => JSON.stringify(h)).join(' ')}`);
   process.exit(1);
 }
 
