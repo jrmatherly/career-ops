@@ -27,6 +27,7 @@ docker run --rm --init --ipc=host --platform linux/amd64 \
 ```
 
 CI uses these same commands and [`tests/cv-visual/Dockerfile`](../tests/cv-visual/Dockerfile).
+In this fork, CI first pulls the pre-built image from GHCR and builds it only when GHCR has none.
 
 A separate CI job, `tool-suites`, runs in the same image the discovered suites
 that need a real Chromium or a TeX engine, with the tool required so that a

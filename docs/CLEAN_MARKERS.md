@@ -18,7 +18,9 @@ node clean-markers.mjs audit  output/*.html output/*.md        # globs OK
 ```
 
 - **`audit`** never modifies a file — use it to *prove* a document is clean. Exit code `1` if any file
-  FAILS, so it works as a pre-send gate in a script or CI step.
+  FAILS, so it works as a pre-send gate in a script or CI step. It reads `.html`, `.htm`, `.md`,
+  `.txt`, `.json`, `.csv`, `.svg`, `.xml` and `.tex` files. Any other type (a `.pdf`, for example)
+  is skipped, not checked, and does not fail the audit.
 - **`clean`** strips invisible Unicode from supported text files. Non-breaking spaces are treated as
   normal typography and are not flagged or replaced.
 - **`--ascii`** (clean, text only) additionally converts curly quotes → straight, em/en-dash → hyphen,

@@ -42,7 +42,8 @@ deduped) and costs nothing. Pick your platform.
 
 The scan exits 2 when every target it tried failed (no network, for example), and 0
 when at least one board was read, so a scheduler that alerts on a non-zero exit
-reports an outage without flagging every run that hit one dead board.
+reports an outage without flagging every run that hit one dead board. It exits 1 on
+a config or flag error, or when the run itself crashes.
 
 Replace `/path/to/career-ops` with your checkout path, and make sure `node` is on
 the `PATH` the scheduler uses (schedulers often run with a minimal environment — use
@@ -151,7 +152,7 @@ The agent needs a logged-in GUI session.
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/install-scan-schedule.ps1
-web/scripts/uninstall-scan-schedule.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/uninstall-scan-schedule.ps1
 ```
 
 The task runs in the current user's interactive session, so you must be logged in.
@@ -196,11 +197,14 @@ of the prohibited actions.
 
 In data/pipeline.md, the `## Pending` section holds one posting per line:
   - [ ] <url> | <company> | <title> | <location> | <comp> | posted: <date> | note: <text>
-(columns after the title are optional and may be absent).
+(columns after the title are optional and may be absent; other labeled segments,
+such as trust:, yrs: or rank:, may follow).
 
 For each pending posting, judge fit from TITLE and LOCATION only, against my profile:
-  - target_roles[].title and their fit tier (primary / secondary / adjacent)
-  - my identity.location and location.* remote/relocation preferences
+  - target_roles.primary, and target_roles.archetypes[] with their fit tier
+    (primary / secondary / adjacent)
+  - my candidate.location, location.*, and compensation.location_flexibility
+    (remote/relocation preferences)
 
 Do NOT open any URL, fetch a JD, generate a PDF, run scan/eval, or spawn subagents —
 this is a zero-cost first glance, not an evaluation.
@@ -214,11 +218,19 @@ Each line: `- <company> — <title> — <one-line reason>  <url>`.
 Leave data/pipeline.md unchanged — this only reads it and writes data/shortlist.md.
 ```
 
-Open `data/shortlist.md`, then run a real evaluation only on the "Worth a look" rows:
+Open `data/shortlist.md`, then run a real evaluation only on the "Worth a look" rows.
+Pipeline mode does not read `data/shortlist.md`. It evaluates every `- [ ]` row in
+`## Pending`. So either paste the chosen URLs into your agent, or
+leave only those rows in `## Pending` first and then run:
 
 ```text
 /career-ops pipeline
 ```
+
+Two built-in alternatives to this prompt: the `triage` mode (`modes/triage.md`)
+scores postings against `modes/_brief.md` and writes no files, and
+`node rank-pipeline.mjs` adds a `rank:` score and reason to pending rows without
+removing any.
 
 That keeps the expensive step — token-spending evaluation — pointed only at postings
 that already cleared a free title/location filter.
@@ -314,8 +326,13 @@ catching up whenever you next open it.
 ### cron (same idea, simpler, no wake-catch-up)
 
 ```cron
+PATH=/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin
 0 9 * * 1,4 /path/to/career-ops/scripts/followup-sweep.sh
 ```
+
+The script calls `node` and `claude`, and cron's default `PATH` usually has
+neither. Set `PATH` in the crontab to the directories that `which node` and
+`which claude` print.
 
 ### Why launchd/cron here, and not the CLI's own scheduler
 
@@ -331,8 +348,12 @@ If you also run a scan-and-score agent (custom, or one you've built per
 `AGENTS.md` → Skill Modes), it's worth adding a floor score below which a
 match auto-merges into `data/applications.md`. A workable heuristic: after
 you've accumulated some real outcomes, run
-`node analyze-patterns.mjs | jq .scoreThreshold` — it reports the lowest
-score among your historical positive outcomes. Add a rule to your own
+`node analyze-patterns.mjs | jq .scoreThreshold.recommended` — it reports the lowest
+score among your historical positive outcomes. It is `null` until at least 3
+positive outcomes carry a score and a rejected application scored below them
+(`.scoreThreshold.reasoning` says which). With fewer than 5 applications sent
+(`--min-threshold` changes that), the script prints only a "Not enough data"
+error. Add a rule to your own
 `modes/_custom.md` (never `modes/_shared.md` — see the Data Contract) like:
 
 > Only write a tracker-addition TSV and merge it for jobs scoring ≥ X/5.

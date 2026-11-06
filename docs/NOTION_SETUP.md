@@ -53,6 +53,10 @@ Open the Career Ops page in the browser and copy the 32-character id from the UR
 
 ## 4. Enable the plugin locally
 
+Both `config/plugins.yml` and `.env` are read from your data root. That is the
+checkout unless you set `CAREER_OPS_ROOT` or a `.career-ops-data` marker, in which
+case create them in that folder instead.
+
 ```bash
 cp config/plugins.example.yml config/plugins.yml   # if you haven't already
 ```
@@ -60,8 +64,9 @@ cp config/plugins.example.yml config/plugins.yml   # if you haven't already
 Edit `config/plugins.yml`:
 
 ```yaml
-notion:
-  enabled: true
+plugins:
+  notion:
+    enabled: true
 ```
 
 ## 5. Add secrets to `.env`
@@ -74,7 +79,7 @@ NOTION_PARENT_PAGE_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ## 6. Verify + run
 
 ```bash
-node doctor.mjs --json                          # confirm notion shows configured
+node doctor.mjs --json                          # notion: enabled true, missingEnv empty
 node plugins.mjs run notion export --dry-run     # preview what would be pushed
 node plugins.mjs run notion export               # push tracker rows into Notion
 ```

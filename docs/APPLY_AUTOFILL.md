@@ -13,7 +13,8 @@ We have field-tested the auto-fill flow across several major ATS platforms (Ashb
 
 ### Ashby
 
-- **Duplicate Prevention:** Ashby merges candidates based on their email. Before filling out the form, the agent checks if you've already applied to this company. If so, it warns you and suggests a modified email alias (like `you+teamname@domain.com`) to prevent silent failures or unintended profile merges.
+- **Duplicate Prevention:** Ashby merges candidates based on their email. Before filling out the form, the agent checks `reports/` for an earlier report on the same company. If it finds one, it warns you and suggests a modified email alias (like `you+teamname@domain.com`) to prevent silent failures or unintended profile merges.
+- **Submission Can Be Rejected as Spam:** Ashby may reject a submission from the Playwright-controlled browser, even when you click Submit yourself. The agent then hands off to your ordinary browser: it gives you the application link, a numbered list of answers to paste, and the files to upload. You fill and submit the form there, and the application counts as submitted only once you see Ashby's confirmation.
 
 ### Lever
 
@@ -34,7 +35,7 @@ We have field-tested the auto-fill flow across several major ATS platforms (Ashb
 
 Before it drafts a single answer, the agent scans the form for **knock-out questions**. These are questions designed to immediately disqualify you if your answers don't match the employer's hard requirements.
 
-The agent checks your `config/profile.yml` against questions regarding:
+The agent checks your `config/profile.yml` (work authorization, sponsorship, location, comp) and your tailored CV or `cv.md` (degree, years of experience) against questions regarding:
 - Minimum years of experience
 - Degree or education requirements
 - Work authorization or visa sponsorship needs
@@ -53,11 +54,12 @@ This saves you from spending time tailoring responses for a job that the ATS wil
 
 - **Agent hangs or crashes mid-form:** This usually happens when an ATS updates its React DOM unexpectedly or pops a hidden captcha. When this happens, look at the agent's output—it always prints a complete list of generated answers. You can easily copy and paste the remaining answers manually.
 - **Form changes:** If you notice the form on screen is for a different role than the one evaluated in your report, the agent will detect it and ask if you want to adapt the responses to the new title or stop and re-evaluate.
-- **Multiple roles in one session:** Running batch applies? Always run the `pipeline` mode **Liveness sweep** first to drop dead postings from your pipeline so you never waste time opening an expired role tab. To run the check by hand, give `check-liveness.mjs --file` a file of bare URLs, one per line. It cannot read `data/pipeline.md` directly: each `- [ ] URL | Company | Role` entry comes back `uncertain` as an invalid URL. Collect the pending URLs first, leaving LinkedIn ones for the pipeline mode:
+- **Multiple roles in one session:** Running batch applies? Always run the `pipeline` mode **Liveness sweep** first to drop dead postings from your pipeline so you never waste time opening an expired role tab. To run the check by hand, give `check-liveness.mjs --file` a file of bare URLs, one per line. It cannot read `data/pipeline.md` directly: each `- [ ] URL | Company | Role` entry comes back `uncertain` as an invalid URL. Collect the pending URLs first, leaving LinkedIn ones for the pipeline mode. Run it from the checkout. The first line finds the inbox the same way the scanner does, so it follows an external data root or a `CAREER_OPS_PIPELINE` lane:
 
   ```bash
+  inbox=$(node --input-type=module -e 'import { PIPELINE_PATH } from "./scan.mjs"; console.log(PIPELINE_PATH)')
   urls=$(mktemp)
-  sed -nE 's/^- \[ \] (https?:\/\/[^ |]+).*/\1/p' data/pipeline.md | grep -viE '^https?://([^/]+\.)?linkedin\.com([:/?#]|$)' > "$urls"
+  sed -nE 's/^- \[ \] (https?:\/\/[^ |]+).*/\1/p' "$inbox" | grep -viE '^https?://([^/]+\.)?linkedin\.com([:/?#]|$)' > "$urls"
   node check-liveness.mjs --file "$urls"
   rm -f "$urls"
   ```

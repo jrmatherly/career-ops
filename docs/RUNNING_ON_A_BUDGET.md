@@ -159,9 +159,11 @@ To configure OpenCode with a custom provider:
 
 > **Headless runs need a model in config.** `opencode run` resolves its model
 > from the top-level `model` key (format `provider/model`, so an OpenRouter id
-> that itself contains a slash reads `openrouter/vendor/model:free`). Scripts
-> that shell out to `opencode run` — `rank-pipeline.mjs`, for one — do not pass
-> `--model`, so without that key there is nothing to select one.
+> that itself contains a slash reads `openrouter/vendor/model:free`).
+> `rank-pipeline.mjs` runs `opencode run` from an empty temporary folder, so it
+> never sees the project's `opencode.json`. Pass the model yourself
+> (`node rank-pipeline.mjs --cli opencode --model provider/model`), or set it in
+> the global `~/.config/opencode/opencode.json`.
 
 Free model ids on OpenRouter rotate, and the one above will eventually stop
 resolving. List what is currently free with:
@@ -278,7 +280,7 @@ When choosing a budget-friendly model, you need strong reasoning capabilities to
 | **DeepSeek-Coder-V2** | DeepSeek API / OpenRouter | ~$0.14 / ~$0.28 | Excellent instruction-following for structured Markdown and resume tailoring. |
 | **Qwen-2.5-Coder (32B / 72B)** | OpenRouter / DeepInfra | ~$0.07 - ~$0.30 | Strong coding and structured reasoning, highly cost-effective. |
 | **GLM-4-Air / GLM-4** | Zhipu AI / OpenRouter | Very Cheap | Reliable multi-turn reasoning and JSON/Markdown generation. |
-| **Gemini 2.5 Flash** | Google AI Studio | Free Tier (15 RPM) | Available via the standalone script `node gemini-eval.mjs`. Excellent for zero-cost low-volume runs, but subject to rate limits. |
+| **Gemini 3.6 Flash** | Google AI Studio | Free Tier | The default model of the standalone script `node gemini-eval.mjs`. Excellent for zero-cost low-volume runs, but subject to rate limits. |
 | **Kimi K2.5** | Moonshot AI | API pricing applies | Verified with OpenCode using the Moonshot OpenAI-compatible endpoint. Produces structured Markdown suitable for Career-Ops evaluations. See the verified OpenCode recipe below. |
 
 
@@ -360,7 +362,7 @@ When choosing a budget-friendly model, you need strong reasoning capabilities to
 Running a model 100% locally via Ollama is completely free, but it comes with significant tradeoffs:
 
 ### The Size vs. Quality Tradeoff
-- **Avoid Small Models (e.g., 8B parameters)**: Models like Llama 3 8B or Qwen-2.5-Coder 7B are generally **too weak** for Career-Ops. They frequently fail to follow the complex evaluation schemas (A-G blocks), fail to output valid Markdown/JSON structures, or generate low-quality, generic resume customizations.
+- **Avoid Small Models (e.g., 8B parameters)**: Models like Llama 3 8B or Qwen-2.5-Coder 7B are generally **too weak** for Career-Ops. They frequently fail to follow the complex evaluation schemas (A-H blocks), fail to output valid Markdown/JSON structures, or generate low-quality, generic resume customizations.
 - **Minimum Recommended Size**: Use at least a **32B+ or 70B+ model** (such as Qwen 2.5 Coder 32B/72B or Llama 3.1 70B) for reliable scoring and high-quality resume tailoring.
 
 ### Hardware & VRAM Requirements
@@ -440,7 +442,7 @@ Evaluating many roles in one interactive session degrades the output well before
 
 The real limit is tokens of accumulated job text, not a hard role count. When descriptions are long, cut the batch roughly in half.
 
-To evaluate more than that in one go, use `batch/batch-runner.sh`. It reuses one worker instead of letting context pile up across interactive turns. Source: [discussion #1089](https://github.com/career-ops-hq/career-ops/discussions/1089).
+To evaluate more than that in one go, use `batch/batch-runner.sh`. Each offer gets a fresh worker, so context does not pile up across interactive turns. Source: [discussion #1089](https://github.com/career-ops-hq/career-ops/discussions/1089).
 
 ---
 
@@ -449,7 +451,7 @@ To evaluate more than that in one go, use `batch/batch-runner.sh`. It reuses one
 Here is a concrete, end-to-end walkthrough of scanning for jobs and evaluating a single posting using **DeepSeek V3 via OpenRouter** and the standalone `openai-eval.mjs` evaluator. This bypasses the need for an expensive CLI agent for the heavy evaluation block.
 
 ### Step 1: Scan for Job Offers (0 Tokens)
-The portal scanner queries ATS APIs directly using Playwright and standard HTTPS requests. It doesn't use the LLM to read job boards.
+The portal scanner queries ATS APIs directly over plain HTTPS. It loads Playwright only for `--verify`. It doesn't use the LLM to read job boards.
 ```bash
 node scan.mjs
 ```
@@ -460,7 +462,7 @@ node scan.mjs
 Open one of the URLs found by the scanner, copy the text of the job description, and save it locally (e.g., `jds/my-target-role.txt`).
 
 ### Step 3: Evaluate the Offer (~4,500 Tokens)
-We'll run the evaluation against OpenRouter's DeepSeek V3 endpoint. The script reads your `cv.md` and the job description, then generates the full A-G evaluation report and tracker entry.
+We'll run the evaluation against OpenRouter's DeepSeek V3 endpoint. The script reads your `cv.md` and the job description, then generates the full A-H evaluation report and tracker entry.
 
 ```bash
 OPENAI_API_KEY="sk-or-your_openrouter_key" \
@@ -471,8 +473,8 @@ node openai-eval.mjs \
 ```
 
 **Approximate Token Usage:**
-- **Input:** ~32,000 tokens. The static prefix alone is **29,341**: the script sends `modes/_shared.md` (7,307) plus `modes/oferta.md` (22,034) as the system prompt, and your `cv.md` and the JD come on top of that. Measured on 4 November 2026 with the command below.
-- **Output:** ~1,000 tokens (the A-G evaluation report).
+- **Input:** ~32,000 tokens. The static prefix alone is **29,713**: the script sends `modes/_shared.md` (7,307) plus `modes/oferta.md` (22,406) as the system prompt, and your `cv.md` and the JD come on top of that. Measured on 6 November 2026 with the command below.
+- **Output:** ~1,000 tokens (the A-H evaluation report).
 - **Cost:** at DeepSeek V3 prices (~$0.14/1M input, ~$0.28/1M output), roughly **$0.005 per evaluation**. Still cheap, and cheap enough that the number below matters more than this one.
 
 Measure it yourself rather than trusting this paragraph, because these files grow with every release:
@@ -487,11 +489,11 @@ for (const f of ['modes/_shared.md','modes/oferta.md','AGENTS.md'])
 
 ### What the default path costs (this is the number most people are actually paying)
 
-The figures above are for the standalone script. **If you paste a job URL into your CLI instead, the agent loads `AGENTS.md` (23,430) + `modes/_shared.md` (7,307) + `modes/oferta.md` (22,034) = about 53,000 tokens of instructions per evaluation** (measured on 4 November 2026 with the command above), before your CV, the job description, or any tool output. That is the real floor of an interactive evaluation, and it is why a long session of pasting URLs burns a quota that a batch of standalone script calls would not.
+The figures above are for the standalone script. **If you paste a job URL into your CLI instead, the agent loads `AGENTS.md` (23,893) + `modes/_shared.md` (7,307) + `modes/oferta.md` (22,406) = about 53,600 tokens of instructions per evaluation** (measured on 6 November 2026 with the command above), before your CV, the job description, or any tool output. That is the real floor of an interactive evaluation, and it is why a long session of pasting URLs burns a quota that a batch of standalone script calls would not.
 
 Two things follow from that, and they are the cheapest wins available:
 
-- **Batch beats pasting** when you have several roles: `batch/batch-runner.sh` reuses one worker instead of re-sending the instructions per role.
+- **Batch beats pasting** when you have several roles: `batch/batch-runner.sh` gives each role a fresh worker with the batch prompt (about 21,000 tokens), instead of about 53,600 plus the context that piles up in an interactive session.
 - **One evaluation is not the risk; unbounded research is.** A single evaluation used to be able to fan out into dozens of subagents and burn tens of millions of tokens (issue #1235). The modes now cap web research at five queries and forbid spawning subagents for it, so an evaluation stays bounded. If you write your own mode, keep that cap: it is the difference between a $0.005 evaluation and an exhausted five-hour limit.
 
 ### Step 4: Tailor the CV HTML (~3,000 Tokens)
@@ -555,7 +557,7 @@ node openrouter-runner.mjs help              # Show this help
 **Setup:**
 
 ```bash
-1. copy .env.example .env
+1. cp .env.example .env    (Windows CMD: copy .env.example .env)
 2. Add OPENROUTER_API_KEY=sk-or-v1-... to .env
 3. Free API key: https://openrouter.ai
 ```
@@ -565,7 +567,7 @@ node openrouter-runner.mjs help              # Show this help
 If you want **zero network calls** and complete privacy, run evaluations against a local Ollama instance:
 
 ```bash
-npm run ollama:eval
+npm run ollama:eval -- --file ./jds/job.txt
 ```
 
 This calls `ollama-eval.mjs` which hits your local Ollama server. No API key, no internet, no cost. See [Section 5](#5-local-llm-tradeoffs-ollama--llamacpp) for model size recommendations (32B+ minimum for reliable scoring).
@@ -575,7 +577,7 @@ This calls `ollama-eval.mjs` which hits your local Ollama server. No API key, no
 Point at **any** endpoint that speaks the OpenAI chat-completions API — NVIDIA NIM (free tier), Zhipu GLM, Together, Groq, LM Studio, llama.cpp, vLLM, or even Ollama's `/v1` route:
 
 ```bash
-npm run openai:eval
+npm run openai:eval -- --file ./jds/job.txt
 ```
 
 Configure via `.env`:

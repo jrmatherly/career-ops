@@ -83,6 +83,7 @@ Versioned history, works across machines, and you already have Git.
 ```bash
 cd ~/career-data
 git init -b main
+echo ".env" >> .gitignore   # keep API keys out of the backup
 git add -A
 # Check what you staged for API keys and tokens. No output means nothing was found.
 git grep --cached -nE 'sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|PRIVATE KEY-----'
@@ -127,8 +128,11 @@ In a [web session](SETUP.md#browser-only--claude-code-on-the-web), the VM starts
 every time, so clone the data repository at the start and push before you finish. The
 session's GitHub access must include the data repository.
 
-Keep secrets out of it: API keys belong in `.env` / `.career-ops.env` in the checkout,
-not in the data folder. The `git grep --cached` line in the first block checks what you
+Keep secrets out of it. Plugin keys and `CAREER_OPS_CLI` are read from `.env` in the
+data root, so after Step 0 copy your `.env` there (`gemini-eval.mjs` and
+`openai-eval.mjs` still read the one in the folder you run them from). The
+`.gitignore` line in the first block keeps it out of the repository, because the
+checkout's `.gitignore` does not apply here. The `git grep --cached` line in the first block checks what you
 staged before anything is committed or pushed. Run it again after `git add -A` whenever
 you add files you did not write yourself.
 
