@@ -75,6 +75,14 @@ export default {
 
 - `id` — required, unique. On a duplicate the first-loaded provider wins and
   the later file is skipped with a warning.
+- `fetchHost(entry)` — optional; the hostname `fetch()` actually requests when
+  it is not the `detect()` URL's host. `scan.mjs` uses it as the per-host
+  concurrency key. Omit it when `detect().url`, `api` or `careers_url` already
+  names that host.
+- `dedupKey(job)` — optional; a provider-scoped id (a Workday requisition ID,
+  say) so one posting served under several paths or hosts of a tenant collapses
+  to one key (#3439). Return `null` when none is derivable; the caller falls
+  back to URL normalization.
 - `detect(entry)` — optional; returns `{ url }` or `null`. `_registry.mjs`
   resolves an entry in order: (1) an explicit `provider: {id}` field, which
   bypasses `detect()` entirely; (2) the `local-parser` provider, when the
@@ -165,7 +173,7 @@ contract** (`name` / `careers_url` / `api` / `provider` / `parser`), the same
 shape from either list. A single-company provider is documented and tested
 against `tracked_companies:`, an aggregator/feed against `job_boards:`. The
 file's header comment must name the target list — reference
-`providers/ibm.mjs` and `providers/amazon.mjs` for a single-company
+`providers/amazon.mjs` (its header names `tracked_companies`; `providers/ibm.mjs` documents `job_boards` first) for a single-company
 `tracked_companies:` adapter, `providers/remotli.mjs` and
 `providers/yourator.mjs` for a `job_boards:` aggregator/feed.
 
@@ -222,7 +230,7 @@ yet, say in the header comment that the hook is inert until it is.
   anchored full-host test instead. Two idioms in the tree: an anchored regex
   over the whole hostname (`/^[a-z0-9-]+\.vendordomain\.com$/` —
   `providers/bamboohr.mjs`, `providers/breezy.mjs`), or
-  `hostname.endsWith('.vendordomain.com')` (`providers/workday.mjs`,
+  `hostname.endsWith('.vendordomain.com')` (`providers/icims.mjs`; `providers/workday.mjs` uses the anchored-regex form,
   `providers/icims.mjs`). Get the anchoring right or the guard is a no-op:
   keep the trailing `$` (without it `tenant.vendordomain.com.evil.example`
   passes), escape the dots (`\.`, or `.` also matches `vendordomainXcom`), and
@@ -739,7 +747,7 @@ went through them. Must cover:
 If `job.url` is built from a host-controlled `id` / `slug` in a loop, add one
 behavioural case to the shared `tests/providers/url-encoding-surrogate.test.mjs`
 (a batch with one lone-surrogate value alongside a clean one → no throw, clean
-posting kept, bad one dropped). That file also carries the cross-provider
+posting kept, bad one dropped). Every provider is also swept by `tests/providers/host-guard-anchoring.test.mjs`, `inter-page-sleep-shared.test.mjs`, `registry-loads-every-provider.test.mjs`, `rss-entity-decoding.test.mjs` and `tests/provider-user-agent-convention.test.mjs`. That file also carries the cross-provider
 source guard (no bare `encodeURIComponent` on a `url:` line, helper imported
 where used) — nothing to add in your own `{name}.test.mjs` for this.
 

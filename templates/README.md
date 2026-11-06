@@ -123,18 +123,18 @@ node build-cv-html.mjs payload.json output/resume.html templates/resume-template
 
 LaTeX template for Overleaf-compatible CV generation. Based on the [sb2nov/resume](https://github.com/sb2nov/resume) format. Uses placeholder tokens (`{{NAME}}`, `{{EXPERIENCE}}`, `{{PROJECTS}}`, etc.) that the LaTeX pipeline fills at generation time.
 
-**Design:** Single-column ATS-safe layout using standard CTAN packages (`fontawesome5`, `enumitem`, `hyperref`, `titlesec`). No custom fonts or external dependencies — uploads directly to Overleaf.
+**Design:** Single-column ATS-safe layout using standard CTAN packages (`fontawesome`, `enumitem`, `hyperref`, `titlesec`). No custom fonts or external dependencies — uploads directly to Overleaf.
 
 **Usage:**
 ```bash
-# Validate and compile .tex → .pdf (requires pdflatex on PATH)
+# Validate and compile .tex → .pdf (uses the repo-local tectonic, then tectonic or pdflatex on PATH)
 node generate-latex.mjs output/cv-name-company-date.tex
 
 # Or specify a custom output path
 node generate-latex.mjs output/cv-name-company-date.tex output/custom-name.pdf
 ```
 
-**Prerequisites:** `pdflatex` via [MiKTeX](https://miktex.org/) (Windows) or TeX Live (Linux/macOS). First compilation may auto-install missing LaTeX packages. Alternatively, upload the `.tex` file directly to [Overleaf](https://www.overleaf.com) — no local install needed.
+**Prerequisites:** `node install-latex-engine.mjs` for a repo-local `tectonic` (preferred), or `pdflatex` via [MiKTeX](https://miktex.org/) (Windows) or TeX Live (Linux/macOS). First compilation may auto-install missing LaTeX packages. Alternatively, upload the `.tex` file directly to [Overleaf](https://www.overleaf.com) — no local install needed.
 
 **Customization:** Edit this file to change margins, section order, or formatting commands. The input fields are documented in `modes/latex.md` under "JSON Input Schema"; `build-cv-latex.mjs` maps them to the tokens.
 

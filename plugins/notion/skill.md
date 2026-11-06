@@ -21,9 +21,13 @@ additive mirror.
 
 ## Setup
 
-A "Career Ops" parent page in Notion containing an "Applications" database with
-Company / Role / Status / Score / URL properties, shared with your internal
-integration. Put `NOTION_ACCESS_TOKEN` + `NOTION_PARENT_PAGE_ID` in `.env`.
+A "Career Ops" parent page in Notion containing an "Applications" database,
+shared with your internal integration. The property types matter: `Role` is the
+database's **title** property (rename the default "Name" column), `Company` is
+rich text, `Status` a select, `Score` a number and `URL` a URL property; a text
+property called "Role" beside the title column fails every write. Enable the
+plugin (`node plugins.mjs enable notion --confirm`) and put `NOTION_ACCESS_TOKEN`
++ `NOTION_PARENT_PAGE_ID` in `.env`.
 
 ## Data it produces
 

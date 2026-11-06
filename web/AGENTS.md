@@ -32,8 +32,11 @@ empty default. (`web/src/lib/portals-config.mjs` is the worked example.)
 ## Testing
 
 Logic that deserves a test lives in a plain `.mjs` module so `node --test` can import
-it with no build step and no `@/` alias loader. See `tracker-table.mjs`,
-`cv-selection.mjs`, `report-sections.mjs`. A component is not a place to put a rule
+it with no build step. See `src/lib/tracker-table.mjs`, `src/lib/apply/cv-selection.mjs`,
+`src/lib/report-sections.mjs`. When extraction is impractical, a suite may import a `.ts`
+module: `npm test` runs under `--experimental-strip-types` and
+`tests/helpers/web-ts-alias-loader.mjs` resolves the `@/` alias; a `.test.ts` suite file
+is still never discovered. A component is not a place to put a rule
 you want to assert.
 
 ```
