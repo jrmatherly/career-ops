@@ -359,7 +359,7 @@ node application-answers.mjs --report reports/NNN-company-role-date.md --input a
 4. 建议下一步：运行 `contacto` 模式（支持时用 `/career-ops contacto`）做 LinkedIn 联系。这是第一次联系，不是跟进，所以即使 `follow_ups.enabled` 为 `false` 也要建议。
 
 **在某个 ATS 厂商处确认出现了简历被篡改的问题？检查流程中的其他申请（#1870）。** 如果候选人确认 ATS 悄悄丢弃或改动了他提交的简历内容（见下文 SuccessFactors 系列的问题），不要把它当作个例。`data/applications.md` 中的 tracker 行没有规范的 ATS 厂商字段，所以不要在 tracker 文本里 grep 厂商名称，那样会悄悄漏掉很多行。应该根据每一行关联报告的 `**URL:**` 字段判断厂商：
-- 对于特征明显的厂商（Greenhouse、Lever、Ashby、Workday、iCIMS），按 `analyze-patterns.mjs` 中 `detectVendor()` 的方式匹配 URL 的主机名。复用这个函数/规则，而不是自己重新推导，这样两边才能保持一致。
+- 对于特征明显的厂商（Greenhouse、Lever、Ashby、Workday、iCIMS），按 `ats-vendor.mjs` 中 `atsVendorOf()` 的方式匹配 URL 的主机名（`analyze-patterns.mjs` 中的 `knownAtsVendorOf()` 把它收窄到这五家）。复用这个函数/规则，而不是自己重新推导，这样两边才能保持一致。
 - 贴牌的 ATS（SuccessFactors、UKG、Dayforce 等）**无法**只从 URL 判断出来，而这个问题恰恰就是在这类厂商身上确认的。对于这些，不要根据域名猜测：直接问候选人其他还在进行中的行（`Applied`、`Responded`、`Assessment`、`Interview`）中，哪些走的是同一个门户，因为 tracker 和 URL 在结构上都不会暴露这一点。
 
 确定了同一厂商的行之后（通过 URL 匹配或候选人确认），把列表给候选人，提醒他通过该门户的预览/档案页面（如果有）逐个抽查。在某个厂商处确认了一次静默截断，就说明经过同一厂商、仍在进行中的其他申请也更可能出现同样的问题。

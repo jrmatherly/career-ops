@@ -459,8 +459,8 @@ export async function processOffer(browser, line, idx, _evaluate = evaluateWithR
     if (!isClosureEvidence(liveness)) {
       return { line, processed: false, outcome: 'unconfirmed-dead-posting' };
     }
-    const label = match[2] ? `${companyHint} | ${titleHint}` : url;
-    const newLine = `- [x] ~~${label}~~ — oferta nieaktywna`;
+    const label = match[2] ? `${url} | ${companyHint} | ${titleHint}` : url;
+    const newLine = `- [x] ~~${label}~~ — posting expired`;
     console.log(`⏭️ Closed posting: ${companyHint} - ${titleHint}`);
     return { line: newLine, processed: true, outcome: 'dead-posting' };
   }

@@ -12,7 +12,7 @@
 2. 投稿を分類する：
    - **active posting evidence:** title/role + 実際の job description または application/apply path
    - **closed posting evidence:** expired/closed/"no longer accepting applications"、読み込み中やアクセス不能ではないと確認した上で JD がなく nav/footer だけ、generic careers/search page への hard redirect、404/410
-3. 投稿が closed に見える場合は、**Block A の前で stop**：候補者に link が dead であると伝える。entry が `data/pipeline.md` 由来なら、`- [x] ~~Company | Role~~ -- 求人非アクティブ` として mark する。評価、report、CV は生成しない。
+3. 投稿が closed に見える場合は、**Block A の前で stop**：候補者に link が dead であると伝える。entry が `data/pipeline.md` 由来なら、`- [x] ~~{URL} | Company | Role~~ -- 求人非アクティブ` として mark する。評価、report、CV は生成しない。
 4. 候補者が JD テキストだけを貼った場合（URL なし）、liveness は確認できない。その limitation を note して進む。確認する link がないため。
 
 この gate が解決するまで Block A に進まない。ここで取得した snapshot は Block G の freshness signals に再利用する。

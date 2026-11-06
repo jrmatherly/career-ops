@@ -51,7 +51,7 @@ Desteklenen girdiler (inputs):
 
 Mevcut olduğunda bu isteğe bağlı (optional) alanları kullan:
 - `candidate.full_name`
-- `candidate.chinese_name`
+- `candidate.chinese_name` (`config/profile.example.yml` içinde yok; kullanıcı `candidate:` altına ekleyebilir)
 - `candidate.email`
 - `candidate.phone`
 - `candidate.wechat`
