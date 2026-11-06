@@ -21,7 +21,10 @@ value.
 
 ## Prerequisites and running
 
-Requires Go 1.26+ (`go.mod`). From the repo root:
+Requires Go 1.26+ (`go.mod`) and an existing tracker: run onboarding first,
+or pass `--path <data root>` to a directory that has `data/applications.md`.
+The dashboard never creates the tracker, so a fresh checkout with no data
+root exits with "could not find applications.md". From the repo root:
 
 ```bash
 npm run serve:dashboard    # cd dashboard && go run .
