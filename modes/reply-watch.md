@@ -71,7 +71,7 @@ Suggested status updates to apply:
 Apply recommended status updates to data/applications.md? (y/N, or comma-separated row IDs):
 ```
 
-Type `y` or `yes` to apply the changes. The script will rewrite the matched rows in `data/applications.md` and rebuild the derived SQLite index.
+Type `y` or `yes` to apply the changes. The script writes each accepted update through `set-status.mjs` (see below), then syncs the derived SQLite index with `tracker.mjs sync`.
 
 For a role-less rejection that safely matches several eligible rows at one
 company, the digest keeps one email entry but lists one proposed `Rejected`

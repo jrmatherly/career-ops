@@ -21,9 +21,9 @@ Export a tailored, ATS-optimized CV as a `.tex` file and compile it to PDF via `
 12. Run: `node build-cv-latex.mjs /tmp/cv-{candidate}[-{report}]-{company}.json output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.tex`
 13. Run: `node generate-latex.mjs output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.tex output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.pdf`
     *(Replace `{candidate}`, `{company}`, `{report}`, `{YYYY-MM-DD}` with actual values. Omit the `-{report}` segment only for a standalone one-off run with no report number at all.)*
-    - This runs the CV fact gate (`verify-cv-facts.mjs`) on the `.tex` before compiling, the same hard gate `pdf` mode runs in step 19. A blocked document is not compiled, and the JSON report carries `factCheck.verdict: "block"` with the claims it could not find in `cv.md` / `article-digest.md`.
+    - When `cv.md` exists, this runs the CV fact gate (`verify-cv-facts.mjs`) on the `.tex` before compiling, the same hard gate `pdf` mode runs in step 19. A blocked document is not compiled, and the JSON report carries `factCheck.verdict: "block"` with the claims it could not find in `cv.md` / `article-digest.md`.
     - If it blocks, stop and fix the step 11 payload (remove the invented claim, or add verified evidence to `cv.md`, `article-digest.md` or `config/cv-facts.json`), rebuild the `.tex`, and re-run. Never pass `--skip-fact-check` unless the user explicitly asks for it.
-14. Report: .tex path, .pdf path, file sizes, section count, keyword coverage %
+14. Report: .tex path, .pdf path, file sizes, section count
 
 **Requires:** `tectonic` (preferred — auto-downloads packages) or `pdflatex` (MiKTeX / TeX Live). `generate-latex.mjs` uses a repo-local tectonic first, then PATH.
 
@@ -192,7 +192,7 @@ Same ethical rules as `modes/pdf.md`:
 
 The generated `.tex` file uses only standard CTAN packages (no custom or bundled dependencies):
 
-- `latexsym`, `fullpage`, `titlesec`, `marvosym`, `color`, `verbatim`, `enumitem`
-- `hyperref`, `fancyhdr`, `babel`, `tabularx`, `fontawesome5`, `multicol`, `glyphtounicode`
+- `fontenc`, `lmodern`, `latexsym`, `fullpage`, `titlesec`, `marvosym`, `color`, `verbatim`, `enumitem`
+- `hyperref`, `fancyhdr`, `babel`, `tabularx`, `fontawesome`, `multicol`, plus `\input{glyphtounicode}`
 
 Upload the `.tex` file directly to Overleaf — compiles with no extra configuration.

@@ -40,10 +40,13 @@ All User Layer files (such as `cv.md`, `config/profile.yml`, `modes/_profile.md`
 ### Data Root Resolution Order:
 1. **Environment Variables**: Check if `CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR` is set. If set, use its value (resolved relative to the repository root if it is a relative path).
 2. **Marker File**: If no environment variable is set, check for a `.career-ops-data` file in the repository root. If it exists and contains a non-empty path, use its value (resolved relative to the repository root if it is a relative path).
-3. **Repository Default**: If neither is set, fall back to the repository root directory as the Data Root.
+3. **Plugin Install Default**: If neither is set and the code runs from a Claude Code plugin install copy (inside `~/.claude/plugins/cache/`, `marketplaces/` or `synced/`), use `~/career-ops-data`.
+4. **Repository Default**: Otherwise, fall back to the repository root directory as the Data Root.
+
+An override in step 1 or 2 that resolves inside a plugin install copy is refused: `getCareerOpsRoot()` throws `UnsafeDataRootError` instead of returning it.
 
 ### Tracker Path Resolution Order:
-* **Explicit override**: If `CAREER_OPS_TRACKER` is set as an environment variable, use it as the absolute path to the tracker file (resolved relative to the repository root if it is a relative path).
+* **Explicit override**: If `CAREER_OPS_TRACKER` is set as an environment variable, use it as the path to the tracker file (a relative path resolves against the current working directory, so pass an absolute one).
 * **Default**: Otherwise, use `{DATA_ROOT}/data/applications.md` if it exists; if not, use `{DATA_ROOT}/applications.md`.
 * **Writing**: All new/boilerplate writes must target `{DATA_ROOT}/data/applications.md`.
 
@@ -62,10 +65,13 @@ All User Layer files (such as `cv.md`, `config/profile.yml`, `modes/_profile.md`
 | Claude Code | Haiku 5.5 | Sonnet 5.5 | Opus 5.5 | off / off / adaptive |
 | OpenCode | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 | Gemini CLI | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
+| Pi | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
+| Oh My Pi | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 | Copilot CLI | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 | Codex | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 | Qwen | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 | Antigravity CLI | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
+| Grok Build CLI | your CLI's cheapest/fastest available model | balanced model | most capable model | off / off / adaptive |
 
 The Claude Code row uses concrete model names because that lineup is well-established. The other rows intentionally avoid naming specific models -- nobody on this project can verify current model lineups for those CLIs with confidence, and a wrong specific guess routes users to a model that doesn't exist. If you actively use one of these CLIs and know its current cheapest/balanced/most-capable models, a follow-up PR filling in concrete names for that row is welcome.
 
@@ -238,7 +244,7 @@ After detecting archetype, read `modes/_profile.md` for the user's specific fram
 ### NEVER
 
 1. Invent experience or metrics
-2. Modify cv.md or portfolio files
+2. Modify cv.md or portfolio files as a side effect of evaluation or generation. Only `add`, `expand`, `intake` and `interview` write `cv.md`, after the user confirms the exact change
 3. Submit applications on behalf of the candidate
 4. Share phone number in generated messages
 5. Recommend comp below market rate
@@ -297,7 +303,7 @@ A mode may tell you to run work in a background subagent (e.g. `scan`, or parall
 
 ### Unattended runs
 
-A run is unattended when nobody can answer before it ends. Treat it as unattended when the request says headless, unattended or non-interactive, when a parent agent or script dispatched you with one prompt (`grok -p`, `claude -p`, `codex exec`), or when an orchestrating mode has no user turn to wait for. Otherwise treat it as interactive. A batch worker follows `batch/batch-prompt.md` and its JSON hand-back instead.
+A run is unattended when nobody can answer before it ends. Treat it as unattended when the request says headless, unattended or non-interactive, when a parent agent or script dispatched you with one prompt (`grok -p`, `claude -p`, `codex exec`), when `CAREER_OPS_HEADLESS` (any value but `0`) or `CAREER_OPS_BATCH_STATE` is set, or when an orchestrating mode has no user turn to wait for. Otherwise treat it as interactive. A batch worker follows `batch/batch-prompt.md` and its JSON hand-back instead.
 
 In an unattended run, at every gate that would ask, confirm, approve or wait:
 
@@ -309,7 +315,7 @@ In an unattended run, at every gate that would ask, confirm, approve or wait:
    needs_confirmation: {gate} {detail} - {resume}
    ```
 
-   `{gate}` is one lowercase word, `{detail}` names what stopped the run, and `{resume}` says what to send or rerun with. Never end on a question, an approval request or the update prompt.
+   `{gate}` is one lowercase token (letters and underscores), `{detail}` names what stopped the run, and `{resume}` says what to send or rerun with. Never end on a question, an approval request or the update prompt.
 
 ### Time-to-offer priority
 - Working demo + metrics > perfection

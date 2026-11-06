@@ -2,7 +2,7 @@
 
 Scans configured job portals, filters by title relevance, and adds new offers to the pipeline for subsequent evaluation.
 
-> **Note (v1.6+):** The default scanner (`scan.mjs` / `npm run scan`) is **zero-token** and uses structured sources: local parsers configured per company and public Greenhouse, Ashby, and Lever APIs. The levels with Playwright/WebSearch described below represent the **agent** workflow (executed by the AI agent), not what `scan.mjs` does. If a company does not have a local parser or a Greenhouse/Ashby/Lever API, `scan.mjs` will ignore it; in those cases, the agent must manually complete Level 1 (Playwright) or Level 3 (WebSearch).
+> **Note (v1.6+):** The default scanner (`scan.mjs` / `npm run scan`) is **zero-token** and uses structured sources: local parsers configured per company and the public ATS APIs and feeds its `providers/` modules read (see [Supported job boards](../docs/SUPPORTED_JOB_BOARDS.md)). The levels with Playwright/WebSearch described below represent the **agent** workflow (executed by the AI agent), not what `scan.mjs` does. If no provider claims a company, `scan.mjs` skips it (the startup line counts them as "skipped — no provider matched", and `node audit-portals.mjs` lists them); in those cases, the agent must manually complete Level 1 (Playwright) or Level 3 (WebSearch).
 >
 > **Rule (v1.8+):** If a company's local parser completes successfully in Level 0, the agent **must not** repeat that company in Playwright (Level 1) or API (Level 2). In Level 3, general queries remain active, but results from companies already covered by a parser are discarded. See [Rule: Successful Local Parser](#rule-successful-local-parser--no-expensive-scraping-repetition).
 
@@ -123,7 +123,7 @@ During the agent's scan, keep the **`local_parser_ok`** set in memory. This set 
 - Level 3: do not deactivate cross-cutting queries (`site:jobs.ashbyhq.com`, `site:boards.greenhouse.io`, etc.) — these are used to discover **new** companies. Only filter out results for companies already in `tracked_companies` with a successful parser.
 - Do not create dedicated `search_queries` for a company with an active local parser (e.g. `site:jobs.ashbyhq.com/cohere "AI Engineer"`); use the parser or, if it fails, Playwright/API.
 
-**Recommended Level 0:** run `node scan.mjs` (or `npm run scan`) at the start of the agent's workflow. This covers local parsers + APIs in a single zero-token step and returns which companies used the `local-parser` successfully.
+**Recommended Level 0:** run `node scan.mjs` (or `npm run scan`) at the start of the agent's workflow. This covers local parsers + APIs in a single zero-token step. It prints how many local parsers ran and lists each failure (a parser rescued by its API fallback included), so `local_parser_ok` is the configured parsers minus the reported failures.
 
 ### Level 1 — Direct Playwright (PRIMARY)
 
@@ -226,7 +226,7 @@ Levels are additive — they are executed in order, and results are merged and d
    c. **Skip** the result if the normalized `company` matches any name in `local_parser_ok`.
    d. Accumulate the rest in the candidates list (deduplicated against Levels 0+1+2).
 
-6. **Filter by Title** using `title_filter` from `portals.yml`:
+6a. **Filter by Title** using `title_filter` from `portals.yml`:
    - At least 1 keyword from `positive` must appear in the title (case-insensitive).
    - 0 keywords from `negative` must appear.
    - `seniority_boost` keywords give priority but are not mandatory.
@@ -235,10 +235,11 @@ Levels are additive — they are executed in order, and results are merged and d
    - If the `location_filter` block is absent, all locations pass (default behavior).
    - Empty location on a posting → passes by default (do not penalize missing data) — **unless** `strict: true` is set AND a restricting tier (`allow`, `block`, or `block_hard`) is configured, in which case an empty location is rejected instead. `strict` exists for a location-restricted sweep over a provider that never returns a location (iCIMS is the common case): without it, every out-of-region posting from that provider silently passes because the restricting tier is never consulted. `strict: true` alone, with no restricting tier, restricts nothing.
    - Any keyword from `block_hard` (like `block`, but `always_allow` cannot override it) matches → reject.
+   - Any keyword from `always_allow` matches → passes (precedes block). When `always_allow` names the US as a country, US state names and 2-letter codes count as `always_allow` matches too.
    - Any keyword from `block` present → reject (precedes allow).
    - Empty `allow` → passes (already cleared block).
-   - Non-empty `allow` → must match at least one keyword.
-   - All matches are case-insensitive substring matches.
+   - Non-empty `allow` → must match at least one keyword, or the title carries an explicit remote marker (unless `remote_title_fallback: false`).
+   - All matches are case-insensitive whole-word matches, so `china` does not match `Chinatown`.
    - The location is persisted as the 7th column in `scan-history.tsv` for later auditing.
 
 6c. **Filter by Posting Age (Optional)** using `max_posting_age_days` from `portals.yml`:
@@ -275,7 +276,7 @@ Levels are additive — they are executed in order, and results are merged and d
    d. If expired: record in `scan-history.tsv` with status `skipped_expired` and discard. If unconfirmed: skip it for this scan without recording it, so the next scan checks it again.
    e. If active: continue to step 8.
 
-   **Do not interrupt the entire scan if a single URL fails.** If `browser_navigate` or parser errors (timeout, 403, crash, etc.), mark as `skipped_error` and continue with the next one.
+   **Do not interrupt the entire scan if a single URL fails.** If `browser_navigate` or parser errors (timeout, 403, crash, etc.), treat the URL like an unconfirmed one: do not record it, and continue with the next one. A status the scanner does not know pins the URL for good, so a transient error must never be written to `scan-history.tsv`.
 
 8. **For each new verified offer that passes filters**:
    a. Add to the `pipeline.md` "Pending" section: `- [ ] {url} | {company} | {title}`
@@ -284,7 +285,7 @@ Levels are additive — they are executed in order, and results are merged and d
 9. **Offers filtered by title**: record in `scan-history.tsv` with status `skipped_title`.
 10. **Duplicate offers**: record with status `skipped_dup`.
 11. **Expired offers (Level 3)**: record with status `skipped_expired`.
-12. **Scan errors / failures**: record in `scan-history.tsv` with status `skipped_error`.
+12. **Scan errors / failures**: do not record them (step 7.5), so the next scan tries again.
 
 ## Extraction of Title and Company from WebSearch Results
 
@@ -311,7 +312,7 @@ If a non-publicly accessible URL is found:
 |---|--------|---------|-------|
 | 1 | `url` | `https://jobs.lever.co/acme/123` | Canonical posting URL |
 | 2 | `first_seen` | `2026-02-10` | ISO date the URL was first encountered |
-| 3 | `portal` | `Ashby — AI PM` | Query name from `portals.yml` |
+| 3 | `portal` | `ashby-api` | The source: `local-parser` or `{provider id}-api` for `scan.mjs` rows, the query name from `portals.yml` (e.g. `Ashby — AI PM`) for agent WebSearch rows |
 | 4 | `title` | `PM AI` | Job title as returned by the ATS |
 | 5 | `company` | `Acme` | Company name |
 | 6 | `status` | `added` | `added`, `skipped_dup`, `skipped_title`, `skipped_expired`, `skipped_location`, `skipped_age`, `skipped_no_apply_control`, `skipped_content`, `skipped_visa`, `skipped_country_eligibility`, `skipped_experience`, `skipped_date`, `skipped_invalid_url`, `skipped_blocked_host`, `cooldown:{company}:{until}` |

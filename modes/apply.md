@@ -1,6 +1,6 @@
 # Mode: apply — Live Application Assistant
 
-> Apply `voice-dna.md` (if present) to free-text answers and cover-letter fields — full guardrail, conversational voice included (Tier 1 + Tier 2). See `_writing.md` → Voice DNA.
+> Apply `voice-dna.md` (if present) to free-text answers and cover-letter fields — the Tier 1 guardrail to every field, the Tier 2 conversational voice to cover-letter fields only. See `_writing.md` → Voice DNA.
 
 Interactive mode for filling out an application form. Open the form in a Playwright browser this project launches, load the previous context of the job, and generate a response for each question.
 
@@ -8,7 +8,7 @@ Interactive mode for filling out an application form. Open the form in a Playwri
 
 ## Scope
 
-Work only inside this checkout. Run `node apply-scope.mjs root` and read or search only the directories it prints. That list is this checkout, plus the data root when `CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR` is set.
+Work only inside this checkout. Run `node apply-scope.mjs root` and read or search only the directories it prints. That list is this checkout, plus the data root when it is not the checkout itself.
 
 Do not search the home directory. Do not grep or open another career-ops install.
 
@@ -65,7 +65,7 @@ Before generating any application answers, verify that the form still points to 
 This is a reminder, not a gate — surface it and continue drafting immediately; do not wait for the candidate to acknowledge it first. The candidate can review their ATS profile/application history manually before they submit. Never scrape or log into the employer's ATS portal on the candidate's behalf; this check only counts rows already in the candidate's own tracker.
 
 1. Read the visible URL, page title, company, role, and any closed/expired signals.
-2. If a URL is available, verify liveness with Playwright:
+2. If a URL is available, verify liveness. Start with `node check-liveness.mjs '<url>'` (AGENTS.md → "Offer Verification"), then verify liveness with Playwright when it cannot confirm the posting. A LinkedIn URL follows AGENTS.md → "LinkedIn JD loading guard", and an aggregator listing follows "Aggregator Listings -- Confirm at the Employer".
    - active posting evidence: title/role + job description or form fields + submit/apply path
    - closed posting evidence: expired/closed/no longer accepting applications, missing JD with only nav/footer, hard redirect to generic careers/search, or 404/410
 3. Compare the visible company and posting against the matched report (see **Posting identity** below).
@@ -168,20 +168,20 @@ Before drafting answers, read the matched report's Block G fixed-term finding an
 ## Step 2 — Identify and search for context
 
 1. Extract company name and role title from the page
-2. Search `reports/` under every root printed by `node apply-scope.mjs root` (this checkout, plus the configured data root when set) by company name (case-insensitive grep). Do not search only the checkout when the data root holds the reports.
+2. Search `reports/` under every root printed by `node apply-scope.mjs root` (this checkout, plus the data root when it differs) by company name (case-insensitive grep). Do not search only the checkout when the data root holds the reports.
 3. If there is a match → read only the header of each matching report (company, role, `**URL:**`). If more than one report matches the company, first compare the posting URL or req ID with each report's `**URL:**`. A report whose posting matches is the one, even if its stored role differs: the posting may have been retitled, and Step 3 handles that. Use the role only to narrow reports that the URL or req ID could not decide. If more than one is still possible, ask the candidate which report belongs to this form before loading any of them: Step 8 writes into the report loaded here. Load the full report, its answers (item 4), its Section H and its tailored CV (Step 4b) only once Step 5 confirms the **Posting identity**: the header is all Step 5 compares. For a different posting, Step 5 offers **Evaluate as new** or **Draft without saving**, and nothing past the header is loaded.
 4. If there is a `## Application Answers` section → recover it through the strict reader, never by re-reading the rendered markdown as prose:
 
    ```bash
-   node application-answers.mjs --report reports/NNN-company-role-date.md --read --strict
+   node application-answers.mjs --report reports/{###}-{company-slug}-{YYYY-MM-DD}.md --read --strict
    ```
 
    - **Exit 0** → the JSON on stdout is the base snapshot of previous answers. `null` means the report has no section; treat it as a fresh application.
    - **Non-zero exit** → the section is partially unreadable and strict mode refused it, naming every unreadable line on stderr. Do NOT fall back to reading the section as prose, and do NOT proceed with a partial base — a silently dropped answer looks like an answer the candidate never gave, and an absorbed one corrupts an answer they did give. Show the candidate the named lines and ask whether to fix the report first or continue without the affected answers.
-   - A **Section H** (`## H) Draft Application Answers`, drafted during evaluation before any form was seen) has its own reader, because its body is a convention rather than a format this repo writes:
+   - A **Section H** (the `## ` heading marked `(draft)`, named `Draft Application Answers`, or lettered `H)` in a translated report, drafted during evaluation before any form was seen) has its own reader, because its body is a convention rather than a format this repo writes:
 
      ```bash
-     node application-answers.mjs --report reports/NNN-company-role-date.md --read-draft
+     node application-answers.mjs --report reports/{###}-{company-slug}-{YYYY-MM-DD}.md --read-draft
      ```
 
      - Prints `{"freeText": [...]}`, or `null` when the report has no Block H. There is no `--strict` counterpart: an empty `freeText` means the block exists but did not follow the convention, which is an expected outcome and not a corrupted report.
@@ -217,23 +217,21 @@ tailoring that made the application relevant.
 1. **The bundle first, because its path needs no lookup.** An application with a
    bundle keeps its tailored CV at a path derived from the report number, the
    company and the role, so nothing has to stay in sync for it to resolve:
-   `node application-artifacts.mjs --report {report#} --company "{company}" --role "{role}"`
+   `node application-artifacts.mjs --report {report#} --company '{company}' --role '{role}'`
+   (single quotes or an argument array, never posting text inside double quotes)
    prints every path as JSON, where `cv` → `tailored` → `html` holds the document's
    path, `cv/tailored/vNNN/cv.html` on disk. That is where `modes/pdf.md` writes it. Read the `.html` and not the `.pdf`: same content,
    readable directly.
 2. Several tailoring versions? The bundle keys them `v001`, `v002`, and so on. Take
    the highest one that exists on disk, and pass it back as `--version N` when you
    want the other paths beside it.
-3. No bundle, so a flat `output/cv-{candidate}[-{report}]-{company}-{YYYY-MM-DD}.html`.
+3. No bundle, so a flat `output/cv-{candidate}[-{report}]-{company}.html`.
    `data/pdf-index.tsv` can shorten the search here, but it is a hint and not an
-   answer. Its columns are `report \t pdf \t html \t format \t date` and there is
-   no document-kind column: `generate-pdf.mjs` drops every earlier row for a report
-   number when it writes a new one, and `generate-cover-letter.mjs` renders through
-   that same function with the same report, so the row for a report can name the
-   cover letter rather than the CV. Read the path before trusting it, and remember a
-   `cover-…` file is never a CV. `node find.mjs {report#}` surfaces the same manifest
-   from the tracker side and returns only the PDF path, so it cannot tell you which
-   kind of document that is either. A CV built through the `latex` / `latex-tex`
+   answer. Its columns are `report \t pdf \t html \t format \t date \t kind`, with
+   one row per report and kind: take the row whose `kind` is `cv` (a blank `kind`
+   is a legacy CV row), never the `cover` row. Read the path before trusting it.
+   `node find.mjs {report#}` surfaces the same manifest from the tracker side and
+   returns the CV's PDF path for the report. A CV built through the `latex` / `latex-tex`
    path is not in the manifest at all, since only `generate-pdf.mjs` writes it.
 4. Manifest silent or pointing at the wrong kind of document? Fall back to a
    filename match in `output/`: a `cv-…` artifact for this application's company,
@@ -414,7 +412,7 @@ Write the section at the end of the report, or replace only the existing `## App
 Use `application-answers.mjs` when possible to format/upsert the section:
 
 ```bash
-node application-answers.mjs --report reports/NNN-company-role-date.md --input answers.json --state filled
+node application-answers.mjs --report reports/{###}-{company-slug}-{YYYY-MM-DD}.md --input answers.json --state filled
 ```
 
 ## Step 9 — Post-apply (optional)
@@ -423,13 +421,13 @@ Every step below acts on the report Step 8 wrote to, chosen by the same check (*
 
 If the candidate confirms that they submitted the application:
 1. Update status to Applied via the canonical CLI: `node set-status.mjs --report <report#> Applied` (never hand-edit the table). If the candidate submitted on a different day than today, add `--on YYYY-MM-DD` with the actual submission date — the status-log ledger should record when it happened, not when it was typed in.
-2. Seed the follow-up schedule: run `node followup-seed.mjs {num} --json` (where `{num}` is the tracker row number). If the candidate applied on a different day than today, pass `--date YYYY-MM-DD` with the actual submission date. It's idempotent, so re-running is safe. (`--on` and `--date` are the same concept — the real submission date — each under its own script's flag name; pass the same value to both.) Skip this step when `config/profile.yml` sets `follow_ups.enabled: false`.
+2. Follow-up schedule: step 1 already seeds it on the move to Applied, from the `--on` date (today without it), and skips it when `config/profile.yml` sets `follow_ups.enabled: false`. If the row was already Applied and its follow-up pin is missing, repair it by rerunning the step 1 command with `--repair-followup` added. It's idempotent, so re-running is safe.
 3. Refresh the report's `## Application Answers` section with the final field values and `**State:** submitted`
 4. Suggest next step: run the `contacto` mode (`/career-ops contacto` where available) for LinkedIn outreach. This is a first outreach, not a follow-up, so suggest it even when `follow_ups.enabled` is `false`.
 
 **Confirmed resume-verification failure at this vendor? Check the rest of the pipeline (#1870).** If the candidate confirms the ATS silently dropped or altered resume content that they had submitted (see the SuccessFactors-family quirk below), don't treat it as a one-off. Tracker rows in `data/applications.md` don't carry a canonical ATS-vendor field, so don't grep the tracker text for a vendor name — it will miss rows silently. Instead, resolve the vendor per row from its linked report's `**URL:**` field:
-- For clean-fingerprint vendors (Greenhouse, Lever, Ashby, Workday, iCIMS), match the URL's hostname the same way `detectVendor()` in `analyze-patterns.mjs` does — reuse that function/pattern rather than re-deriving it, so the two stay in sync.
-- White-labeled ATS (SuccessFactors, UKG, Dayforce, and similar) are **not** detectable from the URL alone — the very vendor family this quirk was confirmed on falls in this bucket. For those, don't guess from the domain: ask the candidate directly which other in-flight rows (`Applied`, `Responded`, `Assessment`, `Interview`) went through the same portal, since neither the tracker nor the URL structurally exposes it.
+- For clean-fingerprint vendors (Greenhouse, Lever, Ashby, Workday, iCIMS), match the URL's hostname with `atsVendorOf()` in `ats-vendor.mjs` (`knownAtsVendorOf()` in `analyze-patterns.mjs` narrows it to these five) — reuse that function/pattern rather than re-deriving it, so the two stay in sync.
+- `atsVendorOf()` also recognizes SuccessFactors, UKG (UltiPro) and Dayforce on their own hosts. A custom-branded careers host is **not** detectable from the URL alone: `atsVendorOf()` returns it as a bare hostname. For those rows, don't guess from the domain: ask the candidate directly which other in-flight rows (`Applied`, `Responded`, `Assessment`, `Interview`) went through the same portal, since neither the tracker nor the URL structurally exposes it.
 
 Once the same-vendor rows are identified (by URL match or candidate confirmation), surface that list and prompt the candidate to spot-check each one via that portal's preview/profile step if one exists. One confirmed silent-truncation case at a vendor raises the prior that it happened elsewhere in-flight through the same vendor too.
 
@@ -506,5 +504,5 @@ Field-tested across ~12 Playwright-driven applications (Ashby, Greenhouse, Lever
 ### SuccessFactors-family — uploaded resume can silently diverge from the stored profile (#1870)
 
 - **Symptom:** Some ATS portals (SuccessFactors-family confirmed; likely others) parse and store an uploaded resume once and don't reliably re-parse it on a later re-upload or profile edit. The portal's internal record can silently drift from the file the candidate believes they submitted — especially for work-history entries added *after* the initial profile was created. There is no error, no warning, and no diff shown to the candidate; the loss surfaces only if someone downstream (a recruiter reading the stored profile back on a call, for example) notices the gap. This is distinct from #1560 (career-ops reading a careers board) and #1741 (recovering a stuck pipeline) — this is the employer's own system corrupting what was submitted.
-- **Agent:** After a submission through one of these portals, if the portal exposes any "preview my profile," "view submitted resume," or "review application" step, surface it to the candidate as a **required check** before closing out the apply flow — don't stop at confirming the upload succeeded. If the candidate later confirms a truncation or mismatch at a given vendor, flag it in the report and prompt them to spot-check other still-active applications through that same vendor (see the apply-mode checklist below) — one confirmed case raises the prior for the rest of that vendor's in-flight applications.
+- **Agent:** After a submission through one of these portals, if the portal exposes any "preview my profile," "view submitted resume," or "review application" step, surface it to the candidate as a **required check** before closing out the apply flow — don't stop at confirming the upload succeeded. If the candidate later confirms a truncation or mismatch at a given vendor, flag it in the report and prompt them to spot-check other still-active applications through that same vendor (see the checklist in Step 9 above) — one confirmed case raises the prior for the rest of that vendor's in-flight applications.
 - **Candidate:** If a profile/resume preview step exists, use it and compare against your actual work history before considering the application done. If no preview step exists, there is currently no way to verify what the portal actually stored — treat this as a known blind spot rather than assuming silence means success.

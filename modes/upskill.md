@@ -1,4 +1,4 @@
-# Mode: upskill -- Aggregate Skill-Gap Analysis
+# Mode: upskill — Aggregate Skill-Gap Analysis
 
 ## Purpose
 
@@ -147,7 +147,7 @@ Condensed version in chat:
 
 Then offer the loop-closing action:
 
-> "If you've since gained any of these skills, tell me — I'll add them to `cv.md`/`config/profile.yml`, and the next run will show the gap closing."
+> "If you've since gained any of these skills, tell me — I'll run `/career-ops add` or `expand`, which show the exact change to `cv.md` and write it only once you confirm, and the next run will show the gap closing."
 
 ## Rules
 

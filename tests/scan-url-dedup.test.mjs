@@ -132,7 +132,7 @@ try {
     // absorbed into the URL, or the key would never match the live posting.
     ['- [x] ~~https://jobs.example.com/posting/5 | Acme Corp | Backend Engineer~~ — posting expired (liveness sweep)',
       'https://jobs.example.com/posting/5', 'expired entry with a URL'],
-    // modes/oferta.md → liveness gate; modes/auto-pipeline.md → Step 0.5 / 0.6.
+    // Legacy line shape: modes/oferta.md and modes/auto-pipeline.md now keep the URL inside the strikethrough.
     // No URL at all — nothing to seed, and nothing to crash on.
     ['- [x] ~~Acme Corp | Data Engineer~~ — oferta nieaktywna', null, 'expired entry without a URL'],
   ];

@@ -35,8 +35,9 @@ Before running any evaluation, confirm the posting is still live. The Step 0 Pla
    - **active posting evidence:** title/role + a real job description or an application/apply path
    - **closed posting evidence:** expired/closed/"no longer accepting applications", missing JD with only nav/footer after the iframe check below, hard redirect to a generic careers/search page, or 404/410
 2. An empty `main` or nav/footer-only snapshot is **inconclusive** when the page contains an iframe. Company careers pages commonly embed an Ashby board (`jobs.ashbyhq.com`), or another ATS, in an iframe that loads after the outer page. Wait briefly and take one fresh snapshot; inspect the iframe content directly if the browser tool exposes it. If the iframe still cannot be read, do not infer that the posting is closed from the empty outer page alone. Try the Step 0 fallback sources or ask the candidate for the JD.
-3. If the posting has confirmed closed evidence or is a dead/fallback shell after that check, first invalidate any resolved strong-identity job-facts cache using `evaluation-cache.mjs --invalidate` only when the liveness verdict has an explicit closure code (`http_gone`, `expired_url`, `expired_body`, or `listing_page`); `insufficient_content` and the weak `expired_body_soft` signal remain inconclusive (see **Local job-facts cache (#1025)** in `batch/batch-prompt.md`). Then **stop here**: do not run Step 1–Step 4. Tell the candidate the link is dead, and if the entry came from `data/pipeline.md`, mark it `- [x] ~~Company | Role~~ — oferta nieaktywna`.
-4. If only JD text was pasted (no URL), there is no link to verify — skip the gate and proceed.
+3. If the posting has confirmed closed evidence or is a dead/fallback shell after that check, first invalidate any resolved strong-identity job-facts cache using `evaluation-cache.mjs --invalidate` only when the liveness verdict has an explicit closure code (`http_gone`, `expired_url`, `expired_body`, or `listing_page`); `insufficient_content` and the weak `expired_body_soft` signal remain inconclusive (see **Local job-facts cache (#1025)** in `batch/batch-prompt.md`). Then **stop here**: do not run Step 1–Step 4. Tell the candidate the link is dead, and if the entry came from `data/pipeline.md`, mark it `- [x] ~~{URL} | Company | Role~~ — posting expired`, keeping the URL inside the strikethrough so the next scan still dedups it.
+4. If the posting came from an aggregator, apply AGENTS.md → **Aggregator Listings -- Confirm at the Employer** before Step 1: an active aggregator page alone is unconfirmed.
+5. If only JD text was pasted (no URL), there is no link to verify — skip the gate and proceed.
 
 Do not continue to Step 1 until this gate is resolved.
 
@@ -92,7 +93,7 @@ If the final score is >= 4.5, generate a draft of responses for the application 
 **Position: "I'm choosing you."** The candidate has options and is choosing this company for specific reasons.
 
 **Tone rules:**
-- **Confident without arrogance**: "I've spent the past year building production AI agent systems — your role is where I want to apply that experience next"
+- **Confident without arrogance**: "I've spent the past year [doing the work cv.md's most recent role describes] — your role is where I want to apply that experience next"
 - **Selective without arrogance**: "I've been intentional about finding a team where I can contribute meaningfully from day one"
 - **Specific and concrete**: Always reference something REAL from the JD or the company, and something REAL from the candidate's experience
 - **Direct, without fluff**: 2-4 sentences per response. No "I'm passionate about..." or "I would love the opportunity to..."
@@ -101,7 +102,7 @@ If the final score is >= 4.5, generate a draft of responses for the application 
 **Framework per question:**
 - **Why this role?** → "Your [specific thing] maps directly to [specific thing I built]."
 - **Why this company?** → Mention something specific about the company. "I've been using [product] for [time/purpose]."
-- **Relevant experience?** → A quantified proof point. "Built [X] that [metric]. Sold the company in 2025."
+- **Relevant experience?** → A quantified proof point. "Built [X] that [metric]. [A closing fact from cv.md]."
 - **Good fit?** → "I sit at the intersection of [A] and [B], which is exactly where this role lives."
 - **How did you hear?** → Honest: "Found through [portal/scan], evaluated against my criteria, and it scored highest."
 
@@ -109,6 +110,6 @@ If the final score is >= 4.5, generate a draft of responses for the application 
 
 ## Step 5 — Update Tracker
 
-Record it in the tracker the way `oferta` does ("Record in tracker"): a tracker-addition TSV merged by `node merge-tracker.mjs`, never a row written into `data/applications.md` by hand. Fill every field, including the Report link and PDF as ✅.
+Record it in the tracker the way `oferta` does ("Record in tracker"): a tracker-addition TSV merged by `node merge-tracker.mjs`, never a row written into `data/applications.md` by hand. Fill every field, including the Report link, and PDF as ✅ only when Step 3 actually generated a PDF (❌ otherwise).
 
 **If an artifact-generation step fails after the JD and gates are resolved**, continue with the next ones and mark the failed step as pending in the tracker. An unavailable JD or unresolved liveness/confirmation gate stops the pipeline before evaluation and all artifact/tracker writes.

@@ -38,7 +38,9 @@ unless the target item contains that substring (case-insensitive). Prefer
 `--expect` whenever you know what you mean to resolve — it turns "right command,
 wrong row" into an error instead of a plausible-looking wrong result line.
 
-`data/agent-inbox.md` is user-layer (gitignored). Items look like:
+The queue is `data/agent-inbox.md` under the data root, or the file `CAREER_OPS_INBOX`
+names (a relative path resolves against the current directory). It is user-layer
+(gitignored). Items look like:
 
 ```markdown
 - [ ] 2026-06-21 09:30 — evaluate https://acme.com/jobs/42
@@ -47,8 +49,8 @@ wrong row" into an error instead of a plausible-looking wrong result line.
 
 ## Agent protocol (when the user invokes this mode, or at session start)
 
-1. Read `data/agent-inbox.md`. If it doesn't exist or has no unchecked items,
-   say so and stop.
+1. Read the queue (`data/agent-inbox.md` under the data root). If it doesn't
+   exist or has no unchecked items, say so and stop.
 2. Run each **unchecked** item top-to-bottom by routing it to the right mode
    (a URL → `auto-pipeline`; "follow-up" → `followup`; "scan" → `scan`; etc.).
 3. After each, mark it `[x]` and append `→ result: <one line>` — either by hand

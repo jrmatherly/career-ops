@@ -74,7 +74,7 @@ If no source was given, ask the user for one.
 |------------|------------|
 | a code project / repo / tool | `Projects` |
 | a paper / publication / preprint | `Publications` (create if absent) |
-| an internship / job / role | `Work Experience` |
+| an internship / job / role | the CV's existing experience heading, exactly as written (`Experience`, `Work Experience`, ...); `Work Experience` if none |
 | a talk / course / certification | `Education` (or ask if unclear) |
 
 `add-entry.mjs` creates the section heading if it doesn't exist yet, so a new

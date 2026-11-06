@@ -2,7 +2,7 @@
 
 **URL:** {project-url}
 
-Scoring matrix with 6 dimensions (1–5). "Target roles" are the North Star and archetypes in `modes/_profile.md`; "JD skill" means a skill those roles' postings ask for.
+Scoring matrix with 6 dimensions (1–5). "Target roles" are the North Star and archetypes in `modes/_profile.md` and `config/profile.yml` → `target_roles`; "JD skill" means a skill those roles' postings ask for.
 
 | Dimension | Weight | 5 = ... | 1 = ... |
 |-----------|------|---------|---------|

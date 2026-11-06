@@ -9,6 +9,10 @@ Run `node update-system.mjs check --force` and parse the JSON output. `--force` 
 - If `up-to-date`: Tell the user "career-ops is up to date (v{version})." and stop.
 - If `offline`: Tell the user "Cannot reach GitHub to check for updates. Try again later." and stop.
 - If `no-remote-version`: Tell the user "Couldn't determine the latest career-ops release right now. Try again later." and stop.
+- If `managed-by-plugin`: career-ops runs as a Claude Code plugin, and `apply` and `rollback` refuse. Tell the user to update the plugin from the career-ops entry under `/plugin` → **Installed** (**Update now**), or, for a plugin added in Claude desktop, with **Check for updates** under **Customize → Plugins**, and stop.
+- If `worktree-without-main`: this is a linked git worktree and no checkout has `main` checked out. Tell the user to check out `main` in their main checkout and run the update there, and stop.
+- If `not-a-git-toplevel` or `not-a-git-checkout`: this install has no `.git` of its own (unpacked from a ZIP or copied), so updates cannot be installed with git. Tell the user to clone career-ops fresh and move their user-layer files into the clone (see `DATA_CONTRACT.md`), and stop.
+- `dismissed` cannot come back here: `--force` ignores an earlier dismissal.
 - If `update-available`: Continue to Step 2.
 
 ## Step 2 — Show What Changed
@@ -27,7 +31,7 @@ If the fetch fails, stop Step 2 and tell the user you couldn't preview the chang
 Then, only if the fetch succeeded, for each System Layer file category show a summary:
 
 ```bash
-git diff HEAD..FETCH_HEAD --stat -- modes/ CLAUDE.md AGENTS.md *.mjs batch/ dashboard/ templates/ docs/ VERSION DATA_CONTRACT.md
+git diff HEAD..FETCH_HEAD --stat -- modes/ CLAUDE.md AGENTS.md CODEX.md GEMINI.md OPENCODE.md KIMI.md *.mjs lib/ scripts/ providers/ .agents/ batch/ dashboard/ templates/ docs/ VERSION DATA_CONTRACT.md
 ```
 
 Present to the user as a clear summary:
@@ -71,7 +75,7 @@ Ask the user for confirmation:
 > "Ready to update. Apply changes? (This can be rolled back with `/career-ops update rollback`)"
 
 If yes:
-1. Capture the current commit as a run-specific pre-update baseline before apply runs, e.g. `PRE_UPDATE_REF=$(git rev-parse HEAD)`. Don't rely on `backup-pre-update-{local}` alone — `update-system.mjs apply` reuses that branch if it already exists, so it may point at an older snapshot.
+1. Capture the current commit as a run-specific pre-update baseline before apply runs, e.g. `PRE_UPDATE_REF=$(git rev-parse HEAD)`. `update-system.mjs apply` also creates a fresh `backup-pre-update-{local}-{UTC stamp}` branch on each run, but the captured ref is what step 7 reads.
 2. **Save local CLAUDE.md additions.** CLAUDE.md is a system file. When this install has changed it, `apply` keeps the local version by default: it lists CLAUDE.md under "Keeping your versions" and writes `CLAUDE.md.bak`. It replaces CLAUDE.md with the two-line template (`@AGENTS.md` + the local-additions comment) only with `--force`, or when it does not see the change as a local edit. Before applying, read the current CLAUDE.md and save everything after that two-line header, so step 4 can put it back if apply replaced the file. If CLAUDE.md has nothing beyond the two-line header, note that there is nothing to restore.
 3. Run `node update-system.mjs apply --confirm`, capturing its exit code without stopping on failure yet — the restore in step 4 must run either way. The `--confirm` flag is required so scheduled checks can never install files silently.
 4. **Restore local CLAUDE.md additions if apply removed them**, whether step 3 succeeded or failed. Re-read CLAUDE.md. If the content saved in step 2 is still in it, which is the default because `apply` kept your version, leave the file as it is: appending the content again would duplicate it, and every later update would add another copy. Only if the saved content is missing, append it after the two-line header.

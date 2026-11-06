@@ -15,7 +15,8 @@
  *       permissions, and writes through a symlinked inbox.
  *   5. An empty `add` fails loudly (exit 1) rather than queuing a blank line.
  *   6. On the default path, a first `add` self-heals .gitignore (idempotent) so
- *      the personal queue isn't accidentally tracked.
+ *      the personal queue isn't accidentally tracked, and the queue lands under
+ *      the data root (getCareerOpsRoot), not the cwd.
  *   7. Concurrent `add` calls all survive — the queue is appended to, never
  *      rewritten, so simultaneous writers cannot clobber each other.
  *   7c. When a writer in 7 dies, the line 7 prints names the cause. It did not:
@@ -255,13 +256,18 @@ console.log('6. first add on the default path self-heals .gitignore (idempotent)
 {
   const repo = tmp('inbox-repo-');
   writeFileSync(join(repo, '.gitignore'), 'node_modules\noutput/*\n');
+  const elsewhere = tmp('inbox-cwd-');
   const addOnce = () => execFileSync(NODE, [CLI, 'add', 'queue a scan'], {
-    cwd: repo, env: { ...process.env, CAREER_OPS_INBOX: '' }, stdio: ['pipe', 'pipe', 'pipe'],
+    cwd: elsewhere,
+    env: { ...process.env, CAREER_OPS_INBOX: '', CAREER_OPS_ROOT: repo, CAREER_OPS_DATA_DIR: '' },
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
   addOnce(); addOnce();
   const gi = readFileSync(join(repo, '.gitignore'), 'utf8');
   const ruleCount = gi.split('\n').filter((l) => l.trim() === 'data/agent-inbox.md').length;
   check('.gitignore gains exactly one data/agent-inbox.md rule', ruleCount === 1, `count=${ruleCount}`);
+  check('default queue lives under the data root, not the cwd',
+    existsSync(join(repo, 'data/agent-inbox.md')) && !existsSync(join(elsewhere, 'data')));
 }
 
 // ---------------------------------------------------------------------------

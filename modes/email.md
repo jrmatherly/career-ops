@@ -96,8 +96,10 @@ and is not affected by it.
 
 For an invocation resolved to a report, normalize the report number when
 matching `data/pdf-index.tsv` (`008` and `8` are the same report). Ignore blank
-and comment rows. The manifest writer keeps one current row per report; if a
-hand-edited manifest contains duplicates, use the last matching row.
+and comment rows. The manifest writer keeps one row per report and `kind`: use
+the row whose `kind` is `cv` (a blank `kind` is a legacy CV row), and the `cover`
+row only for the cover-letter checklist line. If a hand-edited manifest contains
+duplicates, use the last matching row of that kind.
 
 Resolve the row's workspace-relative `pdf` and `html` columns against the
 workspace root (the directory that contains `data/`), matching the base used by
@@ -118,7 +120,7 @@ but never claim the body was aligned to it without a readable HTML companion.
 
 Use these optional fields when present:
 - `candidate.full_name`
-- `candidate.chinese_name`
+- `candidate.chinese_name` (not in `config/profile.example.yml`; the user may add it under `candidate:`)
 - `candidate.email`
 - `candidate.phone`
 - `candidate.wechat`
@@ -377,8 +379,8 @@ Best regards,
 ## Confirmed-Time No-Show Follow-up (`confirmed_time_noshow`)
 
 **Scope note:** this variant is unrelated to the elapsed-time cadence in
-`modes/followup.md` / `followup-cadence.mjs` (applied: 7 days, responded: 3
-days, interview: 1 day). Those track "it's been N days since the status
+`modes/followup.md` / `followup-cadence.mjs` (applied: 7 days, responded: 1 day,
+then 3, interview: 1 day). Those track "it's been N days since the status
 changed." This variant is same-day and commitment-specific: a recruiter or
 interviewer explicitly confirmed a call time in a two-way exchange (email,
 ATS scheduler, text) and the call did not happen. There is no day-elapsed
@@ -457,9 +459,8 @@ Best,
 
 ## Language
 
-- Match the JD/report language.
-- If the JD is Chinese, use Simplified Chinese.
-- If the company/recruiter language is unknown, default to the user's language.
+- Write in `language.output` from `config/profile.yml` (AGENTS.md → "Output
+  Language vs Market Modes"), whatever the JD/report language. Default: `en`.
 - Keep the subject line in the same language as the body unless the user asks
   otherwise.
 

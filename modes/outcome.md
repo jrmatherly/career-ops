@@ -19,7 +19,7 @@ Record the outcome of an application conversationally, archive per-application a
 - `data/applications.md` — Application tracker
 - `cv.md` — Active CV (submitted CV snapshot)
 - `templates/states.yml` — Canonical tracker states
-- User input — Selector (report # or company name), outcome type, stage reached, verbatim feedback, notes
+- User input — Selector (tracker # or company name), outcome type, stage reached, verbatim feedback, notes
 
 ## Supported Outcomes & Tracker Mapping
 
@@ -31,7 +31,7 @@ Record the outcome of an application conversationally, archive per-application a
 | `offer_declined` | `Discarded` | Offer declined by candidate |
 | `rejected` | `Rejected` | Application rejected |
 | `no_response` | `Discarded` | No response / ghosted |
-| `interview_only` | `Interview` (or `Discarded`/`Rejected` if process concluded) | Interview process completed |
+| `interview_only` | `Interview` | Interview process completed |
 
 ## Execution Procedure
 
@@ -60,9 +60,9 @@ node outcome.mjs <tracker#|company> <outcome_type> [--stage "..."] [--feedback "
 
 Each invocation creates or appends to `data/outcomes/{num}_{company_slug}_{role_slug}/`:
 
-1. `submitted_cv.md` — Snapshot of CV at application/outcome time
+1. `submitted_cv.pdf` — the tailored CV PDF, when `--cv`, the tracker's PDF cell or `data/pdf-index.tsv` resolves one; otherwise `submitted_cv.md`, a snapshot of `cv.md` at outcome time
 2. `submitted_cover_letter.md` — Snapshot of cover letter (if provided)
-3. `posting.pdf` — Job posting PDF snapshot via `archive-posting.mjs` (or `posting_missing.md` stub if unavailable)
+3. `posting{ext}` — the posting capture, copied under its own extension (`.pdf`, `.txt`, `.md`). It is found by a `local:jds/` link in the row's Notes, then by a capture keyed to the report number (`jd-capture.mjs`), then by running `archive-posting.mjs --report=N` on the posting URL. If none resolves, a `posting_missing.md` stub is written
 4. `outcome.md` — Append-only outcome journal logging date, status transition, stage, verbatim feedback, and notes
 
 ## Rules & Constraints

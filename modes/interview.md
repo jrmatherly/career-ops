@@ -32,7 +32,7 @@ Ask the user about their immediate goals:
 - What specific roles are they targeting?
 - What are their target salary and total compensation expectations?
 - What are their location preferences (remote, hybrid, on-site, geographic limits)?
-- Update `config/profile.yml` with the target role titles, locations, and salary bounds.
+- Note the target role titles, locations, and salary bounds for Step 5. Write nothing yet.
 
 ### Step 2: Experience & Core Achievements
 
@@ -45,24 +45,25 @@ Ask about their most significant professional achievements:
 
 Recruiters and ATS scanners look for quantifiable metrics. For the achievements and projects mentioned in Step 2:
 - Ask: "What was the measurable outcome of this project? (e.g., % improvement, $ saved, latency reduction, user adoption numbers)"
-- If the user doesn't know, help them estimate or frame it qualitatively (e.g., "enabled 12 developers to ship 3x faster").
+- If the user doesn't know, record the outcome qualitatively (e.g., "enabled the platform team to ship faster") and never estimate a number for them: a guessed figure written to `cv.md` becomes a fact every later mode cites (AGENTS.md, Source-of-Truth Boundary).
 
 ### Step 4: Uncovering Hidden Skills
 
 Ask about adjacent experience or forgotten skills:
 - "What tools, languages, or methodologies do you have experience with that aren't on your main resume?"
-- "Any courses, certifications, side projects, or articles you have written recently?"
+- "Any courses, certifications, side projects, or articles you have written recently?" An article, case study or published proof point goes to `article-digest.md` in Step 5, not into `cv.md`.
 
 ---
 
 ## Step 5 — Apply Updates
 
-Once the interview is complete, or once enough new details have been collected:
+Once the interview is complete, or once enough new details have been collected, show the user every proposed change per file (the current text and the new text) and write only what they confirm, the way `add`, `expand` and `intake` do. Nothing is written before that confirmation.
 1. **Update `cv.md`**: Update the professional summary, rewrite project bullet points to incorporate the new keywords and metrics, and append new skills.
 2. **Update `config/profile.yml`**: Update the targets, compensation, and narrative sections.
 3. **Update `modes/_profile.md`**: Map the new projects/proof points to the target archetypes and update the adaptive framing rules.
-4. Run `node doctor.mjs` silently to verify project integrity.
-5. Provide a summary of the files updated:
+4. **Update `article-digest.md`**: Add the articles, case studies and published proof points the user named, each with the source they gave.
+5. Run `node doctor.mjs` silently to verify project integrity.
+6. Provide a summary of the files updated:
    > "✅ Interactive interview completed! Updated your profile:
    > - **CV**: Refined summaries and project bullets with new metrics.
    > - **Profile config**: Updated target roles and comp expectations.

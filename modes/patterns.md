@@ -1,4 +1,4 @@
-# Mode: patterns -- Rejection Pattern Detector
+# Mode: patterns — Rejection Pattern Detector
 
 ## Purpose
 
@@ -58,9 +58,9 @@ If the script returns `error`, display the error message and exit.
 
 `vendorAnalysis` groups **submitted** applications by the ATS vendor detected from
 each report's `**URL:**` (community ATS with clean fingerprints only: Greenhouse,
-Lever, Ashby, Workday — white-labeled ATS are not URL-detectable and fall into an
+Lever, Ashby, Workday, iCIMS — white-labeled ATS are not URL-detectable and fall into an
 unreported `unknown` bucket). `advanceRate` = share that reached
-`Responded`/`Assessment`/`Interview`/`Offer` (a bare `Applied` does **not** count).
+`Responded`/`Assessment`/`Interview`/`Offer`/`Hired` (a bare `Applied` does **not** count).
 
 Motivation: *Algorithmic Monocultures in Hiring* (Bommasani et al., FAccT 2026,
 [arXiv:2605.27371](https://arxiv.org/abs/2605.27371)) — rejections through a shared
@@ -244,7 +244,7 @@ Ask the user if they want to act on any recommendations:
 
 > "Want me to apply any of these recommendations? I can:
 > - Update `portals.yml` to filter out geo-restricted roles
-> - Set a score threshold in `_profile.md` for PDF generation (only when `scoreThreshold.sufficientSample` is true)
+> - Set a score threshold for PDF generation (`config/profile.yml` → `auto_pdf_score_threshold`) (only when `scoreThreshold.sufficientSample` is true)
 > - Adjust archetype targeting based on what's converting
 > - Realign targeting from the session signal — add the under-targeted archetype X to `modes/_profile.md` and reweight `portals.yml` `title_filter.positive` (if Step 1b ran)
 >
@@ -253,7 +253,7 @@ Ask the user if they want to act on any recommendations:
 If the user agrees:
 - For portal filter changes: edit `portals.yml`
 - For profile/archetype changes: edit `modes/_profile.md` (NEVER `_shared.md`)
-- For score threshold: add to `config/profile.yml` under a `patterns` key
+- For score threshold: set `auto_pdf_score_threshold` in `config/profile.yml`
 
 ## Outcome Classification
 
@@ -261,7 +261,7 @@ For reference, outcomes are classified as:
 
 | Status | Outcome |
 |--------|---------|
-| Interview, Offer, Responded, Hired | **Positive** (the employer moved it forward) |
+| Interview, Offer, Responded, Assessment, Hired | **Positive** (the employer moved it forward) |
 | Applied | **Awaiting** (sent, no answer yet — counts in the conversion denominator, never as a success) |
 | Rejected | **Negative** (the employer said no) |
 | Discarded | **Discarded** (you withdrew, or the posting closed — not an employer decision, not a proven submission; counts in neither `submitted` nor `decided`) |
