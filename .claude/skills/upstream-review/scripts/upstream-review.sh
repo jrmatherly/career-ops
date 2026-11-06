@@ -169,7 +169,8 @@ case "$cmd" in
     trap 'rm -f "$tmp"' EXIT
     jq --arg s "$NEWSHA" --arg ss "$NEWSHORT" --arg d "$NEWDATE" --arg n "$NOW" \
       '.lastReviewedSha=$s | .lastReviewedShaShort=$ss | .lastReviewedDate=$d | .lastAdvancedAt=$n' \
-      "$STATE" > "$tmp" && mv "$tmp" "$STATE"
+      "$STATE" > "$tmp" || die "jq failed; watermark left unchanged"
+    mv "$tmp" "$STATE"
     echo "[upstream-review] watermark -> $NEWSHORT ($NEWDATE). Commit .upstream-review/ to share it." >&2
     exit 0 ;;
   -h|--help) sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;

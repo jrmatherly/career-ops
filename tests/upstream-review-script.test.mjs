@@ -10,7 +10,7 @@
 // fast offline (http.proxy to a closed local port), which takes the script's
 // "fetch failed; using cached" branch.
 import { spawnSync } from 'child_process';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { pass, fail, ROOT } from './helpers.mjs';
@@ -89,6 +89,20 @@ if (spawnSync('jq', ['--version'], { encoding: 'utf-8' }).status !== 0) {
     r = run('--advance', C);
     ok(r.status === 0 && readWatermark() === C && readdirSync(stateDir).sort().join() === 'reviews,watermark.json',
       `advance writes the watermark atomically (got ${r.status}: ${r.stderr.trim()})`);
+
+    // A failing jq must not report success: a fake jq on PATH fails only the watermark rewrite.
+    // Resolve the real binary: a mise shim re-enters mise, which fails under this env.
+    const onPath = spawnSync('bash', ['-c', 'command -v jq'], { encoding: 'utf-8' }).stdout.trim();
+    const realJq = realpathSync(onPath).endsWith('/mise')
+      ? ['bin/jq', 'jq'].map((rel) => join(spawnSync('mise', ['where', 'jq'], { encoding: 'utf-8' }).stdout.trim(), rel)).find((f) => existsSync(f))
+      : onPath;
+    const shim = join(work, 'bin');
+    mkdirSync(shim);
+    writeFileSync(join(shim, 'jq'), `#!/bin/sh\ncase "$*" in *lastReviewedSha=*) exit 1;; esac\nexec "${realJq}" "$@"\n`, { mode: 0o755 });
+    writeWatermark(B);
+    r = spawnSync('bash', [SCRIPT, '--advance', C], { cwd: fx, encoding: 'utf-8', env: { ...env, PATH: `${shim}:${process.env.PATH}` } });
+    ok(r.status === 1 && /jq failed/.test(r.stderr) && readWatermark() === B && readdirSync(stateDir).sort().join() === 'reviews,watermark.json',
+      `advance fails loudly when jq fails and leaves the watermark alone (got ${r.status}: ${r.stderr.trim().split('\n').pop()})`);
 
     r = run('--dry-run-merge');
     ok(r.status === 1 && /README\.md/.test(r.stdout),
