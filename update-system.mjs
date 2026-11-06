@@ -350,6 +350,7 @@ export const USER_PATHS = [
   'writing-samples/',
   'config/plugins.yml',
   'config/privacy.yml',
+  'config/cv-facts.json',
   'plugins.local/',
   'plugins.lock',
   'opencode.json',

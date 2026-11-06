@@ -7,7 +7,7 @@
 // (#1401), so a PR that re-pinned a plugin — the SHA that decides which
 // third-party code users install — was routed to no owner, while the line read
 // as if the trust root were covered. The skill router had the same gap from the
-// other side: all seven CLI skill directories symlink to
+// other side: all six CLI skill directories symlink to
 // .agents/skills/career-ops/SKILL.md, a path no owner entry or label glob named.
 import { pass, fail, ROOT } from './helpers.mjs';
 import assert from 'node:assert';

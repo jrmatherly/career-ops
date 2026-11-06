@@ -15,7 +15,7 @@ permissions:
   packages: read
 
 # A force-push supersedes the running matrix; cancel it instead of letting
-# stale legs occupy runners (3 jobs per push at this repo's PR volume).
+# stale legs occupy runners (8 jobs per push at this repo's PR volume).
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -46,7 +46,7 @@ jobs:
   test:
     needs: changes
     # !cancelled() and not the implicit success(): a failed or skipped `changes`
-    # must still run this job, or the required checks would never pass.
+    # must still run this job (upstream requires its checks; this fork requires none).
     # No `name:` on this job: tests/docs-only-change.test.mjs asserts it is unset.
     if: ${{ !cancelled() }}
     strategy:
@@ -61,9 +61,10 @@ jobs:
     # but its inline sections and the install steps have no limit of their
     # own. The slowest leg (macOS) takes about 11 minutes.
     timeout-minutes: 30
-    # A docs-only PR runs the suite on Ubuntu only (#6402). The other two legs
-    # stay in the matrix and skip their steps, because these three check names
-    # are required, and a job-level `if` cannot read `matrix` to skip just them.
+    # A docs-only change (PR or push) runs the suite on Ubuntu only (#6402). The
+    # other two legs stay in the matrix and skip their steps, because upstream
+    # requires these three check names, and a job-level `if` cannot read `matrix`
+    # to skip just them.
     # Ubuntu keeps the whole suite: about 45 test files read docs-type files, and
     # the inline sections of test-all.mjs scan every tracked file.
     env:
