@@ -15,4 +15,4 @@ Load the career-ops skill:
 skill({ name: "career-ops" })
 ```
 
-Then read the matching `interview-prep/{company}-{role}.md` under the data root (the report the `interview-prep` mode writes) and show it. Do not research or write a new one. If no report exists for that company, say so and offer to run `/career-ops interview-prep` for it.
+Then read the matching `interview-prep/{company-slug}-{role-slug}.md` under the data root (the report the `interview-prep` mode writes) and show it. Do not research or write a new one. If no report exists for that company, say so and offer to run `/career-ops interview-prep` for it.

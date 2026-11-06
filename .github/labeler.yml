@@ -1,3 +1,5 @@
+# No workflow applies these labels on this fork;
+# tests/codeowners-paths.test.mjs reads the agent-behavior block.
 "🔴 core-architecture":
   - changed-files:
       - any-glob-to-any-file:

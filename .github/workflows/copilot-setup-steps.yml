@@ -1,7 +1,8 @@
 # Prepares the environment for Copilot cloud agent sessions.
-# Mirrors test.yml: same Node and Go, dependencies installed without
-# lifecycle scripts. The agent's network firewall does not apply to this
-# job, so this file stays under CODEOWNERS like every other workflow.
+# Mirrors test.yml's test leg (Node 24, Go from dashboard/go.mod); the Node
+# 22.13 lint leg runs only in CI. Dependencies install without lifecycle
+# scripts. The agent's network firewall does not apply to this job; CODEOWNERS
+# names its owner, but nothing enforces that review on this fork.
 name: "🤖 Copilot setup steps"
 
 on:

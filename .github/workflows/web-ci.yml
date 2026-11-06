@@ -2,8 +2,7 @@ name: "🌐 Web CI"
 
 # CI for the experimental web UI (web/). Informative by design: it is NOT a
 # required check for the core — a red here never blocks a core merge, and core
-# changes never trigger it. The web/ tree versions and releases as its own
-# release-please component.
+# changes never trigger it.
 on:
   pull_request:
     paths:
@@ -67,7 +66,7 @@ jobs:
       # build above once per suite on disposable data and runs it there, where a
       # skip is a failure. They launch Google Chrome (`channel: "chrome"`), which
       # the ubuntu-latest image ships; checked first, so a runner image without
-      # it fails here by name rather than in twelve launch errors.
+      # it fails here by name rather than in one launch error per suite.
       - name: "🌐 Browser suites against the built app"
         run: |
           google-chrome --version

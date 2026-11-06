@@ -35,6 +35,7 @@ export const GUARDED_PATHS = [
   'config/profile.yml',
   'config/plugins.yml',
   'config/privacy.yml',
+  'config/cv-facts.json',
   'modes/_profile.md',
   'modes/_custom.md',
   'modes/_brief.md',

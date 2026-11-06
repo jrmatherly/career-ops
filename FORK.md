@@ -27,9 +27,9 @@ fails when a diverged path has no row in the table.
 
 Bug reports, features and pull requests for the product go to
 [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops).
-Issues and pull requests are not used on this fork, and `CONTRIBUTING.md`'s
-bots, `/assign` claims and adoption ladder run upstream only. A problem with
-something only this fork has (its hooks, workflows, GHCR images) goes to
+Issues are off on this fork, and pull requests are only the owner's own branch
+merges; `CONTRIBUTING.md`'s bots, `/assign` claims and adoption ladder run
+upstream only. A problem with something only this fork has (its hooks, workflows, GHCR images) goes to
 support@matherly.net. Security reports for the fork's own files follow
 [`SECURITY.md`](SECURITY.md).
 

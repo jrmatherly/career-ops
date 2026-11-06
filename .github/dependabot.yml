@@ -1,5 +1,7 @@
 # Fork-only scope: npm and Go pins arrive through the upstream sync
-# (/upstream-review); only the SHA-pinned GitHub Actions need their own bumps.
+# (/upstream-review); only the SHA-pinned GitHub Actions need their own bumps,
+# and the root Dockerfile's base digest, which is re-resolved by hand
+# (`docker buildx imagetools inspect`, per .claude/skills/upstream-review/SKILL.md).
 # Version updates are off on forks until enabled in Settings → Code security.
 version: 2
 updates:

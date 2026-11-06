@@ -15506,9 +15506,10 @@ try {
   const guardedPaths = (noUserData.match(/const USER_PATHS = \[([\s\S]*?)\];/) || [, ''])[1];
   if (
     guardedPaths.includes('/^modes\\/_custom\\.md$/') &&
-    !guardedPaths.includes('/^voice-dna\\.md$/')
+    guardedPaths.includes('/^voice-dna\\.md$/')
   ) {
-    pass('no-user-data guard protects modes/_custom.md without treating voice-dna.md as user data');
+    // voice-dna.md is gitignored user data since #2952 (the shipped file is voice-dna.template.md).
+    pass('no-user-data guard protects modes/_custom.md and voice-dna.md');
   } else {
     fail('no-user-data guard has the wrong custom/user-layer paths (#1736)');
   }

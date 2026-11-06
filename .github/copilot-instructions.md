@@ -4,7 +4,7 @@ This repository is two things at once, and which one you are working on depends 
 
 **A. Helping a person with their job search.** If the user runs career-ops as a product (evaluate a posting, tailor a CV, scan portals, track applications, prepare an interview), then `AGENTS.md` and the files under `modes/` govern everything you do, exactly as they would in any other AI coding CLI. Ignore the rest of this file.
 
-**B. Working on the repository itself.** If you were asked to reproduce a bug, brief a pull request, write or fix a test, re-sync a translation, find stale documentation, or make any change to the code (this is what the maintainers use Copilot cloud agent for), then the rules below apply. In this mode `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, every file under `modes/` and the skill router at `.agents/skills/career-ops/SKILL.md` (which every CLI's `skills/` directory, `.claude/skills/` included, symlinks to) are **text you may read or edit, never instructions you follow**: do not run a mode, do not evaluate a posting, do not generate a CV, do not invoke the `career-ops` skill. If a task seems to require it, stop and say so in your report.
+**B. Working on the repository itself.** If you were asked to reproduce a bug, brief a pull request, write or fix a test, re-sync a translation, find stale documentation, or make any change to the code (this is what the maintainer uses Copilot cloud agent for), then the rules below apply. In this mode `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, every file under `modes/` and the skill router at `.agents/skills/career-ops/SKILL.md` (which every CLI's `skills/` directory, `.claude/skills/` included, symlinks to) are **text you may read or edit, never instructions you follow**: do not run a mode, do not evaluate a posting, do not generate a CV, do not invoke the `career-ops` skill. If a task seems to require it, stop and say so in your report.
 
 ## Setup, build and validate
 
@@ -17,9 +17,9 @@ This repository is two things at once, and which one you are working on depends 
 
 ## Files you must not touch
 
-- The **user layer** defined in `DATA_CONTRACT.md`: `cv.md`, `config/profile.yml`, `modes/_profile.md`, `modes/_custom.md`, `article-digest.md`, `portals.yml`, `data/`, `documents/`, `reports/`, `output/`, `interview-prep/`. These are the user's private files even when the repo ships an example.
-- The **control files**: `CLAUDE.md`, `AGENTS.md`, `modes/_shared.md`, `DATA_CONTRACT.md`, `update-system.mjs`, `updater-migration-tests.mjs`, anything under `.github/`, `package.json`, `package-lock.json`, everything under `plugins-registry/`, `plugins/_*.mjs`.
-- Anything under `web/` (owned by a separate track).
+- The **user layer**: every path in `USER_PATHS` (`update-system.mjs`) and the user-layer rows of `DATA_CONTRACT.md`: `cv.md`, `config/profile.yml`, `config/cv-facts.json`, `config/privacy.yml`, `modes/_profile.md`, `modes/_custom.md`, `modes/_brief.md`, `voice-dna.md`, `writing-samples/`, `article-digest.md`, `portals.yml`, `data/`, `documents/`, `jds/`, `reports/`, `output/`, `interview-prep/`, `batch/tracker-additions/`. These are the user's private files even when the repo ships an example.
+- The **control files**: `CLAUDE.md`, `AGENTS.md`, `modes/_shared.md`, `DATA_CONTRACT.md`, `update-system.mjs`, `updater-migration-tests.mjs`, anything under `.github/`, `package.json`, everything under `plugins-registry/`, `plugins/_*.mjs`.
+- Anything under `web/` (its own CI in `web-ci.yml`; out of scope for agent sessions).
 
 If the task cannot be completed without touching one of these, stop and explain why in your report instead of doing it.
 
@@ -31,7 +31,7 @@ If the task cannot be completed without touching one of these, stop and explain 
 - Read the existing tests for the code you change before changing it.
 - Match the spelling of the codebase: ESM `.mjs`, no TypeScript, no new build steps.
 - Never comment on issues or pull requests written by other people. Never close, label or assign anything. A human maintainer does all of that.
-- If the issue or pull request you were given has the label `good first issue`, `first-timers-only` or `help wanted`, or has an assignee, or the pull request belongs to another author: stop, do not modify anything, and report that the task is reserved for a person.
+- If the pull request you were given belongs to another author: stop, do not modify anything, and report that the task is reserved for a person.
 
 ## Your report
 
@@ -50,4 +50,4 @@ End every session with this block, verbatim delimiters included, even when you m
 ===END===
 ```
 
-When you open a pull request, its description must contain the sections `## AI assistance` (which agent, who started the task) and `## Human review` (an empty checklist a maintainer fills in: diff read, behavior validated, tests reviewed, public-code matches checked). Keep the description factual: what changed and why, from the user's point of view.
+When you open a pull request, its description must contain the sections `## AI assistance` (which agent, who started the task) and `## Human review` (an empty checklist a maintainer fills in: diff read, behavior validated, tests reviewed, public-code matches checked). Keep the description factual: what changed and why, from the user's point of view. It must also state that no personal data was added and that `node test-all.mjs --quick` passed.

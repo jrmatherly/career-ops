@@ -5,6 +5,10 @@ title: 'sign: @your-username'
 labels: manifesto-signature
 ---
 
+<!-- This fork runs no signature bot (ledger-bot and signature-ci were removed 2026-11-05),
+     so a PR with this template does nothing here. Sign upstream at
+     https://github.com/career-ops-hq/career-ops or https://career-ops.org/manifesto -->
+
 <!-- Thank you for signing The CareerOps Manifesto.
      Canonical page: https://career-ops.org/manifesto -->
 

@@ -1,20 +1,16 @@
-# CODEOWNERS — auto-requests maintainer review on sensitive paths.
+# CODEOWNERS — the paths whose changes deserve a careful look.
 # Last matching pattern wins. MAINTAINERS.md and GOVERNANCE.md describe upstream's team and ladder;
 # see FORK.md for how this fork is run.
 #
 # Scope principle: gate what CI can't catch (a bad change here passes the
 # tests silently) + the catastrophic updater + governance docs. Code that
-# test-all.mjs / Renovate / dependency-review already guard (scan.mjs,
+# test-all.mjs already guards (scan.mjs,
 # generate-pdf.mjs, test-all.mjs, package.json) is intentionally NOT gated,
 # so routine contributor PRs aren't bottlenecked on a single owner.
 #
-# 2026-08-13: that condition is met — there is now more than one code owner,
-# so the list broadens for the first time. The split is deliberate: the blocks
-# below stay single-owner because they are the ones CI cannot catch and where
-# a quiet mistake is expensive; the areas at the bottom move to the person who
-# has been their de facto expert for months. Area ownership routes review;
-# nothing enforces it on this fork (no branch protection beyond the
-# protect-main ruleset, which only blocks deletion and force-push).
+# On this fork every pattern names the one maintainer, so the split below only
+# records which paths upstream treats as sensitive. Nothing enforces it here
+# (the protect-main ruleset blocks only deletion and force-push).
 
 # Repo docs & governance
 /README*.md            @jrmatherly
@@ -36,7 +32,7 @@
 /OPENCODE.md           @jrmatherly
 /GEMINI.md             @jrmatherly
 /KIMI.md               @jrmatherly
-# The skill router. Every CLI's skill entrypoint (.claude/, .cursor/,
+# The skill router. Every CLI's skill entrypoint (.claude/,
 # .opencode/, .qwen/, .kimi/, .grok/, .antigravitycli/) is a symlink to this
 # one file, so an edit here changes only this path — the symlinks never show
 # up in the diff.
@@ -67,8 +63,7 @@
 /.github/workflows/            @jrmatherly
 /docs/PLUGIN_REVIEW.md         @jrmatherly
 
-# The experimental web UI — owned by the web track (dual-track review with the
-# core maintainer on any PR that also touches root files).
+# The experimental web UI.
 /web/ @jrmatherly
 
 # ── Area owners ────────────────────────────────────────────────────────────
