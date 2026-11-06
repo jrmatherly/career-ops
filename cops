@@ -11,8 +11,8 @@
 #   ./cops bash -c 'ls reports'      # bash one-liner
 #   ./cops up | down | rebuild | logs
 #
-# Anything not matching a known subcommand is forwarded to npm run <subcommand>
-# when package.json defines it, otherwise executed verbatim inside the container.
+# The npm scripts listed in the case below run as `npm run <subcommand>`;
+# anything else is executed verbatim inside the container.
 
 set -euo pipefail
 

@@ -7,7 +7,7 @@ Thanks for your interest in contributing! Career-Ops is built with Claude Code, 
 career-ops is a great place to make your **first open-source contribution** — and a great line on your résumé.
 
 - **You already get it.** This is a job-search tool. If you're job-hunting, you understand the problem better than most — which makes you a better contributor.
-- **A real merged PR, on something people use.** 55K+ stars, shipping most weeks. Your name in the history of a real project, not a toy repo.
+- **A real merged PR, on something people use.** Tens of thousands of stars, shipping most weeks. Your name in the history of a real project, not a toy repo.
 - **We answer fast.** Open an issue or PR and you'll hear back, usually within a day or two. No black holes.
 - **Tiny on-ramps.** Browse [`good first issue`](https://github.com/career-ops-hq/career-ops/contribute) — each is scoped small, with a time estimate, the pattern to copy, and a clear "done", so your first PR is a win, not a maze.
 - **Your human work gets a real review.** We read every PR. We don't drown contributors in bot noise, and we don't merge AI-slop — put thought in, get thought back.

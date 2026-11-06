@@ -7,7 +7,7 @@ A high-level map of how career-ops is put together. For the precise system/user 
 Career-ops is built on three commitments that every design decision serves:
 
 - **Local-first.** Everything runs on your machine against your files. No account required, no server in the loop for the core tool.
-- **AI-agnostic.** The logic lives in Markdown prompt files under `modes/`, executed by whatever AI coding CLI you use (Claude Code, Codex, OpenCode, Gemini, Qwen, Grok, Antigravity) or by standalone Node scripts. No single model is hardcoded.
+- **AI-agnostic.** The logic lives in Markdown prompt files under `modes/`, executed by whatever AI coding CLI you use (Claude Code, Codex, OpenCode, Pi, Qwen, Grok, Antigravity and others; see [docs/SUPPORTED_CLIS.md](docs/SUPPORTED_CLIS.md)) or by standalone Node scripts. No single model is hardcoded.
 - **Human-in-the-loop.** The tool prepares and evaluates; the human reviews and clicks. It never submits applications on your behalf.
 
 ## The two layers (the data contract)
@@ -17,7 +17,7 @@ The single most important architectural rule: **system files** and **user files*
 - **System layer** — the tool itself: `modes/`, scripts (`*.mjs`), templates, the dashboard. These are versioned and updated by `update-system.mjs`. Listed in `SYSTEM_PATHS`, in `lib/update-manifest.mjs`.
 - **User layer** — your data: `cv.md`, `config/profile.yml`, `modes/_profile.md`, `data/`, `reports/`, `jds/`, etc. The updater **never** touches these. Listed in `USER_PATHS`.
 
-`DATA_CONTRACT.md` is the source of truth for this boundary, and `updater-migration-tests.mjs` enforces that no system path ever overlaps a user path.
+`DATA_CONTRACT.md` is the source of truth for this boundary, and `updater-migration-tests.mjs` enforces that no system path names user data, apart from the scaffold placeholders listed in `MANIFEST_USER_PATH_OVERLAPS` (`update-system.mjs`), such as `data/.gitkeep`.
 
 ## Files are canonical — databases are derived
 
@@ -71,9 +71,9 @@ A standalone Go TUI under `dashboard/` for browsing the pipeline. Isolated from 
 
 ## Quality gates
 
-- `test-all.mjs` — the full suite (500+ checks across scoring, scan, tracker, PDF, security, updater).
+- `test-all.mjs` — the full suite (scoring, scan, tracker, PDF, security, updater; one file per suite under `tests/`).
 - `updater-migration-tests.mjs` — enforces the system/user boundary and safe cross-version upgrades.
-- CI: `test` + CodeQL are required; CodeRabbit reviews every PR; Renovate keeps deps current.
+- CI: `test` + CodeQL are required; CodeRabbit reviews every PR; Dependabot (`.github/dependabot.yml`) and Renovate (`renovate.json`) keep deps current.
 
 ## Where to start reading
 

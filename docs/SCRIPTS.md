@@ -1869,6 +1869,25 @@ Self-test: `node ats-payload.mjs --self-test`.
 
 ---
 
+## himalayas-posting.mjs
+
+Reads one Himalayas posting through the site's public single-job API, from a bounded `{"url":"original-posting-url"}` JSON request on stdin (`-`) or in a file. Used by the evaluators to get exact posting text without a browser. Read-only; makes one request.
+
+```bash
+node himalayas-posting.mjs --request -        # JSON request on stdin
+node himalayas-posting.mjs --request req.json
+node himalayas-posting.mjs --help
+```
+
+## verify-tracker-url-match.mjs
+
+Checks that each tracker row's URL cell describes the same posting as the report it links. `verify-pipeline.mjs` Check 3 proves the report file exists and Check 9 compares URLs between reports, but nothing compared a row's own URL against its report's `**URL:**` header, so a row pointing at posting A while its report documents posting B passed every check. Only rows whose URLs are both employer-controlled and distinct are flagged; aggregator and one-sided-language cases are skipped. Read-only; JSON by default, exit 1 on any mismatch.
+
+```bash
+node verify-tracker-url-match.mjs             # JSON
+node verify-tracker-url-match.mjs --summary   # human-readable table
+```
+
 ## process-quality.mjs
 
 Aggregates candidate-authored `[process-friction]` tags from the Notes column

@@ -8,7 +8,7 @@ Built and used by [santifer](https://santifer.io) for his own job search: 740 li
 
 ## Data Contract (CRITICAL)
 
-Two layers — full list in `DATA_CONTRACT.md`:
+Two layers — the tables in `DATA_CONTRACT.md` show the shape; the complete lists are `SYSTEM_PATHS` and `USER_PATHS` in `lib/update-manifest.mjs` and `update-system.mjs`:
 
 - **User Layer (NEVER auto-updated; personalization goes HERE):** `cv.md`, `config/profile.yml`, `config/cv-facts.json`, `modes/_profile.md`, `modes/_custom.md`, `modes/_brief.md`, `voice-dna.md`, `writing-samples/*`, `article-digest.md`, `portals.yml`, `data/*`, `documents/*`, `jds/*`, `reports/*`, `output/*`, `interview-prep/*`, `batch/tracker-additions/*`
 - **System Layer (auto-updatable; DON'T put user data here):** `modes/_shared.md` and every other file in `modes/` except the three user files above, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, `*.mjs` scripts, `dashboard/*`, `templates/*`, `batch/*` (except `batch/tracker-additions/`)
@@ -42,7 +42,7 @@ User-facing content (CV, cover letters, application emails, form answers, recrui
 
 **Derived / accumulated (narrative + phrasing trust; NOT automatically cv.md-equivalent for numbers):**
 
-- `interview-prep/story-bank.md` and `interview-prep/{company}-{role}.md` (the user's own STAR stories and prep notes; consumed by `interview` and `apply`/`match-star`)
+- `interview-prep/story-bank.md` and `interview-prep/{company}-{role}.md` (the user's own STAR stories and prep notes; consumed by `interview-prep`, the `interview/*` modes and `apply`/`match-star`)
 
 `story-bank.md` is *accumulated*, not authored the way `cv.md` is — it is commonly built up from past interview-prep documents, which are themselves AI-written mappings of the user's experience onto a specific job posting's language. A scale figure or scope claim invented once in a prep doc (to match a JD's emphasis) can get absorbed into story-bank.md as a standalone fact, then cited as ground truth by a later, unrelated prep doc, drifting further on each reuse — with nothing forcing it back to a primary file. These files may supply narrative structure and phrasing freely. **Any quantified claim, scale figure, or scope-of-responsibility claim originating in a derived file must trace to a primary file above, or carry an explicit provenance marker on that story-bank entry** (`**Provenance:** source: cv.md | user-stated YYYY-MM-DD | derived-unverified | user-cannot-confirm` — see `story-provenance-check.mjs`'s header for the full convention and classification). Absent a marker, treat an unconfirmed number from story-bank.md as `derived-unverified`, not as an established fact — run `node story-provenance-check.mjs --summary` before trusting a story-bank figure in generated content, and don't restate a `derived-unverified` number as settled just because it appears confidently in the story.
 
@@ -462,6 +462,7 @@ A single-string `modes_dir` (today's default, ~90% of users) behaves exactly as 
 | Wants LinkedIn outreach | `contacto` — identifies hiring manager, recruiter, or team peers via web search; drafts a message tailored to the contact type (recruiter / hiring manager / peer / interviewer), within LinkedIn's connection-request character limit for the account's tier (200 free, 300 Premium/Sales Navigator) |
 | Wants a formal application email | `email` — draft-only subject, body, attachment checklist, and contact block from a report or JD; never sends, submits, or clicks anything |
 | Asks for company research | `deep` — structured 6-axis research prompt (AI strategy, recent moves, engineering culture, likely challenges, competitors, candidate's angle) |
+| Wants a guided interview that builds or enriches `cv.md` and the profile from their answers | `interview` — interactive onboarding interview; not the interview-prep modes below |
 | Preps for interview at specific company | `interview-prep` |
 | Wants a time-blocked prep plan for an upcoming interview | `interview/plan` |
 | Wants to run practice interview questions with feedback | `interview/practice` |
@@ -500,6 +501,7 @@ A single-string `modes_dir` (today's default, ~90% of users) behaves exactly as 
 | Wants to update the system | `update` |
 | Wants to queue a request for later / check the inbox between sessions | `agent-inbox` — append-only checklist drained next session; nothing auto-submits |
 | Wants to add a finished project, paper, or role to the CV | `add` — source-grounded preview, confirm-before-write; dedup + insertion via `add-entry.mjs` |
+| Calibrating an application for a European software-engineering market | `eu-swe` — regional calibration (`modes/regional/eu-swe.md`) |
 
 ### CV Source of Truth
 
@@ -588,6 +590,7 @@ Headless worker command per CLI:
 | Claude Code | `claude -p "prompt"` |
 | **OpenCode** | `opencode run "prompt"` (falls back to `ollama launch opencode -y -- run "prompt"` if `opencode` binary is not in PATH) |
 | Pi | `pi -p "prompt"` |
+| Oh My Pi | `omp -p "prompt"` |
 | Copilot CLI | `copilot -p "prompt"` |
 | Codex | `codex exec "prompt"` |
 | Qwen | `qwen -p "prompt"` |

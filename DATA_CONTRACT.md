@@ -18,6 +18,8 @@ These files contain your personal data, customizations, and work product. Update
 | `modes/_profile.md` | Your archetypes, narrative, negotiation scripts |
 | `modes/_custom.md` | Your house rules, custom workflows & output preferences (procedural — survives updates) |
 | `modes/_brief.md` | Your compact profile brief (~1.5–2K tokens) read by the two-pass triage first pass |
+| `.claude/settings.json` | Your Claude Code project settings (preserved by the updater) |
+| `.claude/hooks/` | Your Claude Code hooks (preserved by the updater) |
 | `voice-dna.md` | Your writing voice guardrail — banned words, anti-AI-slop rules, tone (optional) |
 | `article-digest.md` | Your proof points from portfolio |
 | `interview-prep/story-bank.md` | Your accumulated STAR+R stories |
@@ -115,6 +117,17 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `modes/batch.md` | Batch processing instructions |
 | `modes/apply.md` | Application assistant instructions |
 | `modes/auto-pipeline.md` | Auto-pipeline instructions |
+| `modes/triage.md` | Fast first-pass filter instructions |
+| `modes/discover.md` | Company-to-ATS-board discovery instructions |
+| `modes/expand.md` | CV competency discovery instructions |
+| `modes/intake.md` | Document intake instructions |
+| `modes/ats.md` | ATS parseability check instructions |
+| `modes/latex-tex.md` | In-place tailoring of a user-owned `.tex` CV |
+| `modes/master-profile.md` | Master Career Profile instructions |
+| `modes/calibrate.md` | Score-vs-outcome calibration instructions |
+| `modes/pdf/*` | Opt-in PDF passes (hiring-manager audit) |
+| `modes/oferta-signals/*` | Shared evaluation signal definitions |
+| `modes/README.md` | Mode catalog |
 | `modes/contacto.md` | LinkedIn outreach instructions |
 | `modes/email.md` | Formal application email draft instructions |
 | `modes/deep.md` | Research prompt instructions |
@@ -152,10 +165,12 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `modes/pl/*` | Polish language modes |
 | `modes/pt/*` | Portuguese language modes |
 | `modes/ru/*` | Russian language modes |
+| `modes/sg/*` | Singapore (English) market modes |
 | `modes/tr/*` | Turkish language modes |
 | `modes/ua/*` | Ukrainian language modes |
 | `modes/vi/*` | Vietnamese language modes |
-| `modes/zh/*` | Chinese language modes |
+| `modes/zh/*` | Chinese (Simplified) language modes |
+| `modes/zh-TW/*` | Chinese (Traditional) language modes |
 | `modes/heuristics/*` | Shared candidate-facing application heuristics |
 | `CLAUDE.md` | Agent instructions (Claude Code) |
 | `OPENCODE.md` | Agent instructions (OpenCode) |
@@ -163,6 +178,12 @@ These files contain system logic, scripts, templates, and instructions that impr
 | `KIMI.md` | Agent instructions (Kimi CLI) |
 | `GEMINI.md` | Legacy no-op context guard (prevents Antigravity duplicate imports) |
 | `AGENTS.md` | Canonical agent instructions (imported by CLI-specific wrappers) |
+| `.omp/AGENTS.md` | Agent instructions import (Oh My Pi) |
+| `.agents/skills/*` | Shared skill router (Pi, Oh My Pi and the per-CLI symlinks) |
+| `.kimi/skills/*` | Skill definitions (Kimi CLI) |
+| `lib/*` | Shared library modules |
+| `tracker-aliases.json` | Tracker column alias table |
+| `voice-dna.template.md` | Template seed for the user's `voice-dna.md` |
 | `*.mjs` | Utility scripts |
 | `providers/` | Job-source provider modules for the zero-token scanner |
 | `plugins/` | Bundled plugins + the plugin engine (opt-in external integrations) |

@@ -177,7 +177,7 @@ It reformulates your CV; it must never fabricate it. A check in code stops a PDF
 | **Human-in-the-Loop**    | AI evaluates and recommends, you decide and act. The system never submits an application -- you always have the final call <!-- hitl: absolute guarantee. Do not add "automatically", "by itself", "without your permission" or any other hedge when translating this row. -->               |
 | **ATS PDF Generation**   | ATS-readable CVs tailored to each JD from your own experience, in Space Grotesk + DM Sans design                                                                                 |
 | **Cover Letter Generator** | Research-backed cover letters with keyword mirroring, four interactive angle prompts (why/problems/approach/tone), draft-in-chat approval gate, and A4 PDF via the same HTML + Playwright pipeline as CVs. Auto-drafts on every evaluation; complete and generate on demand via `/career-ops cover` |
-| **Beyond the CV**        | Company research ([`deep`](modes/deep.md)) surfaces AI strategy, recent moves, engineering culture, and the angle your profile should take. Contact discovery ([`contacto`](modes/contacto.md)) identifies the hiring manager, recruiter, or team peer worth reaching out to and drafts a ≤300-character LinkedIn message tuned to each contact type. Formal application email drafts ([`email`](modes/email.md)) turn an evaluated report or pasted JD into a subject line, body, and attachment checklist without sending, submitting, or clicking anything. Applications get you in the queue; research gets you a conversation. |
+| **Beyond the CV**        | Company research ([`deep`](modes/deep.md)) surfaces AI strategy, recent moves, engineering culture, and the angle your profile should take. Contact discovery ([`contacto`](modes/contacto.md)) identifies the hiring manager, recruiter, or team peer worth reaching out to and drafts a LinkedIn message tuned to each contact type, within the connection-request limit for your account tier (200 characters free, 300 Premium). Formal application email drafts ([`email`](modes/email.md)) turn an evaluated report or pasted JD into a subject line, body, and attachment checklist without sending, submitting, or clicking anything. Applications get you in the queue; research gets you a conversation. |
 | **Pattern Analysis**     | Rejection patterns and per-ATS-channel advance rates (`analyze-patterns.mjs`), lifetime funnel stats (`stats.mjs`), repost detection, a possible sign of a ghost job (`detect-reposts.mjs`) |
 
 <details>
@@ -288,7 +288,7 @@ Paste a job URL or description into your AI CLI. career-ops checks that a linked
 | CLI | How you ask for `scan` |
 | --- | --- |
 | Claude Code, OpenCode, Antigravity CLI (`agy`), Grok Build CLI | `/career-ops scan` |
-| Pi | `/skill:career-ops scan` |
+| Pi, Oh My Pi | `/skill:career-ops scan` |
 | Codex, Qwen, Cursor, or any other supported CLI | Plain language: "Run the career-ops scan mode" |
 
 `/career-ops` with nothing after it shows the command menu in the CLIs that use it. Plain language works in every supported CLI. As a Claude Code plugin, the command is `/career-ops:career-ops`.
@@ -398,7 +398,7 @@ All of them share one router, `.agents/skills/career-ops/SKILL.md`, and the same
 
 ## Pre-configured Portals
 
-The scanner comes with **100+ companies** ready to scan and **35+ search queries** across major job boards. Copy `templates/portals.example.yml` to `portals.yml` and add your own:
+The scanner comes with **100+ companies** ready to scan and dozens of search queries across major job boards. Onboarding writes `portals.yml` for you from your answers; to start by hand instead, copy `templates/portals.example.yml` to `portals.yml` and add your own:
 
 **AI Labs:** Anthropic, OpenAI, Mistral, Cohere, LangChain, Pinecone
 **Voice AI:** ElevenLabs, PolyAI, Parloa, Hume AI, Deepgram, Vapi, Bland AI
@@ -409,14 +409,14 @@ The scanner comes with **100+ companies** ready to scan and **35+ search queries
 **Automation:** n8n, Zapier, Make.com
 **European:** Factorial, Attio, Tinybird, Clarity AI, Travelperk
 
-**Job boards searched:** 55+ provider modules cover ATS APIs, board-wide feeds, XML/RSS feeds, markdown feeds, and local parsers. See [Supported job boards](docs/SUPPORTED_JOB_BOARDS.md) for the full table.
+**Job boards searched:** the provider modules cover ATS APIs, board-wide feeds, XML/RSS feeds, markdown feeds, and local parsers. See [Supported job boards](docs/SUPPORTED_JOB_BOARDS.md) for the full table.
 
 Keep the list current: `portals.yml` is designed to stay live, not be a one-time setup file. See [Keeping portals.yml live](docs/KEEPING_PORTALS_LIVE.md) for the house rule that adds new companies automatically and the commands to validate the file after every change.
 
-By default `node scan.mjs` (a.k.a. `npm run scan`) trusts what each ATS feed returns. Some companies leave stale postings in their public API even after the role is closed, so those expired entries can leak into `pipeline.md`. Pass `--verify` to launch Playwright after the API pass and drop expired postings before they hit the pipeline:
+By default `node scan.mjs` (a.k.a. `npm run scan`) trusts what each ATS feed returns. Some companies leave stale postings in their public API even after the role is closed, so those expired entries can leak into `pipeline.md`. Pass `--verify` to check each new posting's liveness through the ATS's public API first, falling back to Playwright only when the API is inconclusive, and drop expired postings before they hit the pipeline:
 
 ```bash
-node scan.mjs --verify          # zero-token discovery + Playwright liveness check
+node scan.mjs --verify          # zero-token discovery + API-first liveness check
 ```
 
 The verification is sequential and only runs against new offers (after dedup), so the cost stays bounded.
@@ -430,7 +430,7 @@ npm run serve:dashboard   # launch the TUI
 npm run build:dashboard   # optional: build the standalone binary
 ```
 
-Features: 10 filter tabs, 8 sort modes, grouped/flat view, lazy-loaded previews, inline status changes.
+Features: 10 filter tabs (plus an Other tab when non-canonical statuses exist), 8 sort modes, grouped/flat view, lazy-loaded previews, inline status changes.
 
 There is also an **experimental web UI** (alpha and opt-in: nothing runs unless you start it): see [`web/README.md`](web/README.md).
 
@@ -484,7 +484,8 @@ To separate your personal data from the code (making it easier to switch branche
    export CAREER_OPS_ROOT=~/my-career-data
    ```
 2. **Marker File:** Create a `.career-ops-data` file in the repository root containing the path to your data directory.
-3. **Default:** Defaults to the repository root.
+3. **Plugin install:** When career-ops runs as a Claude Code plugin, `~/career-ops-data` (see [docs/CLAUDE_PLUGIN.md](docs/CLAUDE_PLUGIN.md)). An override that points inside the plugin's install copy is refused.
+4. **Default:** Defaults to the repository root.
 
 Once resolved, all user files are resolved and written relative to that folder, while prompt files and scripts continue to resolve relative to the repository. 
 
@@ -599,9 +600,9 @@ See [LEGAL_DISCLAIMER.md](LEGAL_DISCLAIMER.md) for full details. This software i
   <img src="https://contrib.rocks/image?repo=career-ops-hq/career-ops" />
 </a>
 
-Every person who has shipped code, docs, translations or tests is listed in
-[CONTRIBUTORS.md](CONTRIBUTORS.md), including non-code contributions, which
-the graph above cannot show.
+[CONTRIBUTORS.md](CONTRIBUTORS.md) lists the contributors recognised through
+the all-contributors bot, including non-code contributions, which the graph
+above cannot show; the graph is the complete record of code authors.
 
 Got hired using career-ops? [Share your story!](https://github.com/career-ops-hq/career-ops/issues/new?template=i-got-hired.yml)
 
