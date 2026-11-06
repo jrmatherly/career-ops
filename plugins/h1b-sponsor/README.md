@@ -45,7 +45,7 @@ Then install the index (about 8 MiB, downloaded from the data repo's GitHub rele
 node plugins/h1b-sponsor/install-h1b-index.mjs
 ```
 
-The installer reads a small pointer file the release publishes, `index-latest.json`, which names the current quarter's index file and its sha256. The download is checked against that digest before it is moved into place, so a truncated or substituted file is never what a lookup reads. It lands in the code checkout's `data/h1b/` (resolved from the plugin's own directory), not in your data root; `H1B_INDEX_PATH` moves it. In a Claude Code plugin install that checkout is replaced on every update, so set `H1B_INDEX_PATH` there. The directory is already gitignored.
+The installer reads a small pointer file the release publishes, `index-latest.json`, which names the current quarter's index file and its sha256. The download is checked against that digest before it is moved into place, so a truncated or substituted file is never what a lookup reads. It lands in `data/h1b/` under your data root (the same root the tracker and reports use, so a Claude Code plugin update does not remove it); `H1B_INDEX_PATH` moves it. The directory is already gitignored.
 
 Both assets live under a permanent `index-latest` release tag whose contents are replaced each quarter, rather than under GitHub's "latest release" path, which resolves to the newest release of any kind in the data repo and would start pointing at the wrong thing the day that repo cuts a code release.
 
@@ -104,7 +104,7 @@ Write the cache somewhere else, which is useful for tests and throwaway runs:
 node plugins/h1b-sponsor/check.mjs "Acme Corp" --cache-dir /tmp/h1b-cache
 ```
 
-Answers are cached under the code checkout's `data/cache/h1b/` (`--cache-dir` moves it), keyed by the company name passed on the command line. Two spellings of the same employer produce two cache entries. The cache file records `fetchedAt`; re-runs with the same name within the cache window return the cached payload without re-reading the index.
+Answers are cached under `data/cache/h1b/` in your data root (`--cache-dir` moves it), keyed by the company name passed on the command line. Two spellings of the same employer produce two cache entries. The cache file records `fetchedAt`; re-runs with the same name within the cache window return the cached payload without re-reading the index.
 
 The index is a single compressed file with no seek structure, so a lookup streams it, and every lookup reads all of it. About 2 seconds on the shipped 335k-employer build, hit or miss, against a floor of roughly 1 second for decompressing the file with no work on top.
 

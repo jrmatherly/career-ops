@@ -15,12 +15,14 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { normalize, num, pickBestMatch, plausibleMatch } from './api.mjs';
+import { getCareerOpsRoot } from '../../../path-resolver.mjs';
 
-// Anchored to the repo root for the same reason lib/cache.mjs is: running the
+// Anchored to the data root for the same reason lib/cache.mjs is: running the
 // CLI from another directory must find the one installed index rather than
-// report it missing. lib/ sits three levels below the root.
+// report it missing, and a Claude Code plugin install replaces the code
+// checkout on every update, so an index kept there would vanish with it.
 //
 // Its own directory, deliberately not the data/cache/h1b/ tree the lookup cache
 // lives in. That tree is documented as safe to delete at any time and it is:
@@ -29,7 +31,7 @@ import { normalize, num, pickBestMatch, plausibleMatch } from './api.mjs';
 // to install, over the network, in a command they had to run themselves, and
 // re-creating it means doing that again. Filing it under "cache" invites a
 // cleanup that silently disables the plugin.
-const DEFAULT_INDEX = fileURLToPath(new URL('../../../data/h1b/index.ndjson.gz', import.meta.url));
+const defaultIndex = () => join(getCareerOpsRoot(), 'data', 'h1b', 'index.ndjson.gz');
 
 // The staffing-shop numbers in an index record are the secondary-worksite
 // counts the API reports under this basis. It is a constant here because the
@@ -130,7 +132,7 @@ function boundedTop(limit) {
  */
 export function indexPath() {
   const raw = process.env.H1B_INDEX_PATH;
-  if (raw === undefined) return DEFAULT_INDEX;
+  if (raw === undefined) return defaultIndex();
   const trimmed = String(raw).trim();
   if (!trimmed) {
     throw new Error('H1B_INDEX_PATH is set but empty. Unset it to use the default index location.');

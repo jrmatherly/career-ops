@@ -5,13 +5,13 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { getCareerOpsRoot } from '../../../path-resolver.mjs';
 
-// Anchored to the repo root, not process.cwd(): running the CLI from another
+// Anchored to the data root, not process.cwd(): running the CLI from another
 // directory must reuse the one cache tree instead of creating a stray one and
-// re-burning the 30/hr anonymous budget. cache.mjs lives at
-// plugins/h1b-sponsor/lib/, so three levels up is the repo root.
-const DEFAULT_DIR = fileURLToPath(new URL('../../../data/cache/h1b', import.meta.url));
+// re-burning the 30/hr anonymous budget. Not the code checkout either: a
+// Claude Code plugin install replaces that on every update.
+const defaultDir = () => path.join(getCareerOpsRoot(), 'data', 'cache', 'h1b');
 const DEFAULT_TTL_DAYS = 90;
 const DEFAULT_NEG_TTL_DAYS = 30;
 const DAY_MS = 86_400_000;
@@ -31,7 +31,7 @@ function entryPath(cacheDir, name) {
 }
 
 export async function readCache(name, opts = {}) {
-  const cacheDir = opts.cacheDir ?? DEFAULT_DIR;
+  const cacheDir = opts.cacheDir ?? defaultDir();
   const ttlDays = Number.isFinite(opts.ttlDays) ? opts.ttlDays : DEFAULT_TTL_DAYS;
   const negTtlDays = Number.isFinite(opts.negativeTtlDays) ? opts.negativeTtlDays : DEFAULT_NEG_TTL_DAYS;
 
@@ -67,7 +67,7 @@ export async function readCache(name, opts = {}) {
 }
 
 export async function writeCache(name, data, opts = {}) {
-  const cacheDir = opts.cacheDir ?? DEFAULT_DIR;
+  const cacheDir = opts.cacheDir ?? defaultDir();
   const negative = opts.negative === true;
 
   await mkdir(cacheDir, { recursive: true });
