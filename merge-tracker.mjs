@@ -10,8 +10,9 @@
  * - 8-col headerless: num\tdate\tcompany\trole\tstatus\tscore\tpdf\treport (no notes)
  * - Pipe-delimited (markdown table row): | col | col | ... |
  *
- * Dedup: company normalized + role fuzzy match + report number match
- * If duplicate with higher score → update in-place, update report link
+ * Dedup: posting URL first, then report number, then company normalized + role fuzzy match
+ * A duplicate is updated in place whether the score goes up, down or stays the same;
+ * a downgrade records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]

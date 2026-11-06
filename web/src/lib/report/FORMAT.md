@@ -12,7 +12,10 @@ the core↔web data contract.
   **user** (preview-then-confirm; nothing is auto-filed).
 - Labels: `web-alpha, area:web`.
 - Title: `[web <channel>] <first 70 chars of the user's description>`.
-- The body's last line contains the literal marker `report-format: v1`.
+- The body's last line contains the literal marker `report-format: v1`. The
+  whole body is cut at 6000 characters (`issueBody` in `report.ts`), so a long
+  `## Recent errors` block can push the marker off the end; a `web-alpha` issue
+  with no marker is a truncated v1 body, not another format.
 
 ## Body sections (stable order)
 
@@ -24,8 +27,9 @@ the core↔web data contract.
    - `- **Browser:** <user agent>`
    - `- **Viewport:** <w×h>`
    - `- **Fingerprint:** \`co-web-<base36>\`` ← **the dedupe key** (see below)
-3. `## Data shape (counts only — no contents)` — optional (absent if the
-   shape endpoint failed):
+3. `## Data shape (counts only — no contents)` — optional (absent only when
+   the fetch of the shape endpoint threw; a non-OK or partial response still
+   renders the section, with `?` for each missing count):
    - `- **Setup:** <phase>[ · missing: <files>]`
    - `- **Inbox:** <parsed>/<candidates> rows parsed · **Tracker:** <parsed>/<candidates> rows parsed`
    - `- **Reports:** <n> · **PDFs:** <n> · **Follow-ups engine:** ok|DEGRADED|?`
@@ -41,7 +45,8 @@ the core↔web data contract.
 
 - **route pathname** (no query), plus
 - **newest error class** — the last ring entry with volatile parts stripped
-  (urls → `<url>`, quoted values → `<v>`, digits → `<n>`), plus
+  (urls → `<url>`, quoted values → `<v>`, digits → `<n>`, whitespace collapsed
+  to single spaces, trimmed, cut to 120 characters), plus
 - **structural flags** — any of `fu-degraded` (follow-ups engine down),
   `inbox-gap` / `tracker-gap` (parsed < candidate rows).
 

@@ -45,7 +45,7 @@ Then install the index (about 8 MiB, downloaded from the data repo's GitHub rele
 node plugins/h1b-sponsor/install-h1b-index.mjs
 ```
 
-The installer reads a small pointer file the release publishes, `index-latest.json`, which names the current quarter's index file and its sha256. The download is checked against that digest before it is moved into place, so a truncated or substituted file is never what a lookup reads. It lands in `data/h1b/`, which is already gitignored.
+The installer reads a small pointer file the release publishes, `index-latest.json`, which names the current quarter's index file and its sha256. The download is checked against that digest before it is moved into place, so a truncated or substituted file is never what a lookup reads. It lands in the code checkout's `data/h1b/` (resolved from the plugin's own directory), not in your data root; `H1B_INDEX_PATH` moves it. In a Claude Code plugin install that checkout is replaced on every update, so set `H1B_INDEX_PATH` there. The directory is already gitignored.
 
 Both assets live under a permanent `index-latest` release tag whose contents are replaced each quarter, rather than under GitHub's "latest release" path, which resolves to the newest release of any kind in the data repo and would start pointing at the wrong thing the day that repo cuts a code release.
 
@@ -65,10 +65,11 @@ Installing is the one thing here that touches the network, and it only happens w
 
 ## CLI usage
 
-Default output is a human-readable summary:
+Default output is a one-line summary, for people and for shell pipelines; `--summary` names it explicitly:
 
 ```bash
-node plugins/h1b-sponsor/check.mjs "Acme Corp"
+node plugins/h1b-sponsor/check.mjs "Acme Corp"            # same as --summary
+# strong: Acme Corp - 412 LCAs, 5 PWDs, 37 PERMs, active 2020-2024
 ```
 
 Machine-readable JSON, for scripts and for the agent:
@@ -77,14 +78,7 @@ Machine-readable JSON, for scripts and for the agent:
 node plugins/h1b-sponsor/check.mjs "Acme Corp" --json
 ```
 
-One-line output for scripts and shell pipelines:
-
-```bash
-node plugins/h1b-sponsor/check.mjs "Acme Corp" --summary
-# strong: Acme Corp - 412 LCAs, 5 PWDs, 37 PERMs, active 2020-2024
-```
-
-The LCA number there is what the employer filed. How many of those filings came back certified is in the JSON envelope as `totals.n_certified`, which is null when the backend does not report it; the summary form stays one line and leaves it out.
+The LCA number in the summary line is what the employer filed. How many of those filings came back certified is in the JSON envelope as `totals.n_certified`, which is null when the backend does not report it; the summary form stays one line and leaves it out.
 
 List matching entities instead of checking one. A large employer files under many distinct FEINs, and the listing shows one page of matches at a time, so a broad name shows the first page and the full count. Narrow the query to reach entities past the page cap, then check a specific one by passing its exact name:
 
@@ -110,7 +104,7 @@ Write the cache somewhere else, which is useful for tests and throwaway runs:
 node plugins/h1b-sponsor/check.mjs "Acme Corp" --cache-dir /tmp/h1b-cache
 ```
 
-Answers are cached under `data/cache/h1b/` keyed by the company name passed on the command line. Two spellings of the same employer produce two cache entries. The cache file records `fetchedAt`; re-runs with the same name within the cache window return the cached payload without re-reading the index.
+Answers are cached under the code checkout's `data/cache/h1b/` (`--cache-dir` moves it), keyed by the company name passed on the command line. Two spellings of the same employer produce two cache entries. The cache file records `fetchedAt`; re-runs with the same name within the cache window return the cached payload without re-reading the index.
 
 The index is a single compressed file with no seek structure, so a lookup streams it, and every lookup reads all of it. About 2 seconds on the shipped 335k-employer build, hit or miss, against a floor of roughly 1 second for decompressing the file with no work on top.
 

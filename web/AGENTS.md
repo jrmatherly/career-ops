@@ -37,7 +37,7 @@ it with no build step and no `@/` alias loader. See `tracker-table.mjs`,
 you want to assert.
 
 ```
-npm test          # node --test "tests/**/*.test.mjs"
+npm test          # node --experimental-strip-types --test "tests/**/*.test.mjs"
 npm run typecheck # tsc --noEmit
 npm run dev       # the app, reading the sibling career-ops files
 ```

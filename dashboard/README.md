@@ -8,8 +8,10 @@ A terminal UI over the application tracker: filter tabs, sort modes,
 grouped/flat views, lazy-loaded report previews, and an inline status picker.
 The report viewer opens the job posting with `o`, using the tracker row's URL
 or, failing that, the report's `**URL:**` header.
-It is isolated from the Node core — optional, never required by any other
-component.
+It is optional, never required by any other component. It reads the tracker
+directly and writes through the checkout's Node scripts: a status change runs
+`set-status.mjs` and a PDF runs `generate-pdf.mjs`, so those two actions need
+Node on PATH.
 
 The list's DATE column shows a row's most recent transition in the ledger
 beside the tracker, `status-log.tsv` — when its status last changed — and
@@ -22,7 +24,7 @@ value.
 Requires Go 1.26+ (`go.mod`). From the repo root:
 
 ```bash
-npm run serve:dashboard    # go run . --path .. (The script automatically resolves external data directories by falling back through CAREER_OPS_ROOT and CAREER_OPS_DATA_DIR enviornment variables,defaulting to repository root.)
+npm run serve:dashboard    # cd dashboard && go run .
 npm run build:dashboard    # build the standalone binary
 ```
 
@@ -30,9 +32,12 @@ npm run build:dashboard    # build the standalone binary
 an extension-less binary on Windows; the wrapper picks the platform-correct
 output name (`career-dashboard.exe` on Windows, `career-dashboard` elsewhere).
 
-The binary accepts `--path <dir>` pointing at a career-ops directory
-(default `.`). The data loader tries both `{path}/applications.md` and
-`{path}/data/applications.md` for layout compatibility.
+The binary resolves the data root the way the Node scripts do:
+`CAREER_OPS_ROOT`, then `CAREER_OPS_DATA_DIR`, then the `.career-ops-data`
+marker in the repo root, then the repo root itself. `--path <dir>` overrides
+that result. The tracker is `CAREER_OPS_TRACKER` when set, otherwise
+`{path}/data/applications.md`, and `{path}/applications.md` only when the
+canonical file is absent.
 
 In the report viewer, `http(s)` links (bare URLs and markdown links) are
 clickable in terminals that support OSC 8 hyperlinks (iTerm2, WezTerm, kitty,
@@ -42,24 +47,31 @@ from untrusted job postings.
 
 ## Package layout
 
-- `main.go` — entry point, flag parsing, top-level Bubble Tea model and view
-  state (pipeline / report viewer / progress).
+- `main.go` — entry point, flag parsing (`--path`, `--lang en|tr`), top-level
+  Bubble Tea model and view state (pipeline / report viewer / stats / progress).
+- `clipboard.go` — copies text through the platform clipboard utility (stdin
+  only, never interpolated into a command).
 - `open_*.go` — platform-specific "open file/URL" commands (darwin, linux,
   windows, unix, unsupported).
 - `internal/data/` — parses `applications.md` (`career.go`), derives
-  aggregate metrics (`derive.go`), and resolves generated PDFs (`pdf.go`).
+  aggregate metrics (`derive.go`), resolves generated PDFs (`pdf.go`), reads
+  `status-log.tsv` (`funnel_history.go`), canonicalizes archetypes for the
+  stats screen (`stats.go`), and writes status changes through
+  `set-status.mjs` (`status_writer.go`).
+- `internal/i18n/` — the UI string catalog (English and Turkish).
 - `internal/model/` — the application row model.
 - `internal/theme/` — Catppuccin Mocha (dark) and Latte (light) themes;
   `NewTheme("auto")` picks by detected terminal background.
-- `internal/ui/screens/` — the pipeline list, report viewer, and progress
-  screens.
+- `internal/ui/screens/` — the pipeline list, report viewer, stats, and
+  progress screens.
 
 ## Dependencies
 
 External: [Bubble Tea](https://github.com/charmbracelet/bubbletea) (TUI
 framework), [Lipgloss](https://github.com/charmbracelet/lipgloss) (styling),
-termenv (background detection). The module has no dependency on the Node
-side; it only reads the tracker files.
+termenv (background detection). The Go module imports nothing from the Node
+side. It reads the tracker files itself and shells out to the checkout's
+`set-status.mjs` and `generate-pdf.mjs` for writes.
 
 ## Tests
 

@@ -4,7 +4,7 @@ Process multiple job offers via headless workers. By default (`--mode full`) eac
 
 ## Quick Start
 
-1. **Add offers** to `batch-input.tsv` (tab-separated: `id`, `url`, `source`, `notes`):
+1. **Add offers** to `batch-input.tsv` (tab-separated: `id`, `url`, `source`, `notes`). `node sync-batch-input.mjs` appends the pipeline's Pending entries for you (`--dry-run` previews):
 
    ```tsv
    id	url	source	notes
@@ -37,7 +37,7 @@ Process multiple job offers via headless workers. By default (`--mode full`) eac
 | `--retry-failed` | off | Only retry offers marked as `failed` in state |
 | `--resume-paused` | off | Resume offers paused after a Claude session/rate limit |
 | `--start-from N` | `0` | Skip offers with ID below N |
-| `--company A,B` | off | Only process offers whose company matches one of the comma-separated names (case- and punctuation-insensitive substring of the URL or of the company in `notes`, i.e. the part before ` - ` in `Company - Role`); applied before `--limit` |
+| `--company A,B` | off | Only process offers whose company matches one of the comma-separated names (case- and punctuation-insensitive substring of the URL or of the company in `notes`, i.e. the part before ` - ` in `Company - Role`); on a shared ATS host the vendor domain is ignored, so `--company Lever` does not match every `jobs.lever.co` posting; applied before `--limit` |
 | `--limit N` | no limit | Max number of offers to process in this run; must be a positive integer (`0` is rejected), so omit the flag for no limit |
 | `--min-score N` | `0` (off) | Record offers that score below N as `skipped` instead of `completed` |
 | `--skip-pdf` | off | Skip PDF generation; the tracker PDF column gets ❌ |
@@ -90,12 +90,21 @@ batch/
   batch-runner.sh          # Orchestrator script
   batch-prompt.md          # Full multi-step prompt template for workers
   batch-prompt-match.md    # Condensed single-pass match prompt template
+  company-scope.mjs        # --company matching (ignores a shared ATS vendor domain)
+  jd-rescue.mjs            # Recovers a JD from raw HTML when the visible text is too thin
+  aggregate-tokens.mjs     # Token usage roll-up across batch runs
   batch-input.tsv          # Input offers (you create this)
   batch-state.tsv          # Processing state (auto-managed, resumable)
+  batch-runner.pid         # Lock file for the running batch
+  batch-runner.paused      # Pause marker written on a session/rate limit (removed at run end)
+  batch-runner.throttled   # Throttle marker: the rest of the batch runs on 1 worker
   logs/                    # Per-offer worker logs ({report_num}-{id}.log)
+    discard.log            # Pre-screen discards and below-min-score skips
   tracker-additions/       # TSV lines produced by workers
     merged/                # TSVs already merged into applications.md
 ```
+
+With a data root outside the checkout (`CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` or a `.career-ops-data` marker), `tracker-additions/` and `reports/` live under that data root; the other files stay beside the script.
 
 ## How It Works
 
@@ -109,18 +118,18 @@ batch/
 
 Workers write one TSV per offer to `batch/tracker-additions/`. The merge script (`npm run merge`) handles:
 
-- Deduplication by company + role fuzzy match and report number
-- Column order conversion (TSV has status before score; applications.md has score before status)
-- In-place updates when a re-evaluation scores higher than the existing entry
+- Deduplication by posting URL first, then report number, then company + role fuzzy match
+- Fields resolved by name from the TSV header; a legacy headerless TSV (status before score, the reverse of applications.md) is converted by column order
+- In-place updates on re-evaluation whether the score goes up, down or stays the same (a downgrade notes the superseded report number)
 - Moving processed TSVs to `tracker-additions/merged/`
 
 Run `npm run merge` manually if you need to merge outside of a batch run.
 
 ## Pipeline Reconcile
 
-Batch mode reads offers from `batch-input.tsv`, but the `data/pipeline.md` inbox is a separate list. Without reconciliation, an offer evaluated by a batch run stays in the pipeline "Pendientes" section and gets surfaced again on the next scan or `/career-ops pipeline` run -- producing duplicate reports.
+Batch mode reads offers from `batch-input.tsv`, but the `data/pipeline.md` inbox is a separate list. Without reconciliation, an offer evaluated by a batch run stays in the pipeline's Pending section (the heading is read in every mode language, `lib/pipeline-sections.mjs`) and gets surfaced again on the next scan or `/career-ops pipeline` run -- producing duplicate reports.
 
-`reconcile-pipeline.mjs` (run as `npm run reconcile`) closes that gap: after the tracker merge, every `completed` or `skipped` offer in `batch-state.tsv` whose URL is still in pipeline "Pendientes" is moved to "Procesadas" with its report link and score (entries without a report file on disk are left in place). It is idempotent -- safe to run after every batch, or manually.
+`reconcile-pipeline.mjs` (run as `npm run reconcile`) closes that gap: after the tracker merge, every `completed` or `skipped` offer in `batch-state.tsv` whose URL is still in Pending is moved to Processed with its report link and score (entries without a report file on disk are left in place). A dealbreaker skip has no report; it is moved with `SKIP, dealbreaker` in place of a score. It is idempotent -- safe to run after every batch, or manually.
 
 ## Resumability
 
@@ -137,5 +146,5 @@ A PID-based lock file (`batch-runner.pid`) prevents concurrent batch runs. If a 
 ## Prerequisites
 
 - Your CLI in PATH (see **Headless / Batch Mode** table in `AGENTS.md`)
-- Node.js >= 22.13, Playwright chromium installed (`npm run doctor` to verify)
+- Node.js 22.13+ (on 23.x, 23.4+), Playwright chromium installed (`npm run doctor` to verify)
 - `batch-input.tsv` with at least one offer

@@ -6,7 +6,10 @@ Job-source provider modules for the zero-token portal scanner (`scan.mjs`).
 
 Each non-helper `*.mjs` file in this directory maps one public, no-auth job
 source (ATS API, RSS/XML feed, or server-rendered HTML page) to the scanner's
-normalized `Job` shape. Providers are zero-token by design: they hit public
+normalized `Job` shape. One exception: `local-parser.mjs` runs a command the
+user configures instead of reading a source. `scan.mjs`, `verify-portals.mjs`,
+`scan-ats-full.mjs`, `audit-portals.mjs` and other scripts load the directory
+through the same registry. Providers are zero-token by design: they hit public
 endpoints directly, with no LLM calls and no login. The user-facing catalog of
 supported sources lives in
 [docs/SUPPORTED_JOB_BOARDS.md](../docs/SUPPORTED_JOB_BOARDS.md).
@@ -35,7 +38,10 @@ There is no index file — discovery is filesystem-convention-based
    `local-parser`, then each provider's `detect()` in load order — first
    non-null hit wins.
 
-Underscore-prefixed files are shared helpers, never loaded as providers:
-`_types.js` (contract typedefs), `_registry.mjs` (loader/router),
-`_http.mjs` (HTTP transport), `_html-entities.mjs`, `_html-to-text.mjs`
-(description HTML → plain text), `_config-utils.mjs`, `_trust-validator.mjs`.
+Underscore-prefixed files are shared helpers, never loaded as providers.
+Examples: `_types.js` (contract typedefs), `_registry.mjs` (loader/router),
+`_http.mjs` (HTTP transport), `_ip-guard.mjs` (DNS/IP-layer SSRF guard),
+`_safe-url.mjs` (URL-component encoding), `_ids.mjs` (ATS id coercion),
+`_cached-lookup.mjs` (board ids kept between scans), `_html-entities.mjs`,
+`_html-to-text.mjs` (description HTML → plain text), `_config-utils.mjs`,
+`_trust-validator.mjs`. The guide says which ones a provider must use.

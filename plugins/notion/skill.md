@@ -7,8 +7,9 @@ license: MIT
 # notion plugin
 
 Mirrors your application tracker to a Notion database (export) and reads records
-back into the pipeline (search). `data/applications.md` stays the source of
-truth — Notion is an additive mirror.
+back into the pipeline (search). The tracker (`data/applications.md`, or the
+file `CAREER_OPS_TRACKER` names) stays the source of truth — Notion is an
+additive mirror.
 
 ## Commands
 

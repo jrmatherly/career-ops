@@ -6,7 +6,8 @@ Auto-discovered test files for the career-ops suite.
 
 `test-all.mjs` (repo root) is the suite runner: it executes its inline core
 checks (syntax, scripts, dashboard, data contract, personal data, paths) and
-then auto-discovers every `*.test.mjs` file under this directory. There is no
+then auto-discovers every `*.test.mjs` file under this directory, except
+`cv-visual/cv-visual.test.mjs`, which its own workflow runs. There is no
 test framework by design — the suite must run on a fresh clone with only
 Node.js (`tests/helpers.mjs`).
 
@@ -27,11 +28,10 @@ Node.js (`tests/helpers.mjs`).
   scripts. Note: standalone `*.test.mjs` files in the repo root are not
   discovered and will not run — `tests/no-root-suites.test.mjs` fails the
   build if one shows up (see "Why the flat root" in ARCHITECTURE.md).
-  A handful of `*-tests.mjs` suites do remain at the root (a flag-driven CI
-  harness, a suite that asserts on its own filename, two needing a per-script
-  timeout, and one added after the convention was written); those are registered in
-  `test-all.mjs`'s `scripts` list or invoked by a workflow, and
-  `root-tests-registration.test.mjs` asserts every one of them is reachable.
+  Two `*-tests.mjs` suites do remain at the root: `upgrade-tests.mjs`, a
+  flag-driven harness `test.yml` invokes, and `updater-migration-tests.mjs`,
+  registered in `test-all.mjs`'s `scripts` list.
+  `root-tests-registration.test.mjs` asserts both are reachable.
 
 **Web tests do not live here.** `web/` runs its own `npm test` over
 `web/tests/**/*.test.mjs` (see [../web/README.md](../web/README.md)); this
@@ -53,6 +53,7 @@ every PR as a required check.
 node test-all.mjs                            # full suite — run before pushing
 node test-all.mjs --quick                    # full suite, skip dashboard build
 node test-all.mjs --only providers/themuse   # only matching tests/ files
+node test-all.mjs --needs browser,latex      # only tests/ suites that declare one of these tools
 node test-all.mjs --quick --jobs 4           # at most 4 suites at a time
 ```
 
@@ -60,8 +61,8 @@ Discovery walks `tests/` recursively, sorted lexicographically for a
 deterministic cross-OS order. `--only` filters on the tests-relative path and
 exits 1 when nothing matches (so a typo cannot turn CI green).
 
-**`--only` is a dev convenience, not a PR gate:** it skips every inline core
-section of `test-all.mjs`. A green `--only` run is not a green suite — always
+**`--only` and `--needs` are dev conveniences, not a PR gate:** they skip every inline core
+section of `test-all.mjs`. A green `--only` or `--needs` run is not a green suite — always
 run the full `node test-all.mjs` before pushing.
 
 ## Parallel runs
@@ -95,7 +96,7 @@ already run, so it is reported as one failure and the run goes on to its
 summary.
 
 **What a suite must not rely on.** Running alone in a process is stricter than
-running after 600 others in one:
+running after about 1100 others in one:
 
 - **Another suite's leftovers.** An environment variable, a module-level cache
   or a process-wide listener set by an earlier suite is not there. Set up what
@@ -139,7 +140,7 @@ their timeouts. A full run therefore waits for any other full run on the
 machine to finish first, and says so:
 
 ```
-  ⏳ another full test-all.mjs run holds the queue (pid 4242 in /path/to/worktree, for 3 min) — waiting for it to finish.
+  ⏳ another full test-all.mjs run holds the queue (pid 4242 in /path/to/worktree, for 3 min) — waiting for it to finish. CAREER_OPS_TEST_QUEUE=0 skips the queue.
 ```
 
 The queue is a `lib/dir-lock.mjs` lock in the OS temp directory, shared by
@@ -148,7 +149,7 @@ and the next run takes it over. Waiting runs are not served strictly in the
 order they arrived, but only one proceeds at a time. A waiter gives up after
 an hour with the same holder, naming it.
 
-`--only` runs do not queue: they are small, and they are what you run while a
+`--only` and `--needs` runs do not queue: they are small, and they are what you run while a
 full run is going. `CAREER_OPS_TEST_QUEUE=0` turns the queue off for a run; the
 run holding the queue sets it for everything it starts, so a suite that starts
 a `test-all.mjs` of its own does not wait for its parent. Fixture runners
@@ -160,6 +161,10 @@ puts the lock somewhere else.
 Add one `{name}.test.mjs` file here — it is auto-discovered, no registration
 needed. Do not add a section to `test-all.mjs`. Import the helpers with a
 path relative to the test file's location:
+
+- Never call `process.exit()` or `finish()` from a suite; the runner owns the exit code.
+- A script that checks whether it is the entry point uses `isMainModule(import.meta.url)` from `lib/is-main-module.mjs`, never `process.argv[1]`.
+- A suite that needs Chromium or TeX declares `toolRequired('browser')` or `toolRequired('latex')`.
 
 ```js
 import { pass, fail, ROOT } from './helpers.mjs';    // tests/*.test.mjs

@@ -176,7 +176,7 @@ Options:
                        comma-separated). Applies before --limit
   --limit N            Max offers: positive integer; omit for no limit
   --max-retries N      Max retry attempts per offer (default: 2)
-  --min-score N        Skip PDF/tracker for offers scoring below N (default: 0 = off)
+  --min-score N        Record offers scoring below N as skipped, not completed (default: 0 = off)
   --skip-pdf           Skip PDF generation entirely (write ❌ in tracker PDF column)
   --worker-timeout N   Stop a worker after N seconds and record it as failed
                        (default: 1800; 0 = no limit)

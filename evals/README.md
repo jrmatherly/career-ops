@@ -24,8 +24,11 @@ to route that task to it.
 applied to each synthetic JD under the repo's own rubric (`modes/_shared.md` §
 Scoring System + § Archetype Detection):
 
-- **`archetype`** is the gate. It is a property of the JD alone (the 6-archetype
-  keyword taxonomy in `_shared.md`), so it is profile-independent and reproducible.
+- **`archetype`** is the gate. The labels come from the 6-archetype keyword
+  taxonomy in `_shared.md`. A `modes/_profile.md` that defines its own archetypes
+  takes precedence over that table, so a `--live` run against a customized profile
+  can report MISS on cases the reference labelled under the default taxonomy.
+  Replay is unaffected: the fixtures were recorded, not re-evaluated.
 - **`score`** (1–5) is the reference model's fit verdict. It is profile-relative by
   construction, but because both reference and candidate are scored under the *same*
   conditions, distance-to-reference stays meaningful regardless of whose profile
@@ -47,7 +50,7 @@ harness.
 ```
 evals/
   golden/      labeled cases — one JSON per case (synthetic JDs, no user data)
-  fixtures/    recorded candidate outputs for $0 deterministic replay in CI
+  fixtures/    recorded candidate outputs for $0 deterministic replay (CI-ready, not yet wired)
   README.md    this file
 eval-golden.mjs  the harness (root level, sibling to openai-eval.mjs)
 ```
@@ -84,7 +87,8 @@ npm run eval:golden -- --replay --model cheap-stub   # offline, deterministic, $
 npm run eval:golden -- --live   --model gpt-4o-mini  # real call via openai-eval.mjs (needs key + cv.md)
 ```
 
-Replay is the CI-friendly path: no API keys, no `cv.md`, fully deterministic.
+Replay is the CI-ready path (not yet wired into CI): no API keys, no `cv.md`, fully deterministic.
+`--golden <dir>` points at another golden set; `--fixtures <dir>` at another fixture directory (default: `fixtures/` beside the golden set).
 The harness reports per-case archetype/score agreement, mean |Δscore|, median
 latency (live only), and a placeholder $/run, then exits `0/1` on the archetype
 agreement gate.

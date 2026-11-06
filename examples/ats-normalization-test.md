@@ -37,7 +37,7 @@ A `\|` in the "Converts to" column is a literal `|`, escaped for the table. The 
 
 ## Writing quality guidelines (the writer must follow these)
 
-The normalizer does NOT fix writing style. These are enforced by the rules in `modes/_shared.md` and should never appear in generated CV text in the first place.
+The normalizer does NOT fix writing style. These are the writing rules in `modes/_writing.md`, enforced by `cv-voice.mjs` (`BANNED_PHRASES`), and should never appear in generated CV text in the first place.
 
 - "passionate about machine learning"
 - "results-oriented professional with a proven track record"

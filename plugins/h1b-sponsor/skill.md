@@ -1,3 +1,9 @@
+---
+name: career-ops-plugin-h1b-sponsor
+description: How to attach a US DOL H-1B sponsorship signal to Block G during oferta evaluations of US roles.
+license: MIT
+---
+
 # H-1B sponsor check skill
 
 Use this plugin during `oferta` evaluations of US roles to attach a factual sponsorship signal to Block G.
@@ -6,7 +12,7 @@ Use this plugin during `oferta` evaluations of US roles to attach a factual spon
 
 Run it when any one of these is true:
 
-- `config/profile.yml` has `location.country == "US"`.
+- `config/profile.yml` names the United States under `location.country` (`US`, `USA` or `United States`).
 - The JD lists a US work location, remote-US, or a US-based employing entity.
 - The user asks explicitly about sponsorship for this role.
 

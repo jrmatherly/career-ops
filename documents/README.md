@@ -5,6 +5,8 @@ Drop the documents you already have here, then ask your agent to run the
 source-annotated additions to `config/profile.yml` / `cv.md` /
 `modes/_profile.md`, and writes nothing without your explicit confirmation.
 
+`node intake.mjs` creates these subfolders on its first run.
+
 | Folder | What goes here |
 |---|---|
 | `cv/` | Master CV (PDF, `.md`, `.tex`, or `.txt`) |

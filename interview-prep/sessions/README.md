@@ -2,8 +2,9 @@
 
 Machine-readable interview transcripts, one `.md` file per round. The
 `interview/debrief` and `interview/practice` modes write files here automatically
-after a real or practice round. Downstream analysis modes read them; each consumer
-documents its own usage.
+after a real or practice round, named `{company-slug}-{role-slug}-{round}-{YYYY-MM-DD}.md`.
+Downstream analysis modes read them; each consumer documents its own usage.
+`weekly-digest.mjs` rolls them up by ISO week (the current week by default).
 
 ## Format
 

@@ -26,7 +26,10 @@ plugins:
 
 ## Data it produces
 
-`Job[]` ({ title, url, company, location }) — the engine de-dups against the
-pipeline and appends new ones. It maintains its own processed-message cursor in
+`Job[]` ({ title, url, company, location }). The engine drops URLs already in
+the tracker, the pipeline or scan history, applies the scanner's
+`data/blacklist.md` and the `portals.yml` title and location filters (the
+manifest sets `jobPostings: true`), appends the rest to the pipeline and records
+them in `data/scan-history.tsv`. It maintains its own processed-message cursor in
 `data/gmail-state.json`, under your data root, to avoid re-reading the same
 emails.

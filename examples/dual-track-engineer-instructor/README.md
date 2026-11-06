@@ -44,19 +44,19 @@ Use single-track instead if:
 
 ## How dual-track changes the rest of career-ops
 
-### `modes/_shared.md`
+### `modes/_profile.md`
 List both archetypes in the "North Star -- Target Roles" table with `fit: primary`. The skill applies equal rigor to all primary archetypes, which is what you need here.
 
 ### `cv.md`
 Two ways to structure it:
 
 - Layered (what I recommend): one Professional Summary that names both tracks in the first sentence, then experience entries that include both engineering and teaching bullets per role. Use this when the roles actually combined both. See the `cv.md` in this folder.
-- Sectioned: separate "Engineering Experience" and "Teaching Experience" headings. Use this when the two tracks happened at different employers and don't need to be told as one story.
+- Sectioned: one `## Experience` heading, with the engineering roles grouped first and the teaching roles after them. Keep the single heading: the CV checks (`doctor.mjs`, `cv-title-check.mjs`, `verify-cv-structure.mjs`) read jobs only under `Experience`, `Work Experience`, `Professional Experience`, `Employment History` or `Work History`, so a "Teaching Experience" heading yields zero jobs. Use this when the two tracks happened at different employers and don't need to be told as one story.
 
 Lead the Professional Summary with the combination itself -- "senior AI engineer who runs the curriculum", or whatever the equivalent is for your stack. The combination is the thing that's hard to hire. Either side alone is not.
 
 ### `profile.yml` -- compensation
-Put your engineering range in `compensation.target_range` (it's usually the higher one) and the teaching range in the optional `compensation.alternate_ranges` block. The evaluator picks the right one based on the JD.
+Put your engineering range in `compensation.target_range` (it's usually the higher one) and the teaching range in the `compensation.alternate_ranges` block. That block is illustrative: no script reads it, so the evaluator sees it only as profile text when it picks a range for the JD.
 
 ### Evaluation reports
 When career-ops evaluates an offer, it should detect which archetype the JD targets and pick the matching salary range, the matching CV emphasis, and the matching STAR stories. With two `fit: primary` entries this mostly just works, but check the `Archetype:` line in the report header. If it picked wrong, the rest of the report is wrong too.
@@ -102,5 +102,5 @@ Dual-track candidates get read as overqualified for pure teaching roles ("you wi
 
 - `../cv-example.md` -- single-track CV example for comparison.
 - `../../config/profile.example.yml` -- the canonical profile schema this example extends.
-- `../../modes/_shared.md` -- where archetypes feed into framing logic.
+- `../../modes/_profile.md` -- where your archetypes live and feed into framing logic (`modes/_shared.md` holds the defaults they override).
 - `../../CONTRIBUTING.md` -- this example was contributed under "Add example CVs for different roles".

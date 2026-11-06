@@ -15,8 +15,10 @@ Anything you've written that sounds like you:
 - Social media posts
 - Anything else in your own words
 
-Plain text (`.txt`) and Markdown (`.md`) are preferred — they require no extraction and are read directly. Other formats like `.pdf` or `.docx` work too.
+Plain text (`.txt`) and Markdown (`.md`) are preferred — they require no extraction and are read directly. A `.pdf` works when your agent can read PDFs. Convert `.docx` to text or Markdown first.
+
+`voice-dna.md` holds the general anti-slop guardrail; the style extracted from these samples wins where the two conflict (`modes/_writing.md`).
 
 ## After adding samples
 
-Tell Claude Code: "recalibrate my writing style" — it will re-scan the files and update your profile.
+Tell your agent: "recalibrate my writing style" — it will re-scan the files and rebuild the cached `## Writing Style` section in `modes/_profile.md`.

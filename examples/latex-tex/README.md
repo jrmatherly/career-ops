@@ -6,6 +6,7 @@ Do not use real names, emails, or employers from your own CV here.
 | File | Family |
 |------|--------|
 | `resume-subheading.tex` | `resumeSubheading` — `\resumeItem` bullets + `\textbf{Category}{: items}` skills |
+| `resume-subheading-withouttitle.tex` | `resumeSubheading` — `\resumeItemWithoutTitle` bullets + `\resumeSubItem` skills, with preamble macro definitions that extraction must skip |
 | `tabularx-itemize.tex` | `tabularx-itemize` — `tabularx` header rows + `itemize` bullets |
 
 ```bash

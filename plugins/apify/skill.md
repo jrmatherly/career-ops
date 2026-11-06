@@ -25,6 +25,10 @@ tracked_companies:
       location: [location, formattedLocation]
 ```
 
+Two optional entry keys. `defaults` fills `title`, `url`, `company` or
+`location` when an item leaves it empty. `timeout_ms` caps how long the actor
+run may take.
+
 ## Then
 
 `node scan.mjs` runs the provider for that entry and writes the results to the

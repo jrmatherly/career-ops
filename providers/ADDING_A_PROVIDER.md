@@ -2,9 +2,10 @@
 
 A provider is a module `providers/{name}.mjs` that maps one public, no-auth
 job source (an ATS API, an RSS/JSON feed, or a server-rendered HTML page) to
-the scanner's normalized `Job` shape. `scan.mjs` and `verify-portals.mjs`
-load every such module through `providers/_registry.mjs` — no manual
-registration, dropping the file in `providers/` is enough.
+the scanner's normalized `Job` shape. `scan.mjs`, `verify-portals.mjs`,
+`scan-ats-full.mjs`, `audit-portals.mjs` and other scripts load every such
+module through `providers/_registry.mjs` — no manual registration, dropping
+the file in `providers/` is enough.
 
 This file is the checklist and the set of requirements. The authoritative
 type catalog is [`_types.js`](_types.js); the architectural role of the layer
@@ -51,8 +52,9 @@ In short:
 If such a source is operator-run, or its eligibility is not obvious, open a
 [source proposal](../.github/ISSUE_TEMPLATE/source-proposal.yml) before
 writing code — a routing decision made on a design doc is cheaper than one
-made on a finished PR. The [Source Indexing Log](../docs/SOURCE_INDEXING_LOG.md)
-records how the rules were applied to sources that went through that process.
+made on a finished PR. A board or aggregator that ships gets an entry in the
+[Source Indexing Log](../docs/SOURCE_INDEXING_LOG.md), one per listed source
+(`CONTRIBUTING.md`), stating what was checked and how.
 
 ## 1. The contract
 
@@ -163,7 +165,7 @@ contract** (`name` / `careers_url` / `api` / `provider` / `parser`), the same
 shape from either list. A single-company provider is documented and tested
 against `tracked_companies:`, an aggregator/feed against `job_boards:`. The
 file's header comment must name the target list — reference
-`providers/ibm.mjs` and `providers/dassault.mjs` for a single-company
+`providers/ibm.mjs` and `providers/amazon.mjs` for a single-company
 `tracked_companies:` adapter, `providers/remotli.mjs` and
 `providers/yourator.mjs` for a `job_boards:` aggregator/feed.
 

@@ -14,7 +14,9 @@ Plugins load **only** when you opt in. With no `config/plugins.yml`, the core
 runs exactly as it always has — no plugin code runs, no `.env` is read, nothing
 changes. Two gates must both be satisfied:
 
-1. **Enable** the plugin in `config/plugins.yml` (copy `config/plugins.example.yml`).
+1. **Enable** the plugin: `node plugins.mjs enable <id> --confirm` shows what it can
+   do, then writes `enabled: true` to `config/plugins.yml` under your data root
+   (or copy `config/plugins.example.yml` there and edit it by hand).
 2. **Provide its keys** in your own `.env` (each plugin declares which it needs).
    Run `node doctor.mjs` or `node plugins.mjs list` to see what's missing.
 
@@ -34,16 +36,24 @@ plugins/<id>/
 
 ```json
 {
-  "id": "wellfound",                 // must equal the directory name; [a-z0-9-]
+  "id": "wellfound",                 // must equal the directory name; [a-z0-9][a-z0-9-]*
   "apiVersion": 1,
+  "version": "1.0.0",                // optional; a bump is how a changed plugin is re-trusted
   "description": "One mission-framed line.",
   "hooks": ["provider"],             // any of: provider, ingest, search, notify, export
   "requiredEnv": ["WELLFOUND_TOKEN"],// env VAR NAMES only — values go in .env
+  "optionalEnv": [],                 // optional: env names the plugin reads when set
   "allowedHosts": ["api.wellfound.com"], // required when requiredEnv is non-empty
+  "allowsLocalhost": false,          // optional: true admits a loopback host in allowedHosts
+  "entry": "index.mjs",              // optional: the hook module, default index.mjs
+  "skill": "skill.md",               // optional: how-to printed by `plugins.mjs skill <id>`
   "humanInTheLoop": true,            // must be true
   "jobPostings": true                // optional: ingest/search results are job postings
 }
 ```
+
+The `//` comments are annotations for this page. JSON has no comments, so a
+real `manifest.json` carries none.
 
 `jobPostings: true` tells the engine that what your `ingest` or `search` hook
 returns are job postings. They then pass the scanner's discovery filters
@@ -64,14 +74,23 @@ the tracker, the pipeline and scan history.
 
 Producers (`provider`/`ingest`/`search`) **return** `Job[]`
 (`{title, url, company, location}`); the engine — never the plugin — writes them
-to `data/pipeline.md` through the canonical writer, so a plugin can't break the
-data formats the web reads. Non-provider hooks run explicitly:
+to `data/pipeline.md` (or the file `CAREER_OPS_PIPELINE` names) through the
+canonical writer, so a plugin can't break the data formats the web reads.
+Non-provider hooks run explicitly through `run`; `node plugins.mjs --help` lists
+every command:
 
 ```bash
-node plugins.mjs list
+node plugins.mjs list                            # installed plugins and whether each is on
+node plugins.mjs available                       # bundled and approved community plugins
+node plugins.mjs enable <id> --confirm           # show what a plugin can do, then turn it on
 node plugins.mjs run gmail                       # ingest
 node plugins.mjs run notion search "platform"    # search
 node plugins.mjs run notion export [--dry-run]   # export
+node plugins.mjs skill <id>                      # print a plugin's how-to
+node plugins.mjs add <name> [--sha <commit>] --confirm   # install an approved community plugin (install is the same)
+node plugins.mjs trust <id>                      # re-pin a plugin after its files change
+node plugins.mjs remove <id>                     # uninstall a community plugin
+node plugins.mjs new <name>                      # scaffold a local plugin
 ```
 
 The `export` snapshot is `{ applications, pipeline }`, frozen. `applications`
@@ -100,13 +119,19 @@ posting link's href. `pipeline` holds `{ url }` per `data/pipeline.md` entry.
   path resolves against the working directory, which is not the data root when
   the user keeps their data outside the checkout or runs the command from
   another directory.
+- `normalizePostingUrl(url)` and `aggregatorPostingId(url)`. The tracker's own
+  posting-URL key, and the requisition id an aggregator URL carries (a LinkedIn
+  job id, Indeed's `jk`), so a plugin deduplicates the way the scanner and the
+  tracker merge do.
 
 ## Your own plugins → `plugins.local/`
 
 Put private or experimental plugins in **`plugins.local/`** (a sibling of
 `plugins/`), never in `plugins/`. `plugins.local/` is gitignored and never
 auto-updated, so updates can't clobber it and a same-id bundled plugin can't be
-shadowed by it. Bundled plugins always win an id collision.
+shadowed by it. Bundled plugins win an id collision, with one exception: a
+community successor the registry marks `supersedesBundled`, installed at its
+pinned sha, replaces the bundled copy.
 
 ## Trust model (read this)
 

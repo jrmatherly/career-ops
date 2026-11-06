@@ -12,7 +12,7 @@ VC portfolio API/page
     ↓ seeds/vc-portfolios.mjs
 SeedCompany[]
     ↓ toPortalEntry()
-PortalEntry (careers_url set to best-guess ATS URL)
+PortalEntry (careers_url set to a Greenhouse, Lever or Ashby URL; other ATSs are not probed)
     ↓ provider.detect() (same as portals.yml companies)
 ATS provider fetches jobs
     ↓ title_filter / location_filter / dedup
@@ -30,7 +30,7 @@ node scan-ats-full.mjs --seeds yc --since 7
 # Seed from both YC and a16z, dry-run preview
 node scan-ats-full.mjs --seeds yc,a16z --dry-run
 
-# Combine seeds + regular ATS sources
+# Combine seeds + regular ATS sources (--seeds alone skips the ATS directory walk)
 node scan-ats-full.mjs --seeds yc --ats greenhouse,lever --since 5
 
 # npm shortcuts
@@ -66,13 +66,13 @@ for (const [id, source] of Object.entries(SEED_SOURCES)) {
 | Y Combinator | `https://api.ycombinator.com/v0.1/companies` | JSON API | None |
 | a16z | `https://a16z.com/portfolio/` | Public HTML page | None |
 
-- **YC**: Fetches up to 3 pages × 1000 companies. Covers all public YC batches.
+- **YC**: Walks every page the API reports in `totalPages` (about 30 companies per page; `per_page` is ignored server-side), capped at `YC_MAX_PAGES` (500) as a runaway guard. Covers all public YC batches.
 - **a16z**: Parses the public portfolio page. Falls back gracefully if the page structure changes.
 
 ## Security
 
 - All slugs are validated against `SLUG_RE = /^[A-Za-z0-9._-]+$/` before any URL interpolation — consistent with the guard in `scan-ats-full.mjs`.
-- Constructed ATS URLs go through the existing `entryOnHost()` SSRF guard before reaching any provider.
+- Constructed ATS URLs are not re-checked by `entryOnHost()`: `runSeedScan()` hands `toPortalEntry()` output straight to `provider.detect()`. The guards are `SLUG_RE` on the ATS id and each provider's own host matching.
 - No authentication tokens, no headless browser, no LLM API calls.
 
 ## Adding more VC portfolios
@@ -90,7 +90,7 @@ export const SEED_SOURCES = {
 };
 ```
 
-4. Add test cases in `test-all.mjs` covering your `parseXyzPayload()` function.
+4. Add a test file under `tests/` (`tests/*.test.mjs`, discovered by `test-all.mjs`) covering your `parseXyzPayload()` function.
 
 ## Prior art
 

@@ -209,7 +209,7 @@ Work passes, benefits, and hiring norms differ materially from the US/EU. Apply 
 8. Natural tech English for generated text. Short sentences, action verbs, avoid the passive. Do not force-translate technical terms.
 8b. **Case-study URLs in the PDF Professional Summary:** If the PDF mentions demos or case studies, their URLs MUST appear in the first paragraph (Professional Summary) — recruiters often read only that. All URLs in HTML with `white-space: nowrap`
 9. **Tracker insertions in TSV format** — NEVER edit `applications.md` directly for new insertions. Write the TSV file in `batch/tracker-additions/`; `merge-tracker.mjs` handles the merge. Write a **column-names** row first and exactly one data row beneath it (see AGENTS.md, "TSV Format for Tracker Additions"). The names row lets `merge-tracker.mjs` resolve fields by NAME instead of guessing which column is score and which is status
-10. **`**URL:**` in every report header** — placed between Score and PDF
+10. **`**URL:**` in every report header** — placed in the header, before Score
 
 ### Tools
 

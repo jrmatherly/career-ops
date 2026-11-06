@@ -3,7 +3,7 @@
 An **experimental, opt-in web UI** for career-ops. It is a local-first *view* over
 the exact same files the CLI reads and writes (`data/pipeline.md`,
 `data/applications.md`, `reports/`, `config/`): no parallel engine, no separate
-database, no server. If you never run it, nothing about your CLI workflow changes.
+database, no remote backend. If you never run it, nothing about your CLI workflow changes.
 
 > **Status: alpha.** Expect rough edges. Feedback →
 > [Discussion #1142](https://github.com/career-ops-hq/career-ops/discussions/1142) ·
@@ -22,12 +22,16 @@ npm start
 
 Open http://localhost:3000. The app reads the career-ops checkout it lives in
 (the parent directory) — your existing CV, pipeline and reports appear as-is.
+`CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` and a `.career-ops-data` marker file
+move the data root, in that order, the same way the CLI resolves it.
 
 `npm start` serves the production build, which is the one to use day to day.
 Run `npm run build` again after updating career-ops so the app picks up the new
 code. `npm run dev` is for working on the web UI itself (see
 [Development](#development)): it compiles each page on first visit and checks
-for changes as you go, so it is noticeably slower to use.
+for changes as you go, so it is noticeably slower to use. `npm run ui` from the
+repository root, where `docs/WEB_UI.md` sends you, starts that dev server, not
+the production build.
 
 The server binds IPv4 loopback, so reach it as `localhost` or `127.0.0.1`;
 `http://[::1]:3000` has nothing listening on it.
@@ -83,8 +87,12 @@ before starting an AI run.
   evaluation reports are untrusted input that reaches this agent, so the safest
   thing is for it to hold no write tool at all — on Claude Code every write-capable
   tool is disallowed for this mode (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`
-  and `Bash`). Other CLIs are invoked with a bare prompt and keep their own default
-  tool access, so on those the agent still *holds* write tools — what the pipeline
+  and `Bash`), and so are `WebFetch` and `WebSearch`, since this worker has no
+  reason to reach the network. Codex is fenced too, with a read-only sandbox
+  (`-c sandbox_mode=read-only`; the `FENCERS` table in `src/lib/cli-fencing.mjs`
+  is the list of fenced runtimes). Every other CLI is invoked with a bare prompt
+  and keeps its own default tool access, so on those the agent still *holds*
+  write tools — what the pipeline
   guarantees is that the CV which gets rendered is the one the backend parsed out of
   the envelope, never a file an agent wrote behind it.
 - **Additive:** the web is isolated from the core's packaging, CI and release
@@ -111,14 +119,16 @@ Remove it with `web/scripts/uninstall-scan-schedule.ps1` on Windows or
 current user (never as root), and Windows and macOS need a logged-in session. The task runs only
 `web/scripts/scheduled-jobs-runner.mjs`; it never evaluates roles, applies, or invokes
 an AI model. Job definitions and run history stay in the gitignored `data/`
-directory.
+directory. The definitions live in `data/scheduled-jobs.json` under the data
+root; `CAREER_OPS_SCHEDULED_JOBS_PATH` moves that file, and a relative value
+resolves against the data root.
 
 ## Development
 
 ```bash
 npm run dev          # dev server (Turbopack)
 npm test             # unit suites (node --test, no framework)
-npx tsc --noEmit     # typecheck
+npm run typecheck    # tsc --noEmit
 npm run build        # production build
 npm run test:browser # tests/lib/*.browser.test.mjs in Chrome, each against its own server (after build)
 ```
@@ -293,8 +303,9 @@ Writes are atomic and revision-checked: a stale tab cannot overwrite newer
 messages. Save failures stay visible, and switching waits for the current save.
 Files with invalid JSON are reported individually without blocking healthy
 conversations; damaged files are never overwritten. A crashed
-writer can leave a `.json.lock` file; after stopping the web server, remove that
-lock and restart to retry. Conversation files contain personal text and should
+writer can leave a `.json.lock` behind; the next save reclaims it once its
+holder is gone (a lock file from an older version, after 30 seconds), so no
+hand cleanup is needed. Conversation files contain personal text and should
 stay local and gitignored. They are conversation history, not new verified CV
 facts or a replacement for the canonical profile files.
 
