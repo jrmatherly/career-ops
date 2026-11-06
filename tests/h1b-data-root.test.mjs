@@ -7,13 +7,14 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 console.log('\nh1b-sponsor: index and cache resolve under the data root');
 
 const dataRoot = realpathSync(mkdtempSync(join(tmpdir(), 'h1b-data-root-')));
 const probe = `
-  const { indexPath } = await import(${JSON.stringify(join(ROOT, 'plugins/h1b-sponsor/lib/index.mjs'))});
-  const { writeCache } = await import(${JSON.stringify(join(ROOT, 'plugins/h1b-sponsor/lib/cache.mjs'))});
+  const { indexPath } = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'plugins/h1b-sponsor/lib/index.mjs')).href)});
+  const { writeCache } = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'plugins/h1b-sponsor/lib/cache.mjs')).href)});
   const entry = await writeCache('Acme Corp', { tier: 'none' });
   console.log(JSON.stringify({ index: indexPath(), cache: entry.path ?? null }));
 `;
