@@ -12,8 +12,9 @@ Every deliberate difference from upstream has a row in the deviations table in
 [`.claude/skills/upstream-review/SKILL.md`](.claude/skills/upstream-review/SKILL.md).
 In short: a Claude Code harness (`.claude/`, `.githooks/`), the fork's own CI
 set (nine workflows instead of upstream's maintainer bots and release
-automation), a GHCR image build, and contact addresses that route reports to
-the fork owner. The product code is upstream's.
+automation; a push that changes only documentation runs the suite on Ubuntu
+alone), a GHCR image build, and contact addresses that route reports to the
+fork owner. The product code is upstream's.
 
 ## How it syncs
 
