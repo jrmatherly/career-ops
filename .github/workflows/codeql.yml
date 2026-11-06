@@ -1,9 +1,27 @@
 name: "🔍 CodeQL Analysis"
+# CodeQL scans JS, Go and workflow YAML, so prose and images cannot change its
+# result. The weekly schedule still scans everything.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.svg'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '.upstream-review/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.svg'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '.upstream-review/**'
   schedule:
     - cron: '0 4 * * 1' # Weekly Monday 4am UTC
 
