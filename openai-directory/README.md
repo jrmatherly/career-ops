@@ -8,7 +8,7 @@ This is the career-ops plugin for the OpenAI plugin directory, for ChatGPT and C
 
 The plugin adds one skill, `career-ops`. The skill is a router: the modes, scripts and rules it follows live in a career-ops folder on your machine.
 
-On first use the skill looks for an existing career-ops folder: the one named in `CAREER_OPS_ROOT`, then `./career-ops`, then `~/career-ops`. If there is none, it asks you before installing one with `npx @santifer/career-ops@1.39.0 init`. After that, paste a job URL or ask for a mode, for example a portal scan or a tailored CV. <!-- x-release-please-version -->
+On first use the skill looks for an existing career-ops folder: the one named in `CAREER_OPS_ROOT` (only when that variable points at a checkout; it is also the data-folder override), then `./career-ops`, then `~/career-ops`. If there is none, it asks you before installing one with `npx @santifer/career-ops@1.39.0 init`. After that, paste a job URL or ask for a mode, for example a portal scan or a tailored CV. <!-- x-release-please-version -->
 
 career-ops needs a local executor: it runs in Codex (the CLI, the IDE extension and the app) and in local threads of the ChatGPT desktop app, which is why the listing says Desktop only. In a chat without local execution the skill can explain career-ops, but it cannot run it.
 
@@ -25,12 +25,13 @@ career-ops needs a local executor: it runs in Codex (the CLI, the IDE extension 
 **Day to day**, career-ops runs Node scripts from that folder:
 
 - **Your files stay local.** Your CV, profile, reports and tracker are files in the folder. No account, no telemetry, no backend of ours.
-- **The AI model sees what you work on.** The job descriptions and the parts of your CV it evaluates go to the model you use in ChatGPT or Codex, as part of the conversation. A few optional scripts call another AI provider (Google Gemini, OpenAI, OpenRouter or a local Ollama) only if you set up that provider's key yourself.
+- **The AI model sees what you work on.** The job descriptions and the parts of your CV it evaluates go to the model you use in ChatGPT or Codex, as part of the conversation. A few optional scripts call another AI provider (Google Gemini, OpenAI or any OpenAI-compatible endpoint you configure, such as OpenRouter, Groq or a local Ollama) only if you set up that provider's key yourself.
 - **Portal scans read public job listings.** They fetch listings from the job boards you turn on in `portals.yml`: applicant tracking systems such as Greenhouse, Ashby, Lever, Workable and SmartRecruiters, and the regional boards in [`providers/`](https://github.com/career-ops-hq/career-ops/tree/main/providers). These requests read listings; they don't send your CV or profile.
-- **A browser on your machine.** Playwright opens job pages in a headless Chromium to read listings and to check whether a role is still open, and it renders your CV to PDF locally.
+- **A browser on your machine.** Playwright opens job pages in a headless Chromium to read listings and to check whether a role is still open (on an anti-bot challenge it retries once in a visible browser window), and it renders your CV to PDF locally.
 - **Update checks.** On the first message of a session career-ops asks the GitHub API whether there is a newer release. It updates only when you say yes.
 - **Optional local apps.** A web UI (`npm run ui`) listens only on 127.0.0.1; it refuses to open to the network unless you allow that explicitly. A terminal dashboard you build yourself with Go (`npm run build:dashboard`) compiles on your machine and downloads its Go modules through the Go module proxy.
 - **Optional scheduled scans.** Only if you install them: `web/scripts/install-scan-schedule.sh` adds a user-level LaunchAgent (macOS) or one marked crontab line (Linux), and `install-scan-schedule.ps1` adds a scheduled task (Windows). Every 15 minutes it runs at most one of the scans you saved in the web UI. `uninstall-scan-schedule.sh` (or `.ps1`) removes it.
+- **Optional integrations.** Plugins you enable yourself in `config/plugins.yml` talk to their own services with your keys: Notion (mirrors your tracker), Gmail (reads one label, read-only), Apify (runs an actor) and the H-1B sponsor lookup (a local index by default, an HTTP endpoint only if you name one). None runs until you enable it.
 
 career-ops can fill application forms and draft answers. It drafts and fills; it never submits. You press Submit.
 

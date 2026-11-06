@@ -11,14 +11,18 @@ in here, declare a manifest, and it's discovered automatically.
 ## Default: off
 
 Plugins load **only** when you opt in. With no `config/plugins.yml`, the core
-runs exactly as it always has — no plugin code runs, no `.env` is read, nothing
-changes. Two gates must both be satisfied:
+runs exactly as it always has — no plugin code runs, the scanner reads no `.env`
+(`plugins.mjs list` and `run` do), nothing changes. Three gates must all be
+satisfied:
 
 1. **Enable** the plugin: `node plugins.mjs enable <id> --confirm` shows what it can
    do, then writes `enabled: true` to `config/plugins.yml` under your data root
    (or copy `config/plugins.example.yml` there and edit it by hand).
 2. **Provide its keys** in your own `.env` (each plugin declares which it needs).
    Run `node doctor.mjs` or `node plugins.mjs list` to see what's missing.
+3. **Pass the integrity check** against `plugins.lock`, which `enable --confirm` writes.
+   A plugin whose files changed without a version bump, or whose hosts or env keys
+   widened, is refused until you re-run `enable --confirm` (or `plugins.mjs trust`).
 
 ## Anatomy of a plugin
 

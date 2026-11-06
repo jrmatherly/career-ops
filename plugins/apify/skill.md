@@ -8,7 +8,7 @@ license: MIT
 
 A keyed provider: runs an Apify actor and maps its dataset items into the
 scanner. It fires ONLY on a `portals.yml` entry that sets `provider: apify` —
-never via auto-detection. Put `APIFY_TOKEN` in `.env`.
+never via auto-detection. Enable it first (`node plugins.mjs enable apify --confirm`; with no `config/plugins.yml`, or the plugin off, `provider: apify` is unknown to the scanner) and put `APIFY_TOKEN` in `.env`.
 
 ## portals.yml entry
 

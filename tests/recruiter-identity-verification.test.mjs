@@ -134,7 +134,7 @@ check(
   'batch prompt mirrors Signal 18 with the hard stop and lets it set the tier',
   /18\. \*\*Recruiter Identity Verification\*\*/.test(batch)
     && /Never clone, install, open, or execute anything the recruiter supplied/.test(batch)
-    && /Signals 1-5, 7-9 and 18 set the tier/.test(batch)
+    && /Signals 1-5 and 18 set the tier; 6-17 and 19-22 never do/.test(batch)
     && /including outreach that links a public posting/.test(batch)
     && !/a posting URL → `not evaluated`/.test(batch)
     && /never Concerning\./.test(batch),

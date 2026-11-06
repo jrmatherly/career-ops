@@ -16,7 +16,9 @@ emails, and returns them as leads. The engine writes them to the pipeline.
 ## Setup
 
 Put `GMAIL_CLIENT_ID` + `GMAIL_CLIENT_SECRET` + `GMAIL_REFRESH_TOKEN` in `.env`
-(an OAuth Desktop client + a refresh token from the consent flow). Configure the
+(an OAuth Desktop client + a refresh token from the consent flow; grant only the
+`https://www.googleapis.com/auth/gmail.readonly` scope, since the code requests
+none and read-only depends on what you consented to). Configure the
 label + lookback in `config/plugins.yml`:
 
 ```yaml
