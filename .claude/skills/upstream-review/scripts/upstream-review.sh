@@ -33,7 +33,8 @@
 #   x   we removed it                        skip unless we want the file back
 #   +   new upstream file                    the merge or pick creates it
 #   bin binary file                          inspect by hand
-# Only --advance writes anything, and only to the watermark file.
+# Every subcommand fetches $REMOTE/main (and adds the remote when missing); only --advance
+# writes a file, the watermark, after a decision log under .upstream-review/reviews/ names the SHA.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -144,6 +145,9 @@ case "$cmd" in
       echo "  clean. Merged tree $(echo "$out" | head -1 | cut -c1-12); \`git merge $REMOTE/$BRANCH\` will not conflict."
       exit 0
     else
+      rc=$?
+      # merge-tree exits 1 for conflicts; anything above is a failure, not a verdict.
+      [ "$rc" -eq 1 ] || { echo "ERROR: merge-tree failed (exit $rc): $out" >&2; exit 2; }
       echo "  CONFLICTS in:"; echo "$out" | sed '1d;/^$/,$d' | sed 's/^/    /'
       echo "  Resolve per the deviations table in SKILL.md, or cherry-pick around them."
       exit 1
@@ -157,12 +161,15 @@ case "$cmd" in
     NEWSHA="$(g rev-parse -q --verify "$2^{commit}")" || die "not a commit: $2"
     g merge-base --is-ancestor "$NEWSHA" "$TIP" || die "$2 is not on $REMOTE/$BRANCH"
     NEWSHORT="$(g rev-parse --short "$NEWSHA")"
+    g merge-base --is-ancestor "$WATERMARK" "$NEWSHA" || die "watermark would move backward: $NEWSHORT is an ancestor of $(g rev-parse --short "$WATERMARK")"
+    grep -rlq -- "$NEWSHORT" "$(dirname "$STATE")/reviews" 2>/dev/null || die "no decision log mentions $NEWSHORT; write .upstream-review/reviews/<date>-review.md first"
     NEWDATE="$(g log -1 --date=short --pretty=%ad "$NEWSHA")"
     NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    tmp="$(mktemp)"
+    tmp="$(mktemp "$(dirname "$STATE")/.watermark.XXXXXX")"
+    trap 'rm -f "$tmp"' EXIT
     jq --arg s "$NEWSHA" --arg ss "$NEWSHORT" --arg d "$NEWDATE" --arg n "$NOW" \
       '.lastReviewedSha=$s | .lastReviewedShaShort=$ss | .lastReviewedDate=$d | .lastAdvancedAt=$n' \
-      "$STATE" > "$tmp" && cat "$tmp" > "$STATE" && rm -f "$tmp"
+      "$STATE" > "$tmp" && mv "$tmp" "$STATE"
     echo "[upstream-review] watermark -> $NEWSHORT ($NEWDATE). Commit .upstream-review/ to share it." >&2
     exit 0 ;;
   -h|--help) sed -n '2,34p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
