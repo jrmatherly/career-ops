@@ -768,15 +768,16 @@ browser via Playwright.
 
   --tenant NAME   only this tenant, instead of every enabled board
   --dry-run       scan and report, write nothing to the pipeline or history
-  --debug         keep the browser visible and log each navigation
+  --debug         save a screenshot to output/ and log each board
   --help, -h      show this message
 `;
 
 if (isMainModule(import.meta.url)) {
   // No `valueFlags` for --tenant, deliberately. Declaring it would accept
   // `--tenant=gnghcm`, and parseArgs() reads the value by `indexOf('--tenant')`
-  // plus the next argv slot — so the `=` form is silently ignored and the run
-  // scans every board instead of the one asked for. A tenant name never starts
+  // plus the next argv slot. An accepted `=` form would be silently ignored and
+  // the run would scan every board instead of the one asked for. Today the `=`
+  // form is refused as an unrecognized flag. A tenant name never starts
   // with `-`, which is the only case valueFlags exists to protect, so the space
   // form needs nothing here.
   //
