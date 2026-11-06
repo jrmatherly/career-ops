@@ -1,6 +1,6 @@
 name: "🔒 No user data in PRs"
 
-# Hard-blocks any PR that adds or modifies user-layer (private data) files.
+# Hard-blocks any PR, or push to main, that adds or modifies user-layer (private data) files.
 # These live ONLY on the candidate's machine per DATA_CONTRACT.md and must never
 # enter the repo — they are personal job-search data. Sample/fixture data belongs
 # under examples/. Tracked scaffolding (.gitkeep keepers, dir READMEs) is exempt.
@@ -8,12 +8,15 @@ name: "🔒 No user data in PRs"
 # what an update must never overwrite, this one says what must never enter the
 # repo. batch/ is where the two part company - its tracked scripts are shipped
 # by the system, so they are SYSTEM_PATHS there, while the worker output written
-# beside them is private data (#4531). Uses the API (listFiles) so it works for
-# fork PRs too.
+# beside them is private data (#4531). Uses the API (listFiles for a PR,
+# compareCommits for a push) so it works for fork PRs too.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # Fork: work lands on main without a PR, so grade each push there too.
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -34,10 +37,19 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const pull_number = context.payload.pull_request.number;
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner, repo, pull_number, per_page: 100,
-            });
+            let files;
+            if (context.eventName === 'push') {
+              // A branch's first push has an all-zero "before"; fall back to the parent.
+              const before = /^0+$/.test(context.payload.before) ? `${context.sha}~1` : context.payload.before;
+              // compareCommits caps at 300 files; the local pre-commit hook graded every file.
+              const compare = await github.rest.repos.compareCommits({ owner, repo, base: before, head: context.sha });
+              files = compare.data.files ?? [];
+            } else {
+              const pull_number = context.payload.pull_request.number;
+              files = await github.paginate(github.rest.pulls.listFiles, {
+                owner, repo, pull_number, per_page: 100,
+              });
+            }
 
             // User-layer paths from DATA_CONTRACT.md and update-system.mjs.
             // Every update-system.mjs USER_PATHS entry must be blocked here
