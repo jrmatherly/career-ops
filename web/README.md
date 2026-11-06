@@ -90,13 +90,14 @@ before starting an AI run.
   and `Bash`), and so are `WebFetch` and `WebSearch`, since this worker has no
   reason to reach the network. Codex is fenced too, with a read-only sandbox
   (`-c sandbox_mode=read-only`; the `FENCERS` table in `src/lib/cli-fencing.mjs`
-  is the list of fenced runtimes). Every other CLI is invoked with a bare prompt
+  is the list of fenced runtimes). A CLI absent from that table is invoked with a bare prompt
   and keeps its own default tool access, so on those the agent still *holds*
   write tools — what the pipeline
   guarantees is that the CV which gets rendered is the one the backend parsed out of
   the envelope, never a file an agent wrote behind it.
-- **Additive:** the web is isolated from the core's packaging, CI and release
-  automation. The CLI works exactly the same without it.
+- **Additive:** the CLI works exactly the same without the web. The core's required
+  check does run the web unit suites (`test-all.mjs`), and `web/` is its own
+  release-please component; nothing in the CLI depends on it.
 
 ## Scheduled scans
 
@@ -276,11 +277,13 @@ Three constraints follow from all this:
 - **Keep tests out of `src/`.** `src/` is the Next.js app's own tree, scanned by
   `next build`'s file tracing and `tsc --noEmit`; test files there entangle
   fixtures with build and route conventions.
-- **Use `.mjs`, not `.ts`.** There is no test framework and no TypeScript loader
-  by design — `node --test` cannot run a `.ts` suite, so one would look like
-  coverage and never execute. Extract the logic under test into a plain `.mjs`
+- **Suite files are `.test.mjs`.** There is no test framework by design, and the
+  glob never discovers a `.test.ts` suite, so one would look like coverage and
+  never execute. Prefer extracting the logic under test into a plain `.mjs`
   module (the pattern `src/lib/pdf-paths.mjs` and `src/lib/pdf-render.mjs`
-  already follow) and import it from the test.
+  already follow); a suite may import a `.ts` module through
+  `--experimental-strip-types` and the `@/` resolver in
+  `tests/helpers/web-ts-alias-loader.mjs`.
 - **Web suites use `node:test`.** Here you write
   `import { test } from "node:test"` with `node:assert/strict`. Don't import the
   root `tests/helpers.mjs` `pass`/`fail` helpers; they belong to the root

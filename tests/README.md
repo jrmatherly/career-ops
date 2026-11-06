@@ -42,7 +42,7 @@ run on a bare clone: `test-all.mjs` imports a `pass`/`fail` suite and runs a
 into the totals (#2463). `tests/helpers.mjs` is for this directory only; web
 suites do not import it.
 
-The one exception to the split is a guard *about* web's layout —
+The required check also runs every `web/tests/lib/*.test.mjs` under `node --test` (see `test-all.mjs`). The one exception to the split is a guard *about* web's layout —
 `web-test-layout.test.mjs` lives here on purpose, because `web-ci.yml` is
 informative by design and never blocks a merge, while `test-all.mjs` runs on
 every PR as a required check.
@@ -63,7 +63,7 @@ exits 1 when nothing matches (so a typo cannot turn CI green).
 
 **`--only` and `--needs` are dev conveniences, not a PR gate:** they skip every inline core
 section of `test-all.mjs`. A green `--only` or `--needs` run is not a green suite — always
-run the full `node test-all.mjs` before pushing.
+run the full `node test-all.mjs` before pushing. In this fork the pre-push sequence is `npm run lint`, then `node test-all.mjs --quick`, plus `go test ./...` from `dashboard/` for dashboard or `templates/states.yml` changes (`.claude/rules/dev-workflow.md`).
 
 ## Parallel runs
 

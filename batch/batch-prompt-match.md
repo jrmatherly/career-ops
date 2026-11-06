@@ -151,7 +151,7 @@ Write the report to `reports/{{REPORT_NUM}}-{company_slug}-{{DATE}}.md` (where `
 
 ### Step 4 — Write Tracker Addition
 
-Write a single TSV line to `batch/tracker-additions/{{REPORT_NUM}}-{company_slug}.tsv`.
+Write a two-line TSV (header, then one data row) to `batch/tracker-additions/{{ID}}.tsv`. The runner quarantines and retries by that exact name, so never add the report number or a slug to it. Match reports carry no `## Machine Summary`, so `salary-gap.mjs`, `upskill.mjs` and `analyze-patterns.mjs` do not read them.
 
 The file MUST start with the canonical TSV header on line 1, followed by the data row on line 2:
 

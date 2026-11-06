@@ -11,7 +11,7 @@ You receive a job URL plus a local JD text file and must produce:
 3. One tracker TSV line for `merge-tracker.mjs`
 4. A final JSON summary on stdout for the batch orchestrator
 
-**Important:** This prompt is self-contained. Do not depend on any slash command, skill, or external mode file at runtime.
+**Important:** This prompt is self-contained. Do not depend on any slash command or skill at runtime; the mode files it cites are read as reference text, never invoked.
 
 ---
 
@@ -100,7 +100,7 @@ value from that job message.
 
 ## Template Placeholders
 
-The HTML CV templates (`templates/cv-template.html`, `templates/resume-template.html`, and the five named variants) use placeholder tokens that `build-cv-html.mjs` fills from the JSON payload. The full list lives in `modes/pdf.md` under "JSON Input Schema"; the opt-in slots below are the ones a worker may set or leave empty without breaking the layout.
+The HTML CV templates (`templates/cv-template.html`, `templates/resume-template.html`, and the named variants) use placeholder tokens that `build-cv-html.mjs` fills from the JSON payload. The full list lives in `modes/pdf.md` under "JSON Input Schema"; the opt-in slots below are the ones a worker may set or leave empty without breaking the layout.
 
 | Placeholder | Source field | Opt-in? | Notes |
 |-------------|--------------|---------|-------|
@@ -396,7 +396,7 @@ Batch mode limitation: Playwright is not available, so exact apply-button state 
 
 22. **Accommodation-Notice** — three independent checks, warn-only, never changes the tier, the score or the recommendation; a result in one never suppresses another. (a) The JD states that accommodation is available during recruitment: quote the sentence. (b) Corroborating-only, never standalone: the candidate's jurisdiction has a row in `templates/jurisdiction-accommodation-notice.yml`, its `effective` date is on or before the posting's own date (or today's date, only when the JD carries no clear date), and (a) found no statement; state the rule and the posting's silence side by side, point the candidate to the row's `official_source.url` as a link they can open themselves (render the note in `{language.output}`), and stop, because whether the rule applies depends on employer type and size, which a posting does not show, and the notice is often on a careers page or in the application system rather than in the ad. Silence is never evidence of non-compliance. (c) Stage hint: when the user says they were invited to an assessment, test or interview, always give an informational hint, with no row required: accommodation can be requested for an assessment or interview. When the jurisdiction has a row whose `effective` date is on or before the posting's own date (or today's date, only when the JD carries no clear date), also say what the row says covered employers must tell selected applicants and, when making an offer, the successful applicant (`requires.assessment` and `requires.offer`), and point to the row's `official_source.url` as a link the candidate can open; without such a row add no jurisdiction-specific detail. It runs regardless of (a) and (b) and never asks about or infers anything about the candidate's health. No row → say nothing for (b). Zero-fetch: never open `official_source.url`; render candidate-facing text in `{language.output}`; informational, not legal advice.
 
-Signals 1-5, 7-9 and 18 set the tier. Signal 6 is `not evaluated` in batch, so it never feeds the tier either — it stays a descriptive, informational finding, as the Risk Summary already reports. Signals 10-16 never change the tier: report each one separately as its own finding, keep every one of them descriptive rather than assertive, and close them as informational, not legal advice. Signals 19, 20, 21 and 22 likewise never change the tier: report each as its own informational finding. Signal 17 likewise never changes the tier: keep it informational, never treat its modeled purchasing-power comparison as a verdict on the offer, and close it as not financial or tax advice. Keep Signal 21 warn-only and informational, and close it as not legal advice.
+Signals 1-5 and 18 set the tier; 6-17 and 19-22 never do. Signal 6 is `not evaluated` in batch, so it never feeds the tier either — it stays a descriptive, informational finding, as the Risk Summary already reports. Signals 10-16 never change the tier: report each one separately as its own finding, keep every one of them descriptive rather than assertive, and close them as informational, not legal advice. Signals 19, 20, 21 and 22 likewise never change the tier: report each as its own informational finding. Signal 17 likewise never changes the tier: keep it informational, never treat its modeled purchasing-power comparison as a verdict on the offer, and close it as not financial or tax advice. Keep Signal 21 warn-only and informational, and close it as not legal advice.
 
 Use one tier: **High Confidence**, **Proceed with Caution**, or **Suspicious**. Present observations, not accusations, and explain thin evidence. When the tier-setting signals give too little evidence to decide either way, use **Proceed with Caution** and say what was missing; never pick **Suspicious** without evidence.
 
@@ -427,6 +427,7 @@ Batch rendering rules per row:
 | Culture screen | `— not evaluated` (batch Block A does not produce the Culture screen pass/caution/fail field) |
 | Interview red flags | If `interview-prep/{company-slug}-redflags.md` exists, mirror its warning level + relative link `[{level}](../interview-prep/{company-slug}-redflags.md)`; if not, `— no interview sessions yet` |
 | AI claims vs. infrastructure | If this prompt/report contains the AI/infrastructure mismatch check, mirror its verdict (`✅ consistent` / `⚠️ {finding}`); if not, `— not evaluated` |
+| AI-screening disclosure | If this report contains the AI-screening disclosure check (Signal 15): mirror its verdict (`✅ discloses AI use`, `ℹ️ {jurisdiction_name} requires disclosure; posting is silent`, or `✅ no AI screening disclosed`); otherwise `— not evaluated` |
 | Fixed-term contract | `ℹ️ fixed term — "{quoted phrase}"` when explicit fixed-term language is present; otherwise `✅ no fixed term disclosed` |
 | Relocation purchasing power | If this report contains the relocation purchasing-power check (Signal 17): `ℹ️ {home.jurisdiction} ~{home.takeHome} vs {dest.jurisdiction} ~{dest.takeHome}` when `ok: true` (informational, never a verdict on the offer); `— no jurisdiction match` ONLY when the script's `reason` is specifically `no-jurisdiction-match`; `— not evaluated` for every other `ok: false` reason (`same-jurisdiction`, `cross-country-not-supported`, `currency-mismatch`, `no-gross-amount`, `no-table`, `no-federal-table`, `malformed-brackets`, …) and when the gate's own conditions were not met. A same-jurisdiction or currency-mismatch result is not a jurisdiction-match failure and must never be rendered as one. |
 | Vacancy-status disclosure | If this report contains the vacancy-status check (Signal 19): `ℹ️ states an existing vacancy — "{quoted phrase}"` / `ℹ️ states no existing vacancy — "{quoted phrase}"` when the posting states its status; `ℹ️ {jurisdiction_name} requires the statement; posting is silent` when only the silence half fired (corroborating-only); `— no jurisdiction match` when the posting is silent and the jurisdiction has no row; `— not evaluated` otherwise, including a silent posting dated before the row's `effective` date |
@@ -446,6 +447,7 @@ Block format:
 | Culture screen | — not evaluated |
 | Interview red flags | — no interview sessions yet |
 | AI claims vs. infrastructure | — not evaluated |
+| AI-screening disclosure | — not evaluated |
 | Fixed-term contract | ✅ no fixed term disclosed |
 | Relocation purchasing power | ℹ️ {home.jurisdiction} ~{home.takeHome} vs {dest.jurisdiction} ~{dest.takeHome} |
 ```
@@ -571,7 +573,7 @@ job_facts_cache:
 Before evaluation, after the existing liveness and confirmation gates:
 
 1. Resolve authoritative ATS-native fields and use `computeListingFingerprint({url, strong: {ats_provider, board_slug, posting_id}})` from `listing-fingerprint.mjs` (or its JSON CLI) to save the current fingerprint to a temporary local JSON file. URL parsing alone cannot supply a strong triple; missing data means no reuse.
-2. Save the **current** liveness verdict to a temporary local JSON file: `{ "url": "https://…", "listing_fingerprint": {…}, "result": "active", "checked_at": "…Z" }`. Use the existing Playwright/liveness-API evidence; the cache performs no network requests. Never invent an active verdict from saved JD text or from an old cache hit. The liveness `listing_fingerprint` must be independently resolved from the ATS fields of the posting actually checked and validate to the requested strong key; never copy the requested key onto unrelated check results. Host/path alone cannot distinguish query-identified postings (for example Greenhouse embed URLs). The URL must be the currently checked posting; its canonical host/path must match the current fingerprint's context. A verified alias can have different context from the stored report while sharing the same strong key.
+2. Save the **current** liveness verdict to a temporary local JSON file: `{ "url": "https://…", "listing_fingerprint": {…}, "result": "active", "checked_at": "…Z" }`. Write {{URL}} to a temporary text file with your file tool (never into a shell command), then take the verdict from `node check-liveness.mjs --no-record --file <that file>` (public ATS APIs first, so a hit needs no browser): `active` sets the report header `**Verification:** active`; any other result sets `**Verification:** unconfirmed (batch mode)` (AGENTS.md, batch-worker exception) and skips the cache. The cache itself performs no network requests. Never invent an active verdict from saved JD text or from an old cache hit. The liveness `listing_fingerprint` must be independently resolved from the ATS fields of the posting actually checked and validate to the requested strong key; never copy the requested key onto unrelated check results. Host/path alone cannot distinguish query-identified postings (for example Greenhouse embed URLs). The URL must be the currently checked posting; its canonical host/path must match the current fingerprint's context. A verified alias can have different context from the stored report while sharing the same strong key.
 3. Run `node evaluation-cache.mjs --identity <fingerprint.json> --liveness <liveness.json>`. `--reports <dir>` overrides the default `{DATA_ROOT}/reports`. A hit requires facts **less than 24 hours** old and an active check **less than 5 minutes** old; future/invalid timestamps, absent metadata, partial/malformed identity, a different key, or failed checks are misses. Never refresh `captured_at` on lookup. Reuse only the returned four facts; recompute all candidate fit and all derived judgments. If the current posting visibly changed, extract again even within the TTL.
 4. On confirmed `expired` with an explicit closure code (`http_gone`, `expired_url`, `expired_body`, or `listing_page`), save the current check in `liveness.json` with `"result": "expired"` (rather than the `"active"` value in step 2); preserve its current `url`, `listing_fingerprint`, and `checked_at`, and never use `code: "insufficient_content"` or `code: "expired_body_soft"`. Then run the same command with `--invalidate` **before the existing closed-posting stop**. This stamps `invalidated_at` in every matching report's cache metadata, preserving other report content and file permissions. Deleting or archiving one duplicate cannot remove the remaining copies' closure marker. Its tombstone invalidates every report for that key captured at/before that instant, so older duplicates cannot revive a closed posting. Only a full extraction after invalidation plus an active check taken after that invalidation allows reuse again. `uncertain`, `insufficient_content`, weak body signals, challenge pages or fetch errors give a miss, never a durable closure. Invalidation errors must be resolved before later reuse, not ignored.
 5. A headless worker lacking verified current liveness cannot use the cache. It follows the existing full-evaluation/unconfirmed-verification path. No extra network calls, sharing or background jobs are introduced.
@@ -598,6 +600,7 @@ Report header:
 **Legitimacy:** {High Confidence | Proceed with Caution | Suspicious}
 **Work Auth:** {✅ Sponsors | ➖ Not needed | ⚠️ Unstated | ⛔ No sponsorship}
 **URL:** {{URL}}
+**Verification:** {active | unconfirmed (batch mode)}
 **PDF:** {output/cv-candidate-{{REPORT_NUM}}-{company-slug}-{{DATE}}.pdf if score >= resolved auto_pdf_score_threshold, otherwise a localized equivalent of `not generated — run /career-ops pdf {company-slug} to create on demand` in `language.output`}
 **Batch ID:** {{ID}}
 
@@ -738,7 +741,7 @@ Only generate the PDF when the score from Step 2 is greater than or equal to the
 
 If score is greater than or equal to the threshold:
 
-1. Read `cv.md`, `article-digest.md`, and `templates/cv-template.html`.
+1. Read `cv.md` and `article-digest.md`. Resolve the template with `node cv-templates.mjs resolve cv` (it honours `cv.template` in `config/profile.yml`; never hardcode `templates/cv-template.html`) and keep the printed path for step 11.
 2. Extract 15-20 JD keywords.
 3. Use `language.output` for CV prose.
 4. Choose paper format: US/Canada -> `letter`; otherwise `a4`.
@@ -748,7 +751,7 @@ If score is greater than or equal to the threshold:
 8. Reorder experience bullets by relevance.
 9. Build a 6-8 item competency grid.
 10. Inject keywords ethically into existing achievements; never invent skills or metrics.
-11. If consent is absent, replace `{{CONSENT}}` with an empty string. If consent is present, replace `{{CONSENT}}` with its HTML-escaped value. Write HTML to `output/cv-candidate-{{REPORT_NUM}}-{company-slug}.html`.
+11. Write the JSON payload (`modes/pdf.md`, "JSON Input Schema"; consent travels as its field, absent when there is none) to `output/cv-candidate-{{REPORT_NUM}}-{company-slug}.json`, then run `node build-cv-html.mjs output/cv-candidate-{{REPORT_NUM}}-{company-slug}.json output/cv-candidate-{{REPORT_NUM}}-{company-slug}.html {template path from step 1}`. The script fills every placeholder, `{{CONSENT}}` included, and owns the HTML escaping, so never emit markup yourself. Write HTML to `output/cv-candidate-{{REPORT_NUM}}-{company-slug}.html` only through that command.
     The report number goes first in every path of this step: `{company-slug}` alone
     collides when the same company has two postings evaluated on the same day, and the
     second PDF silently overwrites the first. `{{REPORT_NUM}}` is unique per report
@@ -775,8 +778,7 @@ ATS rules:
 
 Design rules:
 
-- Space Grotesk for headings, DM Sans for body.
-- Self-hosted fonts from `fonts/`.
+- Keep the template's fonts: a system sans-serif stack, chosen because bundled web fonts broke PDF text extraction.
 - White background, 0.6in margins.
 - Keep the output readable and ATS-safe.
 
@@ -878,7 +880,7 @@ Failure:
 
 ### Always
 
-1. Read the candidate sources before evaluating.
+1. Read the candidate sources at Block B pass 2, after the JD-only pass, never before.
 2. Apply user-specific rules from `modes/_profile.md` and `config/profile.yml`.
 3. Follow `language.output` for human-facing output.
 4. Detect the role archetype and adapt the framing.

@@ -138,7 +138,7 @@ The dataset is public DOL disclosure data and the worker that serves it is open 
 
 If the endpoint goes away or errors, the plugin fails closed: results come back `unknown`, the skill skips the Block G bullet, and nothing is fabricated.
 
-Rate limits on the author's instance are 30 requests per hour per (IP, ASN) anonymously and 200 per hour with a key. A check costs at most two requests. Mint a key with `node plugins/h1b-sponsor/token.mjs request`; it prints the token and the `H1B_API_TOKEN=` line once and writes no file for you, since where a durable credential lives is your call. A new key can take about a minute to work on every server, so a 401 in that window means wait and retry. Minting is metered per address: 2 keys at once, then one more every 12 hours.
+Rate limits on the author's instance are 30 requests per hour per (IP, ASN) anonymously and 200 per hour with a key. A check costs at most two requests. Mint a key with `node plugins/h1b-sponsor/token.mjs request` (the mint request goes to the author's instance unless `H1B_API_BASE` names yours); it prints the token and the `H1B_API_TOKEN=` line once and writes no file for you, since where a durable credential lives is your call. A new key can take about a minute to work on every server, so a 401 in that window means wait and retry. Minting is metered per address: 2 keys at once, then one more every 12 hours.
 
 Notes on configuring an endpoint:
 

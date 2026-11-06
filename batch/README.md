@@ -30,7 +30,7 @@ Process multiple job offers via headless workers. By default (`--mode full`) eac
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--cli NAME` | `claude` | Worker CLI: `claude`, `opencode`, `gemini`, `qwen` or `grok`. Only `claude` runs in parallel and retries; the others run one offer at a time, one attempt each |
+| `--cli NAME` | `claude` | Worker CLI: `claude`, `opencode`, `gemini`, `qwen` or `grok`. Only `claude` runs in parallel and retries; the others run one offer at a time, one attempt each (`--mode match` allows one retry on malformed JSON) |
 | `--model NAME` | per CLI | Model for the worker CLI. For `claude`, overrides the model resolved from `spend_tier` in `config/profile.yml` |
 | `--parallel N` | `3` for `claude`, `1` otherwise | Number of concurrent headless workers; after a rate limit the rest of the batch runs on 1 |
 | `--dry-run` | off | Preview pending offers without processing |
@@ -133,7 +133,7 @@ Batch mode reads offers from `batch-input.tsv`, but the `data/pipeline.md` inbox
 
 ## Resumability
 
-`batch-state.tsv` tracks the status of every offer (`pending`, `processing`, `completed`, `failed`, `skipped`, `rate_limited`, `paused_rate_limit`). If the batch is interrupted, re-running `batch-runner.sh` picks up where it left off -- completed offers are skipped automatically. `rate_limited` is a non-completed state used while the runner waits before retrying, so interrupted rate-limited jobs are eligible on the next normal run.
+`batch-state.tsv` tracks the status of every offer (`pending`, `processing`, `completed`, `failed`, `skipped`, `rate_limited`, `paused_rate_limit`, `needs_confirmation`; a `needs_confirmation` row is held on every run until you close it, see `modes/batch.md`). If the batch is interrupted, re-running `batch-runner.sh` picks up where it left off -- completed offers are skipped automatically. `rate_limited` is a non-completed state used while the runner waits before retrying, so interrupted rate-limited jobs are eligible on the next normal run.
 
 `paused_rate_limit` is different: a worker hit a Claude session/usage limit, zero-wait pause, or a `Retry-After` above the configured ceiling, so the runner stopped scheduling new offers and preserved the retry count. Resume those rows explicitly after the limit resets:
 
