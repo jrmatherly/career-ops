@@ -24,8 +24,9 @@ The policy is an additional gate before the normal location tiers. It never
 rescues a posting the existing `block_hard`, `block` or `allow` rules reject.
 Without `workplace_policy`, location matching is unchanged.
 
-Each policy field is a YAML list; bare strings are rejected. Optional fields may
-be omitted or null. An empty `onsite_countries` list also uses `remote_countries`
+Each policy field is a YAML list; bare strings are rejected. `onsite_locations`
+and `remote_countries` are required and must be nonempty. The optional fields,
+`onsite_countries` and `remote_regions`, may be omitted or null. An empty `onsite_countries` list also uses `remote_countries`
 as its default; a supplied nonempty country list must name a recognized country.
 
 - Office and hybrid roles must name an allowed onsite location. An explicit

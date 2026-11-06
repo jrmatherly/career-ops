@@ -40,8 +40,8 @@ you have to remember:
 ```
 
 Where it goes: `modes/_custom.md`, under **House Rules**. If the file does not exist
-yet, it is copied from `modes/_custom.template.md` on first run — open it and paste
-the rule in. A helpful side effect of putting it there rather than in a system file
+yet, it is created during onboarding (`node doctor.mjs --init-templates`), or copy
+`modes/_custom.template.md` to it by hand. Then open it and paste the rule in. A helpful side effect of putting it there rather than in a system file
 is that your rule also tells the agent *why* and *how*, so it resolves the ATS and
 writes a `notes:` line instead of guessing.
 
@@ -75,8 +75,9 @@ node audit-portals.mjs --company "<Company>" --summary     # what is actually on
   non-zero if any slug is unresolved, which is handy in a script.
 - **`audit-portals.mjs`** — goes further than "does it answer": it fetches each
   board and reports *whose* postings are on it. Verdicts to watch are `no-provider`
-  (enabled but nothing claims it, so the scanner skips it silently) and `empty` /
-  `error` (the board answers but returns nothing). Keep a `--json` snapshot and
+  (enabled but nothing claims it, so the scanner skips it silently), `error` (the
+  fetch failed or returned no result) and `empty` (the board answers with zero
+  postings). Keep a `--json` snapshot and
   pass it back later as `--baseline prev.json` to catch a board that suddenly lost
   most of its postings — the shape an ATS migration takes.
 

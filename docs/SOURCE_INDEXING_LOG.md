@@ -41,7 +41,7 @@ First source reviewed under the written policy. The operator proposing their own
 | | |
 |---|---|
 | **Proposed by** | @justma16ze (community contributor, not affiliated with the source) |
-| **Provider** | `providers/a16z-speedrun.mjs` |
+| **Provider** | `providers/a16z-speedrun-talent.mjs` |
 | **PR** | [#2231](https://github.com/santifer/career-ops/pull/2231) |
 | **Merged** | 2026-07-29 |
 | **Status** | Listed |
@@ -138,7 +138,7 @@ Still out of reach by design: posts whose only application path is a Telegram co
 | **Proposed by** | @configurowebmax (community contributor; no affiliation with the source declared) |
 | **Provider** | `providers/computrabajo.mjs` |
 | **PR** | [#2650](https://github.com/career-ops-hq/career-ops/pull/2650) |
-| **Merged** | pending (this PR) |
+| **Merged** | 2026-10-23 |
 | **Status** | Provider listed; the shipped `job_boards:` entry is `enabled: false`. |
 
 A general job board with one host per Latin American country. Only the Colombian host was measured: one GET of `https://co.computrabajo.com/trabajo-de-sistemas` on 2026-10-23, no key, cookie or session, career-ops' default User-Agent: HTTP 200, 20 posting cards.
@@ -168,7 +168,7 @@ Proposed in [#2650](https://github.com/career-ops-hq/career-ops/pull/2650) toget
 | **Proposed by** | @configurowebmax (community contributor; no affiliation with the source declared) |
 | **Provider** | `providers/magneto.mjs` |
 | **PR** | [#2650](https://github.com/career-ops-hq/career-ops/pull/2650) |
-| **Merged** | pending (this PR) |
+| **Merged** | 2026-10-23 |
 | **Status** | Provider listed; the shipped `job_boards:` entry is `enabled: false`. |
 
 A general job board for Colombia. Measured: one GET of `https://www.magneto365.com/co/trabajos/buscar/tecnologia` on 2026-10-23, no key, cookie or session, career-ops' default User-Agent: HTTP 200, 20 job cards, pager links up to page 20.
@@ -194,8 +194,8 @@ A general job board for Colombia. Measured: one GET of `https://www.magneto365.c
 | **Proposed by** | @kosinal (not the operator) |
 | **Provider** | `providers/jobscz.mjs`, `providers/pracecz.mjs` |
 | **PR** | [#5631](https://github.com/career-ops-hq/career-ops/pull/5631) · issue [#5627](https://github.com/career-ops-hq/career-ops/issues/5627) |
-| **Merged** | — |
-| **Status** | Proposed |
+| **Merged** | 2026-10-25 |
+| **Status** | Provider listed; the shipped `job_boards:` entries are `enabled: false`. |
 
 **Rule 1 (real listings, identifiable employer, free for candidates).** Listings are individual offers, and each names its employer: a company line on every jobs.cz card, `company.publicName` on every prace.cz item. Listings are readable without an account, and the prace.cz footer links an advertising price list for employers ("Ceník inzerce"). Each offer page has an "Odpovědět" (reply) button leading to the portal's application form. It was opened by hand in a browser, as a candidate, on one offer of each portal (the providers never request it; prace.cz's `robots.txt` disallows `/odpovedni-formular/`): on both portals, sending an application requires no account and is free.
 

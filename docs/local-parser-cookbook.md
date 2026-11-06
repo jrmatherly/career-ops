@@ -4,11 +4,11 @@ Local parsers let `scan.mjs` read SSR, static, or user-saved career pages withou
 
 ## When To Use This
 
-Use `scan_method: local_parser` when a company career page has stable HTML, a documented endpoint, or another deterministic source that is easier to parse locally than with Playwright. The parser can be written in JavaScript, Python, shell, Go, or any executable available on the user's machine. Company-specific parsers are user-supplied and referenced from `portals.yml`; copy them into the gitignored `local/` directory so site-specific HTML can evolve independently from core.
+Use a local parser when a company career page has stable HTML, a documented endpoint, or another deterministic source that is easier to parse locally than with Playwright. The parser can be written in JavaScript, Python, shell, Go, or any executable available on the user's machine. Company-specific parsers are user-supplied and referenced from `portals.yml`; copy them into the gitignored `local/` directory so site-specific HTML can evolve independently from core.
 
 ## Portal Configuration
 
-Most local parsers are company-specific: the script already knows the source URL, selectors, endpoint quirks, pagination, and normalization rules. In that common case, the scanner only needs to know which command to run:
+Most local parsers are company-specific: the script already knows the source URL, selectors, endpoint quirks, pagination, and normalization rules. In that common case, the scanner only needs to know which command to run. The `parser:` block is what activates the local parser; `scan.mjs` does not read `scan_method: local_parser`, which is descriptive only:
 
 ```yaml
 - name: Example Company
@@ -27,6 +27,8 @@ Most local parsers are company-specific: the script already knows the source URL
 
 `providers/local-parser.mjs` only runs a script that resolves **inside the repository root** — a whitelisted interpreter (`node`, `python3`, …) must take an in-repo script as its first argument, and a path that escapes the root is rejected. This is a deliberate boundary: `portals.yml` is not fully trusted on a shared or template config, so the parser command cannot point at an arbitrary binary or a file outside the checkout.
 
+The repository root here is the code checkout (the directory above `providers/`), not the data root, and the parser runs with that checkout as its working directory. On a Claude Code plugin install, the checkout is the plugin cache, which every plugin update replaces, so a parser saved in its `local/` does not survive an update.
+
 Because the script has to sit in the tree, put a parser you do not intend to contribute under a path that Git ignores, so it is never staged:
 
 - `local/` is gitignored by default. `local/acme-jobs.mjs` is the simplest home for a one-off, company-specific parser.
@@ -38,9 +40,9 @@ Use `scripts/parsers/` only for a parser you plan to open a PR for. `career-ops`
 
 `scan.mjs` uses **0 LLM tokens** for discovery: parsers run locally and only normalized job rows enter the pipeline.
 
-In agent scan mode (`/career-ops scan`), Playwright and API niveles send large page or JSON payloads into the model. When Nivel 0 succeeds, `modes/scan.md` requires skipping those niveles for the same company (`local_parser_ok`).
+In agent scan mode (`/career-ops scan`), Playwright and API levels send large page or JSON payloads into the model. When Level 0 succeeds, `modes/scan.md` requires skipping those levels for the same company (`local_parser_ok`).
 
-Measured benchmarks (Cohere + Mobileye fixtures, `tiktoken` `cl100k_base`, Playwright vs parser vs API) live on branch `feature/local-parser-integration-tests` with `npm run test:scan-tokens` and full tables in that branch's copy of this cookbook.
+Measured benchmarks (Cohere + Mobileye fixtures, `tiktoken` `cl100k_base`, Playwright vs parser vs API) were run for #595 on the contributor's branch `feature/local-parser-integration-tests`. That branch, its `npm run test:scan-tokens` script and its full tables were not merged into this repository.
 
 ## Stdout Contract
 
@@ -86,8 +88,8 @@ bypasses the site's interactive challenge.
 
 ## Failure Handling
 
-Local parsers run before ATS API detection. If a local parser fails and the company has a detectable Greenhouse, Ashby, or Lever API source, `scan.mjs` records the parser failure and falls back to the API path for that company instead of dropping it from the scan.
+Local parsers run before ATS API detection. If a local parser fails and any other provider claims the entry (for example Greenhouse, Ashby, or Lever), `scan.mjs` records the parser failure and falls back to that provider for that company instead of dropping it from the scan.
 
 ## Agent scan (`/career-ops scan`)
 
-`scan.mjs` already uses one provider per company (local parser only, no duplicate API pass). In full agent scan mode (`modes/scan.md`), when Nivel 0 succeeds for a company, the agent must **skip** Playwright (Nivel 1) and API (Nivel 2) for that company, and filter Nivel 3 WebSearch hits that match the same company. General portal queries (`site:jobs.ashbyhq.com`, role keywords) still run for discovery of other employers.
+`scan.mjs` already uses one provider per company (local parser only, no duplicate API pass). In full agent scan mode (`modes/scan.md`), when Level 0 succeeds for a company, the agent must **skip** Playwright (Level 1) and API (Level 2) for that company, and filter Level 3 WebSearch hits that match the same company. General portal queries (`site:jobs.ashbyhq.com`, role keywords) still run for discovery of other employers.

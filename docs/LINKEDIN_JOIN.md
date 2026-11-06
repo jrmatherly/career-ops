@@ -42,7 +42,7 @@ node linkedin-join.mjs --summary
 
 ```
 LinkedIn warm-intro join
-  5 connections · 4 target companies · 4 companies with a connection · 4 people
+  4 connections · 4 target companies · 4 companies with a connection · 4 people
 
 ── In your tracker ────────────────────────────────────────
 
@@ -51,7 +51,7 @@ LinkedIn warm-intro join
         https://www.linkedin.com/in/janedoe
     2nd-degree: https://www.linkedin.com/search/results/people/?keywords=Siemens%20Digital%20Industries%20Software&network=%5B%22S%22%5D
 
-  Datavant  [#2 Screening · Platform Engineer]
+  Datavant  [#2 Responded · Platform Engineer]
     · Ravi Patel — Staff Data Engineer — since 2019-02
         https://www.linkedin.com/in/ravipatel
     2nd-degree: https://www.linkedin.com/search/results/people/?keywords=Datavant&network=%5B%22S%22%5D
@@ -110,6 +110,9 @@ Do you know anyone at "Stripe"?
 
   No. No first-degree connection in your export lists this company.
   (Strict name matching. Try --include-weak for looser variants.)
+
+  Second-degree (not in any export — open it yourself, nothing is fetched):
+    https://www.linkedin.com/search/results/people/?keywords=Stripe&network=%5B%22S%22%5D
 ```
 
 ### Promoting someone into your phonebook

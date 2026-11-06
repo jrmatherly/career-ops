@@ -14,7 +14,7 @@ You should see a line such as `12 LinkedIn jobs added. Open Pipeline to review t
 
 A job that is already in the pipeline or the tracker is not added again.
 
-To use a saved email instead of a paste, choose the file next to the paste box. `.eml` and `.txt` both work.
+To use a saved email instead of a paste, choose the file next to the paste box. `.eml`, `.txt` and `.mbox` all work.
 
 ## Paste from the terminal
 
@@ -30,7 +30,7 @@ Or pipe it:
 node linkedin-import.mjs < alert.eml
 ```
 
-`--dry-run` prints the count and writes nothing. `--json` prints one object with `added`, `already`, `found`, and `message`.
+`--dry-run` prints the count and writes nothing. `--json` prints one object with `added`, `already`, `found`, and `message`. It also carries `error` when the import failed, and `historyError` when the scan history could not be updated.
 
 With no file and no pipe, the command prints this help and waits for nothing.
 

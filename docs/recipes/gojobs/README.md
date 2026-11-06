@@ -58,8 +58,8 @@ tracked_companies:
 
 Run `node scan.mjs` as usual. The local-parser provider starts the copied script
 from the career-ops checkout, and the parser resolves capture paths through
-`CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR`, or `.career-ops-data` using the same
-precedence as the rest of career-ops. Normal scan filters, deduplication, and
+`CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR`, then `.career-ops-data`, then the
+checkout itself. It does not apply the plugin-install default (`~/career-ops-data`). Normal scan filters, deduplication, and
 pipeline writes still apply. Refreshing coverage requires another manual save;
 this is not real-time or unattended scanning.
 
