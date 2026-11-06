@@ -1,8 +1,9 @@
 // tests/claude-hooks.test.mjs — the fork's Claude Code hooks and git pre-commit
 // hook (.claude/hooks/*.mjs, .githooks/pre-commit.mjs) behave as documented in
 // .claude/rules/dev-workflow.md: the syntax hook flags only an invalid .mjs
-// inside the project, and the pre-commit hook refuses a force-staged
-// gitignored (user-layer) file while letting a clean index through.
+// inside the project, and the pre-commit hook refuses a newly added (or renamed-in)
+// gitignored (user-layer) file while letting a clean index, a staged deletion
+// and an edit to a tracked-but-ignored file through.
 import { spawnSync } from 'child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -78,6 +79,32 @@ try {
   r = spawnSync(NODE, [hook], { cwd: repo, encoding: 'utf-8' });
   if (r.status === 0) pass('pre-commit lets a clean index through');
   else fail(`pre-commit expected exit 0 on a clean index, got ${r.status}: ${r.stderr}`);
+
+  // Only newly ADDED paths are graded: a leak already committed can be undone
+  // with rm --cached, and upstream tracks examples/.../cv.md, which .gitignore matches.
+  git('add', '-f', 'cv.md');
+  git('commit', '-qm', 'leak'); // README.md + the leaked cv.md
+  git('rm', '--cached', '-q', '--', 'cv.md');
+  r = spawnSync(NODE, [hook], { cwd: repo, encoding: 'utf-8' });
+  if (r.status === 0) pass('pre-commit lets a staged deletion of a leaked file through');
+  else fail(`pre-commit expected exit 0 on a staged deletion, got ${r.status}: ${r.stderr}`);
+
+  git('reset', '-q', '--hard');
+  writeFileSync(join(repo, 'cv.md'), 'edited\n');
+  git('add', 'cv.md');
+  r = spawnSync(NODE, [hook], { cwd: repo, encoding: 'utf-8' });
+  if (r.status === 0) pass('pre-commit lets an edit to a tracked-but-ignored file through');
+  else fail(`pre-commit expected exit 0 on a tracked-file edit, got ${r.status}: ${r.stderr}`);
+
+  // A rename onto a user-layer name is an addition, not a rename, to the guard.
+  git('reset', '-q', '--hard');
+  git('rm', '--cached', '-q', '--', 'cv.md');
+  git('commit', '-qm', 'clean');
+  rmSync(join(repo, 'cv.md'));
+  git('mv', 'README.md', 'cv.md');
+  r = spawnSync(NODE, [hook], { cwd: repo, encoding: 'utf-8' });
+  if (r.status === 1 && r.stderr.includes('cv.md')) pass('pre-commit refuses a rename onto a gitignored name');
+  else fail(`pre-commit expected exit 1 naming cv.md on a rename, got ${r.status}: ${r.stderr}`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

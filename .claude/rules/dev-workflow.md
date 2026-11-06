@@ -7,4 +7,4 @@
 - Commits follow Conventional Commits with a scope (`fix(scan): …`, `docs(oferta): …`); release-please (`release-please-config.json`) builds the changelog from them.
 - Upstream wants an issue first for a new feature, mode, command or architecture change; bug fixes, providers, docs and translations go straight to a PR. The PR body must state no personal data was added and `node test-all.mjs` passed.
 - System layer vs user layer is the one rule that must never slip: personalization never lands in `modes/_shared.md`, scripts, templates or `AGENTS.md`. See DATA_CONTRACT.md.
-- The git pre-commit hook in `.githooks/` blocks force-staged user-layer files and syntax errors. If it did not run, `git config core.hooksPath .githooks` is missing (the SessionStart hook sets it).
+- The git pre-commit hook in `.githooks/` refuses a newly added gitignored (user-layer) file and syntax errors; edits and deletions of tracked files pass. If it did not run, `git config core.hooksPath .githooks` is missing (the SessionStart hook sets it).

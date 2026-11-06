@@ -1,6 +1,9 @@
 #!/usr/bin/env node
-// Git pre-commit hook for this fork: refuse force-staged user-layer (gitignored)
-// files and syntax errors. Every User Layer path is gitignored (enforced by
+// Git pre-commit hook for this fork: refuse a newly added gitignored (user-layer)
+// file and syntax errors. Edits and deletions of tracked files pass, so a leak can
+// be undone with rm --cached and upstream's tracked examples/.../cv.md can be
+// edited; --no-renames makes a rename onto an ignored name count as an addition.
+// Every User Layer path is gitignored (enforced by
 // tests/user-layer-gitignored.test.mjs), so "staged and ignored" is the whole
 // personal-data check, with no path list to keep in sync.
 import { spawnSync } from 'node:child_process';
@@ -8,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export function ignoredStagedFiles(root) {
-  const staged = spawnSync('git', ['diff', '--cached', '--name-only', '-z'], { cwd: root });
+  const staged = spawnSync('git', ['diff', '--cached', '--name-only', '--diff-filter=A', '--no-renames', '-z'], { cwd: root });
   if (staged.status !== 0) throw new Error(`git diff --cached failed: ${staged.stderr}`);
   if (!staged.stdout.length) return [];
   const ignored = spawnSync('git', ['check-ignore', '--stdin', '-z', '--no-index'], { cwd: root, input: staged.stdout });
