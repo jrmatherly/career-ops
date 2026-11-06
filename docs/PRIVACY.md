@@ -23,10 +23,11 @@ request and sends nothing**. It never silently edits your prompt.
 ## Quick start
 
 ```bash
-# 1. Copy the sample and fill in your own values.
-cp config/privacy.example.yml config/privacy.yml
+# 1. Copy the sample into your data root and fill in your own values.
+#    In a plain checkout the data root is the checkout itself.
+cp config/privacy.example.yml <data-root>/config/privacy.yml
 
-# 2. Edit config/privacy.yml — replace the fictional placeholders.
+# 2. Edit <data-root>/config/privacy.yml and replace the fictional placeholders.
 
 # 3. Confirm the guard sees them.
 node privacy-status.mjs
@@ -35,6 +36,14 @@ node privacy-status.mjs
 `privacy-status.mjs` reports how many values are guarded, which pattern
 detectors are on, and where its config came from — **without printing any of the
 values themselves**.
+
+The guard reads `{DATA_ROOT}/config/privacy.yml`, the same data root as your
+CV and tracker (`CAREER_OPS_ROOT`, a `.career-ops-data` marker, or
+`~/career-ops-data` in a plugin install). Set `CAREER_OPS_PRIVACY=<path>` to
+read another file; a relative path resolves against the data root. A copy left
+in the checkout while the data root is elsewhere is ignored, and the guard runs
+as `absent`. `privacy-status.mjs` prints the path it read as `config file`.
+Every later mention of `config/privacy.yml` on this page means that file.
 
 `config/privacy.yml` is gitignored. The committed `config/privacy.example.yml`
 holds only fictional placeholders.
@@ -45,7 +54,7 @@ holds only fictional placeholders.
 > while `auto_detect` is on, every evaluation that includes the CV is blocked
 > until those values are out of `cv.md` or out of this config. List what must
 > never leave the machine and is not in your CV, or use `PRIVACY_REDACT=1`
-> (see below).
+> or the profile's `privacy.redact_contact_info` (see below).
 
 ---
 
@@ -154,9 +163,11 @@ the exact line in `config/privacy.yml` to look at — the only way to locate it,
 since the value itself is never echoed. Nested keys report their full dotted path
 and array items report `protected.custom[0]`. (An earlier version printed a
 flattened position, `entry 3`, which pointed at no visible line once a value was
-nested — the case the label exists for.) Configured numbers match as a substring
-of any longer digit run, so a block can be triggered by a number you do not
-recognise; the key path is what turns that into a fix.
+nested — the case the label exists for.) A configured number of 7 or more
+digits matches anywhere in the request's digits joined end to end, so a block
+can be triggered by a number you do not recognise; the key path is what turns
+that into a fix. A number of 5 or 6 digits (a salary such as `145000`) matches
+only a whole digit run, so `1450001` does not trigger it.
 
 ---
 
@@ -184,6 +195,26 @@ Instead of blocking, this replaces **configured** values with placeholder tokens
 on the way out and rehydrates them in the response. It is not the default because
 silently altering a prompt changes what the model was asked. Prefer blocking,
 or narrowing your config.
+
+### Profile contact redaction (`privacy.redact_contact_info`)
+
+A separate opt-in lives in `config/profile.yml`, not in the guard's config:
+
+```yaml
+privacy:
+  redact_contact_info: true
+```
+
+`utils/privacy-filter.mjs` then swaps your name and contact details from the
+profile's `candidate:` block (email, phone, LinkedIn, GitHub, portfolio,
+socials) for fixed placeholders in the prompts that `gemini-eval.mjs`,
+`openai-tailor.mjs` and `openrouter-runner.mjs` send. Output shipped to a
+recruiter, such as a tailored CV, gets the real details back. It differs from
+the guard in three ways. It covers only those three scripts. It reads the
+values from your profile, not from `config/privacy.yml`. It rewrites the prompt
+instead of blocking it. It is the fix for the case above, where your own name
+in `cv.md` blocks every evaluation. `PRIVACY_REDACT=1` is the guard's own
+redaction, of the values in `config/privacy.yml`.
 
 ---
 
@@ -234,7 +265,7 @@ Read these. The guard is useful precisely because its edges are stated.
 | `lib/llm-outbound.mjs` | The shared boundary — `assertLlmRequestAllowed()` |
 | `lib/pii-interceptor.mjs` | Ambient `globalThis.fetch` wrapper |
 | `config/privacy.example.yml` | Committed sample (fictional values only) |
-| `config/privacy.yml` | Your real config — **gitignored** |
+| `config/privacy.yml` | Your real config, under the data root — **gitignored** |
 | `privacy-status.mjs` | Diagnostic — reports counts, never values |
 
 Design reference: the `PIIGuard` class in the

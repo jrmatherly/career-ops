@@ -11,8 +11,8 @@ here, so review is the real control.
   author's `career-ops-plugin-<name>` repo; users `add` it. The default, low
   burden.
 - **Bundled** — promoted into `plugins/` (shipped, auto-updated). Reserve for
-  broadly-useful, low/zero-key, well-tested plugins (how `apify`/`gmail`/`notion`
-  were absorbed). Adds a maintenance commitment + a `config/plugins.example.yml`
+  broadly-useful, low/zero-key, well-tested plugins (as with `apify`/`gmail`/`notion`/
+  `h1b-sponsor`). Adds a maintenance commitment + a `config/plugins.example.yml`
   block + an `.env.example` entry.
 
 ## What CI already checked (don't re-do by hand)
@@ -45,6 +45,11 @@ stop.
 
 ## Auto-merge (only when it's truly safe)
 
+> **Intended process, not yet automated.** No workflow in this repo auto-merges
+> registry PRs, stages rows, runs a canary window or runs an agentic reviewer.
+> A registry entry has one `sha`, and the loader reads it directly.
+> Until that tooling exists, review every update by hand.
+
 Most updates are human-reviewed. An update may auto-merge ONLY when ALL hold: a
 known author (2FA + a verified commit signature on the pinned SHA), the diff is
 **provably non-logic** (metadata / version / strings / comments / whitespace
@@ -66,7 +71,8 @@ author" prompt — the project doesn't host that liability in-tree.
 
 ## Bundled plugins are reference seeds (no feature PRs on `plugins/`)
 
-A bundled plugin (`plugins/apify`, `plugins/gmail`, `plugins/notion`) is a
+A bundled plugin (`plugins/apify`, `plugins/gmail`, `plugins/h1b-sponsor`,
+`plugins/notion`) is a
 **reference seed**: a reviewed, minimal, stable example. We do **not** accept
 feature PRs against it — close-redirect them to "publish `career-ops-plugin-<id>`
 and we'll register it as the maintained successor." Bundled plugins only take

@@ -176,6 +176,12 @@ language:
 # See the tier -> model mapping table in modes/_shared.md.
 spend_tier: standard
 
+# (Optional) Swap your name and contact details from `candidate:` for
+# placeholders in the prompts gemini-eval, openai-tailor and openrouter-runner
+# send to a hosted model. Off unless true. See docs/PRIVACY.md.
+# privacy:
+#   redact_contact_info: true
+
 # (Optional) Paper size for every generated PDF: "letter", "a4" or "auto".
 # One setting for the CV, the cover letter and the HTML body width, so they
 # cannot disagree. Absent means letter. An explicit --format flag or a payload

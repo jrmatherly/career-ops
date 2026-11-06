@@ -10,9 +10,10 @@ system/user data-contract layers live in [../ARCHITECTURE.md](../ARCHITECTURE.md
 ## Evaluation Flow (Single Offer)
 
 1. **Input**: User pastes JD text or URL
-2. **Extract**: Playwright/WebFetch extracts JD from URL
-3. **Classify**: Detect archetype (1 of 6 types)
-4. **Evaluate**: 8 blocks (A-H; H is conditional on scores ≥ 4.5):
+2. **Extract**: Playwright/WebFetch extracts JD from URL, with `fetch-jd.mjs` as the fallback for a supported ATS API
+3. **Gate**: liveness, blacklist and dealbreakers; stop if any fails
+4. **Classify**: Detect archetype (your `modes/_profile.md` targets, or the 6 defaults; "none of these" is a valid outcome)
+5. **Evaluate**: 8 blocks (A-H; H is conditional on scores ≥ 4.5):
    - A: Role summary
    - B: CV match (per-requirement importance + gaps + mitigation)
    - C: Level strategy
@@ -21,11 +22,11 @@ system/user data-contract layers live in [../ARCHITECTURE.md](../ARCHITECTURE.md
    - F: Interview prep (STAR stories)
    - G: Posting legitimacy (scam / ghost-job signals)
    - H: Draft application answers (only when the score is 4.5 or above)
-5. **Score**: One global score (1-5), a holistic judgment across 5 dimensions
+6. **Score**: One global score (1-5), a holistic judgment across 5 dimensions
    with no arithmetic formula; blocks A-H are not averaged (`modes/_shared.md` → Scoring System)
-6. **Report**: Save as `reports/{num}-{company}-{date}.md`
-7. **PDF**: Generate ATS-optimized CV (`generate-pdf.mjs`)
-8. **Track**: New entries via TSV in `batch/tracker-additions/` merged by
+7. **Report**: Save as `reports/{num}-{company}-{date}.md`
+8. **PDF**: Generate ATS-optimized CV (`generate-pdf.mjs`)
+9. **Track**: New entries via TSV in `batch/tracker-additions/` merged by
    `merge-tracker.mjs`; status updates to existing rows via `set-status.mjs`
 
 ## Batch Processing
@@ -47,6 +48,7 @@ The orchestrator manages parallelism, state, retries, and resume.
 cv.md                    →  Evaluation context
 article-digest.md        →  Proof points for matching
 config/profile.yml       →  Candidate identity
+modes/_profile.md        →  Targeting, archetypes, scoring rules
 portals.yml              →  Scanner configuration
 templates/states.yml     →  Canonical status values
 templates/cv-template.html → PDF generation template
@@ -55,8 +57,8 @@ templates/cv-template.html → PDF generation template
 ## File Naming Conventions
 
 - Reports: `{###}-{company-slug}-{YYYY-MM-DD}.md` (3-digit zero-padded)
-- PDFs: `cv-candidate-{report-num}-{company-slug}-{YYYY-MM-DD}.pdf`
-- Tracker TSVs: `batch/tracker-additions/{id}.tsv`
+- PDFs: `cv-candidate-{report-num}-{company-slug}-{YYYY-MM-DD}.pdf`, or `cv/tailored/vNNN/cv.pdf` inside an application bundle
+- Tracker TSVs: `batch/tracker-additions/{num}-{company-slug}.tsv` from interactive and headless modes, `batch/tracker-additions/{id}.tsv` from batch workers
 
 ## Pipeline Integrity
 
@@ -75,7 +77,7 @@ Scripts maintain data consistency:
 
 The `dashboard/` directory contains a standalone Go TUI application that visualizes the pipeline:
 
-- Filter tabs: All, Evaluated, Interview, Assessment, Responded, Applied, Top ≥4, Skip, Rejected, Discarded
+- Filter tabs: All, Evaluated, Interview, Assessment, Responded, Applied, Top ≥4, Skip, Rejected, Discarded, Other
 - Sort modes: Score, Date, Company, Status, Location, Pay, Last contact, Posted
 - Grouped/flat view
 - Lazy-loaded report previews

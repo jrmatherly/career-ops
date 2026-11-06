@@ -16,11 +16,15 @@ node plugins.mjs available     # bundled + community plugins we've approved
 node plugins.mjs add <name>    # install an approved community plugin (`install` does the same)
 node plugins.mjs enable <id>   # show the capability card (then add --confirm)
 node plugins.mjs skill <id>    # print a plugin's how-to (if it ships one)
+node plugins.mjs run <id> [hook] [--dry-run]  # run one hook; --dry-run writes nothing
+node plugins.mjs remove <id>   # uninstall a community plugin and disable it
 ```
 
 Two gates must both be satisfied for a plugin to run: it must be **enabled**
 (`node plugins.mjs enable <id> --confirm`, which records your consent) **and** its
-keys must be in your `.env`. `node doctor.mjs` shows what's missing.
+keys must be in your `.env`. `node doctor.mjs` shows what's missing. To turn a
+plugin off without uninstalling it, set `enabled: false` for it in
+`config/plugins.yml`.
 
 LinkedIn job alerts do not need a plugin. Paste the email on the dashboard, or
 run `node linkedin-import.mjs`. See [Add LinkedIn jobs](LINKEDIN_JOBS.md).
@@ -94,8 +98,8 @@ directory.
 1. Develop locally, then publish your plugin as its **own public GitHub repo**
    named exactly `career-ops-plugin-<name>` (the template repo gives you the
    right shape + a release workflow). Minimum files: `manifest.json`,
-   `index.mjs`, `README.md`, `LICENSE`, plus `skill.md` + `test/smoke.mjs` to be
-   listable.
+   `index.mjs`, `README.md`, `LICENSE`. A `skill.md` and `test/smoke.mjs` are
+   recommended (the scaffold includes both) but not checked.
 2. File a **Plugin registration** issue (becomes your plugin's home/changelog).
 3. Open a **registry PR** (the `?template=plugin-registry.md` template — the
    template repo's release workflow can open it for you on a release tag) that
@@ -109,7 +113,7 @@ directory.
    commit we approved.
 
 Broadly-useful, low/zero-key plugins may be shipped **bundled** in `plugins/`
-(e.g. `apify`, `gmail`, `notion`). Bundled plugins are **reference seeds**:
+(e.g. `apify`, `gmail`, `h1b-sponsor`, `notion`; `node plugins.mjs available` lists them). Bundled plugins are **reference seeds**:
 reviewed in-tree, always present, and a working example to copy — kept minimal
 and stable on purpose, **not** a home for ongoing feature work.
 
@@ -157,6 +161,8 @@ Every community plugin in the registry is reviewed and pinned to an exact commit
 | [career-ops-plugin-markdown](https://github.com/rubicon/career-ops-plugin-markdown) | Export your cv.md to a clean, markdownlint-compliant Markdown resume, honoring #### nested sub-roles for fractional, interim, and umbrella engagements. | export | None | @rubicon |
 | [career-ops-plugin-serper](https://github.com/d-ulker/career-ops-plugin-serper) | Google Search provider via Serper.dev — drop-in replacement for the discontinued serpapi provider, with isFallback detect so free ATS providers are never shadowed. | provider | `SERPER_API_KEY` | @d-ulker |
 | [career-ops-plugin-commute](https://github.com/bullitt186/career-ops-plugin-commute) | Drive time from home to each posting's workplace for evaluation and triage; home stays coordinates, routing runs on your own OSRM/Valhalla | ingest, search | None | @bullitt186 |
+| [career-ops-plugin-exa](https://github.com/Codexnever/career-ops-plugin-exa) | Find job postings beyond your tracked portals with Exa's semantic web search, one query at a time; you review every lead. | search | `EXA_API_KEY` | @Codexnever |
+| [career-ops-plugin-keenable](https://github.com/keenableai/career-ops-plugin-keenable) | Find job postings on employers' own ATS pages (Greenhouse, Lever, Ashby and more) with Keenable web search; works with no API key. | search, provider | None | @keenableai |
 | [career-ops-plugin-workspace-mcp](https://github.com/theridgerugby/career-ops-plugin-workspace-mcp) | Read-only MCP access to application rows with scores and the absolute paths and byte sizes of reports, CVs and cover letters. | export | None | @theridgerugby |
 
 To add your own plugin to the registry, follow the [Publishing + getting approved](#publishing--getting-approved) flow above.

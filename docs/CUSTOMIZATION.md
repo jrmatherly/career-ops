@@ -27,7 +27,7 @@ Also update the "Adaptive Framing" table to map YOUR specific projects to each a
 
 ## Portals (portals.yml)
 
-Copy from `templates/portals.example.yml` and customize:
+Onboarding writes it for you with `node onboard-write.mjs`, which changes only the fields you answered. To set it up by hand instead, copy from `templates/portals.example.yml` and customize:
 
 1. **title_filter.positive**: Keywords matching your target roles
 2. **title_filter.negative**: Tech stacks or domains to exclude
@@ -43,11 +43,17 @@ Once you have a few scans behind you, `node filter-audit.mjs --summary` shows wh
 ## CV Template (templates/cv-template.html)
 
 The HTML template uses these design tokens:
-- **Fonts**: Space Grotesk (headings) + DM Sans (body) -- self-hosted in `fonts/`
+- **Fonts**: a standard system sans stack (`--font-family`), so PDF text extraction stays clean for ATS parsers
 - **Colors**: Cyan primary (`hsl(187,74%,32%)`) + Purple accent (`hsl(270,70%,45%)`)
 - **Layout**: Single-column, ATS-optimized
 
-To customize fonts/colors, copy the template to `data/templates/cv-template.{name}.html` under your data root, edit the CSS in the copy, and set `cv.template: {name}` in `config/profile.yml`. Don't edit `templates/cv-template.html` itself: updates replace it. Update font files in `fonts/` if switching fonts.
+To change colors, fonts, font size or margins without copying the template, set the optional `style:` block in `config/profile.yml`. Its keys (`accent_color`, `secondary_color`, `font_family`, `font_size`, `margin`, `job_break_inside`, `project_break_inside`) override the template's CSS variables. See the commented example in `config/profile.example.yml`.
+
+For deeper changes, copy the template to `data/templates/cv-template.{name}.html` under your data root, edit the CSS in the copy, and set `cv.template: {name}` in `config/profile.yml`. Don't edit `templates/cv-template.html` itself: a local edit stops that file receiving updates, and `update-system.mjs apply --force` or a plugin update overwrites it.
+
+## House Rules (modes/_custom.md)
+
+Standing procedural rules, custom workflows and output preferences go in `modes/_custom.md`. Copy it from `modes/_custom.template.md` if it is missing. Every mode reads it after `modes/_profile.md`. It can change workflow and style, but it never adds facts about you. Updates never touch it.
 
 ## Negotiation Scripts (modes/_profile.md)
 
@@ -56,7 +62,7 @@ Your negotiation scripts live under "Your Negotiation Scripts" in `modes/_profil
 - Geographic discount pushback
 - Responses to an offer below target
 
-Comp research guidance sits just above them, under "Your Comp Targets". Don't put these in `modes/_shared.md`: it is a system file, and an update replaces it.
+Comp research guidance sits just above them, under "Your Comp Targets". Don't put these in `modes/_shared.md`: it is a system file, so a local edit stops it receiving updates, and `apply --force` or a plugin update overwrites it.
 
 ## Hooks (Optional)
 
@@ -81,7 +87,7 @@ Save hooks in `.claude/settings.json` (Claude Code). OpenCode does not support h
 
 `templates/states.yml` lists the tracker's canonical states and the aliases each one accepts (`aplicado` → `Applied`). The Node scripts read it at run time: `set-status.mjs` rejects a status it does not list, and `normalize-statuses.mjs`, `merge-tracker.mjs` and `dedup-tracker.mjs` resolve aliases through it.
 
-It is a system-layer file (see [DATA_CONTRACT.md](../DATA_CONTRACT.md)), so an update replaces it, and no user-layer file adds states or aliases. A state you add only in your own copy is lost on the next update. Until then the scripts and the web app's status API accept it, but the Go dashboard and the web app's tabs, pills and funnel don't, because they keep their own copies of the list. For detail the states don't capture (ghosted, on hold, a referral), use the Notes column.
+It is a system-layer file (see [DATA_CONTRACT.md](../DATA_CONTRACT.md)), so an update replaces it, and no user-layer file adds states or aliases. A state you add only in your own copy stops that file receiving updates, and is lost on `update-system.mjs apply --force` or a plugin update. Until then the scripts and the web app's status API accept it, but the Go dashboard and the web app's tabs, pills and funnel don't, because they keep their own copies of the list. For detail the states don't capture (ghosted, on hold, a referral), use the Notes column.
 
 A new state is a change to career-ops itself, so open an issue first (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The pull request touches more than `states.yml`, because the dashboard, the web app and the funnel keep their own copies of the list:
 

@@ -34,6 +34,7 @@ These files contain your personal data, customizations, and work product. Update
 | `data/intake-snapshots/` | Extracted text of each committed intake source, one `{sha256 of the documents/ path}.txt` per source (written by `node intake.mjs --commit`, read by `node intake.mjs --diff <path>` to show what changed since the last commit). A second copy of the source text, so it is as personal as `documents/*`. Safe to delete: `--diff` then prints the full text once, and the next `--commit` writes it again |
 | `portals.yml` | Your customized company list |
 | `config/plugins.yml` | Your plugin activation toggles (opt-in; seeded from `config/plugins.example.yml`) |
+| `config/privacy.yml` | Your privacy guard config: protected values and pattern detectors (optional; copy `config/privacy.example.yml` here, gitignored). See [docs/PRIVACY.md](docs/PRIVACY.md) |
 | `opencode.json` | Your OpenCode project config (MCP servers, model, formatter, LSP) — gitignored, copy `opencode.example.json` to start |
 | `plugins.local/` | Your own / private plugins (never auto-updated) |
 | `plugins.lock` | Integrity pins + recorded consent for your enabled plugins (generated; never auto-updated) |
