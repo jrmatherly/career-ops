@@ -41,7 +41,7 @@ ${CLAUDE_SKILL_DIR}/scripts/upstream-review.sh --github        # GitHub compare:
 ${CLAUDE_SKILL_DIR}/scripts/upstream-review.sh --advance <tip-sha>  # after the log is written; the listing prints the tip SHA
 ```
 
-The first run adds the `careerops` remote (named so that `gh` keeps `origin` as its default repo; it ranks a remote called `upstream` above `origin`). The driver compares `HEAD:<path>`, so run it from the branch you will merge onto.
+The first run adds the `careerops` remote. Its name alone does not keep `gh` on the fork: with two remotes and no default set, `gh run list` and `gh api` resolved to `career-ops-hq` on 2026-11-06, so run `gh repo set-default jrmatherly/career-ops` once per clone (it writes `remote.origin.gh-resolved` to the local git config) and pass `--repo` in scripts. The driver compares `HEAD:<path>`, so run it from the branch you will merge onto.
 
 Tags in the listing: `[merge]` (parents are in the range; not expanded) and `[picked]` (an earlier cherry-pick already carries this patch). Markers in `--stat`, our HEAD vs the commit's parent (pre-image) for each file it touches:
 
