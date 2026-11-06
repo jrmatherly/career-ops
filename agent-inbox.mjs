@@ -36,12 +36,15 @@ import {
   readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync,
   openSync, fstatSync, readSync, closeSync, realpathSync, statSync,
 } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { withPipelineLock } from './pipeline-lock.mjs';
 import { writeFileAtomic } from './tracker-utils.mjs';
 import { localToday } from './lib/local-today.mjs';
+import { getCareerOpsRoot } from './path-resolver.mjs';
 
-const PATH = process.env.CAREER_OPS_INBOX || 'data/agent-inbox.md';
+// A relative CAREER_OPS_INBOX resolves against the cwd, as CAREER_OPS_TRACKER does.
+const DATA_ROOT = process.env.CAREER_OPS_INBOX ? null : getCareerOpsRoot();
+const PATH = process.env.CAREER_OPS_INBOX || join(DATA_ROOT, 'data/agent-inbox.md');
 
 const HEADER = [
   '# Agent Inbox',
@@ -68,12 +71,14 @@ function ensureGitignored() {
   // The inbox is personal data. On installs whose .gitignore predates this
   // feature, make sure the default path is ignored so a first `add` can't
   // accidentally commit it. Only manages the default, non-overridden path.
-  if (process.env.CAREER_OPS_INBOX || PATH !== 'data/agent-inbox.md') return;
+  if (!DATA_ROOT) return;
+  const RULE = 'data/agent-inbox.md';
+  const gitignore = join(DATA_ROOT, '.gitignore');
   try {
-    if (!existsSync('.gitignore')) return; // not a git checkout we should touch
-    const text = readFileSync('.gitignore', 'utf8');
-    if (text.split('\n').some((l) => l.trim() === PATH)) return; // already ignored
-    writeFileSync('.gitignore', text.replace(/\s*$/, '') + `\n${PATH}\n`);
+    if (!existsSync(gitignore)) return; // not a git checkout we should touch
+    const text = readFileSync(gitignore, 'utf8');
+    if (text.split('\n').some((l) => l.trim() === RULE)) return; // already ignored
+    writeFileSync(gitignore, text.replace(/\s*$/, '') + `\n${RULE}\n`);
   } catch { /* best effort — never block queuing on this */ }
 }
 
