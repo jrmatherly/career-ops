@@ -34,6 +34,7 @@ export const GUARDED_PATHS = [
   'portals.yml',
   'config/profile.yml',
   'config/plugins.yml',
+  'config/privacy.yml',
   'modes/_profile.md',
   'modes/_custom.md',
   'modes/_brief.md',
