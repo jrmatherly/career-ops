@@ -139,7 +139,7 @@ AI-powered, CLI-agnostic job search automation: pipeline tracking, offer evaluat
 | `generate-pdf.mjs` | Playwright: HTML to PDF |
 | `verify-cv-structure.mjs` | Non-blocking warning on the tailored-CV JSON payload (`modes/pdf.md` step 17b), before HTML/PDF rendering — flags structure silently lost or reordered vs. `cv.md` (a dropped `"· {descriptor}"` suffix, an experience entry out of cv.md's chronological order) that fact-checking alone can't see, since the surviving content is still true; reports `UNVERIFIED` rather than a false pass when `cv.md` doesn't use a supported Experience header convention |
 | `generate-latex.mjs` | LaTeX CV fact gate + validator + compiler (gates the `.tex` before compiling whenever `cv.md` exists; `--source` adds evidence, `--skip-fact-check` opts out) |
-| `scan.mjs` | Zero-token portal scanner (Greenhouse/Ashby/Lever APIs, zero LLM cost) |
+| `scan.mjs` | Zero-token portal scanner over the plugin provider layer in `providers/` (Greenhouse, Ashby, Lever and many more; zero LLM cost) |
 | `scan-ats-full.mjs` | Reverse-ATS keyword-first scanner over full public ATS datasets (Greenhouse/Lever/Ashby/Workday/iCIMS/BambooHR/Paylocity/join.com) plus board seeds derived locally from tracker/scan-history URLs, filtered by portals.yml `title_filter`/`location_filter`; optional `domain_filter` gates whole boards on industry relevance before any title is tested (opt-in, #3105); checkpoints every 500 companies, `--resume` continues an interrupted sweep |
 | `scan-interamt.mjs` | Playwright browser scanner for Interamt.de (German public sector portal — Apache Wicket, no REST API) |
 | `audit-portals.mjs` | Content audit of `portals.yml` — the companion to `verify-portals.mjs`, which answers "does this board answer?" but never "*whose* postings are these?". Fetches each enabled board through the same `providers/` modules `scan.mjs` uses and reports provider + posting count + sample titles/locations per entry, verdicts worst-first: `no-provider` (enabled but nothing claims it, so `scan.mjs` skips it silently — the highest-value check), `error`, `empty`, `small`, `ok`. `--baseline prev.json` compares against an earlier `--json` run and flags boards that lost ≥50% of their postings, the shape an ATS migration takes. **It cannot detect a well-formed board belonging to the wrong entity** — a parent company's board is full of real jobs — so it surfaces the evidence a reader needs instead of pretending to a verdict (JSON, `--summary`, `--strict`) |
@@ -209,7 +209,7 @@ not require this check and must not copy onboarding templates as a side effect
 node doctor.mjs --json
 ```
 
-Output: `{"onboardingNeeded": <bool>, "missing": [...], "unpersonalized": [...], "warnings": [...], "autoCopied": [...]}` — `missing` lists whichever of `cv.md`, `config/profile.yml`, `modes/_profile.md`, `portals.yml` are absent; `warnings` is reserved for non-blocking setup signals. This command is read-only: `autoCopied` is empty unless `--init-templates` is explicitly added during onboarding.
+Output: `{"onboardingNeeded": <bool>, "missing": [...], "unpersonalized": [...], "warnings": [...], "autoCopied": [...]}` plus the diagnostic keys `plugins`, `playwright_mcp`, `active_cli` and `cli_source` — `missing` lists whichever of `cv.md`, `config/profile.yml`, `modes/_profile.md`, `portals.yml` are absent; `warnings` is reserved for non-blocking setup signals. This command is read-only: `autoCopied` is empty unless `--init-templates` is explicitly added during onboarding.
 
 **`unpersonalized` — act on this even when `onboardingNeeded` is false.** Entries are `{path, reason, impact}` for a personalization file that exists but still carries template content, and for a `config/profile.yml` or `portals.yml` that holds only comments. After onboarding copies `modes/_profile.md` and `modes/_brief.md`, an existence check cannot catch their unedited content. Left unedited, `_profile.md` feeds the **template author's** archetypes and North Star into every A-F evaluation, so offers get scored against a stranger's targeting; `_brief.md` hands the triage first pass literal `{placeholders}`. It is a warning, not a gate (career-ops works out of the box), but before running `scan`, `pipeline`, or `batch` with a non-empty `unpersonalized`, tell the user:
 
@@ -273,9 +273,9 @@ Keep the answers for the writer in Step 3. Archetypes and targeting narrative go
 
 #### Step 3: Portals (recommended)
 If `portals.yml` is missing:
-> "I'll set up the job scanner with 45+ pre-configured companies. Want me to customize the search keywords for your target roles?"
+> "I'll set up the job scanner with 250+ pre-configured companies. Want me to customize the search keywords for your target roles?"
 
-Then write both files in one run. Do not copy or hand-edit the templates. `templates/portals.example.yml` is about 160 KB, and the writer changes only the answered fields:
+Then write both files in one run. Do not copy or hand-edit the templates. `templates/portals.example.yml` is about 180 KB, and the writer changes only the answered fields:
 
 ```bash
 node onboard-write.mjs --answers - <<'JSON'
