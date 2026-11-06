@@ -21,7 +21,7 @@ The plugin is saved to your claude.ai account. The Code tab downloads it as a sy
 /plugin install career-ops@career-ops
 ```
 
-For a fork, replace `career-ops-hq/career-ops` with your fork's `owner/repo`.
+For a fork, replace `career-ops-hq/career-ops` with your fork's `owner/repo`, e.g. `/plugin marketplace add jrmatherly/career-ops`.
 
 Then start a new session. The first start takes a few seconds longer while the plugin installs its Node packages. Run `/career-ops:career-ops` to open the command menu, or paste a job URL. On a fresh setup the agent walks you through onboarding.
 

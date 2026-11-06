@@ -14,7 +14,7 @@ Career-ops is AI-agnostic and runs on several command-line agent tools. The core
 | Qwen | `AGENTS.md` | Interactive: `qwen` (the career-ops skill is discovered from `.qwen/skills/career-ops/`). Headless/Batch: `qwen -p "prompt"` |
 | Kimi | `KIMI.md` | Interactive: `kimi` (the career-ops skill is discovered from `.kimi/skills/career-ops/`) |
 | GitHub Copilot CLI | `AGENTS.md` | Headless/Batch: `copilot -p "prompt"` |
-| Gemini | `GEMINI.md` | Legacy wrapper redirecting to `AGENTS.md` (transitioned to Antigravity CLI). |
+| Gemini | `GEMINI.md` | Intentionally empty (Gemini CLI consumer access moved to Antigravity CLI, which reads `AGENTS.md` itself; a second copy here would load it twice). |
 | Hermes Agent | `AGENTS.md` | Interactive: `hermes` (then ask for a career-ops task). Web read-only workers: `hermes chat -q "prompt" --oneshot -Q --no-restore-cwd`. Batch ranking: unsupported. |
 | Oh My Pi | `.omp/AGENTS.md` | Interactive: `omp` (then `/skill:career-ops`). Headless/Batch: `omp -p "prompt"` |
 
