@@ -1,0 +1,5 @@
+{
+  "preferences": { "note": "CAREER-PREF-MARKER-5K2" },
+  "facts": [{ "id": "f1", "text": "CAREER-FACT-MARKER-9QX led a fictional migration", "source": "manual" }],
+  "stories": [{ "id": "s1", "title": "CAREER-STORY-MARKER-3VB", "body": "A fictional story that must never reach the data root." }]
+}

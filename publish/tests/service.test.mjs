@@ -1,6 +1,8 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
@@ -314,4 +316,23 @@ test('readConfig refuses a missing secret', () => {
   assert.equal(config.dbPath, 'publish.db');
   assert.equal(config.clientIpHeader, 'x-real-ip');
   assert.deepEqual([...config.trustedProxies], ['10.0.0.1', '10.0.0.2']);
+});
+
+test('hideContacts strips the contact row build-cv-html renders from a payload that carries paths', () => {
+  const work = mkdtempSync(join(tmpdir(), 'publish-hide-'));
+  try {
+    const payload = {
+      candidate: { path: 'basics', name: 'Ada Example', email: 'ada@example.com', location: 'Seattle, WA', linkedin: { url: 'https://linkedin.com/in/ada', display: 'linkedin.com/in/ada' } },
+      experience: [{ path: 'sections.experience.items.0', company: 'Acme', role: 'Engineer', dates: '2020 - 2024' }],
+    };
+    writeFileSync(join(work, 'payload.json'), JSON.stringify(payload));
+    execFileSync(process.execPath, [fileURLToPath(new URL('../../build-cv-html.mjs', import.meta.url)), join(work, 'payload.json'), join(work, 'cv.html')], { stdio: 'pipe' });
+    const html = readFileSync(join(work, 'cv.html'), 'utf8');
+    assert.match(html, /<div data-resume-path="basics" class="contact-row">/, 'the rendered row carries the attribute');
+    const out = hideContacts(html);
+    assert.equal(out.includes('contact-row"'), false, 'the contact row is gone');
+    assert.equal(/linkedin\.com\/in\/ada/.test(out), false, 'its links are gone');
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 });
