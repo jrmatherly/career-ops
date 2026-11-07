@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { builtinModules } from 'module';
-import { join, normalize, dirname } from 'path';
+import { join, posix } from 'path';
 import { load } from 'js-yaml';
 import { pass, fail, ROOT } from './helpers.mjs';
 
@@ -37,7 +37,7 @@ const inImage = new Set(copied.flatMap((c) => (c.endsWith('/') && existsSync(joi
 const imports = [...inImage].filter((f) => f.endsWith('.mjs'))
   .flatMap((file) => [...read(`publish/${file}`).matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map((m) => [file, m[1]]));
 const entry = 'start.mjs';
-const missingImports = [entry, ...imports.filter(([, s]) => s.startsWith('.')).map(([file, s]) => normalize(join(dirname(file), s)))]
+const missingImports = [entry, ...imports.filter(([, s]) => s.startsWith('.')).map(([file, s]) => posix.join(posix.dirname(file), s))]
   .filter((rel) => !inImage.has(rel));
 check(copied.length > 0 && missingImports.length === 0, `publish/Dockerfile copies every module the server imports${missing(missingImports)}`);
 const builtins = new Set(builtinModules);
