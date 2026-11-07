@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:net";
 import "../helpers/web-ts-alias-loader.mjs";
 
 const codeRoot = mkdtempSync(join(tmpdir(), "co-shares-code-"));
@@ -43,9 +44,9 @@ process.exit(plan.exitCode);
 `);
 };
 
-const post = async (body) => {
+const post = async (body, raw = false) => {
   rmSync(argvFile, { force: true });
-  const init = body === undefined ? { method: "POST" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const init = body === undefined ? { method: "POST" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: raw ? body : JSON.stringify(body) };
   const res = await POST(new Request("http://127.0.0.1/api/shares/pull", init));
   return { status: res.status, body: await res.json(), argv: existsSync(argvFile) ? JSON.parse(readFileSync(argvFile, "utf8")) : null };
 };
@@ -117,8 +118,14 @@ test("pull runs share.mjs pull, with --slug only when one is given; a bad slug i
   standIn(0);
   const all = await post({});
   assert.equal(all.status, 200);
-  assert.deepEqual(all.body, { ok: true });
+  assert.deepEqual(all.body, { ok: true, missing: [] });
   assert.deepEqual(all.argv, ["pull"]);
+  assert.equal((await post({ slug: "a".repeat(64) })).status, 200, "64 characters is the limit, not past it");
+  for (const raw of ["not json", "[\"alpha\"]", "\"alpha\""]) {
+    const r = await post(raw, true);
+    assert.equal(r.status, 400, raw);
+    assert.equal(r.argv, null, `a non-object body never runs share.mjs (${raw})`);
+  }
   const none = await post();
   assert.equal(none.status, 200, "a body-less POST pulls everything");
   assert.deepEqual(none.argv, ["pull"]);
@@ -129,6 +136,30 @@ test("pull runs share.mjs pull, with --slug only when one is given; a bad slug i
     const r = await post({ slug });
     assert.equal(r.status, 400, JSON.stringify(slug));
     assert.equal(r.argv, null, `share.mjs never runs for ${JSON.stringify(slug)}`);
+  }
+});
+
+test("a share the service no longer has comes back as missing on a successful pull", async () => {
+  standIn(0, "publish: alpha is not on the server; run delete --slug alpha to drop the record\npublish: beta is not on the server; run delete --slug beta to drop the record\n");
+  const r = await post({});
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: true, missing: ["alpha", "beta"] });
+});
+
+test("a refused key is a 503, rate limiting a 429 and a service error a 502, none naming a URL", async () => {
+  const cases = [
+    ["publish: GET /api/shares/alpha/stats answered 401 (api key required)\n", 503, /PUBLISH_API_KEY/],
+    ["publish: GET /api/shares/alpha/stats answered 403 (forbidden)\n", 503, /PUBLISH_API_KEY/],
+    ["publish: GET /api/shares/alpha/stats answered 429 (rate limited)\n", 429, /rate limit/],
+    ["publish: GET /api/shares/alpha/stats answered 500\n", 502, /did not answer/],
+    ["publish: GET http://127.0.0.1:8099/api/shares/alpha/stats answered 200 with a non-JSON body; is PUBLISH_URL the publish service?\n", 502, /did not answer/],
+  ];
+  for (const [stderr, status, message] of cases) {
+    standIn(1, stderr);
+    const r = await post({ slug: "alpha" });
+    assert.equal(r.status, status, stderr);
+    assert.match(r.body.error, message);
+    assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api/);
   }
 });
 
@@ -152,12 +183,48 @@ test("any other non-zero exit is a 500 with a generic message; a missing record 
   assert.equal((await post({ slug: "zeta" })).status, 404);
 });
 
+// Deletes the stand-in, so it stays after every stand-in case above.
 test("a data-only root (no share.mjs) is a 503 before anything runs", async () => {
   rmSync(join(codeRoot, "publish", "share.mjs"), { force: true });
   const r = await post({});
   assert.equal(r.status, 503);
   assert.equal(r.body.code, "core-script-missing");
   assert.equal(r.argv, null);
+});
+
+// The classes above are regexes over share.mjs's wording; these three run the real CLI
+// (CAREER_OPS_CODE_ROOT at the checkout) so a reworded message fails here, not in the UI.
+// None needs the service: the record check, the env check and a refused connection all
+// happen before or instead of a real request.
+test("the real share.mjs produces the 404, 503 and 502 classes the route reads", async () => {
+  const checkout = join(import.meta.dirname, "..", "..", "..");
+  const env = { ...process.env };
+  process.env.CAREER_OPS_CODE_ROOT = checkout;
+  delete process.env.PUBLISH_URL;
+  delete process.env.PUBLISH_API_KEY;
+  rmSync(join(dataRoot, ".env"), { force: true });
+  try {
+    writeFileSync(sharesFile, JSON.stringify({ alpha: record("alpha") }));
+    const unknown = await post({ slug: "zeta" });
+    assert.equal(unknown.status, 404, JSON.stringify(unknown.body));
+    const unset = await post({ slug: "alpha" });
+    assert.equal(unset.status, 503, JSON.stringify(unset.body));
+    assert.match(unset.body.error, /not set/);
+    // A port just freed, not a reserved one: fetch refuses the spec's bad ports (1, 7, 9, ...) before connecting.
+    const srv = createServer();
+    await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+    const port = srv.address().port;
+    await new Promise((r) => srv.close(r));
+    process.env.PUBLISH_URL = `http://127.0.0.1:${port}`;
+    process.env.PUBLISH_API_KEY = "cops_test";
+    const refused = await post({ slug: "alpha" });
+    assert.equal(refused.status, 502, JSON.stringify(refused.body));
+  } finally {
+    for (const k of ["CAREER_OPS_CODE_ROOT", "PUBLISH_URL", "PUBLISH_API_KEY"]) {
+      if (env[k] === undefined) delete process.env[k];
+      else process.env[k] = env[k];
+    }
+  }
 });
 
 // Read as text: importing nav-items.ts pulls in lucide-react, which the root test job does not install.

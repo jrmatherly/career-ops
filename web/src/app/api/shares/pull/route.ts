@@ -8,12 +8,15 @@ export const runtime = "nodejs"; // delegates to the share CLI via child_process
 export const dynamic = "force-dynamic";
 
 // Runs `node publish/share.mjs pull [--slug s]`: the CLI reads PUBLISH_URL and
-// the key from the data root's .env, refreshes data/shares.json and rewrites
-// data/share-feedback/*.md. The web never holds the key or talks to the service.
+// the key from its environment or the data root's .env, refreshes
+// data/shares.json and rewrites data/share-feedback/*.md. The web never reads
+// the key itself and never talks to the service.
 export async function POST(req: Request) {
-  const body = await readJsonObject<{ slug?: unknown }>(req);
+  // A body-less POST pulls everything; a body that is not an object is a client bug, not "everything".
+  const body = req.headers.get("content-length") === "0" || !req.body ? {} : await readJsonObject<{ slug?: unknown }>(req);
+  if (!body) return Response.json({ error: "bad json" }, { status: 400 });
   const args = ["pull"];
-  if (body?.slug !== undefined) {
+  if (body.slug !== undefined) {
     if (typeof body.slug !== "string" || !SLUG_RE.test(body.slug)) {
       return Response.json({ error: "slug must be [a-z0-9-], at most 64 characters" }, { status: 400 });
     }
@@ -24,20 +27,32 @@ export async function POST(req: Request) {
   }
 
   const r = await runCoreCli("publish/share", args);
-  if (r.code === 0) return Response.json({ ok: true });
+  // stderr names the service URL and the .env path, so it is logged and only classified here.
+  // share.mjs exits 1 for every pull failure (3 is the resume gate, which only publish and
+  // republish reach), so the classes come from its messages: a fetch failure, "answered <status>"
+  // or "non-JSON body" (makeClient.request), "is not set" (serviceConfig), "no local record" and,
+  // on exit 0, "<slug> is not on the server" (fetchStats).
+  const err = r.stderr.trim();
+  if (r.code === 0) {
+    // A share the service no longer has is skipped by the CLI, which still exits 0; its advice goes only to stderr.
+    const missing = [...err.matchAll(/^publish: (\S+) is not on the server/gm)].map((m) => m[1]);
+    if (err) console.error(`/api/shares/pull: share.mjs said: ${err}`);
+    return Response.json({ ok: true, missing });
+  }
   if (r.spawnFailed) {
-    console.error(`/api/shares/pull: share.mjs failed to run: ${r.stderr.trim()}`);
+    console.error(`/api/shares/pull: share.mjs failed to run: ${err}`);
     return Response.json({ error: "pull failed to run" }, { status: 500 });
   }
-  if (r.timedOut) return Response.json({ error: "pull timed out; the publish service may be slow or unreachable" }, { status: 504 });
-  // stderr names the service URL and the .env path, so it is logged and only classified here.
-  // share.mjs exits 1 for every failure, so the classes come from its messages: a fetch
-  // failure (makeClient.request), "is not set" (serviceConfig), "no local record" (fetchStats).
-  const err = r.stderr.trim();
+  if (r.timedOut) {
+    console.error(`/api/shares/pull: share.mjs timed out: ${err}`);
+    return Response.json({ error: "pull timed out; the publish service may be slow or unreachable" }, { status: 504 });
+  }
   console.error(`/api/shares/pull: share.mjs exited ${r.code}: ${err}`);
-  if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|fetch failed|non-JSON body/.test(err)) {
+  if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|fetch failed|non-JSON body|answered 5\d\d/.test(err)) {
     return Response.json({ error: "the publish service did not answer; is it running?" }, { status: 502 });
   }
+  if (/answered 40[13]/.test(err)) return Response.json({ error: "the publish service refused PUBLISH_API_KEY; check the data root's .env" }, { status: 503 });
+  if (/answered 429/.test(err)) return Response.json({ error: "the publish service is rate limiting pulls; try again shortly" }, { status: 429 });
   if (/is not set/.test(err)) return Response.json({ error: "PUBLISH_URL or PUBLISH_API_KEY is not set in the data root's .env" }, { status: 503 });
   if (/no local record/.test(err)) return Response.json({ error: "that share is not in data/shares.json" }, { status: 404 });
   return Response.json({ error: "pull failed; see the server log" }, { status: 500 });

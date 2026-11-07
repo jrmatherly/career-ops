@@ -10,7 +10,7 @@ import type { Share } from "@/lib/shares";
 
 const PUBLISH_CMD = "node publish/share.mjs publish --slug <name> --from-resume";
 
-// UTC to the minute: the same text on the server and the client, so hydration never mismatches.
+// UTC to the minute (pull writes toISOString(), always Z): the same text on the server and the client, so hydration never mismatches.
 const pulledLabel = (at: string) => (Number.isNaN(Date.parse(at)) ? at : `${at.slice(0, 16).replace("T", " ")} UTC`);
 
 export function SharesView({ shares, error }: { shares: Share[]; error: string | null }) {
@@ -30,13 +30,18 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
     setPulling(slug ?? "*");
     try {
       const res = await fetch("/api/shares/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slug ? { slug } : {}) });
+      const data = (await res.json().catch(() => null)) as { error?: string; missing?: string[] } | null;
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
         setToast({ text: `Pull failed: ${data?.error ?? `HTTP ${res.status}`}` });
         return;
       }
+      // The CLI skips a share the service no longer has and still exits 0; say so, or the row just stays stale.
+      if (data?.missing?.length) {
+        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop the record with node publish/share.mjs delete --slug <slug>` });
+      }
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error(err);
       setToast({ text: "Pull failed: could not reach the app" });
     } finally {
       setPulling(null);

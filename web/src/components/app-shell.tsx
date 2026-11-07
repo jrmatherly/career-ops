@@ -43,8 +43,8 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
             </span>
           </Link>
           <CommandPalette followupsEnabled={followupsEnabled} />
-          {/* At md-tall the Ask button sits in the sidebar and the footer reserves room for it, so the nav
-              scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
+          {/* At md-tall the fixed Ask button sits over the sidebar's foot and the footer reserves room for it, so the
+              nav scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
           <nav className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
             {visibleNavItems(followupsEnabled).map(({ href, label, icon: Icon, chip }) => {
               const active = isActivePath(href, pathname);

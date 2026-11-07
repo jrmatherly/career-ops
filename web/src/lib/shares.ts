@@ -34,8 +34,10 @@ function toShare(slug: string, raw: unknown, feedbackDir: string): Share {
   let feedback: string | null = null;
   try {
     feedback = fs.readFileSync(path.join(feedbackDir, `${slug}.md`), "utf8");
-  } catch {
-    // no pull yet, or nothing to read: the row shows the count only
+  } catch (err) {
+    // ENOENT is the normal case (no pull yet); anything else is logged, since the row then shows a count with nothing behind it.
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") console.error(`shares: feedback for ${slug} could not be read: ${code}`);
   }
   return {
     slug,
@@ -53,7 +55,9 @@ export function readShares(root: string = careerOpsRoot()): SharesData {
   try {
     text = fs.readFileSync(path.join(root, "data", "shares.json"), "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { shares: [], error: null };
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return { shares: [], error: null };
+    console.error(`shares: data/shares.json could not be read: ${code}`);
     return { shares: [], error: "data/shares.json could not be read" };
   }
   let data: unknown;
@@ -64,7 +68,8 @@ export function readShares(root: string = careerOpsRoot()): SharesData {
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return { shares: [], error: "data/shares.json is not a record of shares" };
   const feedbackDir = path.join(root, "data", "share-feedback");
-  // A key outside the slug rule cannot name a feedback file or be pulled, so it is skipped.
+  // A key outside SLUG_RE (the CLI's rule minus a leading dash) is skipped: the route could not
+  // pass it as --slug, though the CLI's own `pull` with no slug still refreshes it.
   const shares = Object.entries(data)
     .filter(([slug]) => SLUG_RE.test(slug))
     .map(([slug, raw]) => toShare(slug, raw, feedbackDir));
