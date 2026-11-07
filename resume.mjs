@@ -5,7 +5,7 @@
  *   node resume.mjs absorb [--json]
  *   node resume.mjs adopt [--confirm]
  *   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
- *   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
+ *   node resume.mjs export cv-md|payload|docx|rr-json|json-resume [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
  *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
  *   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
  *   node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]
@@ -25,6 +25,7 @@ import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, 
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
+import { resumeToJsonResume } from './lib/resume/export/json-resume.mjs';
 import { detectFormat, FORMATS, ImportError, importResume } from './lib/resume/import/detect.mjs';
 import { CHECK_RULE_IDS, checkResume } from './lib/resume/check.mjs';
 
@@ -32,7 +33,7 @@ const USAGE = `Usage:
   node resume.mjs absorb [--json]
   node resume.mjs adopt [--confirm]
   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
-  node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
+  node resume.mjs export cv-md|payload|docx|rr-json|json-resume [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
   node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]`;
@@ -180,19 +181,55 @@ function loadData(root, args, json = false) {
   return null;
 }
 
-function exportCommand(root, kind, args) {
-  if (kind !== 'cv-md' && kind !== 'payload') throw new UsageError('export takes cv-md or payload');
+const hidden = (args) => ({ hide: list(flagValue(args, '--hide')), hideItems: list(flagValue(args, '--hide-item')) });
+const asJson = (value) => JSON.stringify(value, null, 2) + '\n';
+
+/** Each export kind: `run` gives the file content and the sections it could not carry. */
+const EXPORTERS = {
+  'cv-md': { run: (data) => ({ content: resumeToCvMarkdown(data) }) },
+  payload: {
+    run: (data, args) => {
+      const { payload, unmapped } = resumeToPayload(data, hidden(args));
+      return { content: asJson(hasFlag(args, '--json') && !flagValue(args, '--out') ? { payload, unmapped } : payload) };
+    },
+  },
+  docx: {
+    binary: true,
+    run: async (data, args) => {
+      // Loaded here so the other subcommands do not pay for the docx package at startup.
+      const { payloadToDocx } = await import('./lib/resume/export/docx.mjs');
+      const { payload, unmapped } = resumeToPayload(data, hidden(args));
+      return { content: await payloadToDocx(payload), unmapped, label: 'DOCX' };
+    },
+  },
+  'rr-json': {
+    // An RR export carries each section's and item's own hidden flag.
+    noHide: 'rr-json does not take --hide or --hide-item; set hidden on the section or item instead',
+    run: (data) => {
+      const { careerOps, ...rest } = data;
+      return { content: asJson(rest) };
+    },
+  },
+  'json-resume': {
+    run: (data, args) => {
+      const { document, unmapped } = resumeToJsonResume(data, hidden(args));
+      return { content: asJson(document), unmapped, label: 'JSON Resume' };
+    },
+  },
+};
+
+async function exportCommand(root, kind, args) {
+  if (!Object.hasOwn(EXPORTERS, kind)) throw new UsageError(`export takes ${Object.keys(EXPORTERS).join(', ')}`);
+  const exporter = EXPORTERS[kind];
+  if (exporter.noHide && (flagValue(args, '--hide') || flagValue(args, '--hide-item'))) throw new UsageError(exporter.noHide);
+  const out = flagValue(args, '--out');
+  if (exporter.binary && !out && process.stdout.isTTY) throw new UsageError(`${kind} is binary; add --out <file>, or pipe stdout to a file`);
   const data = loadData(root, args);
   if (!data) return 3;
-  const out = flagValue(args, '--out');
-  let text;
-  if (kind === 'cv-md') text = resumeToCvMarkdown(data);
-  else {
-    const { payload, unmapped } = resumeToPayload(data, { hide: list(flagValue(args, '--hide')), hideItems: list(flagValue(args, '--hide-item')) });
-    text = JSON.stringify(hasFlag(args, '--json') && !out ? { payload, unmapped } : payload, null, 2) + '\n';
-  }
-  if (out) writeFileAtomic(out, text);
-  else process.stdout.write(text);
+  const { content, unmapped = [], label } = await exporter.run(data, args);
+  if (unmapped.length) console.error(`resume: not in the ${label}: ${unmapped.join(', ')}`);
+  if (out) writeFileAtomic(out, content);
+  else process.stdout.write(content);
   return 0;
 }
 
@@ -312,7 +349,7 @@ export async function main(args) {
       case 'absorb': return await absorbCommand(root, hasFlag(args, '--json'));
       case 'adopt': return await adoptCommand(root, hasFlag(args, '--confirm'));
       case 'pair': return await pairCommand(root, rest);
-      case 'export': return exportCommand(root, rest[0], args);
+      case 'export': return await exportCommand(root, rest[0], args);
       case 'save': return await saveCommand(root, args);
       case 'import': return await importCommand(root, rest[0], args);
       case 'check': return checkCommand(root, args);
