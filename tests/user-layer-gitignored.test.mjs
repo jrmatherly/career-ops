@@ -210,10 +210,10 @@ for (const path of atomicWriteTempProbes) {
 // notes.
 //
 // On the standard layout it lands in data/ and the rules above already cover
-// it. But resolveTrackerPath() falls back to `<root>/applications.md` when
-// data/applications.md is absent, and the index follows the markdown, so on
-// the legacy layout it sits in the repo root instead. That is also every fresh
-// clone: `node test-all.mjs` leaves one there, 36KB, ready for `git add .`.
+// it. But resolveTrackerPath() returns `<root>/applications.md` when that
+// file exists and data/applications.md is absent, and the index follows the
+// markdown, so on the legacy layout it sits in the repo root instead, 36KB,
+// ready for `git add .`.
 //
 // The nested probes are the ones that decide the SHAPE of the rule. A
 // root-anchored `/*.db` covers the repo root and nothing else, and would still

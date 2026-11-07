@@ -163,9 +163,10 @@ func resolveTrackerPath(careerOpsPath string) string {
 		// a second error channel for a path it only computes.
 		return dataPath
 	}
-	// Neither file exists: name the file the Node writers will create.
+	// data/ tracker absent: a flat tracker wins when it exists, otherwise name
+	// the file the Node writers will create.
 	legacy := filepath.Clean(filepath.Join(careerOpsPath, "applications.md"))
-	if _, err := os.Stat(legacy); err == nil {
+	if _, err := os.Stat(legacy); err == nil || !errors.Is(err, fs.ErrNotExist) {
 		return legacy
 	}
 	return dataPath
