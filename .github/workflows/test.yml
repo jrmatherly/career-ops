@@ -282,3 +282,30 @@ jobs:
         run: npm install --ignore-scripts
       - name: "🛡️ npm audit"
         run: npm audit --audit-level=high
+
+  publish:
+    name: "📤 Publish service"
+    # The share-page service under publish/ has its own package.json and its
+    # own node:test suite; nothing under the root tests/ imports it, so the
+    # test job never exercises it. Runs on the Node floor (lib/node-floor.mjs),
+    # like the test job. Not a required check.
+    needs: changes
+    # Skipped on a docs-only PR for the reason given on cv-visual.
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "⬇️ Checkout"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "🟢 Set up Node"
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.13'
+      # No install step: the service has no dependencies, and the root
+      # .gitignore ignores every package-lock.json but web/'s, so there is no
+      # lockfile for `npm ci`. The day a dependency lands, un-ignore
+      # publish/package-lock.json and add `npm --prefix publish ci` here.
+      - name: "🧪 Publish service tests"
+        run: npm --prefix publish test
