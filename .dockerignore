@@ -17,9 +17,7 @@ reports
 .DS_Store
 writing-samples
 
-# User Layer (DATA_CONTRACT.md). The Dockerfile copies only package.json and
-# the project is bind-mounted at runtime, so none of this belongs in the
-# build context, which is sent to the Docker daemon on every build.
+# deploy/Dockerfile copies the whole checkout, so every user-layer and local-only path must be listed here.
 cv.md
 article-digest.md
 voice-dna.md
@@ -27,6 +25,7 @@ portals.yml
 config/profile.yml
 config/plugins.yml
 config/cv-facts.json
+config/privacy.yml
 config/local-paths.txt
 data
 documents
@@ -36,6 +35,10 @@ modes/_custom.md
 modes/_brief.md
 .career-ops-web
 plugins.local
+plugins.lock
+opencode.json
+.claude/settings.json
+.claude/hooks
 # Per-application CVs and cover letters saved under templates/. The shipped
 # cv-template* and cover-letter-template* files stay in the context.
 templates/cv-*.html
@@ -43,7 +46,16 @@ templates/cv-*.html
 templates/cover-*.html
 !templates/cover-letter-template*.html
 
+# Gitignored local working trees
+private
+.codegraph
+.remember
+.serena
+.claude/worktrees
+.claude/settings.local.json
+.tmp-*
+
 # Build output
-web/.next
+**/.next
 dashboard/career-dashboard
 dashboard/career-dashboard.exe

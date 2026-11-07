@@ -4,12 +4,16 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { load } from 'js-yaml';
 import { pass, fail, ROOT } from './helpers.mjs';
+import { USER_PATHS } from '../update-system.mjs';
 
 console.log('\n🔎 server image (deploy/Dockerfile and deploy/compose.yml)');
 
 const read = (rel) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), 'utf-8') : '');
 const check = (ok, msg) => (ok ? pass(msg) : fail(msg));
+
+check(existsSync(join(ROOT, 'deploy/Dockerfile')), 'deploy/Dockerfile exists');
 
 const server = read('deploy/Dockerfile');
 const compose = read('deploy/compose.yml');
@@ -28,3 +32,23 @@ check(!server.includes('GO_VERSION') && !/texlive/i.test(server),
 check(server.includes('ENTRYPOINT ["/usr/bin/tini", "--"]') && server.includes('CMD ["node", "web/server.mjs", "start"]'),
   'deploy/Dockerfile starts web/server.mjs under tini');
 check(/"127\.0\.0\.1:[^"]*:3000"/.test(compose), 'deploy/compose.yml publishes port 3000 on loopback only');
+check(/^\s*-\s*CLAUDE_CODE_OAUTH_TOKEN\s*$/m.test(compose) && !/(TOKEN|API_KEY)=\S/.test(compose),
+  'deploy/compose.yml passes CLAUDE_CODE_OAUTH_TOKEN through from the host and sets no secret value');
+check(/^\s*-\s*CAREER_OPS_ROOT=\/data\s*$/m.test(compose) && /^\s*-\s*".*:\/data"\s*$/m.test(compose),
+  'deploy/compose.yml sets CAREER_OPS_ROOT=/data and mounts the data root at /data');
+
+// deploy/Dockerfile copies the whole checkout, so a user-layer path missing here is baked into the image.
+const ignoreLines = new Set(read('.dockerignore').split('\n').map((line) => line.trim()));
+const uncovered = USER_PATHS.filter((entry) => {
+  const bare = entry.replace(/\/$/, '');
+  return ![entry, bare, `${bare}/*`, `**/${bare}`].some((form) => ignoreLines.has(form));
+});
+check(uncovered.length === 0, `.dockerignore covers every USER_PATHS entry${uncovered.length ? `, missing: ${uncovered.join(', ')}` : ''}`);
+
+const workflow = load(read('.github/workflows/docker-image.yml') || '{}') ?? {};
+const triggers = workflow.on ?? workflow[true] ?? {};
+const matrix = workflow.jobs?.publish?.strategy?.matrix?.include ?? [];
+check(matrix.some((m) => m.name === 'career-ops-server' && m.file === 'deploy/Dockerfile' && m.context === '.' && m.platforms === 'linux/amd64'),
+  'docker-image.yml builds career-ops-server from deploy/Dockerfile for linux/amd64');
+check(triggers.push && !('paths' in triggers.push), 'docker-image.yml builds every push with no path filter');
+check((triggers.pull_request?.paths ?? []).includes('deploy/**'), 'docker-image.yml builds pull requests that touch deploy/**');
