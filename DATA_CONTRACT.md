@@ -234,5 +234,6 @@ When resolved, all User Layer files/directories (e.g. `cv.md`, `config/profile.y
 ### Tracker Path & Writes:
 - **`CAREER_OPS_TRACKER`** can be set to override the applications tracker file path directly (relative paths are resolved relative to the repository root).
 - **`CAREER_OPS_BLACKLIST`** overrides the `data/blacklist.md` path read by `discover-new-companies.mjs` and `discover-ats.mjs` (the same pattern as their `CAREER_OPS_PORTALS` / `CAREER_OPS_SCAN_HISTORY` overrides); unset, they read `{DATA_ROOT}/data/blacklist.md`.
-- **Read Resolution:** If no tracker override is set, reading resolves to `{DATA_ROOT}/data/applications.md` if it exists; otherwise falls back to `{DATA_ROOT}/applications.md`.
+- **Read Resolution:** If no tracker override is set, reading resolves to `{DATA_ROOT}/data/applications.md` if it exists, then to `{DATA_ROOT}/applications.md` if that exists, and otherwise to `{DATA_ROOT}/data/applications.md`, the write location. A fresh data root is then its own workspace even when its basename is `data`.
+- **Known limitation:** a data root whose basename is `data` and that keeps its tracker at `{DATA_ROOT}/applications.md` (the legacy flat layout) still resolves its workspace to the parent directory, because `resolveWorkspaceRoot` reads any tracker directory named `data` as the `data/` layout. Use the `data/applications.md` layout for such a root.
 - **Write Resolution:** All writes (including merge operations and first-run creation) target the canonical location `{DATA_ROOT}/data/applications.md`.

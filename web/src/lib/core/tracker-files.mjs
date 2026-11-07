@@ -5,11 +5,11 @@ import path from "node:path";
 // `rawTrackerPath`, made absolute.
 function rawTrackerPath(root) {
   const override = process.env.CAREER_OPS_TRACKER?.trim();
-  return path.resolve(override || (
-    fs.existsSync(path.join(root, "data/applications.md"))
-      ? path.join(root, "data/applications.md")
-      : path.join(root, "applications.md")
-  ));
+  if (override) return path.resolve(override);
+  const inData = path.join(root, "data/applications.md");
+  const atRoot = path.join(root, "applications.md");
+  // Neither file exists: read where core writes.
+  return path.resolve(!fs.existsSync(inData) && fs.existsSync(atRoot) ? atRoot : inData);
 }
 
 // Synchronous mirror of path-resolver.mjs for the synchronous web readers.
