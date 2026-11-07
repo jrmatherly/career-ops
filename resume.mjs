@@ -7,12 +7,14 @@
  *   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
  *   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
  *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+ *   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
  *
- * Exit codes: 0 ok, 1 any other error, 3 the lossless gate failed (nothing
- * written), 4 save with a stale --expected-cv-sha (nothing written).
+ * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
+ * 3 the lossless gate failed (nothing written), 4 save with a stale
+ * --expected-cv-sha (nothing written).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
@@ -21,15 +23,17 @@ import { markInSync, readResume, readResumeFile, serialize, sha256, writeResume 
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
+import { detectFormat, FORMATS, ImportError, importResume } from './lib/resume/import/detect.mjs';
 
 const USAGE = `Usage:
   node resume.mjs absorb [--json]
   node resume.mjs adopt [--confirm]
   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
-  node resume.mjs save --in file --expected-cv-sha <sha> [--json]`;
-const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha'];
-const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--help', '-h'];
+  node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+  node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]`;
+const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--format'];
+const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--replace-cv', '--help', '-h'];
 
 class UsageError extends Error {}
 
@@ -212,6 +216,59 @@ async function saveCommand(root, args) {
   return 0;
 }
 
+async function importCommand(root, file, args) {
+  if (!file) throw new UsageError('import takes <file>');
+  const forced = flagValue(args, '--format');
+  if (forced !== undefined && !FORMATS.includes(forced)) throw new UsageError(`--format takes one of ${FORMATS.join(', ')}`);
+  let buffer;
+  try {
+    buffer = readFileSync(file);
+  } catch (err) {
+    throw new ImportError(`${file}: ${err.code === 'ENOENT' ? 'no such file' : err.message}`);
+  }
+  const format = forced ?? detectFormat(buffer, basename(file));
+  if (format === 'unknown') throw new ImportError(`${file}: not a Reactive Resume JSON, JSON Resume, LinkedIn export zip or .docx`);
+  let imported;
+  try {
+    imported = importResume(buffer, format);
+  } catch (err) {
+    if (err instanceof ImportError) err.message = `${file}: ${err.message}`;
+    throw err;
+  }
+  const { data, generated, gate, review } = imported;
+  console.log('Found:');
+  for (const line of review.sections) console.log(`  ${line}`);
+  if (review.leftover.length) {
+    console.log('Not carried by cv.md:');
+    for (const line of review.leftover) console.log(`  ${line}`);
+  }
+  const cvPath = join(root, 'cv.md');
+  const cv = existsSync(cvPath) ? readFileSync(cvPath, 'utf8') : null;
+  if (cv !== null) {
+    console.log('cv.md exists; import would replace it:');
+    console.log(lineDiff(cv, generated));
+  }
+  if (!hasFlag(args, '--confirm')) {
+    console.log(`Nothing written. Add --confirm${cv !== null ? ' --replace-cv' : ''}`);
+    return 0;
+  }
+  if (cv !== null && !hasFlag(args, '--replace-cv')) throw new ImportError('cv.md exists; add --replace-cv to replace it (a copy is kept as cv.md.bak); import never merges two CVs');
+  if (!gate.lossless) {
+    printReport(gate, false, { written: false });
+    return 3;
+  }
+  let bak = null;
+  if (cv !== null) {
+    bak = existsSync(`${cvPath}.bak`) ? `${cvPath}.${Date.now()}.bak` : `${cvPath}.bak`;
+    writeFileAtomic(bak, cv);
+  }
+  replaceUserFile(cvPath, generated);
+  markInSync(data, sha256(generated));
+  await writeResume(root, data);
+  console.log(`cv.md and data/resume.json written${bak ? ` (previous cv.md in ${bak})` : ''}`);
+  return 0;
+}
+
 export async function main(args) {
   validateFlags(args, FLAGS, USAGE, { valueFlags: VALUE_FLAGS, requireOperand: true });
   const positional = args.filter((a, i) => !a.startsWith('-') && !VALUE_FLAGS.includes(args[i - 1]));
@@ -224,12 +281,13 @@ export async function main(args) {
       case 'pair': return await pairCommand(root, rest);
       case 'export': return exportCommand(root, rest[0], args);
       case 'save': return await saveCommand(root, args);
+      case 'import': return await importCommand(root, rest[0], args);
       default: throw new UsageError(command ? `unknown command: ${command}` : 'no command given');
     }
   } catch (err) {
     console.error(`resume: ${err.message}`);
     if (err instanceof UsageError) console.error(USAGE);
-    return 1;
+    return err instanceof ImportError ? 2 : 1;
   }
 }
 

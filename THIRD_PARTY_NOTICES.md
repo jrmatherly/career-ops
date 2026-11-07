@@ -21,6 +21,19 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/vendor/present-labels.json` from `packages/schema/src/resume/present-labels.json`, unchanged (PR-02)
 - `lib/resume/vendor/expected-labels.json` from `packages/schema/src/resume/expected-labels.json`, unchanged (PR-02)
 - `tests/fixtures/resume/sample.json`, the fictional sample resume, from `packages/schema/src/resume/sample.ts` evaluated with `default.ts`, plus two added experience items the tests need (PR-02)
+- `lib/resume/import/zip.mjs` from `packages/import/src/zip.ts` (PR-03)
+- `lib/resume/import/error.mjs` from `packages/import/src/error.ts`; an `ImportError` class and a one-line issue list (PR-03)
+- `lib/resume/import/date.mjs` from `packages/import/src/date.ts` (PR-03)
+- `lib/resume/import/html.mjs` from `packages/import/src/html.ts`; descriptions are built with `lib/resume/to-cv-md.mjs`'s `pHtml`/`liHtml` so an import round-trips through `absorb` unchanged (PR-03)
+- `lib/resume/import/level.mjs` from `packages/import/src/level.ts` (PR-03)
+- `lib/resume/import/plain-text.mjs` from `packages/import/src/plain-text.ts` (PR-03)
+- `lib/resume/import/docx-text.mjs` from `packages/import/src/docx-text.ts` (PR-03)
+- `lib/resume/import/json-resume.mjs` from `packages/import/src/json-resume.tsx`; the network icon lookup is dropped (PR-03)
+- `lib/resume/import/linkedin.mjs` from `packages/import/src/linkedin.ts` (PR-03)
+- `lib/resume/import/reactive-resume-json.mjs` from `packages/import/src/reactive-resume-json.tsx` (PR-03)
+- `lib/resume/import/detect.mjs` from `apps/web/src/features/resume/import/read-file.ts` lines 32-115 (`detectJsonImportKind` and the magic-byte sniffing), plus the `importResume` dispatcher, which is ours (PR-03)
+
+The import files are hand-ported JavaScript (types removed, `generateId()` replaced by `crypto.randomUUID()`, i18n macros removed), not `stripTypeScriptTypes` output, so their line numbers do not match the clone's.
 
 ### Licence text
 

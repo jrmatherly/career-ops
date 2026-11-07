@@ -1,0 +1,86 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "basics": {
+    "name": "Morgan Testwell",
+    "label": "Staff Engineer, Robotics Platforms",
+    "email": "morgan.testwell@example.com",
+    "phone": "+1 503 555 0100",
+    "url": "https://morgan.example.com",
+    "summary": "Robotics platform engineer with nine years across motion planning, telemetry pipelines and small-team leadership.",
+    "location": { "city": "Portland", "region": "Oregon", "countryCode": "US" },
+    "profiles": [
+      { "network": "GitHub", "username": "mtestwell", "url": "https://github.com/mtestwell" }
+    ]
+  },
+  "work": [
+    {
+      "name": "Lumen Robotics",
+      "position": "Staff Engineer",
+      "location": "Portland, Oregon",
+      "url": "https://lumen.example.com",
+      "startDate": "2021-03",
+      "endDate": "",
+      "summary": "Platform lead for the fleet control stack.",
+      "highlights": [
+        "Led the motion-planning rewrite that ships in every fleet release",
+        "Cut the fleet incident rate by a third over two quarters"
+      ]
+    },
+    {
+      "name": "Harbor Analytics",
+      "position": "Senior Software Engineer",
+      "location": "Remote",
+      "startDate": "2017-06-12",
+      "endDate": "2021-02-26",
+      "highlights": ["Owned the ingestion pipeline for sensor telemetry"]
+    },
+    {
+      "name": "Northfield Institute of Technology",
+      "position": "Research Assistant",
+      "startDate": "2015",
+      "endDate": "2017"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Northfield Institute of Technology",
+      "area": "Computer Science",
+      "studyType": "BSc",
+      "startDate": "2013",
+      "endDate": "2017",
+      "score": "3.8",
+      "courses": ["Robotics", "Distributed Systems"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Open Planner",
+      "description": "A sampling-based motion planner for small robots.",
+      "highlights": ["Used by two university labs"],
+      "startDate": "2019-01",
+      "url": "https://github.com/mtestwell/open-planner"
+    }
+  ],
+  "skills": [
+    { "name": "Robotics", "level": "Expert", "keywords": ["ROS 2", "Motion planning"] },
+    { "name": "Backend", "level": "Advanced", "keywords": ["C++", "Go"] }
+  ],
+  "languages": [
+    { "language": "English", "fluency": "Native speaker" },
+    { "language": "German", "fluency": "Intermediate" }
+  ],
+  "certificates": [
+    { "name": "Certified Kubernetes Administrator", "date": "2022-09", "issuer": "Example Certification Board", "url": "https://example.com/cka/0000" }
+  ],
+  "awards": [
+    { "title": "Robotics Innovation Prize", "date": "2020-11", "awarder": "Example Robotics Society", "summary": "For the open planner." }
+  ],
+  "publications": [
+    { "name": "Sampling planners at fleet scale", "publisher": "Example Robotics Journal", "releaseDate": "2021", "url": "https://journal.example.com/planners" }
+  ],
+  "volunteer": [
+    { "organization": "Robotics for Schools", "startDate": "2018", "summary": "Mentors a yearly build camp." }
+  ],
+  "interests": [{ "name": "Trail running", "keywords": ["Ultras"] }],
+  "references": [{ "name": "Available on request", "reference": "" }]
+}
