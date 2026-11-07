@@ -57,9 +57,9 @@ version: 1.0.0
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.5;
-    color: #16181d;
-    background: #ffffff;
+    line-height: var(--line-height, 1.5);
+    color: var(--text-color, #16181d);
+    background: var(--background-color, #ffffff);
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
   }
@@ -88,6 +88,7 @@ version: 1.0.0
   }
 
   .header h1 {
+    font-family: var(--heading-font-family, inherit);
     font-size: 31px;
     font-weight: 700;
     letter-spacing: -0.022em;
@@ -141,12 +142,13 @@ version: 1.0.0
   }
 
   /* === SECTIONS === */
-  .section { margin-bottom: 14px; }
+  .section { margin-bottom: var(--section-gap, 14px); }
 
   /* Keep the accent bar in normal flow so PDF text follows section order. */
   .section-title {
+    font-family: var(--heading-font-family, inherit);
     border-left: 3px solid var(--accent-color);
-    font-size: 10px;
+    font-size: var(--heading-font-size, 10px);
     font-weight: 700;
     text-transform: uppercase;
     /* Keep section names intact in the PDF text layer. */
@@ -161,7 +163,7 @@ version: 1.0.0
     border-left: 2px solid var(--accent-color);
     padding: 7px 10px;
     text-align: justify;
-    color: #262b33;
+    color: var(--text-color, #262b33);
   }
 
   /* === COMPETENCIES === */
@@ -185,7 +187,7 @@ version: 1.0.0
 
   /* === WORK EXPERIENCE === */
   .job {
-    margin-bottom: 12px;
+    margin-bottom: var(--item-gap, 12px);
     padding-left: 10px;
     border-left: 1px solid #e6e3f4;
   }
@@ -228,7 +230,7 @@ version: 1.0.0
   .job-context {
     font-style: italic;
     font-size: 9.5px;
-    line-height: 1.5;
+    line-height: var(--line-height, 1.5);
     color: #55606d;
     margin-top: 3px;
   }
@@ -246,7 +248,7 @@ version: 1.0.0
 
   /* === PROJECTS === */
   .project {
-    margin-bottom: 8px;
+    margin-bottom: var(--item-gap, 8px);
     padding-left: 10px;
     border-left: 1px solid #e6e3f4;
   }
@@ -286,7 +288,7 @@ version: 1.0.0
     gap: 10px;
   }
 
-  .edu-title { font-weight: 700; color: #0d0f13; }
+  .edu-title { font-weight: 700; color: var(--text-color, #0d0f13); }
 
   .edu-org { font-weight: 600; color: var(--accent-color); }
 
@@ -313,7 +315,7 @@ version: 1.0.0
     margin-bottom: 3px;
   }
 
-  .cert-title { font-weight: 700; color: #0d0f13; }
+  .cert-title { font-weight: 700; color: var(--text-color, #0d0f13); }
   .cert-org { flex: 1; color: #3a4048; }
   .cert-year { font-size: 9px; font-weight: 600; color: #6b7280; white-space: nowrap; }
 
@@ -427,7 +429,7 @@ version: 1.0.0
   html[lang="zh-CN"] .summary-text,
   html[lang="zh"] .summary-text,
   html[lang="zh-CN"] .job li,
-  html[lang="zh"] .job li { line-height: 1.7; }
+  html[lang="zh"] .job li { line-height: var(--line-height, 1.7); }
 </style>
 </head>
 <body>
