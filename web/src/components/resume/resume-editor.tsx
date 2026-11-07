@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CvPreview } from "@/components/cv-studio/cv-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CheckPanel, type CheckReport, type Severity } from "@/components/resume/check-panel";
 import { DesignPanel } from "@/components/resume/design-panel";
 import { GatePanel, type Report } from "@/components/resume/gate-panel";
 import { Field, SectionForm, type FieldKind, type ResumeDraft } from "@/components/resume/section-form";
@@ -61,6 +62,8 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   // What the last pairing or adoption reported, such as where the cv.md backup went.
   const [notice, setNotice] = useState<string | null>(null);
   const requestNo = useRef(0);
+  const [check, setCheck] = useState<{ report: CheckReport | null; error: string | null }>({ report: null, error: null });
+  const [pin, setPin] = useState<{ key: string; seq: number } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -84,6 +87,13 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
     if (!editable) return;
     const timer = setTimeout(async () => {
       const n = ++requestNo.current;
+      fetch("/api/resume/check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })
+        .then(async (res) => {
+          const body = await readBody(res);
+          if (n !== requestNo.current) return;
+          setCheck(res.ok ? { report: body.report, error: null } : { report: null, error: body.error ?? `HTTP ${res.status}` });
+        })
+        .catch((err: Error) => n === requestNo.current && setCheck({ report: null, error: err.message }));
       try {
         const res = await fetch("/api/resume/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) });
         const body = await readBody(res);
@@ -103,8 +113,25 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
         if (n === requestNo.current) setPreviewError((err as Error).message);
       }
     }, edited.current ? editDelay.current : 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Responses for this draft are stale from here, including after the editor leaves editing.
+      requestNo.current += 1;
+    };
   }, [data, editable]);
+
+  // Keyed by content so a check response with the same findings keeps the same array and the preview skips its marker effect.
+  const markerKey = JSON.stringify(check.report?.findings.map((f) => [f.path, f.severity]) ?? null);
+  const markers = useMemo(() => (JSON.parse(markerKey) as [string, Severity][] | null)?.map(([path, severity]) => ({ path, severity })), [markerKey]);
+  // The pin follows its finding's key, so a reorder that changes the path still outlines that finding.
+  const pinnedPath = check.report?.findings.find((f) => f.key === pin?.key)?.path;
+  const pinned = useMemo(() => (pin && pinnedPath ? { path: pinnedPath, seq: pin.seq } : null), [pinnedPath, pin]);
+
+  const ignore = (key: string) => {
+    if (!data) return;
+    const kept: string[] = data.metadata?.check?.ignored ?? [];
+    edit(setField(data, ["metadata", "check", "ignored"], [...new Set([...kept, key])]), 0);
+  };
 
   const dirty = state.data !== state.saved;
   useEffect(() => {
@@ -241,6 +268,7 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
           </form>
 
           <div className="min-w-0 lg:self-start">
+            <CheckPanel report={check.report} error={check.error} pinned={pin?.key ?? null} onPin={(key) => setPin((p) => ({ key, seq: (p?.seq ?? 0) + 1 }))} onIgnore={ignore} />
             {previewError && (
               <p role="alert" className="mb-2 text-sm text-red-700 dark:text-red-300">
                 Preview failed: {previewError}
@@ -256,7 +284,7 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
                 {w}
               </p>
             ))}
-            {html ? <CvPreview html={html} /> : <Card className="text-sm text-muted">Preview appears here.</Card>}
+            {html ? <CvPreview html={html} markers={markers} pinned={pinned} /> : <Card className="text-sm text-muted">Preview appears here.</Card>}
           </div>
         </div>
       )}
