@@ -7,29 +7,33 @@
  *   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
  *   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
  *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+ *   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
  *
- * Exit codes: 0 ok, 1 any other error, 3 the lossless gate failed (nothing
- * written), 4 save with a stale --expected-cv-sha (nothing written).
+ * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
+ * 3 the lossless gate failed (nothing written), 4 save with a stale
+ * --expected-cv-sha (nothing written).
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
-import { markInSync, readResume, readResumeFile, serialize, sha256, writeResume } from './lib/resume/model.mjs';
+import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, writeResume } from './lib/resume/model.mjs';
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
+import { detectFormat, FORMATS, ImportError, importResume } from './lib/resume/import/detect.mjs';
 
 const USAGE = `Usage:
   node resume.mjs absorb [--json]
   node resume.mjs adopt [--confirm]
   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
-  node resume.mjs save --in file --expected-cv-sha <sha> [--json]`;
-const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha'];
-const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--help', '-h'];
+  node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+  node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]`;
+const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--format'];
+const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--replace-cv', '--help', '-h'];
 
 class UsageError extends Error {}
 
@@ -71,7 +75,7 @@ function printReport({ report, lossless }, json, extra = {}) {
 }
 
 /** A unified-style line diff with two lines of context, from a longest common subsequence. */
-function lineDiff(before, after) {
+function lineDiff(before, after, label = 'generated from data/resume.json') {
   const a = before.replace(/\n$/, '').split('\n');
   const b = after.replace(/\n$/, '').split('\n');
   const lcs = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
@@ -87,7 +91,7 @@ function lineDiff(before, after) {
     else lines.push(`+${b[j++]}`);
   }
   const near = (k) => lines.slice(Math.max(0, k - 2), k + 3).some((l) => l[0] !== ' ');
-  const out = ['--- cv.md', '+++ generated from data/resume.json'];
+  const out = ['--- cv.md', `+++ ${label}`];
   lines.forEach((line, k) => {
     if (near(k)) out.push(line);
     else if (out.at(-1) !== '@@') out.push('@@');
@@ -212,6 +216,68 @@ async function saveCommand(root, args) {
   return 0;
 }
 
+async function importCommand(root, file, args) {
+  if (!file) throw new UsageError('import takes <file>');
+  const forced = flagValue(args, '--format');
+  if (forced !== undefined && !FORMATS.includes(forced)) throw new UsageError(`--format takes one of ${FORMATS.join(', ')}`);
+  let buffer;
+  try {
+    buffer = readFileSync(file);
+  } catch (err) {
+    throw new ImportError(`${file}: ${err.code === 'ENOENT' ? 'no such file' : err.message}`);
+  }
+  let imported;
+  try {
+    const format = forced ?? detectFormat(buffer, basename(file));
+    if (format === 'unknown') throw new ImportError('not a Reactive Resume JSON, JSON Resume, LinkedIn export zip or .docx');
+    imported = importResume(buffer, format);
+  } catch (err) {
+    if (err instanceof ImportError) err.message = `${file}: ${err.message}`;
+    throw err;
+  }
+  const { data, generated, gate, review } = imported;
+  console.log('Found:');
+  for (const line of review.sections) console.log(`  ${line}`);
+  if (review.leftover.length) {
+    console.log('Not carried by cv.md:');
+    for (const line of review.leftover) console.log(`  ${line}`);
+  }
+  if (!gate.lossless) {
+    printReport(gate, false, { written: false });
+    return 3;
+  }
+  const cvPath = join(root, 'cv.md');
+  const jsonPath = resumePath(root);
+  const cv = existsSync(cvPath) ? readFileSync(cvPath, 'utf8') : null;
+  // The sidecar holds orphans, hidden flags and links that cv.md cannot carry, so it is gated and backed up like cv.md.
+  const json = existsSync(jsonPath) ? readFileSync(jsonPath, 'utf8') : null;
+  if (cv !== null) {
+    console.log('cv.md exists; import would replace it:');
+    console.log(lineDiff(cv, generated, `generated from ${basename(file)}`));
+  } else {
+    console.log('cv.md to be written:');
+    console.log(generated);
+  }
+  if (json !== null) console.log('data/resume.json exists; import would replace it');
+  const existing = [cv !== null && 'cv.md', json !== null && 'data/resume.json'].filter(Boolean);
+  if (!hasFlag(args, '--confirm')) {
+    console.log(`Nothing written. Add --confirm${existing.length ? ' --replace-cv' : ''}`);
+    return 0;
+  }
+  if (existing.length && !hasFlag(args, '--replace-cv')) throw new ImportError(`${existing.join(' and ')} exist${existing.length === 1 ? 's' : ''}; add --replace-cv to replace (a copy is kept as .bak, or a timestamped .bak when one exists); import never merges two CVs`);
+  const backup = (path, text) => {
+    const bak = existsSync(`${path}.bak`) ? `${path}.${Date.now()}.bak` : `${path}.bak`;
+    writeFileAtomic(bak, text);
+    return bak;
+  };
+  const baks = [cv !== null && backup(cvPath, cv), json !== null && backup(jsonPath, json)].filter(Boolean);
+  replaceUserFile(cvPath, generated);
+  markInSync(data, sha256(generated));
+  await writeResume(root, data);
+  console.log(`cv.md and data/resume.json written${baks.length ? ` (previous copies in ${baks.join(', ')})` : ''}`);
+  return 0;
+}
+
 export async function main(args) {
   validateFlags(args, FLAGS, USAGE, { valueFlags: VALUE_FLAGS, requireOperand: true });
   const positional = args.filter((a, i) => !a.startsWith('-') && !VALUE_FLAGS.includes(args[i - 1]));
@@ -224,12 +290,13 @@ export async function main(args) {
       case 'pair': return await pairCommand(root, rest);
       case 'export': return exportCommand(root, rest[0], args);
       case 'save': return await saveCommand(root, args);
+      case 'import': return await importCommand(root, rest[0], args);
       default: throw new UsageError(command ? `unknown command: ${command}` : 'no command given');
     }
   } catch (err) {
-    console.error(`resume: ${err.message}`);
+    console.error(err instanceof UsageError || err instanceof ImportError ? `resume: ${err.message}` : err.stack);
     if (err instanceof UsageError) console.error(USAGE);
-    return 1;
+    return err instanceof ImportError ? 2 : 1;
   }
 }
 
