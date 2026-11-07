@@ -10,3 +10,5 @@
 .serena/
 .upstream-review/
 FORK.md
+THIRD_PARTY_NOTICES.md
+publish/
