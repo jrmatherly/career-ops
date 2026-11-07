@@ -303,9 +303,13 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.13'
-      # No install step: the service has no dependencies, and the root
-      # .gitignore ignores every package-lock.json but web/'s, so there is no
-      # lockfile for `npm ci`. The day a dependency lands, un-ignore
-      # publish/package-lock.json and add `npm --prefix publish ci` here.
+      # The service itself has no dependencies, but the share CLI imports
+      # root modules that need js-yaml and spawns resume.mjs, which needs zod,
+      # so the root install runs here as in the test job. The
+      # root .gitignore ignores every package-lock.json but web/'s, so there is
+      # no lockfile for `npm ci`. The day publish/ itself gets a dependency,
+      # un-ignore publish/package-lock.json and add `npm --prefix publish ci`.
+      - name: "📦 Install root dependencies"
+        run: npm install --ignore-scripts
       - name: "🧪 Publish service tests"
         run: npm --prefix publish test
