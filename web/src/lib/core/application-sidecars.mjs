@@ -9,13 +9,22 @@ import { dayInstant, zonedInstant } from "../next-step.mjs";
 
 const META_KEYS = ["lane", "tag", "closed_reason", "source", "closed_at"];
 
-/** Sidecar data rows as cells, `cells[0]` a positive integer. Same rule as readSidecarRows. */
-function sidecarRows(text) {
+/**
+ * Sidecar data rows as cells, `cells[0]` a positive integer: readSidecarRows' rule
+ * (five cells, positive row number), stricter on the number (digits only). A row
+ * that does not parse goes to `skipped`, never dropped in silence.
+ * @param {string | null | undefined} text
+ * @param {string[]} [skipped]
+ */
+function sidecarRows(text, skipped = []) {
   const rows = [];
   for (const line of String(text ?? "").split(/\r?\n/)) {
     if (!line || line[0] === "#") continue;
     const cells = line.split("\t");
-    if (cells.length < 5 || !/^\d+$/.test(cells[0]) || Number(cells[0]) <= 0) continue;
+    if (cells.length < 5 || !/^\d+$/.test(cells[0]) || Number(cells[0]) <= 0) {
+      skipped.push(line);
+      continue;
+    }
     cells[0] = Number(cells[0]);
     cells[4] = cells[4].trimEnd();
     rows.push(cells);
@@ -25,12 +34,19 @@ function sidecarRows(text) {
 
 /**
  * Latest value per (num, key); `tag` collects every distinct value, as readMeta does.
+ * Malformed rows and unknown keys go to `skipped`.
+ * @param {string | null | undefined} text
+ * @param {string[]} [skipped]
  * @returns {Map<number, { lane?: string, tag?: string[], closed_reason?: string, source?: string, closed_at?: string }>}
  */
-export function parseMeta(text) {
+export function parseMeta(text, skipped = []) {
   const out = new Map();
-  for (const [num, , key, value] of sidecarRows(text)) {
-    if (!META_KEYS.includes(key)) continue;
+  for (const cells of sidecarRows(text, skipped)) {
+    const [num, , key, value] = cells;
+    if (!META_KEYS.includes(key)) {
+      skipped.push(cells.join("\t"));
+      continue;
+    }
     let rec = out.get(num);
     if (!rec) out.set(num, (rec = {}));
     if (key === "tag") rec.tag = [...new Set([...(rec.tag ?? []), value])];
@@ -40,8 +56,8 @@ export function parseMeta(text) {
 }
 
 /** @returns {{ num: number, at: string, kind: string, text: string, source: string }[]} */
-export function parseEvents(text) {
-  return sidecarRows(text).map(([num, at, kind, body, source]) => ({ num, at, kind, text: body, source }));
+export function parseEvents(text, skipped = []) {
+  return sidecarRows(text, skipped).map(([num, at, kind, body, source]) => ({ num, at, kind, text: body, source }));
 }
 
 const splitRow = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
@@ -61,6 +77,7 @@ export function parseActiveInterviews(md) {
   const start = lines.findIndex(isTableLine);
   if (start === -1) return [];
   const header = splitRow(lines[start]).map((h) => h.toLowerCase());
+  /** @param {string[]} cells @param {...string} names @returns {string} */
   const col = (cells, ...names) => {
     const i = header.findIndex((h) => names.includes(h));
     return i === -1 ? "" : (cells[i] ?? "");
@@ -99,7 +116,9 @@ const CONTACT_COLUMNS = ["name", "company", "type", "title", "phone", "email", "
  */
 export function parseContacts(text) {
   const lines = String(text ?? "").split(/\r?\n/);
-  const head = lines[0]?.startsWith("#") ? lines[0].replace(/^#\s*/, "").split("\t").map((h) => h.trim().toLowerCase()) : CONTACT_COLUMNS;
+  const named = lines[0]?.startsWith("#") ? lines[0].replace(/^#\s*/, "").split("\t").map((h) => h.trim().toLowerCase()) : [];
+  // A first `#` line is the header only when it names the columns; any other comment keeps the default order.
+  const head = named.includes("name") && named.includes("tracker") ? named : CONTACT_COLUMNS;
   const out = [];
   for (const line of lines) {
     if (!line.trim() || line.startsWith("#")) continue;
@@ -114,14 +133,18 @@ export function parseContacts(text) {
 // followup-cadence.mjs grammar: OVERRIDE_RE for pins, table rows and bullets for logged follow-ups.
 const PIN_RE = /^-\s+next\s+#(\d+)\s+(\d{4}-\d{2}-\d{2})(?:\s+\(set\s+(\d{4}-\d{2}-\d{2})\))?(?:\s*[—–-]\s*(.*))?\s*$/i;
 const BULLET_RE = /^-\s+(\d{4}-\d{2}-\d{2})\s+·\s+#(\d+)\s/;
+const CLEARED_RE = /^-\s+cleared\s+#(\d+)\s+(\d{4}-\d{2}-\d{2})(?:\s*[—–-].*)?\s*$/i;
 
 /**
  * The live follow-up pin per tracker number. The last pin wins, and it lapses
  * once a follow-up is logged after the day it was set (resolveNextOverride).
+ * A `- cleared #N` retirement hides it until a follow-up is logged after the
+ * retirement (isRetired).
  * @returns {Map<number, { date: string, setDate: string, note: string }>}
  */
 export function parseFollowupPins(md) {
   const pins = new Map();
+  const cleared = new Map();
   const lastLogged = new Map();
   const logged = (num, date) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !(lastLogged.get(num) >= date)) lastLogged.set(num, date);
@@ -132,6 +155,11 @@ export function parseFollowupPins(md) {
       if (dayInstant(pin[2])) pins.set(Number(pin[1]), { date: pin[2], setDate: pin[3] || pin[2], note: (pin[4] ?? "").trim() });
       continue;
     }
+    const clear = line.match(CLEARED_RE);
+    if (clear) {
+      if (dayInstant(clear[2])) cleared.set(Number(clear[1]), clear[2]);
+      continue;
+    }
     if (line.startsWith("|")) {
       const parts = line.split("|").map((s) => s.trim());
       if (parts.length >= 8 && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[2])) logged(Number(parts[2]), parts[3]);
@@ -140,7 +168,11 @@ export function parseFollowupPins(md) {
     const bullet = line.match(BULLET_RE);
     if (bullet) logged(Number(bullet[2]), bullet[1]);
   }
-  for (const [num, pin] of pins) if ((lastLogged.get(num) ?? "") > pin.setDate) pins.delete(num);
+  for (const [num, pin] of pins) {
+    const logged = lastLogged.get(num) ?? "";
+    const retired = cleared.has(num) && !(logged > cleared.get(num));
+    if (logged > pin.setDate || retired) pins.delete(num);
+  }
   return pins;
 }
 
@@ -155,7 +187,8 @@ export function parseOfferTerms(md) {
     const m = line.match(/^\| (.+?) \| (.*) \|$/);
     if (m && m[1] !== "Field" && !/^-+$/.test(m[1])) fields[m[1]] = m[2];
   }
-  return { num: Number(num[1]), fields, respondBy: dayInstant(fields["Respond by"]) ? fields["Respond by"] : null };
+  const recorded = text.match(/^Recorded:\s*(\d{4}-\d{2}-\d{2})\s*$/m)?.[1] ?? "";
+  return { num: Number(num[1]), recorded, fields, respondBy: dayInstant(fields["Respond by"]) ? fields["Respond by"] : null };
 }
 
 /**

@@ -50,8 +50,9 @@ export function Board({ cards }: { cards: BoardCard[] }) {
     if (!row || inFlight.current.has(key)) return;
     inFlight.current.add(key);
     const result = await dropCard(state, row, tab, setState).finally(() => inFlight.current.delete(key));
-    if (result.outcome === "saved") router.refresh();
-    else if (result.outcome === "reverted") setToast(result.error);
+    // A reverted move refreshes too: a 504 or an unconfirmed 200 may still have written the tracker.
+    if (result.outcome !== "noop") router.refresh();
+    if (result.outcome === "reverted") setToast(result.error);
   }
 
   return (
@@ -84,7 +85,7 @@ export function Board({ cards }: { cards: BoardCard[] }) {
       )}
       {open && openKey && <ApplicationSheet card={open} onClose={() => setOpenKey(null)} onMove={(tab) => void move(openKey, tab)} />}
       {toast && (
-        <div className="fixed inset-x-0 bottom-20 z-40 flex justify-center px-4 sm:bottom-6">
+        <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
           <p role="status" className="max-w-full break-words rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
             {toast}
           </p>

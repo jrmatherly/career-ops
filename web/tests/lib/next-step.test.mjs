@@ -73,6 +73,12 @@ test("Interview with no round in this visit needs one; a finished round awaits f
   assert.deepEqual(nextStep(a, [], [round("2026-10-27T10:00:00Z")], now), { kind: "interview-feedback", days: 6 });
 });
 
+test("a round on the morning the stage began still counts as this visit's", () => {
+  const a = app("Interview", [entered("Interview", "2026-10-25")]);
+  assert.deepEqual(nextStep(a, [], [round("2026-10-25T09:00:00Z")], now), { kind: "interview-feedback", days: 6 });
+  assert.equal(nextStep(a, [], [round("2026-10-24T09:00:00Z")], now).kind, "no-interview");
+});
+
 test("silence after the last round is counted from its end", () => {
   const a = app("Interview", [entered("Interview", "2026-10-01")]);
   assert.deepEqual(nextStep(a, [], [round("2026-10-05T10:00:00Z")], now), { kind: "no-reply", days: 26, after: "interview" });

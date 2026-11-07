@@ -21,9 +21,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "body must be { n, key: \"lane\" | \"tag\", value }" }, { status: 400 });
   }
   const value = typeof body.value === "string" ? body.value.trim() : "";
-  // A leading dash would read as a flag; control characters would split the TSV row.
+  // A leading dash would read as a flag; control characters (tabs and line breaks
+  // among them) are refused rather than silently flattened by tsvCell.
   if (!value || value.length > MAX_VALUE || value.startsWith("-") || /[\p{Cc}]/u.test(value)) {
-    return Response.json({ error: `value must be 1-${MAX_VALUE} characters, no line breaks or tabs, not starting with "-"` }, { status: 400 });
+    return Response.json({ error: `value must be 1-${MAX_VALUE} characters, no control characters, not starting with "-"` }, { status: 400 });
   }
   if (!fs.existsSync(rootScript("app-meta"))) {
     return Response.json({ error: "lanes and tags need the career-ops scripts; this root has data only", code: "core-script-missing" }, { status: 503 });
@@ -31,6 +32,10 @@ export async function POST(req: Request) {
 
   const r = await runCoreCli("app-meta", ["set", row, body.key, value, "--source", "web"]);
   if (r.code === 0) return Response.json({ ok: true, n: row, key: body.key, value });
+  if (r.spawnFailed) {
+    console.error(`/api/app-meta: app-meta.mjs failed to run: ${r.stderr.trim()}`);
+    return Response.json({ error: "saving failed to run" }, { status: 500 });
+  }
   if (r.timedOut) return Response.json({ error: "saving timed out; the change may or may not have been applied" }, { status: 504 });
   // stderr names absolute paths, so it is logged and only classified here.
   const err = r.stderr.trim();

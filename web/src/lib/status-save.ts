@@ -1,5 +1,5 @@
 // The board's drop rules. A drop moves a card to another stage through the
-// only tracker writer the web has, POST /api/status (set-status.mjs under the
+// web's only status writer, POST /api/status (set-status.mjs under the
 // tracker lock), reusing the pipeline's identity, optimistic-replay and held-
 // save helpers. Relative .mjs imports keep this file loadable by node --test.
 import { applicationKey, applySavedStatus, saveStatus } from "./pipeline-status.mjs";
@@ -12,7 +12,7 @@ export type BoardSaveState<T extends BoardRow = BoardRow> = { rows: T[]; holds: 
 export type SaveOptions = { request?: typeof fetch; wait?: (ms: number) => Promise<void> };
 export type DropOutcome = { outcome: "noop" } | { outcome: "saved"; status: string } | { outcome: "reverted"; error: string };
 
-/** /api/status answers 503 when set-status.mjs exits 4: another writer holds the tracker lock. */
+/** Retries for a 503 whose code is "lock-timeout": set-status.mjs exit 4, another writer holds the tracker lock. */
 export const RETRIES = 3;
 export const RETRY_DELAY_MS = 250;
 
@@ -32,29 +32,34 @@ export async function saveWithRetry(
   { request = fetch, wait = sleep }: SaveOptions = {},
 ): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
   for (let attempt = 0; ; attempt++) {
-    let httpStatus = 0;
+    // Set inside the fetch wrapper, so the declared type must stay wide.
+    let reply = "none" as "none" | "busy" | "other";
+    // Only set-status.mjs exit 4 (code "lock-timeout") is worth retrying; /api/status
+    // also answers 503 for a data-only root, which no retry fixes.
     const tracked: typeof fetch = async (input, init) => {
       const response = await request(input, init);
-      httpStatus = response.status;
+      const code = response.status === 503 ? (await response.clone().json().catch(() => null))?.code : undefined;
+      reply = code === "lock-timeout" ? "busy" : "other";
       return response;
     };
     try {
       return { ok: true, status: (await saveStatus(n, from, to, tracked)) ?? to };
     } catch (e) {
-      if (httpStatus === 503 && attempt < RETRIES) {
+      if (reply === "busy" && attempt < RETRIES) {
         await wait(RETRY_DELAY_MS);
         continue;
       }
-      // The 503 body names the lock directory, an absolute server path, so it stays out of the toast.
-      if (httpStatus === 503) return { ok: false, error: "The tracker stayed busy, so the card moved back. Try again in a moment." };
+      // The lock-timeout body names the lock directory, an absolute server path, so it stays out of the toast.
+      if (reply === "busy") return { ok: false, error: "The tracker stayed busy, so the card moved back. Try again in a moment." };
+      if (reply === "none") return { ok: false, error: "Could not reach career-ops, so the card moved back. Check that the web server is running." };
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
 }
 
 /**
- * Drop `row` onto column `tab`. A drop onto its own column, or onto a card
- * still saving, does nothing and sends nothing. Otherwise the card moves at
+ * Drop `row` onto column `tab`. A drop onto the card's own column, or of a card
+ * whose last save is still pending, does nothing and sends nothing. Otherwise the card moves at
  * once, and moves back with an error if the save fails. State changes go
  * through `update` as functions, so a second drop that settles first is kept.
  */

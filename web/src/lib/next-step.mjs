@@ -72,6 +72,8 @@ export function zonedInstant(date, time, timeZone = "UTC") {
   }
 }
 
+const dayNumber = (t) => Math.floor(t / DAY_MS);
+
 const daysBetween = (from, to) => Math.max(0, Math.floor((to.getTime() - from.getTime()) / DAY_MS));
 
 /**
@@ -150,7 +152,7 @@ export function nextStep(app, events, interviews, now = new Date(), timeZone = "
     if (event.kind !== "contact") return latest;
     const at = new Date(event.at).getTime();
     if (Number.isNaN(at) || at > now.getTime()) return latest;
-    if (visitSince !== undefined && Math.floor(at / DAY_MS) < Math.floor(visitSince / DAY_MS)) return latest;
+    if (visitSince !== undefined && dayNumber(at) < dayNumber(visitSince)) return latest;
     return Math.max(latest, at);
   }, -Infinity);
   const replySince = Number.isFinite(contacted) ? contacted : (visitSince ?? -Infinity);
@@ -159,8 +161,9 @@ export function nextStep(app, events, interviews, now = new Date(), timeZone = "
     return { kind: "no-reply", days: quietDays };
   }
   if (token === "INTERVIEW") {
-    // Rounds that ended during this visit, counted from when they ended.
-    const ended = visitSince === undefined ? [] : rounds.map(interviewEnd).filter((end) => end >= visitSince);
+    // Rounds that ended during this visit, counted from when they ended. Same-day
+    // rounds count by day, like contact: a whole-day stage date sits at noon.
+    const ended = visitSince === undefined ? [] : rounds.map(interviewEnd).filter((end) => dayNumber(end) >= dayNumber(visitSince));
     if (ended.length === 0) return { kind: "no-interview", days };
     const quiet = daysBetween(new Date(Math.max(...ended, contacted)), now);
     return quiet >= FOLLOW_UP_AFTER_DAYS ? { kind: "no-reply", days: quiet, after: "interview" } : { kind: "interview-feedback", days };
