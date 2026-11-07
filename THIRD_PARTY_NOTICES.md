@@ -6,7 +6,7 @@ Code this fork vendors from other projects, with the licence each one carries. E
 
 - Source: https://github.com/reactive-resume/reactive-resume
 - Clone SHA: `d065a9f76538afda5da5de9374da2ed51f96c1e4`, 16 commits after the v6.1.0 tag
-- Licence: MIT, copyright Amruth Pillai. Every vendored file also carries this notice in a header comment.
+- Licence: MIT, copyright Amruth Pillai. Each vendored file carries this notice in a header comment.
 
 ### Files
 
