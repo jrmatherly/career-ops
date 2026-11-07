@@ -94,6 +94,11 @@ The last line lists fork-local files the batch touched. It should be empty excep
 - Generated or mirrored files are regenerated, never merged by hand: `claude-directory/`, `cursor-directory/`, `openai-directory/`, `antigravity-directory/` mirror `.agents/skills/career-ops/SKILL.md` and `tests/*-directory-plugin.test.mjs` compare them byte for byte. A conflict in one means the source skill changed; resolve `.agents/skills/career-ops/SKILL.md`, copy, and run those tests.
 - Keep `-x` on every cherry-pick so the log line "cherry picked from commit" carries provenance. Keep upstream's subject, including its `(#NNNN)`: GitHub resolves those against this fork's own issue list, which is empty, so the decision log carries the `--urls` link for every adopted commit.
 - A watermark advance without a decision log is a lost review. Never advance past commits you did not classify.
+- **Reactive Resume convergence** (`docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`; its rows sit under the sub-heading of the same name in "Deviations decided"):
+  - Areas this program owns outright (`lib/resume/`, `resume.mjs`, the sidecar writers, `publish/`, `web/src/app/{resume,board,shares}`, `web/src/components/{resume,board,shares}`). An upstream file arriving at one of these paths is ADAPT, never merged blind.
+  - Upstream files this program edits substantively (`import-tracker.mjs`, `tracker-utils.mjs`, `theme-style.mjs`, `build-cv-html.mjs`, `lib/cv-payload-schema.mjs`, the templates, `doctor.mjs`, `modes/pdf.md`, `nav-items.ts`, `AGENTS.md`, `DATA_CONTRACT.md`). The row names the exact hunks we own; an upstream hunk elsewhere in the file is ADOPT, one that overlaps ours is ADAPT, and the pinning test decides.
+  - An upstream feature that overlaps one we built (a structured resume, a board, imports, sharing) is a comparison review, not a merge. Read it, record in the decision log what it does better, and open a fork issue for anything worth porting. Default SKIP for its files; never let it replace ours silently.
+  - Shared append-only files (`resume.mjs`, `docs/SCRIPTS.md`, `THIRD_PARTY_NOTICES.md`, `DATA_CONTRACT.md`, the deviations table, `nav-items.ts`, `package.json`). Program PRs add lines and never reorder, and a rebase conflict keeps both. Upstream hunks in these files ADOPT, ours stay, conflicts resolve by keeping both; `resume.mjs` is fork-only and follows the first class above.
 
 ## Deleted or moved paths
 
@@ -106,11 +111,21 @@ An `x` marker means we removed the path, not always that the change is irrelevan
 
 A new deviation gets a row here; a SKIP revert gets a row with the upstream SHA; a deleted path also gets a line in "Deleted or moved paths".
 
+### Reactive Resume convergence
+
+Rows added by the program's PRs, in PR order; the Rules entry of the same name points at the plan and gives the four path classes. Each Notes cell opens with the hunk rule for the path (ADOPT, ADAPT, KEEP or SKIP) and names the fork test that pins the behaviour.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| no third-party notices file | `THIRD_PARTY_NOTICES.md` at the root: the Reactive Resume MIT notice (copyright Amruth Pillai, clone `d065a9f7`) and the Files list each vendoring PR extends | landed 2026-11-06 (PR-01) | ADOPT upstream hunks, ours stay, a conflict keeps both (append-only shared file). Pinned by the `config/local-paths.txt` entry, which `validate-system-paths-coverage.mjs` fails without, and by `tests/updater-local-paths.test.mjs`, which pins that `apply` treats a declared path as user layer. |
+
+### Fork harness, CI and docs
+
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
 | `.claude/` holds only the `career-ops` skill symlink | `.claude/settings.json` (SessionStart, PostToolUse hooks), `.claude/hooks/`, `.claude/rules/`, `.claude/agents/contract-reviewer.md`, `.claude/skills/{pr-ready,add-provider,upstream-review}` | landed 2026-11-05 | Branch `claude-automation`. Upstream `.claude/` additions are ADAPT (see Rules). `.claude/skills/` is SYSTEM_PATHS, so our skills there survive the updater's prune only because they never appeared in upstream history. Fork suites: `tests/claude-hooks.test.mjs`, `tests/upstream-review-script.test.mjs`, `tests/fork-deviations-covered.test.mjs` (fails when a diverged path has no row here). |
 | no git hooks | `.githooks/pre-commit` and `.githooks/commit-msg` (+ `.mjs`), `core.hooksPath` set by the SessionStart hook | landed 2026-11-05 | pre-commit refuses a newly added gitignored file and syntax errors (edits and deletions of tracked files pass); commit-msg enforces Conventional Commits with a scope. Merge commits bypass pre-commit but run commit-msg; cherry-picks run neither; the validation batch runs the pre-commit script. |
-| `config/local-paths.txt` gitignored, untracked | tracked and un-ignored (`!config/local-paths.txt`), declaring `.claude/rules/`, `.claude/agents/`, `.githooks/`, `.serena/`, `.upstream-review/`, `FORK.md` | landed 2026-11-05 | Upstream's own documented fork route (#2991, #4128). |
+| `config/local-paths.txt` gitignored, untracked | tracked and un-ignored (`!config/local-paths.txt`), declaring the fork-only paths the file lists | landed 2026-11-05 | Upstream's own documented fork route (#2991, #4128). |
 | `.gitignore` ends at upstream's rules | tail block: `private/`, `.codegraph/`, `.remember/`, `.claude/skill-stack.json`, `.claude/rules/skill-stack.md`, `!config/local-paths.txt` | landed 2026-11-05 | Every upstream `.gitignore` commit shows `~`; merge and keep the tail. |
 | no `.serena/` | `.serena/project.yml` + its own `.gitignore` | landed 2026-11-05 | Serena language-server project config. |
 | no upstream-review state | `.upstream-review/` | landed 2026-11-05 | This skill's watermark and logs. |

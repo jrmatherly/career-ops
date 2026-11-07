@@ -23,6 +23,22 @@ lists what changed since the last review, dry-runs the merge, and records each
 decision under `.upstream-review/reviews/`. `tests/fork-deviations-covered.test.mjs`
 fails when a diverged path has no row in the table.
 
+## Run the fork as your plugin
+
+Daily use goes through the Claude Code plugin, never through this checkout.
+In Claude Code, run the fork route that
+[`docs/CLAUDE_PLUGIN.md`](docs/CLAUDE_PLUGIN.md) documents:
+
+```
+/plugin marketplace add jrmatherly/career-ops
+/plugin install career-ops@career-ops
+```
+
+The plugin installs from the fork's `main` and updates only when `version` in
+`.claude-plugin/plugin.json` changes, so a branch checked out here never reaches
+daily use and user data cannot land in the checkout. The data root stays
+`~/career-ops-data`, the plugin default, so `CAREER_OPS_ROOT` needs no change.
+
 ## Where to contribute
 
 Bug reports, features and pull requests for the product go to

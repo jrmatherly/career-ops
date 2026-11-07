@@ -10,3 +10,6 @@
 .serena/
 .upstream-review/
 FORK.md
+THIRD_PARTY_NOTICES.md
+# publish/ is claimed ahead of PR-12 of the Reactive Resume convergence plan, which creates it.
+publish/
