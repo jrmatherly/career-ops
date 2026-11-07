@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.INBOX_UNDO_TEST_URL;
 const root = process.env.INBOX_UNDO_TEST_ROOT;
@@ -42,7 +43,7 @@ test("Inbox Undo remains retryable after failure", { skip: liveServerSkip("INBOX
     const response = await page.request.post(`${origin.origin}/api/inbox/skip`, { data: { url: `https://example.com/fixture-${company}`, done: false } });
     assert.equal(response.ok(), true);
   }
-  await page.goto(`${origin.origin}/pipeline`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline`));
 
   let restores = 0;
   const gate = new Promise((resolve) => { release = resolve; });
@@ -91,7 +92,7 @@ test("Inbox Undo remains retryable after failure", { skip: liveServerSkip("INBOX
       assert.equal(response.ok(), true);
     }
     await page.evaluate(() => localStorage.removeItem("career-ops:hidden"));
-    await page.reload();
+    await settled(page, () => page.reload());
     await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").waitFor();
   }
 
@@ -137,7 +138,7 @@ test("Inbox Undo remains retryable after failure", { skip: liveServerSkip("INBOX
     await page.evaluate(() => localStorage.setItem("career-ops:hidden", JSON.stringify([
       "https://example.com/fixture-alpha", "https://example.com/fixture-beta",
     ])));
-    await page.reload();
+    await settled(page, () => page.reload());
     const restore = page.getByRole("button", { name: "2 hidden · restore", exact: true });
     await restore.waitFor();
     const restoreGate = new Promise((resolve) => { release = resolve; });

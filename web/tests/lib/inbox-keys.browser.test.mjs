@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.INBOX_KEYS_TEST_URL;
 const root = process.env.INBOX_KEYS_TEST_ROOT;
@@ -34,7 +35,7 @@ test("inbox keys act on the cursor row and on checked rows", { skip: liveServerS
     }
   }
 
-  await page.goto(`${origin.origin}/pipeline`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline`));
   await row("Fixture Beta").getByRole("checkbox").waitFor();
 
   // With no row under the cursor, x only places the cursor. Nothing is skipped.
@@ -73,7 +74,7 @@ test("an unscored needs-review row keeps its review link and row-level Skip", { 
   const restore = () => page.request.post(`${origin.origin}/api/inbox/skip`, { data: { url: posting, done: false } });
   assert.equal((await restore()).ok(), true);
   t.after(async () => { try { await restore(); } finally { await browser.close(); } });
-  await page.goto(`${origin.origin}/pipeline`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline`));
   const row = page.locator("li").filter({ hasText: "Fixture Alpha" });
   await row.getByRole("link", { name: "Needs review", exact: true }).waitFor();
   assert.match(await row.innerText(), /not scored/);
