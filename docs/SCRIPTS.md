@@ -1011,9 +1011,19 @@ node import-tracker.mjs teal-export.csv --confirm    # add the rows
 node import-tracker.mjs sheet.csv --day-first        # 03/04/2026 is 3 April
 ```
 
+**Reactive Resume exports.** A CSV exported from Reactive Resume's applications list is recognized by its headers (`Lane Category`, `Stage History`, `Timeline` and `Posting Source` all present), and `--rr-zip <file>` reads the "Export everything" account zip (`applications.json`, `application-stages.json` and `account.json`; `career.json` is never read). Both go through `lib/import-rr-applications.mjs`, and the preview prints every row with its outcome and the sidecar fields it will write, then `Nothing written. Add --confirm ...`. Stages map as the convergence spec fixes them: `applied` to `Applied`, `screening` to `Responded`, `interview` and `offer` unchanged, `closed` by reason to `Rejected` (`not-selected`), `Hired` (`accepted`) or `Discarded` (`withdrew`, `accepted-other`, `no-response`, or no reason). A row Reactive Resume never submitted (blank `Application Date` in the CSV, `submittedAt: null` in the zip; an older zip without the field falls back to its stage history) is skipped and the preview says why. A `saved` row with a posting URL is added to `data/pipeline.md` Pending under the pipeline lock unless scan history or the inbox already holds it. A row whose company differs from a URL-less tracker row only by a legal suffix (`Acme` and `Acme Inc`) with the same role counts as already tracked, the same match `merge-tracker.mjs` makes.
+
+After the merge, each imported or already-tracked row gets its sidecars under the number it holds in the tracker: `lane`, `tag`, `closed_reason` and `source` in `data/application-meta.tsv`; notes in `data/application-events.tsv`; stage history as `backfill` rows in `data/status-log.tsv` (not for a tracked row that already has its own history there); contacts in `data/contacts.tsv`; interviews through `interview-round.mjs`; the follow-up date through `followup-pin.mjs`; a salary with a currency through `salary-observe.mjs` (`advertised`), and for an offer or an accepted close also through `offer-terms.mjs`; the job description as a `jds/{NNN}-{date}_{company}_{role}.md` capture. A CSV export carries no timeline notes, interviews or follow-ups; use the zip for those. Each completed row gets an `import` event `rr-export <export>` last, so a rerun skips it and completes any row a failed write left unmarked. Running the same export twice adds nothing.
+
+```bash
+node import-tracker.mjs rr-applications.csv                        # preview a Reactive Resume CSV
+node import-tracker.mjs --rr-zip reactive-resume-2026-11-01.zip    # preview the account zip
+node import-tracker.mjs --rr-zip reactive-resume-2026-11-01.zip --confirm
+```
+
 Paths follow `CAREER_OPS_ROOT` / `CAREER_OPS_DATA_DIR` / `CAREER_OPS_TRACKER`.
 
-**Exit codes:** `0` on a preview or a completed import, `1` for a usage error, an unreadable file, a file with no company or role column, or a date column that mixes both orders. Under `--confirm` the exit code is `merge-tracker.mjs`'s, or `1` when the tracker has no `URL` column and the file has links, or when merge left a row unapplied.
+**Exit codes:** `0` on a preview or a completed import, `1` for a usage error, an unreadable file, a file with no company or role column, or a date column that mixes both orders. Under `--confirm` the exit code is `merge-tracker.mjs`'s, or `1` when the tracker has no `URL` column and the file has links, when merge left a row unapplied, or when a Reactive Resume row's sidecar write failed (rerun to complete it). A zip that is not a Reactive Resume export is refused with `1` and a one-line reason.
 
 ---
 
