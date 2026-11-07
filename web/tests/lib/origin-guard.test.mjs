@@ -344,3 +344,70 @@ test("the guard still works with no allowedOrigins passed at all", () => {
   });
   assert.equal(d.ok, true);
 });
+
+// --- checkRequest: top-level navigations from another site -----------------
+
+const navigate = (fields) =>
+  checkRequest({
+    origin: null,
+    host: "localhost:3000",
+    allowedHosts: parseAllowedHosts(""),
+    secFetchDest: "document",
+    pathname: "/pipeline",
+    ...fields,
+  });
+
+test("GET navigate cross-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate" }).ok, true);
+});
+
+test("GET navigate same-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "same-site", method: "GET", secFetchMode: "navigate" }).ok, true);
+});
+
+test("HEAD navigate cross-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "HEAD", secFetchMode: "navigate" }).ok, true);
+});
+
+test("POST cross-site is refused", () => {
+  const d = navigate({ secFetchSite: "cross-site", method: "POST", secFetchMode: "navigate", origin: "https://evil.example.com" });
+  assert.equal(d.ok, false);
+  assert.equal(d.status, 403);
+});
+
+test("GET cross-site with Sec-Fetch-Mode cors is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "cors" }).ok, false);
+});
+
+test("GET cross-site with no Sec-Fetch-Mode is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: null }).ok, false);
+});
+
+test("a cross-site iframe navigation (Sec-Fetch-Dest iframe) is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", secFetchDest: "iframe" }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", secFetchDest: null }).ok, false);
+});
+
+test("a cross-site navigation to an /api route is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: "/api/portals/verify" }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: "/api/healthz" }).ok, false);
+});
+
+test("navigation does not bypass the Host filter", () => {
+  const d = navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", host: "192.168.1.50:3000" });
+  assert.equal(d.ok, false);
+  assert.equal(d.status, 403);
+});
+
+test("same-origin and none still pass when method and secFetchMode are omitted", () => {
+  assert.equal(navigate({ secFetchSite: "same-origin", origin: "http://localhost:3000" }).ok, true);
+  assert.equal(navigate({ secFetchSite: "none" }).ok, true);
+});
+
+test("proxy.ts hands the guard the method, Sec-Fetch-Mode, Sec-Fetch-Dest and path", () => {
+  const src = readFileSync(join(WEB_ROOT, "src", "proxy.ts"), "utf8");
+  assert.ok(src.includes("method: req.method"), "passes method");
+  assert.ok(src.includes('secFetchMode: req.headers.get("sec-fetch-mode")'), "passes Sec-Fetch-Mode");
+  assert.ok(src.includes('secFetchDest: req.headers.get("sec-fetch-dest")'), "passes Sec-Fetch-Dest");
+  assert.ok(src.includes("pathname: req.nextUrl.pathname"), "passes the path");
+});

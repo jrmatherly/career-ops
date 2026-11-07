@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { readLockStatus } from "./scheduled-jobs-store.mjs";
-import { osScheduleStatus } from "./scheduled-os-schedule.mjs";
+import { externalScheduleStatus, osScheduleStatus } from "./scheduled-os-schedule.mjs";
 import { scheduledRunnerResourcePath, scheduledStorePath } from "./scheduled-runner-path.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -16,6 +16,9 @@ export type SchedulerStatus = {
   platform: NodeJS.Platform;
   available: boolean;
   running: boolean;
+  source: "os" | "external";
+  installed: boolean;
+  description: string | null;
   task: {
     exists: boolean;
     enabled: boolean;
@@ -27,16 +30,20 @@ export type SchedulerStatus = {
 
 const EMPTY_TASK: SchedulerStatus["task"] = { exists: false, enabled: false, status: null, nextRun: null, lastRun: null };
 
-function readTickMtimeMs(): number | null {
+export function schedulerTickPath(root = careerOpsRoot()): string {
+  return scheduledStorePath(root) + ".tick";
+}
+
+function readTickMtimeMs(root: string): number | null {
   try {
-    return fs.statSync(scheduledStorePath(careerOpsRoot()) + ".tick").mtimeMs;
+    return fs.statSync(schedulerTickPath(root)).mtimeMs;
   } catch {
     return null;
   }
 }
 
-async function readUnixTask(platform: "darwin" | "linux"): Promise<SchedulerStatus["task"]> {
-  const tickMtimeMs = readTickMtimeMs();
+async function readUnixTask(root: string, platform: "darwin" | "linux"): Promise<SchedulerStatus["task"]> {
+  const tickMtimeMs = readTickMtimeMs(root);
   const now = new Date();
   if (platform === "linux") {
     let crontabText = "";
@@ -60,8 +67,8 @@ async function readUnixTask(platform: "darwin" | "linux"): Promise<SchedulerStat
   return osScheduleStatus({ platform, crontabText: "", launchctlExitCode, tickMtimeMs, now });
 }
 
-async function readTask(): Promise<SchedulerStatus["task"]> {
-  if (process.platform === "darwin" || process.platform === "linux") return readUnixTask(process.platform);
+async function readTask(root: string): Promise<SchedulerStatus["task"]> {
+  if (process.platform === "darwin" || process.platform === "linux") return readUnixTask(root, process.platform);
   if (process.platform !== "win32") return { ...EMPTY_TASK };
 
   const script = [
@@ -102,10 +109,16 @@ export async function schedulerStatus(): Promise<SchedulerStatus> {
   const runner = path.join(resolveCodeRoot(process.cwd(), process.env), "web", "scripts", "scheduled-jobs-runner.mjs");
   const runnerLock = scheduledRunnerResourcePath(scheduledStorePath(root));
   const lock = readLockStatus(runnerLock, { staleMs: 25 * 60 * 1_000 * 3 + 60_000 });
+  const external = process.env.CAREER_OPS_SCHEDULER === "external";
+  const description = external ? process.env.CAREER_OPS_SCHEDULER_DESCRIPTION?.trim() || null : null;
+  const task = external ? externalScheduleStatus({ description, tickMtimeMs: readTickMtimeMs(root) }) : await readTask(root);
   return {
     platform: process.platform,
     available: fs.existsSync(runner),
     running: lock.active && !lock.stale,
-    task: await readTask(),
+    source: external ? "external" : "os",
+    installed: task.exists,
+    description,
+    task,
   };
 }

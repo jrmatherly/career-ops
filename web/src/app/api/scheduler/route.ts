@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
-import { schedulerStatus } from "@/lib/scheduler-status";
+import { schedulerStatus, schedulerTickPath } from "@/lib/scheduler-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +23,11 @@ export async function POST() {
   }
 
   try {
+    // The cron line touches the tick before the runner; this route is the external scheduler's and the manual
+    // trigger's entry point, so it touches it too.
+    const tick = schedulerTickPath();
+    fs.mkdirSync(path.dirname(tick), { recursive: true });
+    fs.writeFileSync(tick, "");
     const child = spawn(process.execPath, [script], {
       cwd: resolveCodeRoot(process.cwd(), process.env),
       detached: true,

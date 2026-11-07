@@ -129,9 +129,15 @@ function block(reason) {
  * @param {string|null} req.host          Host header
  * @param {Set<string>} req.allowedHosts  extra non-loopback hosts opted in
  * @param {Set<string>} [req.allowedOrigins] extra origins allowed to call the API
+ * @param {string|null} [req.method]       HTTP method
+ * @param {string|null} [req.secFetchMode] Sec-Fetch-Mode header, if any
+ * @param {string|null} [req.secFetchDest] Sec-Fetch-Dest header, if any
+ * @param {string|null} [req.pathname]     request path, to keep /api out of the navigation rule
  * @returns {{ok: true} | {ok: false, status: number, reason: string}}
  */
-export function checkRequest({ secFetchSite, origin, host, allowedHosts, allowedOrigins }) {
+export function checkRequest({
+  secFetchSite, origin, host, allowedHosts, allowedOrigins, method, secFetchMode, secFetchDest, pathname,
+}) {
   // Host filter (see header — NOT the LAN control): loopback, or an opted-in
   // host. A direct client picks its own Host, so this cannot be what closes F2.
   const normalizedHost = normalizeHost(host);
@@ -157,6 +163,17 @@ export function checkRequest({ secFetchSite, origin, host, allowedHosts, allowed
   //   same-site / cross-site — another origin        → block
   if (secFetchSite) {
     if (secFetchSite === "same-origin" || secFetchSite === "none") return { ok: true };
+    // A top-level page navigation carries no body or custom header, so it is not this layer's CSRF, and an
+    // OIDC redirect lands as one. Dest "document" keeps a cross-site iframe (clickjacking) out; the /api
+    // exclusion keeps a link from starting the scripts GET routes spawn.
+    if (
+      (method === "GET" || method === "HEAD") &&
+      secFetchMode === "navigate" &&
+      secFetchDest === "document" &&
+      !String(pathname ?? "").startsWith("/api/")
+    ) {
+      return { ok: true };
+    }
     return block(`cross-origin request refused (Sec-Fetch-Site: ${secFetchSite})`);
   }
 
