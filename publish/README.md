@@ -2,7 +2,7 @@
 
 A small HTTP service that hosts rendered CVs behind a short slug, with an optional password, a view counter and feedback links for reviewers. It is the server half of the Reactive Resume sharing feature (plan: `docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`, section PR-12; architecture: research report 03). The client half is `publish/share.mjs`, the share CLI that uploads a render and pulls comments into `data/share-feedback/*.md` (section PR-12b; see [Share CLI](#share-cli) below).
 
-Node 22.13 or newer, except 23.0 to 23.3, where `node:sqlite` is still behind a flag (see `lib/node-floor.mjs`). State lives in one SQLite file through `node:sqlite`, shared with [Better Auth](https://better-auth.com) (`better-auth`, `@better-auth/api-key` and its `auth` CLI, pinned `~1.7.14`; install with `npm --prefix publish ci`), which handles sign-in and API keys (see [Auth](#auth)).
+Node 22.16 or newer on the 22 line, or 23.11 or newer: Better Auth's `node:sqlite` dialect calls `StatementSync.columns()`, which earlier releases lack, so the service refuses to start on them. The root checkout's floor (`lib/node-floor.mjs`, 22.13) is lower. State lives in one SQLite file through `node:sqlite`, shared with [Better Auth](https://better-auth.com) (`better-auth`, `@better-auth/api-key` and its `auth` CLI, pinned `~1.7.14`; install with `npm --prefix publish ci`), which handles sign-in and API keys (see [Auth](#auth)).
 
 ## Run
 
@@ -95,7 +95,7 @@ The key flow:
 1. Register an OIDC client in Pocket ID with the redirect URI `$PUBLISH_BASE_URL/api/auth/callback/pocket-id`, and put its id, secret and discovery URL in the service's environment.
 2. Open `$PUBLISH_BASE_URL/account`, sign in with Pocket ID, and create a key. It is shown once.
 3. Put it in the data root's `.env` as `PUBLISH_API_KEY`, next to `PUBLISH_URL`. The share CLI sends it on every request.
-4. Revoke it on the same page when a machine is retired. Revoking takes effect on the next request.
+4. Revoke it on the same page when a machine is retired. Revoking takes effect on the next request. Removing an email from `PUBLISH_ALLOWED_EMAILS` and restarting the service stops that user's sign-ins, open sessions and keys; the keys stay in the database, refused, until revoked.
 
 If Pocket ID is down when the service starts, shares and keys keep working and sign-in answers 503; the next sign-in after Pocket ID is back re-reads its discovery document.
 

@@ -11,6 +11,7 @@ const dir = mkdtempSync(join(tmpdir(), 'publish-auth-test-'));
 after(() => rmSync(dir, { recursive: true, force: true }));
 // Browsers send the public origin, which is PUBLISH_BASE_URL, not the ephemeral port the test listens on.
 const ORIGIN = AUTH_ENV.PUBLISH_BASE_URL;
+const AUTH_BASE = (server) => `http://127.0.0.1:${server.address().port}`;
 const html = '<!doctype html><html><body><p>CV</p></body></html>';
 
 let count = 0;
@@ -89,7 +90,7 @@ test('x-api-key alone cannot create another key or open the account page', async
   const { server, call, user } = await boot(t);
   const key = await makeKey(server, user.id, ['upload', 'manage']);
   const viaAuth = await call('POST', '/api/auth/api-key/create', { key, body: { name: 'sneaky' }, headers: { Origin: ORIGIN } });
-  assert.notEqual(viaAuth.status, 200, viaAuth.text);
+  assert.equal(viaAuth.status, 404, viaAuth.text);
   const viaAccount = await call('POST', '/account/keys', { key, headers: { Origin: ORIGIN, 'Content-Type': 'application/x-www-form-urlencoded' } });
   assert.equal(viaAccount.status, 401);
   const keys = await (await server.auth.$context).adapter.findMany({ model: 'apikey' });
@@ -230,4 +231,63 @@ test('a second account email, or an unverified one, is refused at the callback a
     assert.equal((await call('GET', location.replace(/^https?:\/\/[^/]+/, ''))).status, 401);
     assert.equal((await (await server.auth.$context).adapter.findMany({ model: 'user' })).length, 0);
   }
+});
+
+test('Better Auth cannot make, change or read keys over HTTP, and a key is not a session there', async (t) => {
+  const { server, call, user } = await boot(t);
+  const key = await makeKey(server, user.id, ['upload', 'manage']);
+  const cookie = await sessionCookie(server, user.id);
+  for (const path of ['/api/auth/api-key/create', '/api/auth/api-key/update']) {
+    const r = await call('POST', path, { body: { name: 'x', keyId: 'x' }, headers: { Cookie: cookie, Origin: ORIGIN } });
+    assert.equal(r.status, 404, `${path} is disabled: ${r.text}`);
+  }
+  const viaKey = await call('GET', '/api/auth/get-session', { key });
+  assert.equal(viaKey.status, 200);
+  assert.equal(JSON.parse(viaKey.text), null, 'x-api-key never becomes a session');
+});
+
+test('a session cookie or the old bearer token does not open the share API', async (t) => {
+  const { server, call, user } = await boot(t);
+  const cookie = await sessionCookie(server, user.id);
+  refused(await call('PUT', '/api/shares/me', { body: { html }, headers: { Cookie: cookie } }), 'session cookie');
+  refused(await call('GET', '/api/shares/me/stats', { headers: { Cookie: cookie } }), 'session cookie on stats');
+  refused(await call('PUT', '/api/shares/me', { body: { html }, headers: { Authorization: 'Bearer anything' } }), 'bearer token');
+});
+
+test('a key past its hourly budget gets 429, not the bad-key 401', async (t) => {
+  const { server, call, user } = await boot(t);
+  const { key } = await server.auth.api.createApiKey({ body: { userId: user.id, name: 'tight', permissions: { share: ['upload'] }, rateLimitMax: 1 } });
+  assert.equal((await call('PUT', '/api/shares/me', { key, body: { html } })).status, 200);
+  const limited = await call('PUT', '/api/shares/me', { key, body: { html }, headers: { 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '203.0.113.8' } });
+  assert.equal(limited.status, 429, 'client address headers do not reset a key budget');
+  assert.deepEqual(JSON.parse(limited.text), { error: 'rate limited' });
+});
+
+test('revoke needs a trusted origin, and key names are 1 to 32 characters', async (t) => {
+  const { server, call, user } = await boot(t);
+  const key = await makeKey(server, user.id, ['manage']);
+  const cookie = await sessionCookie(server, user.id);
+  const [row] = await (await server.auth.$context).adapter.findMany({ model: 'apikey' });
+  const post = (path, fields, origin = ORIGIN) => fetch(`${AUTH_BASE(server)}${path}`, { method: 'POST', redirect: 'manual', body: new URLSearchParams(fields), headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/x-www-form-urlencoded' } });
+  assert.equal((await post('/account/keys/revoke', { keyId: row.id }, 'https://evil.example')).status, 403);
+  assert.equal((await call('GET', '/api/shares/none/stats', { key })).status, 404, 'the key still works');
+  for (const name of ['', '   ', 'x'.repeat(33)]) assert.equal((await post('/account/keys', { name })).status, 400, `name ${JSON.stringify(name)}`);
+  assert.equal((await (await server.auth.$context).adapter.findMany({ model: 'apikey' })).length, 1, 'no key was created');
+});
+
+test('dropping an email from the allow-list stops its keys and sessions', async (t) => {
+  const first = await boot(t);
+  const key = await makeKey(first.server, first.user.id, ['upload', 'manage']);
+  const cookie = await sessionCookie(first.server, first.user.id);
+  assert.equal((await first.call('PUT', '/api/shares/me', { key, body: { html } })).status, 200);
+  // A second service on the same database stands in for a restart with a different allow-list.
+  const server = createServer(readConfig({ ...AUTH_ENV, PUBLISH_DB: join(dir, `db-${count}.sqlite`), PUBLISH_ALLOWED_EMAILS: 'someone-else@example.com' }));
+  await server.ready;
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
+  const base = AUTH_BASE(server);
+  const stats = await fetch(`${base}/api/shares/me/stats`, { headers: { 'x-api-key': key } });
+  assert.equal(stats.status, 401);
+  assert.deepEqual(await stats.json(), { error: 'api key required' }, 'the same refusal as any bad key');
+  assert.equal((await fetch(`${base}/account`, { headers: { Cookie: cookie } })).status, 401, 'the open session is refused too');
 });

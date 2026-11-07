@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { toNodeHandler, fromNodeHeaders } from 'better-auth/node';
 import { isAPIError } from 'better-auth/api';
 import { openDb } from './db.mjs';
-import { createAuth, migrate, authConfigFromEnv, requiredEnv, PROVIDER_ID } from './auth.mjs';
+import { createAuth, migrate, authConfigFromEnv, requiredEnv, emailAllowList, PROVIDER_ID } from './auth.mjs';
 import { passwordForm, feedbackPage, hideContacts } from './pages.mjs';
 import { signInPage, accountPage } from './pages/account.mjs';
 
@@ -111,6 +111,12 @@ export function createServer(config) {
   const auth = createAuth({ ...config.auth, db: db.handle, clientIpHeader: config.clientIpHeader });
   const ready = migrate(auth);
   const authHandler = toNodeHandler(auth);
+  // The allow-list is checked on every use, not only at sign-in, so dropping an email stops that user's keys and sessions at the next restart.
+  const isAllowed = emailAllowList(config.auth.allowedEmails);
+  const allowedUser = async (userId) => {
+    const user = await (await auth.$context).adapter.findOne({ model: 'user', where: [{ field: 'id', value: userId }] });
+    return !!user && isAllowed(user.email);
+  };
   const accessValue = (slug, pwHash, exp) => `${exp}.${sign(`${slug}|${pwHash}|${exp}`)}`;
 
   function hasAccess(req, share) {
@@ -155,11 +161,13 @@ export function createServer(config) {
     let code;
     try {
       const r = await auth.api.verifyApiKey({ body: { key, permissions: { share: [permission] } } });
-      if (r.valid) return 'ok';
+      if (r.valid) return (await allowedUser(r.key.referenceId)) ? 'ok' : 'refused';
       code = r.error?.code;
     } catch (e) {
       if (!isAPIError(e)) throw e;
       code = e.body?.code;
+      // Better Auth logs its own key-state refusals; anything else thrown here is a configuration or request-shape fault worth seeing.
+      if (code !== 'RATE_LIMITED') console.error('api key check threw', { code, status: e.statusCode });
     }
     return code === 'RATE_LIMITED' ? 'limited' : 'refused';
   }
@@ -173,7 +181,11 @@ export function createServer(config) {
     return share ? handler(req, res, share) : json(res, 404, { error: 'no such share' });
   });
 
-  const sessionOf = async (req) => { await ready; return auth.api.getSession({ headers: fromNodeHeaders(req.headers) }); };
+  const sessionOf = async (req) => {
+    await ready;
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    return session && isAllowed(session.user.email) ? session : null;
+  };
   const trustedOrigin = async (req) => (await auth.$context).isTrustedOrigin(String(req.headers.origin ?? ''));
   // Account writes need a cookie session and a request from the service's own origin; anything else gets the sign-in page.
   const signedIn = (handler) => async (req, res, m) => {
@@ -301,7 +313,11 @@ export function createServer(config) {
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
-      if (isAPIError(e)) return plain(res, e.statusCode, 'Request refused');
+      // A Better Auth 4xx (an unknown key id on revoke, say) is the caller's; a 5xx falls through to the logged 500.
+      if (isAPIError(e) && e.statusCode < 500) {
+        console.error('request refused by Better Auth', { method: req.method, route: matched?.pattern.source ?? 'unmatched', code: e.body?.code, status: e.statusCode });
+        return plain(res, e.statusCode, 'Request refused');
+      }
       // A feedback token is a bearer secret, so the log names the route pattern and nothing from the URL.
       console.error('request failed', { method: req.method, route: matched?.pattern.source ?? 'unmatched', client: clientKey(req, config) }, e);
       plain(res, 500, 'Internal error');

@@ -6,8 +6,16 @@ import { apiKey } from '@better-auth/api-key';
 
 export const PROVIDER_ID = 'pocket-id';
 
-function authOptions({ db, baseURL, secret, pocketId, allowedEmails, clientIpHeader = 'cf-connecting-ip' }) {
+// One normalisation for every allow-list check: sign-in here, and each key and session use in server.mjs.
+export function emailAllowList(allowedEmails) {
   const allowed = new Set(allowedEmails.map((e) => e.toLowerCase()));
+  return (email) => allowed.has(String(email ?? '').toLowerCase());
+}
+
+function authOptions({ db, baseURL, secret, pocketId, allowedEmails, clientIpHeader = 'cf-connecting-ip' }) {
+  // Better Auth's node:sqlite dialect reads StatementSync.columns(), added in Node 22.16 and 23.11.
+  if (typeof db.prepare('SELECT 1').columns !== 'function') throw new Error(`publish needs Node 22.16+ or 23.11+ for Better Auth's node:sqlite dialect; this is ${process.version}`);
+  const isAllowed = emailAllowList(allowedEmails);
   return {
     database: db,
     baseURL,
@@ -24,7 +32,7 @@ function authOptions({ db, baseURL, secret, pocketId, allowedEmails, clientIpHea
     advanced: { ipAddress: { ipAddressHeaders: [clientIpHeader] } },
     user: {
       // Runs on create-user, link-account and every OAuth sign-in with the provider's fresh claims; an unverified email could be anyone's.
-      validateUserInfo: ({ user }) => (user.emailVerified === true && allowed.has(String(user.email ?? '').toLowerCase()) ? undefined : { error: 'email not allowed' }),
+      validateUserInfo: ({ user }) => (user.emailVerified === true && isAllowed(user.email) ? undefined : { error: 'email not allowed' }),
     },
     plugins: [
       genericOAuth({

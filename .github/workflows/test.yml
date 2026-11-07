@@ -287,8 +287,9 @@ jobs:
     name: "📤 Publish service"
     # The share-page service under publish/ has its own package.json and its
     # own node:test suite; nothing under the root tests/ imports it, so the
-    # test job never exercises it. Runs on the Node floor (lib/node-floor.mjs),
-    # like the test job. Not a required check.
+    # test job never exercises it. Runs on the service's own floor, 22.16:
+    # Better Auth's node:sqlite dialect calls StatementSync.columns(), which
+    # 22.13 (the root floor, lib/node-floor.mjs) lacks. Not a required check.
     needs: changes
     # Skipped on a docs-only PR for the reason given on cv-visual.
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
@@ -302,7 +303,7 @@ jobs:
       - name: "🟢 Set up Node"
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22.13'
+          node-version: '22.16'
       # The share CLI imports root modules that need js-yaml and spawns
       # resume.mjs, which needs zod, so the root install runs here as in the
       # test job; the root has no lockfile (the root .gitignore ignores it).

@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-// Pocket ID is never contacted in these suites: discovery fails fast against a closed port and only sign-in needs it.
+// Unless a test passes its own POCKET_ID_DISCOVERY_URL, discovery targets a closed port and fails fast; only sign-in needs the provider.
 export const AUTH_ENV = {
   PUBLISH_SECRET: 'test-secret',
   PUBLISH_BASE_URL: 'http://127.0.0.1:1',
