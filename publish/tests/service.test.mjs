@@ -97,12 +97,13 @@ test('PUT refuses an oversized body, bad JSON, missing html and non-boolean hide
     const req = request(`${origin}/api/shares/big`, { method: 'PUT', headers: { ...AUTH, 'Content-Type': 'application/json', 'Content-Length': (4 << 20) + 1 } }, (res) => {
       let body = '';
       res.on('data', (c) => { body += c; });
-      res.on('end', () => resolve({ status: res.statusCode, body, connection: res.headers.connection }));
+      res.on('end', () => resolve({ status: res.statusCode, body, connection: res.headers.connection, type: res.headers['content-type'], nosniff: res.headers['x-content-type-options'] }));
     });
     req.on('error', reject);
     req.flushHeaders();
   });
-  assert.deepEqual(big, { status: 413, body: 'Payload too large', connection: 'close' });
+  // An error body goes out as text, never HTML (CodeQL alert 17 read `plain` as an HTML sink).
+  assert.deepEqual(big, { status: 413, body: 'Payload too large', connection: 'close', type: 'text/plain; charset=utf-8', nosniff: 'nosniff' });
   const streamed = await put(new Blob(['x'.repeat((4 << 20) + 1)]).stream(), {}, 'half').catch((e) => e.cause?.code);
   assert.ok(streamed === 'ECONNRESET' || streamed === 'EPIPE' || streamed.status === 413, `a chunked oversize body is cut off (${streamed.status ?? streamed})`);
   assert.deepEqual([(await put('{not json')).status, (await (await put('{not json')).json()).error], [400, 'body must be JSON']);
