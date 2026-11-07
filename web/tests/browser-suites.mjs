@@ -22,10 +22,7 @@
 //   node tests/browser-suites.mjs inbox-undo      # suites whose name contains it
 //
 // BROWSER_SUITES_SEGMENT_DELAY_MS=100 puts tests/helpers/delay-proxy.mjs in front
-// of each suite's server, so every page lands in React's throttled streaming
-// reveal (a hidden server copy next to the client copy for 300 ms after load)
-// and a suite that reads the page right after page.goto fails every time
-// instead of once in a while. Off unless set.
+// of each suite's server, so the streaming reveal race reproduces on every load.
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -33,6 +30,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { startDelayProxy } from "./helpers/delay-proxy.mjs";
 import { REQUIRE_WEB_SERVER_ENV } from "./helpers/live-server.mjs";
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -121,17 +119,7 @@ function startServer(root, port, log) {
   return { child, exited };
 }
 
-// tests/helpers/delay-proxy.mjs between the suite and its server, holding the
-// streamed segment back by BROWSER_SUITES_SEGMENT_DELAY_MS. Same process-group
-// shape as startServer so stop() applies.
 const SEGMENT_DELAY_MS = Number(process.env.BROWSER_SUITES_SEGMENT_DELAY_MS) || 0;
-function startProxy(listen, upstream) {
-  const child = spawn(process.execPath, [path.join(WEB, "tests", "helpers", "delay-proxy.mjs"), String(listen), String(upstream), String(SEGMENT_DELAY_MS)], {
-    cwd: WEB, detached: true, stdio: "inherit",
-  });
-  const exited = new Promise((resolve) => child.once("exit", (code, signal) => resolve({ code, signal })));
-  return { child, exited };
-}
 
 async function waitReady(url, server) {
   const deadline = Date.now() + READY_TIMEOUT_MS;
@@ -219,10 +207,8 @@ async function attempt(name) {
     fs.closeSync(log);
     await waitReady(url, server);
     if (SEGMENT_DELAY_MS) {
-      const proxyPort = await freePort();
-      proxy = startProxy(proxyPort, port);
-      url = `http://127.0.0.1:${proxyPort}`;
-      await waitReady(url, proxy);
+      proxy = await startDelayProxy(port, SEGMENT_DELAY_MS);
+      url = `http://127.0.0.1:${proxy.address().port}`;
     }
     // FORCE_COLOR=0: an inherited FORCE_COLOR colors the reporter's summary
     // lines, and count() would then find no tests.
@@ -243,7 +229,7 @@ async function attempt(name) {
   } catch (err) {
     problem = { message: err.message, retryable: true };
   } finally {
-    if (proxy) await stop(proxy);
+    if (proxy) { proxy.closeAllConnections(); proxy.close(); }
     if (server) await stop(server);
     if (problem && logPath && fs.existsSync(logPath)) {
       console.log(`--- ${name} server log ---\n${fs.readFileSync(logPath, "utf8").slice(-8_000)}`);

@@ -22,13 +22,11 @@ export async function settled(page, action) {
   const result = await action();
   try {
     await page.waitForFunction(
-      // eslint-disable-next-line no-undef
       (selector) => document.readyState === "complete" && document.querySelector(selector) === null,
       HIDDEN_SEGMENT,
       { timeout: TIMEOUT_MS },
     );
   } catch (err) {
-    // eslint-disable-next-line no-undef
     const ids = await page.evaluate((selector) => [...document.querySelectorAll(selector)].map((el) => el.id), HIDDEN_SEGMENT).catch(() => []);
     throw new Error(`streaming reveal did not finish within ${TIMEOUT_MS} ms; still hidden: ${ids.join(", ") || "(none)"}`, { cause: err });
   }
