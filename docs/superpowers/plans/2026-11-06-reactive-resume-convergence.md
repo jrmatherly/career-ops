@@ -80,8 +80,9 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 | PR-13 | Add Better Auth to the publish service | PR-12b | none |
 | PR-14 | Add the shares page to the web app | PR-12b | operator |
 | PR-15 | Package the publish service for deployment | PR-13 | none |
+| PR-16 | Fix the root Dockerfile lint findings | PR-01 | none |
 
-PR-02, PR-05, PR-08 and PR-12 are independent and can start together after PR-01.
+PR-02, PR-05, PR-08, PR-12 and PR-16 are independent and can start together after PR-01.
 
 ### PR mechanics, for every PR
 
@@ -1160,6 +1161,58 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 - [ ] Rule. Under 250 MB and under 3 s.
 
 **Review gate.** None. PR-15 is not review-gated.
+
+**Merge.**
+
+- [ ] Every Verify box above checked with its evidence at the exact head SHA.
+- [ ] Review comments triaged.
+- [ ] Rebased onto current `main` after verification.
+- [ ] The operator merges.
+
+---
+
+## Fix the root Dockerfile lint findings (PR-16)
+
+**Depends on.** PR-01.
+
+**Files.**
+
+- [ ] Edit `Dockerfile` (the root development image).
+- [ ] Edit `.github/workflows/docker-image.yml` to run `hadolint` before the build.
+- [ ] Create `.hadolint.yaml`.
+- [ ] Edit the deviations table (the existing root `Dockerfile` row gains the two rules and the workflow step).
+
+**Interfaces.** hadolint on the root `Dockerfile` reports DL4006 (a `RUN` with a pipe, `echo "${go_sha256}  /tmp/go.tgz" | sha256sum -c -`, under a shell with no `pipefail`) and DL3008 (unpinned `apt-get install` packages) at line 23. The base image is Ubuntu jammy, so bash is present.
+
+**Build.**
+
+- [ ] **Step 1.** Run `hadolint Dockerfile`. Expect the two warnings at line 23.
+- [ ] **Step 2.** Add `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` before the first `RUN`. For DL3008, add `.hadolint.yaml` with `ignored: [DL3008]` and a comment that Ubuntu package versions rot out of the archive within weeks, so pinning them breaks the build rather than making it reproducible; the base image digest pin is the reproducibility guarantee. Run `hadolint Dockerfile`. Expect no output.
+- [ ] **Step 3.** Add a `hadolint/hadolint-action` step, pinned by SHA like the other actions, before the build job in `docker-image.yml`, failing on `warning` and above.
+- [ ] **Step 4.** Build the image locally with `docker build -t career-ops:lint .`. Expect success and the same `go version` output as before from `docker run --rm career-ops:lint go version`.
+- [ ] **Step 5.** Commit `build(docker): set pipefail and lint the root Dockerfile`.
+
+**You see.**
+
+- [ ] `hadolint Dockerfile` prints nothing and exits 0.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] `hadolint Dockerfile` exits 0, and `node test-all.mjs --only fork-deviations` passes after the commit.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Two lanes on `sonnet medium` at the PR head, per the boot recipe.
+
+- [ ] Lane 1. Regression lane against trunk. Build the image at trunk and head and run `node --version`, `go version` and `npx playwright --version` in each. Save `versions.txt`. Pass when the three outputs match.
+- [ ] Lane 2. Break the Go checksum in a scratch copy of the Dockerfile and build. Save `pipefail.txt`. Pass when the build fails at the checksum step instead of continuing, which is what `pipefail` buys.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] Metric. Image size at trunk and head.
+- [ ] Probe. `docker images --format '{{.Size}}'` for each build.
+- [ ] Baseline. Record trunk first.
+- [ ] Rule. Head equals trunk within 1 MB.
+
+**Review gate.** None. PR-16 is not review-gated.
 
 **Merge.**
 
