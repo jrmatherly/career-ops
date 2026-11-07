@@ -220,7 +220,9 @@ export function createServer(config) {
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
-      console.error('request failed', { method: req.method, url: req.url, client: clientKey(req, config) }, e);
+      // A feedback token is a bearer secret, so the log keeps the route shape only.
+      const path = String(req.url).split('?')[0].replace(/^\/f\/.+/, '/f/[token]');
+      console.error('request failed', { method: req.method, path, client: clientKey(req, config) }, e);
       plain(res, 500, 'Internal error');
     }
   });
