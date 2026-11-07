@@ -20,7 +20,6 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/vendor/default.mjs` from `packages/schema/src/resume/default.ts` (PR-02)
 - `lib/resume/vendor/present-labels.json` from `packages/schema/src/resume/present-labels.json`, unchanged (PR-02)
 - `lib/resume/vendor/expected-labels.json` from `packages/schema/src/resume/expected-labels.json`, unchanged (PR-02)
-- `stripHtml` in `lib/resume/schema.mjs` from `packages/utils/src/string.ts` (PR-02)
 - `tests/fixtures/resume/sample.json`, the fictional sample resume, from `packages/schema/src/resume/sample.ts` evaluated with `default.ts`, plus two added experience items the tests need (PR-02)
 
 ### Licence text
