@@ -26,6 +26,10 @@ test("web tracker and ledger follow the core resolver across supported layouts",
     check(path.join(root, "data"));
     fs.unlinkSync(path.join(root, "data/applications.md"));
     check(root);
+    // A root with no tracker at all resolves to the data/ layout, as core does.
+    fs.unlinkSync(path.join(root, "applications.md"));
+    assert.equal(resolveTrackerPath(root), coreResolve(root));
+    assert.deepEqual(trackerLinkDirs(root), coreLinkDirs(root));
     process.env.CAREER_OPS_TRACKER = path.join(root, "custom/applications.md");
     check(path.join(root, "custom"));
     process.env.CAREER_OPS_TRACKER = path.relative(process.cwd(), path.join(root, "custom/applications.md"));

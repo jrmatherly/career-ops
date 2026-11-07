@@ -163,7 +163,13 @@ func resolveTrackerPath(careerOpsPath string) string {
 		// a second error channel for a path it only computes.
 		return dataPath
 	}
-	return filepath.Clean(filepath.Join(careerOpsPath, "applications.md"))
+	// data/ tracker absent: a flat tracker wins when it exists, otherwise name
+	// the file the Node writers will create.
+	legacy := filepath.Clean(filepath.Join(careerOpsPath, "applications.md"))
+	if _, err := os.Stat(legacy); err == nil || !errors.Is(err, fs.ErrNotExist) {
+		return legacy
+	}
+	return dataPath
 }
 
 // reportHeaderBytes is how much of a report the URL enrichment scans.
