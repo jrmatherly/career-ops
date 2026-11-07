@@ -102,7 +102,7 @@ test('PUT refuses an oversized body, bad JSON, missing html and non-boolean hide
     req.on('error', reject);
     req.flushHeaders();
   });
-  // An error body goes out as text, never HTML (CodeQL alert 17 read `plain` as an HTML sink).
+  // Error bodies stay text/plain with nosniff, never HTML.
   assert.deepEqual(big, { status: 413, body: 'Payload too large', connection: 'close', type: 'text/plain; charset=utf-8', nosniff: 'nosniff' });
   const streamed = await put(new Blob(['x'.repeat((4 << 20) + 1)]).stream(), {}, 'half').catch((e) => e.cause?.code);
   assert.ok(streamed === 'ECONNRESET' || streamed === 'EPIPE' || streamed.status === 413, `a chunked oversize body is cut off (${streamed.status ?? streamed})`);
