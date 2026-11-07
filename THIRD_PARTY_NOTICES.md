@@ -10,7 +10,17 @@ Code this fork vendors from other projects, with the licence each one carries. E
 
 ### Files
 
-None yet. A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the clone>`.
+A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the clone>`. Each `.mjs` is the clone's TypeScript with types stripped (`stripTypeScriptTypes`, positions kept, so line N upstream is line N+1 here under the header), `.mjs` import specifiers, named `zod` imports, and the two JSON label imports read with `readFileSync`.
+
+- `lib/resume/vendor/period.mjs` from `packages/schema/src/resume/period.ts` (PR-02)
+- `lib/resume/vendor/stylesheet.mjs` from `packages/schema/src/resume/stylesheet.ts` (PR-02)
+- `lib/resume/vendor/templates.mjs` from `packages/schema/src/templates.ts` (PR-02)
+- `lib/resume/vendor/dates.mjs` from `packages/schema/src/resume/dates.ts` (PR-02)
+- `lib/resume/vendor/data.mjs` from `packages/schema/src/resume/data.ts` (PR-02)
+- `lib/resume/vendor/default.mjs` from `packages/schema/src/resume/default.ts` (PR-02)
+- `lib/resume/vendor/present-labels.json` from `packages/schema/src/resume/present-labels.json`, unchanged (PR-02)
+- `lib/resume/vendor/expected-labels.json` from `packages/schema/src/resume/expected-labels.json`, unchanged (PR-02)
+- `tests/fixtures/resume/sample.json`, the fictional sample resume, from `packages/schema/src/resume/sample.ts` evaluated with `default.ts`, plus two added experience items the tests need (PR-02)
 
 ### Licence text
 

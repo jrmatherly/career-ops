@@ -7,6 +7,7 @@
 
 import { accessSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import { homedir } from 'os';
 import { delimiter, join, dirname, isAbsolute, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
@@ -1547,6 +1548,27 @@ function checkCvShape(root) {
   };
 }
 
+// data/resume.json is derived from cv.md and records the sha of the cv.md it
+// was absorbed from. A cv.md edited since then leaves the sidecar behind. Read
+// with a plain JSON.parse so doctor does not load the resume schema.
+function checkResumeSidecar(root) {
+  const path = join(root, 'data', 'resume.json');
+  if (!existsSync(path)) return null;
+  const fix = ['Run node resume.mjs absorb (it saves only when cv.md absorbs losslessly; otherwise it lists what to pair or adopt)'];
+  let careerOps;
+  try {
+    careerOps = JSON.parse(readFileSync(path, 'utf-8'))?.careerOps;
+  } catch (err) {
+    return { warn: true, label: `data/resume.json could not be read (${err.message})`, fix };
+  }
+  const cvPath = join(root, 'cv.md');
+  const cvSha = existsSync(cvPath) ? createHash('sha256').update(readFileSync(cvPath, 'utf-8')).digest('hex') : '';
+  if (careerOps?.cvSha256 === cvSha || careerOps?.pendingCvSha256 === cvSha) {
+    return { pass: true, label: 'data/resume.json is in step with cv.md' };
+  }
+  return { warn: true, label: 'data/resume.json is behind cv.md; run node resume.mjs absorb', fix };
+}
+
 // The user's own templates under data/templates/ (#5777). Advisory: a template
 // that stopped resolving, or lost a slot every shipped variant keeps, is named
 // here instead of surfacing at render time.
@@ -1920,6 +1942,7 @@ function onboardingState(root) {
   const bakCheck = checkTrackedBakFiles(codeRoot);
   const skillCheck = checkSkillEntrypoints(codeRoot);
   const cvShape = checkCvShape(root);
+  const resumeSidecar = checkResumeSidecar(root);
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
   const warnings = [
@@ -1929,6 +1952,7 @@ function onboardingState(root) {
     ...(bakCheck.warn ? [`${bakCheck.label}\n→ ${[].concat(bakCheck.fix || []).join('\n  ')}`] : []),
     ...(skillCheck.warn ? [`${skillCheck.label}\n→ ${[].concat(skillCheck.fix || []).join('\n  ')}`] : []),
     ...(cvShape?.warn ? [`${cvShape.label}\n→ ${[].concat(cvShape.fix || []).join('\n  ')}`] : []),
+    ...(resumeSidecar?.warn ? [`${resumeSidecar.label}\n→ ${resumeSidecar.fix.join('\n  ')}`] : []),
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
