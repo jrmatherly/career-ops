@@ -1,0 +1,19 @@
+// RR-style: no session mocking; verify the key with a required permission.
+import { DatabaseSync } from "node:sqlite";
+import { betterAuth } from "better-auth";
+import { apiKey } from "@better-auth/api-key";
+
+const auth = betterAuth({
+  baseURL: "http://localhost:4321",
+  database: new DatabaseSync("auth.sqlite"),
+  telemetry: { enabled: false },
+  plugins: [apiKey({ defaultPrefix: "cops_", enableSessionForAPIKeys: false,
+    rateLimit: { enabled: true, timeWindow: 60 * 60 * 1000, maxRequests: 1000 } })],
+});
+const { userId } = JSON.parse(await (await import("node:fs/promises")).readFile("seed.json", "utf8"));
+const k = await auth.api.createApiKey({ body: { userId, name: "upload-only", permissions: { share: ["upload"] } } });
+const ok = await auth.api.verifyApiKey({ body: { key: k.key, permissions: { share: ["upload"] } } });
+const denied = await auth.api.verifyApiKey({ body: { key: k.key, permissions: { share: ["delete"] } } });
+const session = await auth.api.getSession({ headers: new Headers({ "x-api-key": k.key }) }).catch(e => `threw ${e.body?.code}`);
+console.log(JSON.stringify({ ok: { valid: ok.valid, referenceId: ok.key?.referenceId === userId, rateLimitMax: ok.key?.rateLimitMax },
+  denied: { valid: denied.valid, code: denied.error?.code }, sessionFromKey: session }));

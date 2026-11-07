@@ -1,0 +1,10 @@
+// Creates one user and one API key through the server API, prints the key once.
+import { auth } from "./auth.mjs";
+
+const ctx = await auth.$context;
+const existing = await ctx.internalAdapter.findUserByEmail("operator@example.test");
+const user = existing?.user ?? await ctx.internalAdapter.createUser({
+  email: "operator@example.test", name: "Operator", emailVerified: true,
+});
+const key = await auth.api.createApiKey({ body: { userId: user.id, name: "career-ops-cli" } });
+console.log(JSON.stringify({ userId: user.id, keyPrefix: key.key.slice(0, 5), key: key.key }));

@@ -1,0 +1,9 @@
+// Mints a DB session the way a finished OIDC login would, and prints a signed cookie header for it.
+import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { auth } from "./auth.mjs";
+const ctx = await auth.$context;
+const { userId } = JSON.parse(readFileSync("seed.json", "utf8"));
+const s = await ctx.internalAdapter.createSession(userId);
+const sig = createHmac("sha256", ctx.secret).update(s.token).digest("base64");
+console.log(`${ctx.authCookies.sessionToken.name}=${encodeURIComponent(`${s.token}.${sig}`)}`);

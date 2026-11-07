@@ -1,0 +1,120 @@
+import http from 'node:http';
+import { DatabaseSync } from 'node:sqlite';
+import { scryptSync, randomBytes, createHmac, timingSafeEqual, createHash } from 'node:crypto';
+
+const PORT = Number(process.env.PORT || 8787);
+const OWNER = process.env.OWNER_TOKEN || 'owner-dev-token';
+const SECRET = process.env.SHARE_SECRET || 'dev-secret';
+const db = new DatabaseSync(process.env.SHARE_DB || 'shares.db');
+db.exec(`
+CREATE TABLE IF NOT EXISTS shares (slug TEXT PRIMARY KEY, html_sha TEXT NOT NULL, pw TEXT, views INTEGER NOT NULL DEFAULT 0, updated TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS snapshots (sha TEXT PRIMARY KEY, html TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS view_hits (slug TEXT, client TEXT, hour INTEGER, PRIMARY KEY (slug, client, hour));
+CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, slug TEXT, link_id TEXT, author TEXT, body TEXT, created TEXT);`);
+
+const PAGE_HEADERS = {
+  'Content-Type': 'text/html; charset=utf-8',
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  'Cache-Control': 'private, no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Robots-Tag': 'noindex',
+};
+const CRAWLER = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|embedly|preview/i;
+const DUMMY = `${'00'.repeat(16)}:${scryptSync('x', Buffer.alloc(16), 32).toString('hex')}`;
+const sign = (s) => createHmac('sha256', SECRET).update(s).digest('base64url');
+const eq = (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const hashPw = (p) => { const salt = randomBytes(16); return `${salt.toString('hex')}:${scryptSync(p, salt, 32).toString('hex')}`; };
+const checkPw = (p, stored) => { const [s, h] = stored.split(':'); return eq(scryptSync(p, Buffer.from(s, 'hex'), 32).toString('hex'), h); };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function body(req, limit = 4 << 20) {
+  return new Promise((ok, fail) => {
+    let n = 0; const chunks = [];
+    req.on('data', (c) => { n += c.length; if (n > limit) { fail(new Error('too large')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => ok(Buffer.concat(chunks).toString('utf8')));
+  });
+}
+const send = (res, code, data, headers = {}) => { res.writeHead(code, headers); res.end(data); };
+const json = (res, code, obj) => send(res, code, JSON.stringify(obj), { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+const isOwner = (req) => eq(req.headers.authorization || '', `Bearer ${OWNER}`);
+// shortcut: trusts X-Forwarded-For unconditionally, upgrade to trusting it only from a known proxy hop.
+const clientKey = (req) => (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+const cookieName = (slug) => `s_${slug}`;
+const accessCookie = (slug, pw, exp) => `${exp}.${sign(`${slug}|${pw}|${exp}`)}`;
+function hasAccess(req, slug, pw) {
+  const c = Object.fromEntries((req.headers.cookie || '').split(';').map((p) => p.trim().split('=')));
+  const v = c[cookieName(slug)]; if (!v) return false;
+  const exp = Number(v.split('.')[0]);
+  return exp > Date.now() && eq(v, accessCookie(slug, pw, exp));
+}
+const form = (slug, msg = '') => `<!doctype html><meta charset=utf-8><title>Protected CV</title><body style="font-family:sans-serif;max-width:22rem;margin:4rem auto">
+<form method=post action="/s/${esc(slug)}"><label>Password <input type=password name=password autofocus required></label> <button>View</button>${msg ? `<p role=alert>${esc(msg)}</p>` : ''}</form>`;
+
+function countView(req, slug) {
+  if (isOwner(req) || CRAWLER.test(req.headers['user-agent'] || '')) return;
+  const hit = db.prepare('INSERT OR IGNORE INTO view_hits VALUES (?, ?, ?)').run(slug, clientKey(req), Math.floor(Date.now() / 3600e3));
+  if (hit.changes === 1) db.prepare('UPDATE shares SET views = views + 1 WHERE slug = ?').run(slug);
+}
+const feedbackToken = (slug, sha, id) => { const p = Buffer.from(`${slug}|${sha}|${id}`).toString('base64url'); return `${p}~${sign(`fb|${p}`)}`; };
+function readToken(t) {
+  const [p, mac] = t.split('~'); if (!p || !mac || !eq(mac, sign(`fb|${p}`))) return null;
+  const [slug, sha, id] = Buffer.from(p, 'base64url').toString().split('|'); return { slug, sha, id };
+}
+const commentForm = (t) => `<form method=post action="/f/${esc(t)}" style="font-family:sans-serif;max-width:40rem;margin:2rem auto;border-top:1px solid #ccc;padding-top:1rem">
+<label>Name <input name=authorName required maxlength=80></label><br><label>Comment<br><textarea name=body required maxlength=4000 rows=4 cols=60></textarea></label><br><button>Send feedback</button></form>`;
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, 'http://x');
+    const m = (re) => url.pathname.match(re);
+    let r;
+    if ((r = m(/^\/api\/shares\/([a-z0-9-]{1,64})$/)) && req.method === 'PUT') {
+      if (!isOwner(req)) return json(res, 401, { error: 'owner token required' });
+      const { html, password } = JSON.parse(await body(req));
+      if (typeof html !== 'string' || !html) return json(res, 400, { error: 'html required' });
+      const sha = createHash('sha256').update(html).digest('hex');
+      db.prepare('INSERT OR IGNORE INTO snapshots VALUES (?, ?)').run(sha, html);
+      db.prepare(`INSERT INTO shares (slug, html_sha, pw, updated) VALUES (?, ?, ?, ?)
+        ON CONFLICT(slug) DO UPDATE SET html_sha = excluded.html_sha, pw = excluded.pw, updated = excluded.updated`)
+        .run(r[1], sha, password ? hashPw(password) : null, new Date().toISOString());
+      return json(res, 200, { slug: r[1], sha, url: `/s/${r[1]}` });
+    }
+    if ((r = m(/^\/api\/shares\/([a-z0-9-]{1,64})\/(stats|feedback|feedback-links)$/))) {
+      if (!isOwner(req)) return json(res, 401, { error: 'owner token required' });
+      const s = db.prepare('SELECT * FROM shares WHERE slug = ?').get(r[1]);
+      if (!s) return json(res, 404, { error: 'no such share' });
+      if (r[2] === 'stats') return json(res, 200, { slug: s.slug, views: s.views, hasPassword: !!s.pw, sha: s.html_sha, updated: s.updated });
+      if (r[2] === 'feedback') return json(res, 200, db.prepare('SELECT author, body, created, link_id FROM comments WHERE slug = ? ORDER BY id').all(r[1]));
+      if (req.method === 'POST') return json(res, 200, { token: feedbackToken(s.slug, s.html_sha, randomBytes(6).toString('hex')) });
+    }
+    if ((r = m(/^\/s\/([a-z0-9-]{1,64})$/))) {
+      const s = db.prepare('SELECT * FROM shares WHERE slug = ?').get(r[1]);
+      if (req.method === 'POST') {
+        const pw = new URLSearchParams(await body(req, 4096)).get('password') || '';
+        const ok = checkPw(pw, s?.pw || DUMMY) && !!s?.pw; // dummy keeps miss timing equal to a hit
+        if (!ok) return send(res, 401, form(r[1], 'Wrong password'), PAGE_HEADERS);
+        const exp = Date.now() + 10 * 60e3;
+        return send(res, 303, '', { Location: `/s/${r[1]}`, 'Set-Cookie': `${cookieName(r[1])}=${accessCookie(s.slug, s.pw, exp)}; Path=/s/${r[1]}; HttpOnly; SameSite=Lax; Max-Age=600` });
+      }
+      if (!s) return send(res, 404, 'Not found', { 'Content-Type': 'text/plain' });
+      if (s.pw && !isOwner(req) && !hasAccess(req, s.slug, s.pw)) return send(res, 401, form(s.slug), PAGE_HEADERS);
+      countView(req, s.slug);
+      return send(res, 200, db.prepare('SELECT html FROM snapshots WHERE sha = ?').get(s.html_sha).html, PAGE_HEADERS);
+    }
+    if ((r = m(/^\/f\/([A-Za-z0-9_~-]{10,400})$/))) {
+      const t = readToken(r[1]); const snap = t && db.prepare('SELECT html FROM snapshots WHERE sha = ?').get(t.sha);
+      if (!snap) return send(res, 404, 'Not found', { 'Content-Type': 'text/plain' });
+      if (req.method === 'POST') {
+        const f = new URLSearchParams(await body(req, 16384));
+        const author = (f.get('authorName') || '').trim().slice(0, 80); const text = (f.get('body') || '').trim().slice(0, 4000);
+        if (!author || !text) return send(res, 400, 'authorName and body required', { 'Content-Type': 'text/plain' });
+        db.prepare('INSERT INTO comments (slug, link_id, author, body, created) VALUES (?, ?, ?, ?, ?)').run(t.slug, t.id, author, text, new Date().toISOString());
+        return send(res, 303, '', { Location: `/f/${r[1]}` });
+      }
+      return send(res, 200, snap.html.replace(/<\/body>/i, `${commentForm(r[1])}</body>`), PAGE_HEADERS);
+    }
+    send(res, 404, 'Not found', { 'Content-Type': 'text/plain' });
+  } catch (e) { send(res, 400, String(e.message), { 'Content-Type': 'text/plain' }); }
+});
+server.listen(PORT, '127.0.0.1', () => console.log(`listening ${server.address().port}`));

@@ -1,0 +1,185 @@
+// Throwaway prototype for design (D): RR v6 JSON -> cv.md -> edit cv.md -> absorb back into JSON.
+// Run: node absorb.mjs  (reads sample.json next to this file, imports career-ops lib read-only)
+import { readFileSync, writeFileSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
+const CO = '/Users/jason/dev/career-ops';
+const { findExperienceSections, parseCompanyHeading, boldLineText, toPlainText, headingText, normalizePandocLine } = await import(`${CO}/lib/cv-markdown.mjs`);
+const { parseCvExperience, normalizeDates } = await import(`${CO}/cv-title-check.mjs`);
+const { parseCvMdExperience } = await import(`${CO}/verify-cv-structure.mjs`);
+const { insertIntoCvSection } = await import(`${CO}/add-entry.mjs`);
+
+const HERE = new URL('.', import.meta.url).pathname;
+const base = JSON.parse(readFileSync(HERE + 'sample.json', 'utf8'));
+
+// Enrich the sample with shapes it lacks: multi-role company, hidden entry, lead paragraph, inline link.
+base.sections.experience.items.push({
+  id: 'x-roles', hidden: false, company: 'Northwind Games', position: 'Engineer', location: 'Remote', period: '2016 - 2020',
+  website: { url: 'https://northwind.example', label: 'northwind', inlineLink: true },
+  roles: [
+    { id: 'r1', position: 'Lead Engineer', period: '2018 - 2020', description: '<ul><li><p>Led a team of <strong>4</strong> on <a href="https://x.example">Project X</a></p></li></ul>' },
+    { id: 'r2', position: 'Engineer', period: '2016 - 2018', description: '<p>Joined as the second hire.</p><ul><li><p>Built the build farm</p></li></ul>' },
+  ],
+  description: '',
+}, {
+  id: 'x-hidden', hidden: true, company: 'Secret Corp', position: 'Contractor', location: 'Seattle, WA', period: '2015',
+  website: { url: '', label: '', inlineLink: false }, roles: [], description: '<ul><li><p>Confidential engine work</p></li></ul>',
+});
+
+// ---------- inline HTML <-> markdown ----------
+const unesc = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function htmlToMd(h) {
+  return unesc(h.replace(/<\/?(strong|b)>/g, '**').replace(/<\/?(em|i)>/g, '_')
+    .replace(/<a [^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/g, '[$2]($1)').replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+}
+function mdToHtml(m) {
+  return esc(m).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>').replace(/(^|\W)_(.+?)_(?=\W|$)/g, '$1<em>$2</em>');
+}
+function splitDesc(desc) { // lead <p> blocks outside lists, and <li> items, each with original html kept
+  const lead = [], items = [];
+  const noLists = desc.replace(/<ul>[\s\S]*?<\/ul>/g, (ul) => { for (const m of ul.matchAll(/<li>([\s\S]*?)<\/li>/g)) items.push({ html: m[0], md: htmlToMd(m[1]) }); return ''; });
+  for (const m of noLists.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)) if (htmlToMd(m[1])) lead.push({ html: m[0], md: htmlToMd(m[1]) });
+  return { lead, items };
+}
+
+// ---------- JSON -> cv.md (examples/cv-example.md convention) ----------
+const expItems = (d) => [...d.sections.experience.items, ...d.customSections.filter((s) => s.type === 'experience').flatMap((s) => s.items)];
+const flatRoles = (d) => expItems(d).flatMap((it) => (it.roles?.length ? it.roles.map((r) => ({ item: it, role: r })) : [{ item: it, role: it }]));
+function gen(d, { anchors = false } = {}) {
+  const b = d.basics, s = d.sections, L = [`# CV -- ${b.name}`, '', `**Location:** ${b.location}`, `**Email:** ${b.email}`];
+  for (const p of s.profiles.items) L.push(`**${p.network}:** ${p.website.label || p.username}`);
+  L.push('', '## Professional Summary', '', htmlToMd(d.summary.content), '', '## Work Experience');
+  for (const { item, role } of flatRoles(d)) {
+    if (anchors) L.push('', `<!-- rr:${role.id}${item.hidden ? ' hidden' : ''} -->`);
+    L.push('', `### ${item.company} -- ${item.location}`, '', `**${role.position}**`, role.period, '');
+    const { lead, items } = splitDesc(role.description);
+    for (const p of lead) L.push(p.md, '');
+    for (const i of items) L.push(`- ${i.md}`);
+  }
+  L.push('', '## Projects', '');
+  for (const p of s.projects.items) L.push(`- **${p.name}** (${p.period}) -- ${htmlToMd(p.description)}`);
+  L.push('', '## Education', '');
+  for (const e of s.education.items) L.push(`- ${e.degree} ${e.area}, ${e.school} (${e.period})`);
+  L.push('', '## Skills', '');
+  for (const k of s.skills.items) L.push(`- **${k.name}:** ${k.keywords.join(', ')}`);
+  return L.join('\n').replace(/\n{3,}/g, '\n\n') + '\n';
+}
+
+// ---------- cv.md -> structure (own minimal parser on lib/cv-markdown.mjs) ----------
+function parse(md) {
+  const exp = [];
+  for (const lines of findExperienceSections(md)) {
+    let cur = null, stage = 0;
+    for (const line of lines) {
+      const h = parseCompanyHeading(line);
+      if (h) { cur = { ...h, title: null, dates: null, lead: [], bullets: [] }; exp.push(cur); stage = 1; continue; }
+      if (!cur || !line.trim() || /^<!--/.test(line)) continue;
+      if (stage === 1) { cur.title = boldLineText(line); stage = 2; continue; }
+      if (stage === 2) { cur.dates = toPlainText(line); stage = 3; continue; }
+      const bm = line.match(/^\s*[-*+]\s+(.*)$/);
+      if (bm) cur.bullets.push(bm[1].trim()); else cur.lead.push(line.trim());
+    }
+  }
+  const sec = (name) => { const out = []; let on = false; for (const l of md.split('\n').map(normalizePandocLine)) { const h = headingText(l, 2); if (h !== null) { on = h === name; continue; } if (on && /^\s*-\s+/.test(l)) out.push(l.replace(/^\s*-\s+/, '')); } return out; };
+  const projects = sec('Projects').map((l) => { const m = l.match(/^\*\*(.+?)\*\*\s*(?:\(([^)]*)\))?\s*(?:--|—|–)\s*(.*)$/); return m ? { name: m[1], period: m[2] ?? '', desc: m[3] } : { name: null, raw: l }; });
+  const skills = sec('Skills').map((l) => { const m = l.match(/^\*\*(.+?):\*\*\s*(.*)$/); return m ? { name: m[1], keywords: m[2].split(/,\s*/).filter(Boolean) } : { name: null, raw: l }; });
+  const sm = md.match(/## Professional Summary\n\n([\s\S]*?)\n\n##/);
+  return { exp, projects, skills, summary: sm ? sm[1].trim() : null };
+}
+
+// ---------- align two bullet lists (LCS on text), keeping original html for unchanged ones ----------
+function align(oldItems, newMd) {
+  const a = oldItems.map((i) => i.md), n = a.length, m = newMd.length, T = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) T[i][j] = a[i] === newMd[j] ? T[i + 1][j + 1] + 1 : Math.max(T[i + 1][j], T[i][j + 1]);
+  const out = [], ops = { kept: 0, changed: 0, added: 0, removed: 0 }; let i = 0, j = 0; const po = [], pn = [];
+  const flush = () => { while (po.length && pn.length) { po.shift(); out.push({ html: `<li><p>${mdToHtml(pn.shift())}</p></li>` }); ops.changed++; } ops.removed += po.splice(0).length; while (pn.length) { out.push({ html: `<li><p>${mdToHtml(pn.shift())}</p></li>` }); ops.added++; } };
+  while (i < n || j < m) {
+    if (i < n && j < m && a[i] === newMd[j]) { flush(); out.push(oldItems[i]); ops.kept++; i++; j++; }
+    else if (j >= m || (i < n && T[i + 1][j] >= T[i][j + 1])) po.push(oldItems[i++]); else pn.push(newMd[j++]);
+  }
+  flush();
+  return { out, ops };
+}
+
+// ---------- absorb cv.md edits into JSON ----------
+const key = (c, t, d) => `${toPlainText(c).toLowerCase()}|${toPlainText(t ?? '').toLowerCase()}|${normalizeDates(d)}`;
+function absorb(json, md) {
+  const d = structuredClone(json), p = parse(md), log = [];
+  const index = new Map(flatRoles(d).map((x) => [key(x.item.company, x.role.position, x.role.period), x]));
+  const seen = new Set();
+  for (const e of p.exp) {
+    const k = key(e.company, e.title, e.dates), hit = index.get(k);
+    if (!hit) {
+      d.sections.experience.items.push({ id: `new-${d.sections.experience.items.length}`, hidden: false, company: e.company, position: e.title ?? '', location: e.location, period: e.dates ?? '',
+        website: { url: '', label: '', inlineLink: false }, roles: [], description: (e.lead.map((l) => `<p>${mdToHtml(l)}</p>`).join('')) + (e.bullets.length ? `<ul>${e.bullets.map((b) => `<li><p>${mdToHtml(b)}</p></li>`).join('')}</ul>` : '') });
+      log.push(`exp ADD "${e.company} / ${e.title} / ${e.dates}" (no id, hidden=false, website empty)`); continue;
+    }
+    seen.add(k);
+    const orig = splitDesc(hit.role.description), { out, ops } = align(orig.items, e.bullets);
+    const leadSame = isDeepStrictEqual(orig.lead.map((x) => x.md), e.lead);
+    if (ops.changed || ops.added || ops.removed || !leadSame) {
+      const lead = leadSame ? orig.lead.map((x) => x.html) : e.lead.map((l) => `<p>${mdToHtml(l)}</p>`);
+      hit.role.description = lead.join('') + (out.length ? `<ul>${out.map((x) => x.html).join('')}</ul>` : '');
+      log.push(`exp EDIT "${e.company} / ${e.title}" ${JSON.stringify(ops)}${leadSame ? '' : ' lead-rewritten'}`);
+    }
+    if (hit.item.location !== e.location) { log.push(`exp LOCATION "${hit.item.location}" -> "${e.location}"`); hit.item.location = e.location; }
+  }
+  for (const [k, x] of index) if (!seen.has(k)) log.push(`exp ORPHAN "${x.item.company} / ${x.role.position}" in JSON, absent from cv.md (kept; a delete or a rename?)`);
+  for (const pr of p.projects) {
+    if (!pr.name) { log.push(`proj UNPARSED "${pr.raw.slice(0, 60)}"`); continue; }
+    const hit = d.sections.projects.items.find((x) => x.name === pr.name);
+    if (!hit) { d.sections.projects.items.push({ id: `new-proj-${pr.name}`, hidden: false, name: pr.name, period: pr.period, website: { url: '', label: '', inlineLink: false }, description: `<p>${mdToHtml(pr.desc)}</p>` }); log.push(`proj ADD "${pr.name}"`); }
+    else if (htmlToMd(hit.description) !== pr.desc) { hit.description = `<p>${mdToHtml(pr.desc)}</p>`; log.push(`proj EDIT "${pr.name}"`); }
+  }
+  for (const sk of p.skills) {
+    const hit = d.sections.skills.items.find((x) => x.name === sk.name);
+    if (!hit) { log.push(`skill ADD "${sk.name}"`); d.sections.skills.items.push({ id: `new-skill-${sk.name}`, hidden: false, icon: '', iconColor: '', name: sk.name, proficiency: '', level: 0, keywords: sk.keywords }); }
+    else if (!isDeepStrictEqual(hit.keywords, sk.keywords)) { hit.keywords = sk.keywords; log.push(`skill EDIT "${sk.name}"`); }
+  }
+  if (p.summary !== null && p.summary !== htmlToMd(json.summary.content)) { d.summary.content = `<p>${mdToHtml(p.summary)}</p>`; log.push('summary EDIT (whole <p> rewritten)'); }
+  return { d, log };
+}
+function diffPaths(a, b, path = '', out = []) {
+  if (isDeepStrictEqual(a, b)) return out;
+  if (a && b && typeof a === 'object' && typeof b === 'object') { for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) diffPaths(a[k], b[k], `${path}.${k}`, out); return out; }
+  out.push(path); return out;
+}
+
+// ---------- scenarios ----------
+const md0 = gen(base);
+writeFileSync(HERE + 'gen-cv.md', md0);
+writeFileSync(HERE + 'gen-cv-anchored.md', gen(base, { anchors: true }));
+const say = (...a) => console.log(...a);
+say('== upstream parsers on generated cv.md');
+for (const [label, md] of [['plain', md0], ['anchored', gen(base, { anchors: true })]]) {
+  say(` ${label}: cv-title-check entries=${parseCvExperience(md).length}, verify-cv-structure entries=${parseCvMdExperience(md).length}, flatRoles=${flatRoles(base).length}`);
+}
+say('\n== S0 no-op round trip (gen -> absorb, no edit)');
+{ const { d, log } = absorb(base, md0); say(' log:', log.length ? log : '(none)'); say(' JSON identical to input:', isDeepStrictEqual(d, base)); }
+
+const scen = {
+  'S1 change a bullet': (m) => m.replace('reduced level designer iteration time by 40%', 'reduced level designer iteration time by 45%'),
+  'S2 add a bullet': (m) => m.replace('- Built the build farm', '- Built the build farm\n- Wrote the **CI** pipeline, see [docs](https://ci.example)'),
+  'S3 append new job entry': (m) => m.replace('## Projects', '### Fabrikam -- Austin, TX\n\n**Intern**\n2014\n\n- Shipped a mobile port\n\n## Projects'),
+  'S4 add-entry.mjs Projects insert': (m) => insertIntoCvSection(m, 'Projects', '- **FraudShield** (Open Source) -- Real-time fraud detection framework'),
+  'S5 retitle an entry (agent rewords title)': (m) => m.replace('**Senior Game Developer**', '**Senior Gameplay Engineer**'),
+  'S6 edit bullet of hidden entry': (m) => m.replace('Confidential engine work', 'Confidential engine work on rendering'),
+  'S7 reword summary': (m) => m.replace('Passionate game developer', 'Game developer'),
+  'S8 reformat dates (en dash)': (m) => m.replace('March 2022 - Present', 'March 2022 – Present'),
+  'S9 delete a bullet': (m) => m.replace(/- Collaborated with designers[^\n]*\n/, ''),
+  'S10 skill keywords edit': (m) => m.replace('C#, Editor Tools, Performance Profiling', 'C#, Editor Tools, DOTS'),
+};
+for (const [name, edit] of Object.entries(scen)) {
+  const md1 = edit(md0);
+  if (md1 === md0) { say(`\n== ${name}: EDIT DID NOT APPLY`); continue; }
+  const { d, log } = absorb(base, md1);
+  const regen = gen(d);
+  say(`\n== ${name}`);
+  say(' log:', log);
+  say(' JSON paths changed:', diffPaths(base, d).slice(0, 8));
+  say(' regen cv.md == edited cv.md:', regen === md1);
+}
+
+say('\n== What cv.md cannot carry (fields in JSON with no cv.md representation)');
+const lostTop = ['picture', 'metadata', 'customSections[].{title,icon,columns}', 'basics.phone/headline/customFields', 'items[].id', 'items[].hidden', 'items[].website', 'skills[].{level,proficiency,icon}', 'languages/interests/awards/certifications/volunteer/references (not generated)', 'roles[] grouping (flattened to repeated ### Company)', 'dates (structured) vs period text'];
+say(' ', lostTop.join('\n  '));

@@ -1,0 +1,4 @@
+{"candidate":{"name":"Ada Example","email":"ada@example.com","phone":"+1 555 0100","linkedin":{"url":"https://linkedin.com/in/ada","display":"linkedin.com/in/ada"},"location":"Remote","photo":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="},
+"summary":"Platform engineer with ten years of distributed systems work.",
+"experience":[{"company":"Acme","role":"Staff Engineer","location":"Remote","dates":"2020-2026","bullets":["Cut deploy time 40%","Led migration to Kubernetes"]}],
+"skills":[{"category":"Languages","items":["Go","TypeScript"]}]}

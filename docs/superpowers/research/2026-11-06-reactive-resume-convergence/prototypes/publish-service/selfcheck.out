@@ -1,0 +1,13 @@
+  cookie: s_pw=1794012444093.U57zdx3EkQOAUBmVnnUQweaUEM25EUg8f-SYwvnIXUA; Path=/s/pw; HttpOnly; SameSite=Lax; Max-Age=600
+  headers: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none' | private, no-store
+  views after 50 parallel: 52
+  token: b3BlbnwzNTQzNGI2NTA2N2M0YmU2Y2VjNDEzODgxM2E4MTVjMWJjZjI1ZWYwMmUyYmUwNTA5OWE3ODVhNTc3MWZiN2JhfGY4Y2U4OTk0ODI3NQ~OAtcKjXH3gaEkAiK6T3RVMWtvqTapkEPkCfnADuIVCI
+  pull: [{"slug":"pw","views":1,"comments":0},{"slug":"open","views":52,"comments":1}]
+  changed by pull: ["/data/share-feedback/open.md","/data/shares.json"]
+  open.md: "# Feedback on open\n\n## Rita Reviewer (2026-11-07T00:37:24.488Z)\n\nLead with the Kubernetes migration.\n"
+  upload: email text present=false phone text present=false linkedin present=false
+  served: email text present=false phone text present=false linkedin present=false
+PASS (a) password gate
+PASS (b) view counting
+PASS (c) feedback round-trip, pull touches only data/shares.json and data/share-feedback
+PASS (d) hide-contacts

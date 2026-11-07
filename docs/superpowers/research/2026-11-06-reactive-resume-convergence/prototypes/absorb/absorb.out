@@ -1,0 +1,83 @@
+== upstream parsers on generated cv.md
+ plain: cv-title-check entries=6, verify-cv-structure entries=6, flatRoles=6
+ anchored: cv-title-check entries=6, verify-cv-structure entries=6, flatRoles=6
+
+== S0 no-op round trip (gen -> absorb, no edit)
+ log: (none)
+ JSON identical to input: true
+
+== S1 change a bullet
+ log: [
+  'exp EDIT "Cascade Studios / Senior Game Developer" {"kept":4,"changed":1,"added":0,"removed":0}'
+]
+ JSON paths changed: [ '.sections.experience.items.0.description' ]
+ regen cv.md == edited cv.md: true
+
+== S2 add a bullet
+ log: [
+  'exp EDIT "Northwind Games / Engineer" {"kept":1,"changed":0,"added":1,"removed":0}'
+]
+ JSON paths changed: [ '.sections.experience.items.1.roles.1.description' ]
+ regen cv.md == edited cv.md: true
+
+== S3 append new job entry
+ log: [
+  'exp ADD "Fabrikam / Intern / 2014" (no id, hidden=false, website empty)'
+]
+ JSON paths changed: [ '.sections.experience.items.3' ]
+ regen cv.md == edited cv.md: false
+
+== S4 add-entry.mjs Projects insert
+ log: [ 'proj ADD "FraudShield"' ]
+ JSON paths changed: [ '.sections.projects.items.3' ]
+ regen cv.md == edited cv.md: true
+
+== S5 retitle an entry (agent rewords title)
+ log: [
+  'exp ADD "Cascade Studios / Senior Gameplay Engineer / March 2022 - Present" (no id, hidden=false, website empty)',
+  'exp ORPHAN "Cascade Studios / Senior Game Developer" in JSON, absent from cv.md (kept; a delete or a rename?)'
+]
+ JSON paths changed: [ '.sections.experience.items.3' ]
+ regen cv.md == edited cv.md: false
+
+== S6 edit bullet of hidden entry
+ log: [
+  'exp EDIT "Secret Corp / Contractor" {"kept":0,"changed":1,"added":0,"removed":0}'
+]
+ JSON paths changed: [ '.sections.experience.items.2.description' ]
+ regen cv.md == edited cv.md: true
+
+== S7 reword summary
+ log: [ 'summary EDIT (whole <p> rewritten)' ]
+ JSON paths changed: [ '.summary.content' ]
+ regen cv.md == edited cv.md: true
+
+== S8 reformat dates (en dash)
+ log: []
+ JSON paths changed: []
+ regen cv.md == edited cv.md: false
+
+== S9 delete a bullet
+ log: [
+  'exp EDIT "Cascade Studios / Senior Game Developer" {"kept":4,"changed":0,"added":0,"removed":1}'
+]
+ JSON paths changed: [ '.sections.experience.items.0.description' ]
+ regen cv.md == edited cv.md: true
+
+== S10 skill keywords edit
+ log: [ 'skill EDIT "Unity Engine"' ]
+ JSON paths changed: [ '.sections.skills.items.0.keywords.2' ]
+ regen cv.md == edited cv.md: true
+
+== What cv.md cannot carry (fields in JSON with no cv.md representation)
+  picture
+  metadata
+  customSections[].{title,icon,columns}
+  basics.phone/headline/customFields
+  items[].id
+  items[].hidden
+  items[].website
+  skills[].{level,proficiency,icon}
+  languages/interests/awards/certifications/volunteer/references (not generated)
+  roles[] grouping (flattened to repeated ### Company)
+  dates (structured) vs period text

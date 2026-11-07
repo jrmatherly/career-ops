@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import { spawn, execFileSync } from 'node:child_process';
+import { rmSync, readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+
+const DIR = import.meta.dirname;
+const ROOT = join(DIR, 'root');
+const PORT = 8799;
+const BASE = `http://127.0.0.1:${PORT}`;
+const OWNER = 'owner-dev-token';
+rmSync(join(ROOT, 'data'), { recursive: true, force: true });
+rmSync(join(DIR, 'selfcheck.db'), { force: true });
+
+const srv = spawn('node', [join(DIR, 'server.mjs')], { env: { ...process.env, PORT, SHARE_DB: join(DIR, 'selfcheck.db'), OWNER_TOKEN: OWNER } });
+await new Promise((ok) => srv.stdout.on('data', (d) => String(d).includes('listening') && ok()));
+const env = { ...process.env, CAREER_OPS_ROOT: ROOT, SHARE_URL: BASE, OWNER_TOKEN: OWNER };
+const cli = (...a) => execFileSync('node', [join(DIR, 'share.mjs'), ...a], { env, encoding: 'utf8' }).trim();
+const get = (path, headers = {}) => fetch(BASE + path, { headers, redirect: 'manual' });
+const post = (path, form, headers = {}) => fetch(BASE + path, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers }, body: new URLSearchParams(form) });
+const stats = async (slug) => (await (await get(`/api/shares/${slug}/stats`, { Authorization: `Bearer ${OWNER}` })).json());
+const HTML = join(ROOT, 'output', 'cv-ada-resume.html');
+const results = [];
+const check = async (name, fn) => { try { await fn(); results.push(`PASS ${name}`); } catch (e) { results.push(`FAIL ${name}: ${e.message}`); } };
+
+try {
+  await check('(a) password gate', async () => {
+    cli('publish', '--html', HTML, '--slug', 'pw', '--password', 'hunter22');
+    assert.equal((await get('/s/pw')).status, 401, 'no cookie shows form with 401');
+    assert.equal((await post('/s/pw', { password: 'nope' })).status, 401, 'wrong password 401');
+    assert.equal((await post('/s/missing', { password: 'x' })).status, 401, 'unknown slug 401 via dummy hash');
+    const ok = await post('/s/pw', { password: 'hunter22' });
+    assert.equal(ok.status, 303, 'right password 303');
+    const cookie = ok.headers.get('set-cookie').split(';')[0];
+    console.log('  cookie:', ok.headers.get('set-cookie'));
+    const page = await get('/s/pw', { Cookie: cookie });
+    assert.equal(page.status, 200, 'cookie gives 200');
+    console.log('  headers:', page.headers.get('content-security-policy'), '|', page.headers.get('cache-control'));
+    cli('publish', '--html', HTML, '--slug', 'pw', '--password', 'hunter23');
+    assert.equal((await get('/s/pw', { Cookie: cookie })).status, 401, 'password change invalidates cookie');
+  });
+
+  await check('(b) view counting', async () => {
+    cli('publish', '--html', HTML, '--slug', 'open');
+    for (let i = 0; i < 10; i++) { await get('/s/open', { 'X-Forwarded-For': '10.0.0.1' }); await get('/s/open', { 'X-Forwarded-For': '10.0.0.2' }); }
+    assert.equal((await stats('open')).views, 2, 'two clients x10 -> 2');
+    for (let i = 0; i < 5; i++) await get('/s/open', { Authorization: `Bearer ${OWNER}`, 'X-Forwarded-For': '10.9.9.9' });
+    assert.equal((await stats('open')).views, 2, 'owner counts 0');
+    await get('/s/open', { 'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'X-Forwarded-For': '66.249.66.1' });
+    assert.equal((await stats('open')).views, 2, 'Googlebot counts 0');
+    const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => get('/s/open', { 'X-Forwarded-For': `10.1.0.${i}` })));
+    assert.ok(rs.every((r) => r.status === 200), 'all 50 served');
+    const v = (await stats('open')).views;
+    console.log('  views after 50 parallel:', v);
+    assert.equal(v, 52, '50 parallel distinct keys add exactly 50');
+  });
+
+  await check('(c) feedback round-trip, pull touches only data/shares.json and data/share-feedback', async () => {
+    const { token } = JSON.parse(cli('feedback-link', '--slug', 'open'));
+    console.log('  token:', token);
+    const fpage = await get(`/f/${token}`);
+    const fhtml = await fpage.text();
+    assert.equal(fpage.status, 200);
+    assert.ok(fhtml.includes('Ada Example') && fhtml.includes('name=authorName'), 'snapshot + form rendered');
+    assert.equal((await get(`/f/${token.slice(0, -2)}xx`)).status, 404, 'tampered token 404');
+    // republish changes the live html, the link must still show the frozen snapshot
+    cli('publish', '--html', join(ROOT, 'output', 'cv-ada.html'), '--slug', 'open');
+    const snapAfter = await (await get(`/f/${token}`)).text();
+    assert.equal(createHash('sha256').update(snapAfter).digest('hex'), createHash('sha256').update(fhtml).digest('hex'), 'link keeps frozen snapshot after republish');
+    assert.equal((await post(`/f/${token}`, { authorName: 'Rita Reviewer', body: 'Lead with the Kubernetes migration.' })).status, 303);
+    const snap = () => Object.fromEntries(walk(ROOT).map((f) => [f.replace(ROOT, ''), createHash('sha256').update(readFileSync(f)).digest('hex')]));
+    const before = snap();
+    console.log('  pull:', cli('pull'));
+    const after = snap();
+    const changed = Object.keys({ ...before, ...after }).filter((k) => before[k] !== after[k]).sort();
+    console.log('  changed by pull:', JSON.stringify(changed));
+    assert.deepEqual(changed, ['/data/share-feedback/open.md', '/data/shares.json']);
+    const md = readFileSync(join(ROOT, 'data', 'share-feedback', 'open.md'), 'utf8');
+    assert.ok(md.includes('Rita Reviewer') && md.includes('Kubernetes migration'));
+    console.log('  open.md:', JSON.stringify(md));
+  });
+
+  await check('(d) hide-contacts', async () => {
+    const dump = join(DIR, 'hidden-upload.html');
+    cli('publish', '--html', HTML, '--slug', 'hidden', '--hide-contacts', '--dump', dump);
+    const served = await (await get('/s/hidden')).text();
+    for (const [label, h] of [['upload', readFileSync(dump, 'utf8')], ['served', served]]) {
+      assert.ok(!/class="contact-row"/.test(h), `${label}: no .contact-row element`);
+      assert.ok(!/mailto:/i.test(h), `${label}: no mailto:`);
+      assert.ok(!/tel:/i.test(h), `${label}: no tel:`);
+      console.log(`  ${label}: email text present=${h.includes('ada@example.com')} phone text present=${h.includes('555 0100')} linkedin present=${h.includes('linkedin.com/in/ada')}`);
+    }
+  });
+} finally {
+  console.log(results.join('\n'));
+  if (process.env.KEEP_SERVER) console.log(`server left running pid ${srv.pid} on ${BASE}`); else srv.kill();
+}
+function walk(d) { return readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; }); }
+if (results.some((r) => r.startsWith('FAIL'))) process.exitCode = 1;

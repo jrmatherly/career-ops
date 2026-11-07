@@ -1,0 +1,17 @@
+{
+  "name": "proto",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Jason Matherly",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "@better-auth/api-key": "1.7.14",
+    "better-auth": "1.7.14"
+  }
+}

@@ -1,0 +1,27 @@
+import { DatabaseSync } from "node:sqlite";
+import { betterAuth } from "better-auth";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { admin } from "better-auth/plugins/admin";
+import { apiKey } from "@better-auth/api-key";
+
+export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:4321",
+  database: new DatabaseSync(process.env.AUTH_DB ?? "auth.sqlite"),
+  emailAndPassword: { enabled: false },
+  telemetry: { enabled: false },
+  plugins: [
+    genericOAuth({
+      config: [{
+        providerId: "pocket-id",
+        clientId: "dummy-client",
+        clientSecret: "dummy-secret",
+        // Unreachable on purpose: discovery failure should skip the provider, not crash boot.
+        discoveryUrl: "https://id.example.invalid/.well-known/openid-configuration",
+        scopes: ["openid", "email", "profile"],
+        disableSignUp: true,
+      }],
+    }),
+    apiKey({ defaultPrefix: "cops_", enableSessionForAPIKeys: true }),
+    admin(),
+  ],
+});

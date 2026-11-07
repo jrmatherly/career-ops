@@ -1,0 +1,9 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { inlineLocalFonts } from '/Users/jason/dev/career-ops/generate-pdf.mjs';
+for (const f of process.argv.slice(2)) {
+  const out = await inlineLocalFonts(readFileSync(f, 'utf8'));
+  const g = f.replace(/\.html$/, '.inlined.html'); writeFileSync(g, out);
+  const rel = [...out.matchAll(/(?:url\(\s*['"]?|(?:src|href)=["'])(?!data:|https?:|mailto:|tel:|#)([^'")]{1,60})/g)].map(m=>m[1]);
+  const abs = [...out.matchAll(/(?:url\(\s*['"]?|(?:src)=["'])(https?:[^'")]{1,60})/g)].map(m=>m[1]);
+  console.log(g.split('/').pop(), 'bytes', out.length, 'fontsRefs', (out.match(/\.\/fonts\//g)||[]).length, 'relativeRefs', JSON.stringify(rel), 'remoteLoads', JSON.stringify(abs));
+}

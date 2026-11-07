@@ -1,6 +1,6 @@
 # Reactive Resume convergence, 2026-11-06
 
-Design for bringing the features of Reactive Resume v6 that career-ops lacks into this fork, so one project covers job finding, resume building and checking, application tracking, and public sharing. Decisions here come from six read-only research passes over both repositories, two prototypes, and four rounds of questions answered by the operator on 2026-11-06. Research reports live outside the repo in the session scratchpad and are summarised where a decision depends on them.
+Design for bringing the features of Reactive Resume v6 that career-ops lacks into this fork, so one project covers job finding, resume building and checking, application tracking, and public sharing. Decisions here come from six read-only research passes over both repositories, two prototypes, and four rounds of questions answered by the operator on 2026-11-06. The research reports, prototypes, reviews and decision trail are in `docs/superpowers/research/2026-11-06-reactive-resume-convergence/`.
 
 Reactive Resume (RR) is at `reactive-resume/reactive-resume`, MIT, v6.1.0 released 2026-11-05, clone HEAD `d065a9f7`. career-ops upstream is `career-ops-hq/career-ops` 1.39.0, this fork is `jrmatherly/career-ops` at `42f2c07b`.
 

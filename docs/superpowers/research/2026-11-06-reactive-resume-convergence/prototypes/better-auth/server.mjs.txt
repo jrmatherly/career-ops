@@ -1,0 +1,26 @@
+import { createServer } from "node:http";
+import { toNodeHandler, fromNodeHeaders } from "better-auth/node";
+import { auth } from "./auth.mjs";
+
+const authHandler = toNodeHandler(auth);
+const port = Number(process.env.PORT ?? 4321);
+
+createServer(async (req, res) => {
+  const url = new URL(req.url, "http://x");
+  if (url.pathname.startsWith("/api/auth/")) return authHandler(req, res);
+
+  // Forward-auth shape: 200 plus identity headers, or 401.
+  if (url.pathname === "/forward-auth" || url.pathname === "/whoami") {
+    // getSession throws APIError (403 INVALID_API_KEY, 429 RATE_LIMITED) for a bad or throttled key.
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) }).catch(() => null);
+    if (!session) { res.writeHead(401).end(); return; }
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "x-auth-user-id": session.user.id,
+      "x-auth-user-email": session.user.email,
+    });
+    res.end(JSON.stringify({ userId: session.user.id, email: session.user.email, sessionId: session.session.id }));
+    return;
+  }
+  res.writeHead(404).end();
+}).listen(port, "127.0.0.1", () => console.log(`listening on ${port}`));

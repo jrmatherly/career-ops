@@ -1,0 +1,61 @@
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { parseArgs } from 'node:util';
+import { getCareerOpsRoot } from '/Users/jason/dev/career-ops/path-resolver.mjs';
+import { inlineLocalFonts } from '/Users/jason/dev/career-ops/generate-pdf.mjs';
+
+const BASE = process.env.SHARE_URL || 'http://127.0.0.1:8787';
+const auth = { Authorization: `Bearer ${process.env.OWNER_TOKEN || 'owner-dev-token'}` };
+const root = getCareerOpsRoot();
+const storePath = join(root, 'data', 'shares.json');
+const load = () => (existsSync(storePath) ? JSON.parse(readFileSync(storePath, 'utf8')) : { shares: {} });
+// shortcut: no dir-lock around the store, upgrade to lib/dir-lock.mjs when promoted.
+const save = (s) => { mkdirSync(join(root, 'data'), { recursive: true }); writeFileSync(storePath, JSON.stringify(s, null, 2) + '\n'); };
+
+export function hideContacts(html) {
+  return html
+    .replace(/<div class="contact-row">[\s\S]*?<\/div>/g, '')
+    .replace(/<a\b[^>]*href="(?:mailto|tel):[^"]*"[^>]*>[\s\S]*?<\/a>/gi, '');
+}
+
+const { positionals: [cmd], values: o } = parseArgs({ allowPositionals: true, options: {
+  html: { type: 'string' }, slug: { type: 'string' }, password: { type: 'string' }, 'hide-contacts': { type: 'boolean' }, 'dump': { type: 'string' } } });
+
+const api = async (method, path, payload) => {
+  const r = await fetch(BASE + path, { method, headers: { ...auth, 'Content-Type': 'application/json' }, body: payload && JSON.stringify(payload) });
+  if (!r.ok) throw new Error(`${method} ${path} -> ${r.status} ${await r.text()}`);
+  return r.json();
+};
+
+if (cmd === 'publish') {
+  let html = await inlineLocalFonts(readFileSync(resolve(o.html), 'utf8'));
+  if (o['hide-contacts']) html = hideContacts(html);
+  if (o.dump) writeFileSync(o.dump, html);
+  const r = await api('PUT', `/api/shares/${o.slug}`, { html, password: o.password });
+  const store = load();
+  store.shares[o.slug] = { slug: o.slug, source: resolve(o.html), sha256: createHash('sha256').update(html).digest('hex'), url: BASE + r.url,
+    hasPassword: !!o.password, hideContacts: !!o['hide-contacts'], publishedAt: new Date().toISOString() };
+  save(store);
+  console.log(JSON.stringify(r));
+} else if (cmd === 'stats') {
+  const slugs = o.slug ? [o.slug] : Object.keys(load().shares);
+  for (const s of slugs) console.log(JSON.stringify(await api('GET', `/api/shares/${s}/stats`)));
+} else if (cmd === 'pull') {
+  const store = load();
+  mkdirSync(join(root, 'data', 'share-feedback'), { recursive: true });
+  for (const slug of Object.keys(store.shares)) {
+    const st = await api('GET', `/api/shares/${slug}/stats`);
+    const fb = await api('GET', `/api/shares/${slug}/feedback`);
+    Object.assign(store.shares[slug], { views: st.views, comments: fb.length, pulledAt: new Date().toISOString() });
+    if (fb.length) writeFileSync(join(root, 'data', 'share-feedback', `${slug}.md`),
+      `# Feedback on ${slug}\n\n` + fb.map((c) => `## ${c.author} (${c.created})\n\n${c.body}\n`).join('\n'));
+  }
+  save(store);
+  console.log(JSON.stringify(Object.values(store.shares).map(({ slug, views, comments }) => ({ slug, views, comments }))));
+} else if (cmd === 'feedback-link') {
+  console.log(JSON.stringify(await api('POST', `/api/shares/${o.slug}/feedback-links`)));
+} else {
+  console.error('usage: share.mjs publish --html f --slug s [--password p] [--hide-contacts] | stats [--slug s] | pull | feedback-link --slug s');
+  process.exit(2);
+}
