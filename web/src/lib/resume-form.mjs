@@ -157,9 +157,65 @@ export function toggleHidden(data, ref, itemId) {
   return setField(data, itemPath, !getIn(data, itemPath));
 }
 
+// Headings absorb.mjs (resolveSection) gives to a built-in section before any custom one, mirrored from
+// lib/resume/to-cv-md.mjs SECTION_ROWS and lib/cv-markdown.mjs EXPERIENCE_HEADING_RE; resume-form.test.mjs pins the list.
+export const BUILT_IN_HEADINGS = ["Education", "Projects", "Skills", "Certifications", "Awards", "Publications", "Languages", "Interests", "Volunteer", "References"];
+export const EXPERIENCE_HEADING_RE = /^(?:(?:work|professional)\s+)?experience$|^(?:employment|work)\s+history$|^(?:experiencia(?:\s+(?:laboral|profesional))?)$/i;
+export const SUMMARY_HEADING_RE = /^(professional )?summary$/i;
+
+/**
+ * Why a custom section's title cannot round-trip through cv.md, or null when it can. A title absorb reads as
+ * a built-in section (or as another custom one) moves the items there, and save refuses the draft.
+ */
+export function customTitleProblem(data, id) {
+  const title = (data.customSections ?? []).find((s) => s.id === id)?.title?.trim() ?? "";
+  if (!title) return "Give this section a title.";
+  const same = (other) => Boolean(other) && other.trim().toLowerCase() === title.toLowerCase();
+  const builtIn =
+    EXPERIENCE_HEADING_RE.test(title) || SUMMARY_HEADING_RE.test(title) || same(data.careerOps?.cvStyle?.summaryHeading) || same(data.summary?.title) ||
+    BUILT_IN_HEADINGS.some(same) || BUILT_IN_SECTIONS.some((key) => same(data.sections?.[key]?.title));
+  if (builtIn) return `"${title}" is a built-in section heading; cv.md would read it back as that section.`;
+  if ((data.customSections ?? []).some((s) => s.id !== id && same(s.title))) return `Another custom section is already titled "${title}".`;
+  return null;
+}
+
+/** The first custom-section title problem in the draft, or null; save refuses the draft while one exists. */
+export function firstTitleProblem(data) {
+  for (const s of data.customSections ?? []) {
+    const problem = customTitleProblem(data, s.id);
+    if (problem) return problem;
+  }
+  return null;
+}
+
 export function addCustomSection(data, type, id, title) {
   const section = { title, icon: "", columns: 1, hidden: false, showHeading: true, keepTogether: false, startOnNewPage: false, type, id, items: [] };
   return { ...data, customSections: [...(data.customSections ?? []), section] };
+}
+
+/**
+ * The editor's state machine. `saved` is the draft as last loaded or written, so `data !== saved` means
+ * unsaved edits. A conflict stays until reload (the draft's base sha is stale), a save in flight stays
+ * until it answers, and a save that returns while newer edits are pending goes back to editing.
+ */
+export function editorReducer(state, a) {
+  switch (a.type) {
+    case "loaded":
+      return { data: a.data, saved: a.data, cvMdSha: a.cvMdSha, report: a.report, status: a.lossless && a.data ? { kind: "editing" } : { kind: "readonly" } };
+    case "failed":
+      return { ...state, status: { kind: "error", message: a.message } };
+    case "edit":
+      return { ...state, data: a.data, status: state.status.kind === "conflict" || state.status.kind === "saving" ? state.status : { kind: "editing" } };
+    case "saving":
+      return { ...state, status: { kind: "saving" } };
+    case "saved":
+      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, status: state.data === a.data ? { kind: "saved" } : { kind: "editing" } };
+    case "conflict":
+      return { ...state, status: { kind: "conflict", message: a.message } };
+    case "invalid":
+      return { ...state, status: { kind: "invalid", message: a.message } };
+  }
+  return state;
 }
 
 // shortcut: mirrors lib/resume/to-cv-md.mjs's converter (stripTags, htmlToMd, mdToHtml) because client code cannot import root lib; resume-form.test.mjs pins the two copies together; share it if a third copy appears.

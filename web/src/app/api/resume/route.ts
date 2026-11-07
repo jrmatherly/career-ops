@@ -79,7 +79,7 @@ export async function PUT(req: Request) {
   })();
   if (r.code === 0) return validSha(out.cvSha256) ? Response.json({ cvMdSha: out.cvSha256 }) : failure(r, "save", STALE_AFTER_SAVE);
   if (r.code === 4) return Response.json({ error: "cv.md changed since this draft was opened; reload to continue", cvMdSha: out.cvSha256 }, { status: 409 });
-  if (r.code === 3) return Response.json({ error: "cv.md cannot hold this draft as written: check for an entry missing its name, company or title, and for leading or trailing spaces" }, { status: 422 });
+  if (r.code === 3) return Response.json({ error: "cv.md cannot hold this draft as written: check for an entry whose first field (company, school, name, title) is empty, and for leading or trailing spaces" }, { status: 422 });
   const usage = usageMessage(r);
   if (usage) return Response.json({ error: usage }, { status: 400 });
   return failure(r, "save", STALE_AFTER_SAVE);

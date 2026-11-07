@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import {
   SECTION_TYPES,
   addItem,
+  customTitleProblem,
   descriptionToText,
   getIn,
   moveItem,
@@ -62,6 +63,7 @@ export function SectionForm({ data, sectionRef, onChange }: { data: ResumeDraft;
   const type = SECTION_TYPES[sectionType(data, sectionRef)];
   const custom = path[0] === "customSections";
   const headingId = `section-${sectionRef}`;
+  const titleProblem = custom ? customTitleProblem(data, sectionRef) : null;
 
   return (
     <section aria-labelledby={headingId} className="space-y-3">
@@ -71,7 +73,12 @@ export function SectionForm({ data, sectionRef, onChange }: { data: ResumeDraft;
             <label id={headingId} htmlFor={`${headingId}-title`} className="mb-1 block text-xs font-medium text-muted">
               {type?.label ?? "Custom"} section title
             </label>
-            <input id={`${headingId}-title`} type="text" value={section.title} onChange={(e) => onChange(setField(data, [...path, "title"], e.target.value))} className={INPUT} />
+            <input id={`${headingId}-title`} type="text" value={section.title} aria-invalid={titleProblem ? true : undefined} aria-describedby={titleProblem ? `${headingId}-title-problem` : undefined} onChange={(e) => onChange(setField(data, [...path, "title"], e.target.value))} className={INPUT} />
+            {titleProblem && (
+              <p id={`${headingId}-title-problem`} className="mt-1 text-xs text-red-700 dark:text-red-300">
+                {titleProblem}
+              </p>
+            )}
           </div>
         ) : (
           <h2 id={headingId} className="font-display text-lg tracking-tight text-foreground">

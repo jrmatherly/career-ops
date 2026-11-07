@@ -83,6 +83,15 @@ test("preview renders the draft, edited bullet included", async () => {
   assert.match(body.html, new RegExp(EDITED));
 });
 
+test("preview names the sections the template has no slot for", async () => {
+  const data = structuredClone(opened.data);
+  data.sections.languages.items.push({ id: "lang-1", hidden: false, language: "Spanish", fluency: "Fluent", level: 0 });
+  const { status, body } = await post({ data });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.deepEqual(body.unmapped, ["languages"]);
+  assert.ok(Array.isArray(body.warnings));
+});
+
 test("preview rejects an invalid draft with 400", async () => {
   assert.equal((await post({ data: { ...opened.data, sections: "x" } })).status, 400);
   assert.equal((await post({ data: [] })).status, 400);
@@ -122,6 +131,23 @@ test("PUT with the right sha writes the edit into cv.md; the old sha then confli
   assert.match(descriptionOf(reopened.body.data), new RegExp(EDITED));
 });
 
+test("a custom section with a non-built-in title saves and re-opens losslessly", async () => {
+  const { body: current } = await get();
+  const data = structuredClone(current.data);
+  data.customSections.push({ title: "Additional projects", icon: "", columns: 1, hidden: false, showHeading: true, keepTogether: false, startOnNewPage: false, type: "projects", id: "custom-1", items: [{ id: "cp-1", hidden: false, name: "Side tool", period: "2024", website: { url: "", label: "", inlineLink: false }, description: "" }] });
+  const saved = await put({ data, expectedCvSha: current.cvMdSha });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.match(readFileSync(cvPath, "utf8"), /## Additional projects\n\n- \*\*Side tool\*\* \(2024\)/);
+  const reopened = await get();
+  assert.equal(reopened.body.lossless, true);
+  assert.equal(reopened.body.data.customSections.find((s) => s.id === "custom-1")?.items[0]?.name, "Side tool");
+
+  // The editor refuses this before it reaches the CLI (customTitleProblem); the CLI's own gate is the backstop.
+  const clash = structuredClone(reopened.body.data);
+  clash.customSections.find((s) => s.id === "custom-1").title = "Projects";
+  assert.equal((await put({ data: clash, expectedCvSha: reopened.body.cvMdSha })).status, 422);
+});
+
 test("GET after a dates line changed on disk is read-only with one orphan", async () => {
   writeFileSync(cvPath, readFileSync(cvPath, "utf8").replace("\n2018-2020\n", "\n2017-2020\n"));
   const { status, body } = await get();
@@ -130,6 +156,25 @@ test("GET after a dates line changed on disk is read-only with one orphan", asyn
   assert.equal(body.cvMdSha, null);
   assert.equal(body.report.orphans.length, 1);
   assert.equal(body.report.orphans[0].company, "DataStartup Inc");
+});
+
+test("GET of a cv.md that never absorbed is read-only with no data", async () => {
+  const kept = readFileSync(cvPath, "utf8");
+  const sidecar = join(dataRoot, "data", "resume.json");
+  const keptSidecar = readFileSync(sidecar, "utf8");
+  rmSync(sidecar);
+  // The example ends with Skills; a list row there without its bold lead is a line absorb cannot place.
+  writeFileSync(cvPath, `${readFileSync(join(codeRoot, "examples", "cv-example.md"), "utf8").trimEnd()}\n- stray bullet without a bold lead\n`);
+  try {
+    const { status, body } = await get();
+    assert.equal(status, 200, JSON.stringify(body));
+    assert.equal(body.lossless, false);
+    assert.equal(body.data, null);
+    assert.ok(body.report.unparsed.length > 0, JSON.stringify(body.report));
+  } finally {
+    writeFileSync(cvPath, kept);
+    writeFileSync(sidecar, keptSidecar);
+  }
 });
 
 test("GET without cv.md is a 404", async () => {

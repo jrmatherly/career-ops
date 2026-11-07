@@ -5,7 +5,10 @@ import { CvPreview } from "@/components/cv-studio/cv-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, SectionForm, type FieldKind, type ResumeDraft } from "@/components/resume/section-form";
-import { BUILT_IN_SECTIONS, SECTION_TYPES, addCustomSection, setField } from "@/lib/resume-form.mjs";
+import { BUILT_IN_SECTIONS, SECTION_TYPES, addCustomSection, editorReducer, firstTitleProblem, setField } from "@/lib/resume-form.mjs";
+
+// The reducer is plain JS in resume-form.mjs so its save-state rules have unit tests; these types describe it.
+const reducer = editorReducer as (state: State, action: Action) => State;
 
 type Entry = { id: string; section?: string; name?: string; company?: string; position?: string; period?: string };
 type Report = { orphans?: Entry[]; newEntries?: Entry[]; unparsed?: { line: number; text: string }[] };
@@ -32,27 +35,6 @@ type Action =
   | { type: "conflict"; message: string }
   | { type: "invalid"; message: string };
 
-function reducer(state: State, a: Action): State {
-  switch (a.type) {
-    case "loaded":
-      return { data: a.data, saved: a.data, cvMdSha: a.cvMdSha, report: a.report, status: a.lossless && a.data ? { kind: "editing" } : { kind: "readonly" } };
-    case "failed":
-      return { ...state, status: { kind: "error", message: a.message } };
-    case "edit":
-      // A conflict stays until reload (the draft's base sha is stale), and a save in flight stays until it answers.
-      return { ...state, data: a.data, status: state.status.kind === "conflict" || state.status.kind === "saving" ? state.status : { kind: "editing" } };
-    case "saving":
-      return { ...state, status: { kind: "saving" } };
-    case "saved":
-      // Edits typed while the save was in flight are not in cv.md yet.
-      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, status: state.data === a.data ? { kind: "saved" } : { kind: "editing" } };
-    case "conflict":
-      return { ...state, status: { kind: "conflict", message: a.message } };
-    case "invalid":
-      return { ...state, status: { kind: "invalid", message: a.message } };
-  }
-}
-
 const BASICS: { key: string; label: string; kind: FieldKind }[] = [
   { key: "name", label: "Name", kind: "text" },
   { key: "headline", label: "Headline", kind: "text" },
@@ -70,6 +52,8 @@ const entryText = (e: Entry) => (e.section ? `${e.section}: ${e.name ?? ""}` : [
 export function ResumeEditor() {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
   const [html, setHtml] = useState("");
+  // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
+  const [omitted, setOmitted] = useState<{ unmapped: string[]; warnings: string[] }>({ unmapped: [], warnings: [] });
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [customType, setCustomType] = useState("projects");
   const edited = useRef(false);
@@ -104,6 +88,7 @@ export function ResumeEditor() {
         if (!res.ok) return setPreviewError(body.error ?? `HTTP ${res.status}`);
         setPreviewError(null);
         setHtml(body.html);
+        setOmitted({ unmapped: body.unmapped ?? [], warnings: body.warnings ?? [] });
         if (edited.current) {
           edited.current = false;
           performance.mark("resume-preview");
@@ -135,12 +120,14 @@ export function ResumeEditor() {
   const save = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (!data || !state.cvMdSha || status.kind === "saving" || status.kind === "conflict") return;
+    const titleProblem = firstTitleProblem(data);
+    if (titleProblem) return dispatch({ type: "invalid", message: `Not saved. ${titleProblem}` });
     dispatch({ type: "saving" });
     try {
       const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha }) });
       const body = await readBody(res);
       if (res.ok) dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
-      // A 500 from save may come after cv.md was written, so it locks like a conflict until reload.
+      // A 5xx from save (500, or 503 on timeout) may come after cv.md was written, so it locks like a conflict until reload.
       else if (res.status === 409 || res.status >= 500) dispatch({ type: "conflict", message: body.error ?? `HTTP ${res.status}` });
       else dispatch({ type: "invalid", message: body.error ?? `HTTP ${res.status}` });
     } catch (err) {
@@ -161,7 +148,7 @@ export function ResumeEditor() {
           {status.message}
         </p>
       )}
-      {status.kind === "readonly" && <ReadOnlyReport report={state.report} />}
+      {status.kind === "readonly" && <ReadOnlyReport report={state.report} absorbed={state.data !== null} />}
 
       {editable && data && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -219,7 +206,7 @@ export function ResumeEditor() {
                   ))}
                 </select>
               </div>
-              <Button type="button" variant="outline" onClick={() => edit(addCustomSection(data, customType, crypto.randomUUID(), SECTION_TYPES[customType].label))}>
+              <Button type="button" variant="outline" onClick={() => edit(addCustomSection(data, customType, crypto.randomUUID(), `Additional ${SECTION_TYPES[customType].label.toLowerCase()}`))}>
                 Add custom section
               </Button>
             </div>
@@ -231,6 +218,16 @@ export function ResumeEditor() {
                 Preview failed: {previewError}
               </p>
             )}
+            {omitted.unmapped.length > 0 && (
+              <p className="mb-2 text-xs text-muted">
+                Not shown in this template&apos;s preview or PDF (still saved to cv.md): {omitted.unmapped.map((s) => SECTION_TYPES[s]?.label ?? s).join(", ")}
+              </p>
+            )}
+            {omitted.warnings.map((w, i) => (
+              <p key={i} className="mb-2 text-xs text-muted">
+                {w}
+              </p>
+            ))}
             {html ? <CvPreview html={html} /> : <Card className="text-sm text-muted">Preview appears here.</Card>}
           </div>
         </div>
@@ -239,7 +236,7 @@ export function ResumeEditor() {
   );
 }
 
-function ReadOnlyReport({ report }: { report: Report | null }) {
+function ReadOnlyReport({ report, absorbed }: { report: Report | null; absorbed: boolean }) {
   const list = (title: string, entries: Entry[] | undefined) =>
     entries?.length ? (
       <div>
@@ -256,7 +253,15 @@ function ReadOnlyReport({ report }: { report: Report | null }) {
   return (
     <Card className="mt-6 space-y-4">
       <p role="status" className="text-sm text-foreground">
-        <code>cv.md</code> no longer matches <code>data/resume.json</code>, so the editor is read-only. A renamed or redated entry is paired with <code>node resume.mjs pair &lt;orphanId&gt; &lt;newId&gt;</code>; <code>node resume.mjs adopt</code> shows how cv.md differs from the regenerated file.
+        <code>cv.md</code> does not read back into the editor without loss, so the editor is read-only.{" "}
+        {absorbed ? (
+          <>
+            If an entry was renamed or redated (it shows in both lists below), pair it with <code>node resume.mjs pair &lt;orphanId&gt; &lt;newId&gt;</code>.{" "}
+          </>
+        ) : (
+          <>Fix the lines listed below and reload. </>
+        )}
+        <code>node resume.mjs adopt</code> shows how cv.md differs from the file regenerated from it.
       </p>
       {list("Entries only in data/resume.json", report?.orphans)}
       {list("Entries only in cv.md", report?.newEntries)}
