@@ -19,7 +19,7 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
-import { markInSync, readResume, readResumeFile, serialize, sha256, writeResume } from './lib/resume/model.mjs';
+import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, writeResume } from './lib/resume/model.mjs';
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
@@ -242,30 +242,36 @@ async function importCommand(root, file, args) {
     console.log('Not carried by cv.md:');
     for (const line of review.leftover) console.log(`  ${line}`);
   }
-  const cvPath = join(root, 'cv.md');
-  const cv = existsSync(cvPath) ? readFileSync(cvPath, 'utf8') : null;
-  if (cv !== null) {
-    console.log('cv.md exists; import would replace it:');
-    console.log(lineDiff(cv, generated));
-  }
-  if (!hasFlag(args, '--confirm')) {
-    console.log(`Nothing written. Add --confirm${cv !== null ? ' --replace-cv' : ''}`);
-    return 0;
-  }
-  if (cv !== null && !hasFlag(args, '--replace-cv')) throw new ImportError('cv.md exists; add --replace-cv to replace it (a copy is kept as cv.md.bak); import never merges two CVs');
   if (!gate.lossless) {
     printReport(gate, false, { written: false });
     return 3;
   }
-  let bak = null;
+  const cvPath = join(root, 'cv.md');
+  const jsonPath = resumePath(root);
+  const cv = existsSync(cvPath) ? readFileSync(cvPath, 'utf8') : null;
+  // The sidecar holds orphans, hidden flags and links that cv.md cannot carry, so it is gated and backed up like cv.md.
+  const json = existsSync(jsonPath) ? readFileSync(jsonPath, 'utf8') : null;
   if (cv !== null) {
-    bak = existsSync(`${cvPath}.bak`) ? `${cvPath}.${Date.now()}.bak` : `${cvPath}.bak`;
-    writeFileAtomic(bak, cv);
+    console.log('cv.md exists; import would replace it:');
+    console.log(lineDiff(cv, generated));
   }
+  if (json !== null) console.log('data/resume.json exists; import would replace it');
+  const existing = [cv !== null && 'cv.md', json !== null && 'data/resume.json'].filter(Boolean);
+  if (!hasFlag(args, '--confirm')) {
+    console.log(`Nothing written. Add --confirm${existing.length ? ' --replace-cv' : ''}`);
+    return 0;
+  }
+  if (existing.length && !hasFlag(args, '--replace-cv')) throw new ImportError(`${existing.join(' and ')} exist${existing.length === 1 ? 's' : ''}; add --replace-cv to replace (a copy is kept as .bak); import never merges two CVs`);
+  const backup = (path, text) => {
+    const bak = existsSync(`${path}.bak`) ? `${path}.${Date.now()}.bak` : `${path}.bak`;
+    writeFileAtomic(bak, text);
+    return bak;
+  };
+  const baks = [cv !== null && backup(cvPath, cv), json !== null && backup(jsonPath, json)].filter(Boolean);
   replaceUserFile(cvPath, generated);
   markInSync(data, sha256(generated));
   await writeResume(root, data);
-  console.log(`cv.md and data/resume.json written${bak ? ` (previous cv.md in ${bak})` : ''}`);
+  console.log(`cv.md and data/resume.json written${baks.length ? ` (previous copies in ${baks.join(', ')})` : ''}`);
   return 0;
 }
 

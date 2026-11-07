@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,6 +118,21 @@ test('confirm with an existing cv.md refuses without --replace-cv, and replaces 
   assert.deepEqual(files(root), ['cv.md', 'cv.md.bak', 'data/resume.json']);
   assert.equal(readFileSync(join(root, 'cv.md.bak'), 'utf8'), before);
   assert.match(readFileSync(join(root, 'cv.md'), 'utf8'), /^### Lumen Robotics -- Portland, Oregon$/m);
+}));
+
+test('an existing data/resume.json is refused without --replace-cv and backed up with it', () => withRoot((root) => {
+  mkdirSync(join(root, 'data'));
+  writeFileSync(join(root, 'data/resume.json'), '{"orphan":"kept in the backup"}\n');
+  const refused = run(root, 'import', fixture('json-resume.json'), '--confirm');
+  assert.equal(refused.status, 2, refused.stdout + refused.stderr);
+  assert.match(refused.stderr, /data\/resume\.json exists; add --replace-cv/);
+  assert.match(refused.stdout, /data\/resume\.json exists; import would replace it/);
+  assert.deepEqual(files(root), ['data/resume.json']);
+
+  const replaced = run(root, 'import', fixture('json-resume.json'), '--confirm', '--replace-cv');
+  assert.equal(replaced.status, 0, replaced.stdout + replaced.stderr);
+  assert.deepEqual(files(root), ['cv.md', 'data/resume.json', 'data/resume.json.bak']);
+  assert.equal(readFileSync(join(root, 'data/resume.json.bak'), 'utf8'), '{"orphan":"kept in the backup"}\n');
 }));
 
 test('confirm then absorb is lossless', () => withRoot((root) => {
