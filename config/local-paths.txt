@@ -19,3 +19,12 @@ resume.mjs
 lib/resume/
 # deploy/ is the hosted server image (PR-17 of the Reactive Resume convergence plan).
 deploy/
+# Reactive Resume convergence, PR-08: tracker sidecars and their fork-local writers.
+lib/application-meta.mjs
+lib/application-events.mjs
+app-meta.mjs
+app-events.mjs
+interview-round.mjs
+salary-observe.mjs
+offer-terms.mjs
+followup-pin.mjs
