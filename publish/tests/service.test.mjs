@@ -7,9 +7,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { request } from 'node:http';
 import { readConfig, createServer, clientKey } from '../server.mjs';
 import { hideContacts } from '../pages.mjs';
+import { AUTH_ENV, ownerKey } from './helpers.mjs';
 
-const OWNER = 'owner-test-token';
-const AUTH = { Authorization: `Bearer ${OWNER}` };
+// The owner's key for the server under test, set by boot(); top-level tests run one at a time.
+let OWNER;
+let AUTH;
 const dir = mkdtempSync(join(tmpdir(), 'publish-test-'));
 after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -21,12 +23,14 @@ const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 let dbCount = 0;
 async function boot(t, { proxied = false } = {}) {
   const config = readConfig({
-    PUBLISH_OWNER_TOKEN: OWNER,
-    PUBLISH_SECRET: 'test-secret',
+    ...AUTH_ENV,
     PUBLISH_DB: join(dir, `db-${++dbCount}.sqlite`),
     PUBLISH_TRUSTED_PROXIES: proxied ? '127.0.0.1,::1' : '',
   });
   const server = createServer(config);
+  await server.ready;
+  OWNER = await ownerKey(server);
+  AUTH = { 'x-api-key': OWNER };
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -59,7 +63,7 @@ test('password gate: wrong 401, right 303 plus cookie, cookie 200, password chan
   assert.match(await page.text(), /v1/);
   const [, exp, mac] = cookie.match(/^s_pw=(\d+)\.(.+)$/);
   assert.equal((await get('/s/pw', { Cookie: `s_pw=${Number(exp) + 1}.${mac}` })).status, 401, 'an edited expiry breaks the MAC');
-  assert.equal((await get('/s/pw', AUTH)).status, 200, 'the owner token opens the page without the password');
+  assert.equal((await get('/s/pw', AUTH)).status, 200, 'the owner key opens the page without the password');
   t.mock.timers.enable({ apis: ['Date'], now: Number(exp) + 1 });
   assert.equal((await get('/s/pw', { Cookie: cookie })).status, 401, 'the cookie stops working server-side after ten minutes');
   t.mock.timers.reset();
@@ -67,15 +71,15 @@ test('password gate: wrong 401, right 303 plus cookie, cookie 200, password chan
   assert.equal((await get('/s/pw', { Cookie: cookie })).status, 401, 'password change invalidates the cookie');
 });
 
-test('every /api/ route refuses a missing or wrong owner token with the same 401 body', async (t) => {
+test('every /api/ route refuses a missing or wrong key with the same 401 body', async (t) => {
   const { get, api } = await boot(t);
   const base = { 'Content-Type': 'application/json' };
   const calls = [['PUT', '/api/shares/x', JSON.stringify({ html: fixture('x') })], ['GET', '/api/shares/x/stats'], ['POST', '/api/shares/x/feedback-links'], ['GET', '/api/shares/x/feedback'], ['DELETE', '/api/shares/x']];
   for (const [method, path, body] of calls) {
-    for (const headers of [base, { ...base, Authorization: 'Bearer wrong' }, { ...base, Authorization: `Bearer ${OWNER}x` }]) {
+    for (const headers of [base, { ...base, 'x-api-key': 'wrong' }, { ...base, 'x-api-key': `${OWNER}x` }]) {
       const r = await fetch(`${(await get('/')).url.replace(/\/$/, '')}${path}`, { method, headers, body });
-      assert.equal(r.status, 401, `${method} ${path} ${headers.Authorization ?? 'no token'}`);
-      assert.deepEqual(await r.json(), { error: 'owner token required' });
+      assert.equal(r.status, 401, `${method} ${path} ${headers['x-api-key'] ? 'bad key' : 'no key'}`);
+      assert.deepEqual(await r.json(), { error: 'api key required' });
     }
   }
   assert.equal((await get('/s/x')).status, 401, 'the refused PUT published nothing');
@@ -290,7 +294,7 @@ test('delete removes the share: /s/ is 401 form, stats 404, old feedback token 4
 });
 
 test('clientKey folds an IPv6 address into its /64 and keeps IPv4 as is', () => {
-  const config = readConfig({ PUBLISH_OWNER_TOKEN: 'o', PUBLISH_SECRET: 's', PUBLISH_TRUSTED_PROXIES: '127.0.0.1' });
+  const config = readConfig({ ...AUTH_ENV, PUBLISH_TRUSTED_PROXIES: '127.0.0.1' });
   const key = (remoteAddress, header) => clientKey({ socket: { remoteAddress }, headers: header ? { 'cf-connecting-ip': header } : {} }, config);
   assert.equal(key('127.0.0.1', '2001:db8:1:2::a'), key('127.0.0.1', '2001:db8:1:2:ffff::b'), 'same /64 is one client');
   assert.notEqual(key('127.0.0.1', '2001:db8:1:2::a'), key('127.0.0.1', '2001:db8:1:3::a'), 'another /64 is another client');
@@ -301,12 +305,10 @@ test('clientKey folds an IPv6 address into its /64 and keeps IPv4 as is', () => 
   assert.equal(key('10.0.0.5', '203.0.113.1'), '10.0.0.5', 'an untrusted peer never gets the header');
 });
 
-test('readConfig refuses a missing owner token or secret', () => {
-  assert.throws(() => readConfig({ PUBLISH_SECRET: 's' }), /PUBLISH_OWNER_TOKEN/);
-  assert.throws(() => readConfig({ PUBLISH_OWNER_TOKEN: ' ', PUBLISH_SECRET: 's' }), /PUBLISH_OWNER_TOKEN/);
-  assert.throws(() => readConfig({ PUBLISH_OWNER_TOKEN: 'o' }), /PUBLISH_SECRET/);
-  assert.throws(() => readConfig({ PUBLISH_OWNER_TOKEN: 'o', PUBLISH_SECRET: '' }), /PUBLISH_SECRET/);
-  const config = readConfig({ PUBLISH_OWNER_TOKEN: 'o', PUBLISH_SECRET: 's', PUBLISH_CLIENT_IP_HEADER: 'X-Real-IP', PUBLISH_TRUSTED_PROXIES: '10.0.0.1, 10.0.0.2' });
+test('readConfig refuses a missing secret', () => {
+  assert.throws(() => readConfig({ ...AUTH_ENV, PUBLISH_SECRET: undefined }), /PUBLISH_SECRET/);
+  assert.throws(() => readConfig({ ...AUTH_ENV, PUBLISH_SECRET: ' ' }), /PUBLISH_SECRET/);
+  const config = readConfig({ ...AUTH_ENV, PUBLISH_CLIENT_IP_HEADER: 'X-Real-IP', PUBLISH_TRUSTED_PROXIES: '10.0.0.1, 10.0.0.2' });
   assert.equal(config.bind, '127.0.0.1');
   assert.equal(config.port, 8080);
   assert.equal(config.dbPath, 'publish.db');

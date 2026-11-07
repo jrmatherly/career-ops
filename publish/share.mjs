@@ -3,7 +3,7 @@
  * publish/share.mjs — the share CLI: uploads a rendered CV to the publish
  * service and pulls its views and reviewer comments back into the data root.
  *
- * PUBLISH_URL and PUBLISH_OWNER_TOKEN come from the environment or the data
+ * PUBLISH_URL and PUBLISH_API_KEY come from the environment or the data
  * root's .env, never from argv. Records live in data/shares.json; comments are
  * written to data/share-feedback/<slug>.md.
  */
@@ -28,7 +28,7 @@ const USAGE = `Usage:
   node publish/share.mjs stats [--slug <s>]
   node publish/share.mjs pull [--slug <s>]
   node publish/share.mjs delete --slug <s>
-PUBLISH_URL and PUBLISH_OWNER_TOKEN are read from the environment, else from the data root's .env.`;
+PUBLISH_URL and PUBLISH_API_KEY are read from the environment, else from the data root's .env.`;
 const VALUE_FLAGS = ['--slug', '--html', '--from-studio', '--template', '--hide', '--hide-item', '--password'];
 const FLAGS = [...VALUE_FLAGS, '--from-resume', '--hide-contacts', '--help', '-h'];
 const IMAGE_MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
@@ -43,12 +43,12 @@ function serviceConfig(root, env) {
   const envPath = join(root, '.env');
   // The trailing newline is the same Node 22.13 parseEnv fix lib/browser-launch.mjs applies.
   const file = existsSync(envPath) ? parseEnv(readFileSync(envPath, 'utf8') + '\n') : {};
-  const [base, token] = ['PUBLISH_URL', 'PUBLISH_OWNER_TOKEN'].map((key) => {
-    const value = env[key] || file[key];
-    if (!value) throw new Error(`${key} is not set (environment or ${envPath})`);
+  const [base, key] = ['PUBLISH_URL', 'PUBLISH_API_KEY'].map((name) => {
+    const value = env[name] || file[name];
+    if (!value) throw new Error(`${name} is not set (environment or ${envPath})`);
     return value;
   });
-  return { url: base.replace(/\/+$/, ''), token };
+  return { url: base.replace(/\/+$/, ''), key };
 }
 
 // Config loads on first request, so a usage error is reported before a missing PUBLISH_URL.
@@ -58,8 +58,8 @@ function makeClient(root, env) {
   return {
     get url() { return load().url; },
     async request(method, path, body) {
-      const { url, token } = load();
-      const headers = { Authorization: `Bearer ${token}`, ...(body && { 'Content-Type': 'application/json' }) };
+      const { url, key } = load();
+      const headers = { 'x-api-key': key, ...(body && { 'Content-Type': 'application/json' }) };
       let r;
       try {
         r = await fetch(url + path, { method, headers, body: body && JSON.stringify(body) });

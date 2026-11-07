@@ -7,9 +7,11 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig, createServer } from '../server.mjs';
 import { listTree } from '../../lib/walk-tree.mjs';
+import { AUTH_ENV, ownerKey } from './helpers.mjs';
 
-const OWNER = 'owner-test-token';
-const AUTH = { Authorization: `Bearer ${OWNER}` };
+// The owner's key for the server under test, set by boot(); top-level tests run one at a time.
+let OWNER;
+let AUTH;
 const SHARE = fileURLToPath(new URL('../share.mjs', import.meta.url));
 const CV_EXAMPLE = fileURLToPath(new URL('../../examples/cv-example.md', import.meta.url));
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -18,8 +20,11 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 
 let count = 0;
 async function boot(t) {
-  const config = readConfig({ PUBLISH_OWNER_TOKEN: OWNER, PUBLISH_SECRET: 'test-secret', PUBLISH_DB: join(dir, `db-${++count}.sqlite`) });
+  const config = readConfig({ ...AUTH_ENV, PUBLISH_DB: join(dir, `db-${++count}.sqlite`) });
   const server = createServer(config);
+  await server.ready;
+  OWNER = await ownerKey(server);
+  AUTH = { 'x-api-key': OWNER };
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -28,9 +33,9 @@ async function boot(t) {
   copyFileSync(CV_EXAMPLE, join(root, 'cv.md'));
   const baseEnv = { ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '' };
   delete baseEnv.PUBLISH_URL;
-  delete baseEnv.PUBLISH_OWNER_TOKEN;
+  delete baseEnv.PUBLISH_API_KEY;
   // Async spawn: a spawnSync would block this process's event loop, and the server under test runs on it.
-  const cli = (args, env = { PUBLISH_URL: base, PUBLISH_OWNER_TOKEN: OWNER }) => new Promise((done) => {
+  const cli = (args, env = { PUBLISH_URL: base, PUBLISH_API_KEY: OWNER }) => new Promise((done) => {
     const child = spawn(process.execPath, [SHARE, ...args], { env: { ...baseEnv, ...env } });
     let stdout = '';
     let stderr = '';
@@ -143,16 +148,16 @@ test('from-resume: hide overlay, lossless gate, republish reapplies the overlay,
   assert.match(gone.stderr, /not on the server/);
 });
 
-test('service config comes from the data root .env, and a rejected token is named by status only', async (t) => {
+test('service config comes from the data root .env, and a rejected key is named by status only', async (t) => {
   const { base, root, cli, ok } = await boot(t);
-  writeFileSync(join(root, '.env'), `PUBLISH_URL=${base}\nPUBLISH_OWNER_TOKEN='${OWNER}'\n`);
+  writeFileSync(join(root, '.env'), `PUBLISH_URL=${base}\nPUBLISH_API_KEY='${OWNER}'\n`);
   ok(await cli(['publish', '--slug', 'e', '--html', htmlDir()], {}), 'publish with config from .env');
   ok(await cli(['stats'], {}), 'stats with config from .env');
   assert.equal(existsSync(join(root, 'data', 'share-feedback')), false, 'stats writes nothing');
-  const wrong = await cli(['stats'], { PUBLISH_OWNER_TOKEN: 'wrong-token-value' });
+  const wrong = await cli(['stats'], { PUBLISH_API_KEY: 'cops_wrong-key-value' });
   assert.equal(wrong.status, 1, wrong.stderr);
   assert.match(wrong.stderr, /401/, 'stderr names the status');
-  assert.doesNotMatch(wrong.stderr, /wrong-token-value/, 'stderr never echoes the token');
+  assert.doesNotMatch(wrong.stderr, /cops_wrong-key-value/, 'stderr never echoes the key');
   rmSync(join(root, '.env'));
   const missing = await cli(['stats'], {});
   assert.equal(missing.status, 1);

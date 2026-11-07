@@ -1,8 +1,12 @@
 import http from 'node:http';
 import { scrypt, randomBytes, createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { toNodeHandler, fromNodeHeaders } from 'better-auth/node';
+import { isAPIError } from 'better-auth/api';
 import { openDb } from './db.mjs';
+import { createAuth, migrate, authConfigFromEnv, requiredEnv, PROVIDER_ID } from './auth.mjs';
 import { passwordForm, feedbackPage, hideContacts } from './pages.mjs';
+import { signInPage, accountPage } from './pages/account.mjs';
 
 const scryptAsync = promisify(scrypt);
 const SLUG = '([a-z0-9-]{1,64})';
@@ -20,23 +24,20 @@ const CRAWLER = /bot|crawl|spider|slurp|facebookexternalhit|linkedinbot|embedly|
 const ATTEMPTS = 5;
 const WINDOW_MS = 10 * 60e3;
 const COOKIE_MS = 10 * 60e3;
+const KEY_PERMISSIONS = { share: ['upload', 'manage'] };
 
 export function readConfig(env) {
-  const required = (key) => {
-    const value = (env[key] ?? '').trim();
-    if (!value) throw new Error(`${key} is required and must not be empty`);
-    return value;
-  };
+  const required = (key) => requiredEnv(env, key);
   const port = Number(env.PUBLISH_PORT || 8080);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`PUBLISH_PORT must be an integer 0-65535, got ${env.PUBLISH_PORT}`);
   return {
     bind: env.PUBLISH_BIND || '127.0.0.1',
     port,
-    ownerToken: required('PUBLISH_OWNER_TOKEN'),
     secret: required('PUBLISH_SECRET'),
     dbPath: env.PUBLISH_DB || 'publish.db',
     clientIpHeader: (env.PUBLISH_CLIENT_IP_HEADER || 'cf-connecting-ip').toLowerCase(),
     trustedProxies: new Set((env.PUBLISH_TRUSTED_PROXIES || '').split(',').map((s) => s.trim()).filter(Boolean)),
+    auth: authConfigFromEnv(env),
   };
 }
 
@@ -49,10 +50,14 @@ function ipv6Prefix(ip) {
 }
 
 // The header is only as honest as the hop that set it, so it is read only from a known proxy peer.
-export function clientKey(req, config) {
+function clientIp(req, config) {
   const peer = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
   const forwarded = config.trustedProxies.has(peer) && String(req.headers[config.clientIpHeader] ?? '').split(',')[0].trim().replace(/^::ffff:/, '');
-  const ip = forwarded || peer;
+  return forwarded || peer;
+}
+
+export function clientKey(req, config) {
+  const ip = clientIp(req, config);
   return ip.includes(':') ? ipv6Prefix(ip) : ip;
 }
 
@@ -103,7 +108,9 @@ export function createServer(config) {
   const dummyHash = hashPassword(randomBytes(16).toString('hex'));
   const attempts = new Map();
   const sign = (s) => createHmac('sha256', config.secret).update(s).digest('base64url');
-  const isOwner = (req) => safeEqual(req.headers.authorization || '', `Bearer ${config.ownerToken}`);
+  const auth = createAuth({ ...config.auth, db: db.handle, clientIpHeader: config.clientIpHeader });
+  const ready = migrate(auth);
+  const authHandler = toNodeHandler(auth);
   const accessValue = (slug, pwHash, exp) => `${exp}.${sign(`${slug}|${pwHash}|${exp}`)}`;
 
   function hasAccess(req, share) {
@@ -141,14 +148,46 @@ export function createServer(config) {
     return blocked ? Math.max(1, Math.ceil((recent[0] + WINDOW_MS - now) / 1000)) : 0;
   }
 
-  const owner = (handler) => (req, res, m) => (isOwner(req) ? handler(req, res, m) : json(res, 401, { error: 'owner token required' }));
-  const withShare = (handler) => owner((req, res, m) => {
+  // One verdict per request: a missing key, an unknown key and a key without the permission all read as 'refused'.
+  async function keyVerdict(key, permission) {
+    if (typeof key !== 'string' || !key) return 'refused';
+    await ready;
+    let code;
+    try {
+      const r = await auth.api.verifyApiKey({ body: { key, permissions: { share: [permission] } } });
+      if (r.valid) return 'ok';
+      code = r.error?.code;
+    } catch (e) {
+      if (!isAPIError(e)) throw e;
+      code = e.body?.code;
+    }
+    return code === 'RATE_LIMITED' ? 'limited' : 'refused';
+  }
+  const keyed = (permission, handler) => async (req, res, m, key) => {
+    const verdict = await keyVerdict(key, permission);
+    if (verdict === 'ok') return handler(req, res, m);
+    return verdict === 'limited' ? json(res, 429, { error: 'rate limited' }) : json(res, 401, { error: 'api key required' });
+  };
+  const withShare = (handler) => keyed('manage', (req, res, m) => {
     const share = db.getShare(m[1]);
     return share ? handler(req, res, share) : json(res, 404, { error: 'no such share' });
   });
 
+  const sessionOf = async (req) => { await ready; return auth.api.getSession({ headers: fromNodeHeaders(req.headers) }); };
+  const trustedOrigin = async (req) => (await auth.$context).isTrustedOrigin(String(req.headers.origin ?? ''));
+  // Account writes need a cookie session and a request from the service's own origin; anything else gets the sign-in page.
+  const signedIn = (handler) => async (req, res, m) => {
+    const session = await sessionOf(req);
+    if (!session) return accountReply(res, 401, signInPage());
+    if (req.method !== 'GET' && !(await trustedOrigin(req))) return plain(res, 403, 'Forbidden');
+    return handler(req, res, session);
+  };
+  // Browsers send Origin: null on a form post from a no-referrer page, which the origin check would refuse.
+  const accountReply = (res, status, html, extra) => page(res, status, html, { 'Referrer-Policy': 'same-origin', ...extra });
+  const listKeys = async (req) => (await auth.api.listApiKeys({ headers: fromNodeHeaders(req.headers) })).apiKeys;
+
   const routes = [
-    { method: 'PUT', pattern: route(`/api/shares/${SLUG}`), handler: owner(async (req, res, m) => {
+    { method: 'PUT', pattern: route(`/api/shares/${SLUG}`), handler: keyed('upload', async (req, res, m) => {
       const text = await readBody(req, 4 << 20);
       let payload;
       try { payload = JSON.parse(text); } catch { return json(res, 400, { error: 'body must be JSON' }); }
@@ -171,13 +210,13 @@ export function createServer(config) {
     })) },
     { method: 'POST', pattern: route(`/api/shares/${SLUG}/feedback-links`), handler: withShare((req, res, s) => json(res, 200, { token: makeToken(s) })) },
     { method: 'GET', pattern: route(`/api/shares/${SLUG}/feedback`), handler: withShare((req, res, s) => json(res, 200, db.listComments(s.slug))) },
-    { method: 'DELETE', pattern: route(`/api/shares/${SLUG}`), handler: owner((req, res, m) => (db.deleteShare(m[1])
+    { method: 'DELETE', pattern: route(`/api/shares/${SLUG}`), handler: keyed('manage', (req, res, m) => (db.deleteShare(m[1])
       ? json(res, 200, { deleted: m[1] })
       : json(res, 404, { error: 'no such share' }))) },
-    { method: 'GET', pattern: route(`/s/${SLUG}`), handler: (req, res, m) => {
+    { method: 'GET', pattern: route(`/s/${SLUG}`), handler: async (req, res, m, key) => {
       const share = db.getShare(m[1]);
       if (!share) return page(res, 401, passwordForm());
-      const owned = isOwner(req);
+      const owned = key !== undefined && await keyVerdict(key, 'manage') === 'ok';
       if (share.pw_hash && !owned && !hasAccess(req, share)) return page(res, 401, passwordForm());
       if (!owned && !CRAWLER.test(req.headers['user-agent'] || '')) db.recordView(share.slug, clientKey(req, config), Math.floor(Date.now() / 3600e3));
       return page(res, 200, db.getSnapshot(share.slug, share.html_sha));
@@ -207,25 +246,67 @@ export function createServer(config) {
       db.addComment(snapshot.slug, snapshot.linkId, author, body);
       return page(res, 303, '', { Location: `/f/${m[1]}` });
     } },
+    { method: 'GET', pattern: route('/account'), handler: async (req, res) => {
+      const session = await sessionOf(req);
+      // A refused sign-in comes back here with ?error=; the code is not echoed, so the page cannot be made to say anything.
+      if (!session) return accountReply(res, 401, signInPage(new URL(req.url, 'http://local').searchParams.has('error') ? 'Sign-in was refused.' : ''));
+      return accountReply(res, 200, accountPage({ email: session.user.email, keys: await listKeys(req) }));
+    } },
+    { method: 'GET', pattern: route('/account/sign-in'), handler: async (req, res) => {
+      await ready;
+      let r;
+      try {
+        r = await auth.api.signInSocial({ body: { provider: PROVIDER_ID, callbackURL: '/account', errorCallbackURL: '/account' }, headers: fromNodeHeaders(req.headers), returnHeaders: true });
+      } catch (e) {
+        console.error('sign-in could not start', e);
+        return accountReply(res, 503, signInPage('The sign-in provider is unavailable. Try again later.'));
+      }
+      return accountReply(res, 303, '', { Location: r.response.url, 'Set-Cookie': r.headers.getSetCookie() });
+    } },
+    { method: 'POST', pattern: route('/account/keys'), handler: signedIn(async (req, res, session) => {
+      const freshMs = (await auth.$context).sessionConfig.freshAge * 1000;
+      if (Date.now() - new Date(session.session.createdAt).getTime() >= freshMs) return accountReply(res, 403, signInPage('Sign in again to create a key: this sign-in is more than 24 hours old.'));
+      const name = (new URLSearchParams(await readBody(req, 4096)).get('name') || '').trim();
+      if (!name || name.length > 32) return plain(res, 400, 'name (max 32) is required');
+      // A server call with no headers is the only way Better Auth lets permissions be set.
+      const created = await auth.api.createApiKey({ body: { userId: session.user.id, name, permissions: KEY_PERMISSIONS } });
+      return accountReply(res, 200, accountPage({ email: session.user.email, keys: await listKeys(req), created: created.key }));
+    }) },
+    { method: 'POST', pattern: route('/account/keys/revoke'), handler: signedIn(async (req, res) => {
+      const keyId = new URLSearchParams(await readBody(req, 4096)).get('keyId') || '';
+      await auth.api.deleteApiKey({ body: { keyId }, headers: fromNodeHeaders(req.headers) });
+      return accountReply(res, 303, '', { Location: '/account' });
+    }) },
   ];
 
   const server = http.createServer(async (req, res) => {
     let matched = null;
+    // The key is taken off the request before anything else reads it, so no cookie or session lookup can see it.
+    const key = req.headers['x-api-key'];
+    delete req.headers['x-api-key'];
     try {
       const { pathname } = new URL(req.url, 'http://local');
+      // Better Auth reads its own bodies, so its routes go before any of ours.
+      if (pathname.startsWith('/api/auth/')) {
+        // Better Auth believes this header from any peer, so it is overwritten with the address the service itself trusts.
+        req.headers[config.clientIpHeader] = clientIp(req, config);
+        await ready;
+        return await authHandler(req, res);
+      }
       for (const r of routes) {
         const m = r.method === req.method && pathname.match(r.pattern);
-        if (m) { matched = r; return await r.handler(req, res, m); }
+        if (m) { matched = r; return await r.handler(req, res, m, key); }
       }
       plain(res, 404, 'Not found');
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
+      if (isAPIError(e)) return plain(res, e.statusCode, 'Request refused');
       // A feedback token is a bearer secret, so the log names the route pattern and nothing from the URL.
       console.error('request failed', { method: req.method, route: matched?.pattern.source ?? 'unmatched', client: clientKey(req, config) }, e);
       plain(res, 500, 'Internal error');
     }
   });
   server.on('close', () => db.close());
-  return server;
+  return Object.assign(server, { auth, ready });
 }

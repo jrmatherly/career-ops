@@ -51,6 +51,7 @@ export function openDb(path) {
     addComment: (slug, linkId, author, body) => q.addComment.run(slug, linkId, author, body, new Date().toISOString()),
     listComments: (slug) => q.listComments.all(slug),
     deleteShare: (slug) => tx(() => q.deletes.map((d) => d.run(slug).changes)[0] === 1),
+    handle: db,
     close: () => db.close(),
   };
 }
