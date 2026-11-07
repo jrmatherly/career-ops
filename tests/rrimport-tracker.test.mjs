@@ -124,7 +124,7 @@ test('the remaining closed reasons map per the table', () => {
   for (const [company, status] of Object.entries(expect)) assert.equal(byCompany(entries, company).status, status, company);
 });
 
-test('an older export without submittedAt falls back to the stage history', () => {
+test('an older export without submittedAt falls back to the stage and its history', () => {
   const apps = JSON.parse(fixture('applications.json'));
   for (const a of apps) delete a.submittedAt;
   const entries = planOf(readRrZip(rrZip({ 'applications.json': strToU8(JSON.stringify(apps)) })).apps);
@@ -132,7 +132,7 @@ test('an older export without submittedAt falls back to the stage history', () =
   assert.equal(byCompany(entries, 'Marrowfield Foods').outcome, 'import', 'an applied status counts as sent');
 });
 
-test('the preview names both Review Focus cases and writes nothing', () => {
+test('the preview names the reasonless close and the never-submitted row, and writes nothing', () => {
   withRoot({}, (fx) => {
     const before = snapshot(fx.root);
     const r = run(fx, [CSV]);
@@ -179,7 +179,7 @@ test('zip import writes every sidecar under the merged number', () => {
     const contact = read(fx, 'data/contacts.tsv').split('\n').find((l) => l.startsWith('Rowan Vale\t')).split('\t');
     assert.deepEqual([contact[1], contact[2], contact[3], contact[7]], ['Larkspur Analytics', 'recruiter', 'Talent Partner', String(lark)]);
     assert.match(read(fx, 'data/follow-ups.md'), new RegExp(`- next #${lark} 2026-07-20 .*Ask about the take-home`));
-    assert.deepEqual(rowsFor(fx, 'data/salary-observations.tsv', lark).map((l) => l.split('\t').slice(2, 6)), [['advertised', '150000', 'USD', 'rr-import']]);
+    assert.deepEqual(rowsFor(fx, 'data/salary-observations.tsv', lark).map((l) => l.split('\t').slice(2, 6)), [['advertised', '150000-170000', 'USD', 'rr-import']]);
     const salt = trackerNum(fx, 'Saltmarsh Labs');
     const terms = read(fx, 'data/offers/saltmarsh-labs/terms.md');
     assert.match(terms, new RegExp(`Tracker: #${salt}`));
@@ -233,7 +233,7 @@ test('a rerun after a failed sidecar write completes it', () => {
     writeFileSync(join(fx.root, 'data', 'offers'), 'not a directory');
     const r = zipImport(fx);
     assert.equal(r.status, 1, describeSpawn(r));
-    assert.match(r.stderr, /offer-terms\.mjs: /);
+    assert.match(r.stderr, /offer-terms\.mjs --num=\d+: Error: ENOTDIR/);
     assert.match(r.stderr, /Run the same command again/);
     const salt = trackerNum(fx, 'Saltmarsh Labs');
     const lark = trackerNum(fx, 'Larkspur Analytics');
@@ -261,12 +261,16 @@ test('jd capture resolves by number', () => {
   });
 });
 
+// Flips bytes inside the first entry's deflate stream, past its local header.
+const corrupt = (zip) => zip.map((b, i) => (i >= 60 && i < 200 ? b ^ 0xff : b));
+
 test('a malformed zip is refused with a one-line reason', () => {
   const cases = [
     [strToU8('not a zip at all'), /export\.zip is not a Reactive Resume export: no applications\.json/],
     [zipSync({ 'career.json': fixture('career.json') }), /no applications\.json/],
     [rrZip({ 'applications.json': strToU8('{ broken') }), /applications\.json is not valid JSON/],
     [rrZip({ 'applications.json': strToU8('{"company":"x"}') }), /applications\.json is not a list of applications/],
+    [corrupt(zipSync({ 'applications.json': strToU8(JSON.stringify(Array.from({ length: 200 }, (_, i) => ({ company: `Co ${i}`, role: 'Role' })))) })), /export\.zip is not a readable zip: /],
   ];
   for (const [zip, reason] of cases) {
     withRoot({ zip }, (fx) => {
@@ -287,5 +291,76 @@ test('career.json never crosses', () => {
       if (file === 'export.zip') continue;
       assert.doesNotMatch(text, /CAREER-(FACT|STORY|PREF)-MARKER/, file);
     }
+  });
+});
+
+const larkspur = () => readRrZip(rrZip()).apps.find((a) => a.company === 'Larkspur Analytics');
+
+test('salary text is recorded only as one annual figure or range in one currency', () => {
+  const cases = {
+    '$150k': { amount: '150000', currency: 'USD', single: true },
+    '$120-150k': { amount: '120000-150000', currency: 'USD', single: false },
+    '€90.000': { amount: '90000', currency: 'EUR', single: true },
+    '£70,000': { amount: '70000', currency: 'GBP', single: true },
+    '$45/hr': null, 'EUR 5.000 per month': null, '$1.5M': null, 'CA$120k': null, 'A$100k': null,
+    'USD 100k - EUR 90k': null, '120k': null, Competitive: null,
+  };
+  for (const [salary, want] of Object.entries(cases)) {
+    const [e] = planOf([{ ...larkspur(), salary }]);
+    assert.deepEqual(e.sidecars.salary, want, salary);
+    assert.equal(e.sidecars.salaryUnparsed, want === null, salary);
+  }
+  const [range] = planOf([{ ...larkspur(), status: 'offer', salary: '$120-150k' }]);
+  assert.equal(range.sidecars.offer, false, 'a range is not an offer base');
+});
+
+test('a row merge would fold by a fuzzy title plans as tracked under the existing number', () => {
+  const trackerRows = [{ num: 7, company: 'Larkspur Analytics Inc', role: 'Senior Analytics Engineer', url: '', status: 'Interview' }];
+  const [e] = planOf([larkspur()], trackerRows);
+  assert.equal(e.outcome, 'tracked');
+  assert.equal(e.trackedNum, 7);
+  assert.equal(e.trackedStatus, 'Interview');
+  const [withUrl] = planOf([larkspur()], [{ ...trackerRows[0], url: 'https://jobs.example.com/other/1' }]);
+  assert.equal(withUrl.outcome, 'import', 'a tracker row with its own posting URL is a different posting');
+});
+
+test('an unreadable CSV Application Date imports undated, not stamped silently', () => {
+  const rows = parseCsv(readFileSync(CSV, 'utf-8'));
+  const col = rows[0].findIndex((h) => h.replace(/^\uFEFF/, '').trim() === 'Application Date');
+  for (const bad of ['2026-13-45', '07/01/2026', 'n/a']) {
+    const edited = rows.map((r, i) => (i === 1 ? r.map((c, j) => (j === col ? bad : c)) : r));
+    const [e] = planOf(rrFromCsv(edited));
+    assert.equal(e.outcome, 'import', bad);
+    assert.equal(e.undated, true, bad);
+    assert.match(e.notes, /no date in source/, bad);
+  }
+});
+
+test('a closed stage visit with no reason of its own takes the row\'s closed reason', () => {
+  const apps = JSON.parse(fixture('applications.json'));
+  const harrow = apps.find((a) => a.company === 'Harrowgate Systems');
+  for (const e of harrow.activity) if (e.type === 'stage' && e.stage === 'closed') delete e.closedReason;
+  const [entry] = planOf(readRrZip(rrZip({ 'applications.json': strToU8(JSON.stringify([harrow])) })).apps);
+  assert.equal(entry.sidecars.statusLog.at(-1).to, 'Hired');
+});
+
+test('a tracked row with its own status-log history gets no RR backfill rows', () => {
+  const tracker = trackerText(['| 1 | 2026-06-30 | Larkspur Analytics | Analytics Engineer | 4.1/5 | Evaluated | ❌ | — | | [example.com](https://jobs.example.com/larkspur/1) |']);
+  withRoot({ tracker }, (fx) => {
+    writeFileSync(join(fx.root, 'data', 'status-log.tsv'), '1\t2026-06-30\t-\tEvaluated\tset-status\t\n');
+    const r = zipImport(fx);
+    assert.equal(r.status, 0, describeSpawn(r));
+    assert.deepEqual(rowsFor(fx, 'data/status-log.tsv', 1), ['1\t2026-06-30\t-\tEvaluated\tset-status\t']);
+    assert.ok(rowsFor(fx, 'data/application-events.tsv', 1).some((l) => l.includes('\timport\trr-export ')), 'the row was imported as tracked #1');
+  });
+});
+
+test('a zip import after a CSV import still writes what only the zip carries', () => {
+  withRoot({}, (fx) => {
+    assert.equal(run(fx, [CSV, '--confirm']).status, 0);
+    assert.ok(!existsSync(join(fx.root, 'data', 'active-interviews.md')), 'the CSV path writes no interviews');
+    const r = zipImport(fx);
+    assert.equal(r.status, 0, describeSpawn(r));
+    assert.match(read(fx, 'data/active-interviews.md'), /\| Larkspur Analytics \| Analytics Engineer \| screening \|/);
   });
 });

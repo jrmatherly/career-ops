@@ -392,7 +392,7 @@ function sidecarSummary(s) {
     count(s.interviews, 'interview'),
     s.followUp ? 'follow-up pin' : '',
     s.salary ? `salary ${s.salary.amount} ${s.salary.currency}` : '',
-    s.salaryUnparsed ? 'salary not recorded: no single currency' : '',
+    s.salaryUnparsed ? 'salary not recorded: no amount or no single currency' : '',
     s.offer ? 'offer terms' : '',
     s.jd ? 'JD capture' : '',
   ].filter(Boolean).join('; ');
@@ -405,8 +405,8 @@ function printRrPreview(plan, { label, csv, confirm, urlColumn, trackerExists, b
   const state = (e) => (e.app.status === 'closed' ? `${e.status} (closed, ${e.closedReason ?? 'no reason'})` : `${e.status} (${e.app.status})`);
   for (const e of plan.entries) {
     const detail = {
-      import: () => `to import: ${e.date}  ${state(e)}`,
-      tracked: () => `already in the tracker as #${e.trackedNum}: ${state(e)}`,
+      import: () => `to import: ${e.date}${e.undated ? ' (no readable Application Date: today)' : ''}  ${state(e)}`,
+      tracked: () => `already in the tracker as #${e.trackedNum}: ${state(e)}${e.trackedStatus && e.trackedStatus !== e.status ? `; the tracker says ${e.trackedStatus}, not changed (use set-status.mjs)` : ''}`,
       repeat: () => `repeated in this file, same as row ${e.firstRow}`,
       saved: () => (e.url ? 'saved: goes to the pipeline inbox' : 'saved, no posting URL: not added anywhere'),
       'never-submitted': () => `never submitted (${e.app.unsentReason}): skipped`,
@@ -422,7 +422,7 @@ function printRrPreview(plan, { label, csv, confirm, urlColumn, trackerExists, b
     const rows = count(outcome);
     if (rows.length) console.log(`${String(rows.length).padStart(4)} ${text}`);
   }
-  if (csv) console.log('\nA CSV export carries no timeline notes, interviews or follow-ups. Import the account zip with --rr-zip to keep them.');
+  if (csv) console.log("\nThe CSV's Timeline column is not read, and the CSV has no follow-up field. Import the account zip with --rr-zip to keep timeline notes, interviews and follow-ups.");
   const links = count('import').filter((e) => e.url).length;
   if (links && !urlColumn) {
     console.log(`\n${links} row(s) carry a posting link, and the tracker has no URL column, so the links will not be kept. Run "node merge-tracker.mjs --backfill-urls" once to add the column, then import.`);
@@ -447,7 +447,7 @@ function urlGate(toImport, tracker, confirm) {
 async function runRr(plan, { label, csv, confirm, dataRoot, tracker, trackerPath, exportLabel, today, fail }) {
   const toImport = plan.entries.filter((e) => e.outcome === 'import');
   const { withUrl, urlColumn, blocked } = urlGate(toImport, tracker, confirm);
-  printRrPreview(plan, { label, csv, confirm: confirm && !blocked, urlColumn, trackerExists: tracker.exists, blocked, imported: importedNums(dataRoot) });
+  printRrPreview(plan, { label, csv, confirm: confirm && !blocked, urlColumn, trackerExists: tracker.exists, blocked, imported: importedNums(dataRoot, exportLabel) });
   if (blocked) fail(BLOCKED_NO_URL);
   if (!confirm) return 0;
   if (!tracker.exists && toImport.length) {
@@ -459,16 +459,20 @@ async function runRr(plan, { label, csv, confirm, dataRoot, tracker, trackerPath
     console.log('');
     status = await writeImport(toImport, { colmap: tracker.colmap });
   }
-  const queued = await appendSavedToPipeline(dataRoot, plan.entries);
-  if (queued) console.log(`\nPipeline inbox: ${queued} saved posting(s) added to data/pipeline.md.`);
-  const result = await writeRrSidecars(dataRoot, trackerPath, plan.entries, { exportLabel, today });
-  console.log(`\nSidecars: ${result.completed} row(s) written, ${result.skipped.filter((s) => s.num != null).length} already imported.`);
-  for (const s of result.skipped.filter((x) => x.num == null)) console.error(`import-tracker: row ${s.row}: ${s.reason}; its sidecars were not written.`);
-  for (const f of result.failed) console.error(`import-tracker: row ${f.row} (#${f.num}): ${f.error}`);
-  if (result.failed.length) {
-    console.error('Run the same command again to complete those rows once the cause is fixed.');
+  try {
+    const queued = await appendSavedToPipeline(dataRoot, plan.entries);
+    if (queued) console.log(`\nPipeline inbox: ${queued} saved posting(s) added to data/pipeline.md.`);
+  } catch (err) {
+    console.error(`import-tracker: the saved postings were not added to data/pipeline.md: ${err.message}`);
     status = 1;
   }
+  const result = await writeRrSidecars(dataRoot, trackerPath, plan.entries, { exportLabel, today });
+  console.log(`\nSidecars: ${result.completed} row(s) written, ${result.skipped.filter((s) => s.num != null).length} already imported.`);
+  const lost = result.skipped.filter((x) => x.num == null);
+  for (const s of lost) console.error(`import-tracker: row ${s.row}: ${s.reason}; merge-tracker.mjs may have folded it into another row. Its sidecars were not written.`);
+  for (const f of result.failed) console.error(`import-tracker: row ${f.row} (#${f.num}): ${f.error}`);
+  if (result.failed.length) console.error('Run the same command again to complete those rows once the cause is fixed.');
+  if (lost.length || result.failed.length) status = 1;
   return status;
 }
 
