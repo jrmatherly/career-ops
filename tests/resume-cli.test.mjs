@@ -131,13 +131,12 @@ test('save refuses with exit 4 on a stale --expected-cv-sha, and writes cv.md on
   draft.basics.headline = 'ML platform engineer';
   writeFileSync(join(root, 'draft.json'), JSON.stringify(draft));
   const cvBefore = read(root, 'cv.md');
+  const jsonBefore = read(root, 'data/resume.json');
 
   const stale = run(root, 'save', '--in', join(root, 'draft.json'), '--expected-cv-sha', 'f'.repeat(64), '--json');
   assert.equal(stale.status, 4);
   assert.equal(read(root, 'cv.md'), cvBefore, 'cv.md untouched');
-  assert.ok(JSON.parse(read(root, 'data/resume.json')).careerOps.pendingCvSha256, 'pending left set');
-  assert.equal(run(root, 'absorb').status, 0);
-  assert.equal('pendingCvSha256' in JSON.parse(read(root, 'data/resume.json')).careerOps, false, 'an absorb clears a refused save');
+  assert.equal(read(root, 'data/resume.json'), jsonBefore, 'data/resume.json untouched');
 
   const fresh = run(root, 'save', '--in', join(root, 'draft.json'), '--expected-cv-sha', sha256(cvBefore), '--json');
   assert.equal(fresh.status, 0, fresh.stdout + fresh.stderr);

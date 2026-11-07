@@ -50,3 +50,10 @@ test('unmapped lists the slotless sections', () => {
   assert.deepEqual([...unmapped].sort(), ['languages', 'publications', 'references', 'volunteer']);
   assert.deepEqual(resumeToPayload(sample(), { hide: ['languages'] }).unmapped.includes('languages'), false);
 });
+
+test('hiding one role id keeps the other role of that company', () => {
+  const data = sample();
+  const [lead, engineer] = data.sections.experience.items.find((i) => i.company === 'Northwind Games').roles;
+  const northwind = resumeToPayload(data, { hideItems: [engineer.id] }).payload.experience.filter((e) => e.company === 'Northwind Games');
+  assert.deepEqual(northwind.map((e) => e.role), [lead.position]);
+});

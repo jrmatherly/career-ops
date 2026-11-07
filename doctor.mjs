@@ -1549,9 +1549,8 @@ function checkCvShape(root) {
 }
 
 // data/resume.json is derived from cv.md and records the sha of the cv.md it
-// was absorbed from. A cv.md edited since then leaves the sidecar (and the web
-// editor that reads it) behind. Read with a plain JSON.parse so doctor does not
-// load the resume schema.
+// was absorbed from. A cv.md edited since then leaves the sidecar behind. Read
+// with a plain JSON.parse so doctor does not load the resume schema.
 function checkResumeSidecar(root) {
   const path = join(root, 'data', 'resume.json');
   if (!existsSync(path)) return null;

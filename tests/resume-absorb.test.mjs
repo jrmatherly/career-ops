@@ -200,3 +200,81 @@ test('the generated sample absorbs lossless with no prior, through every section
   assert.equal(custom.items.length, 2);
   assert.deepEqual(absorb(md, data).data, data, 'a second absorb is a fixed point');
 });
+
+test('changed dates yield one orphan carrying the stored id plus one new entry, and pairOrphan makes it lossless', () => {
+  const p = absorb(fixture('cv-example-shape.md'), null).data;
+  const original = experience(p, 'TechFin Corp');
+  const md = edit(fixture('cv-example-shape.md'), '\n2020-2024\n', '\n2021-2024\n');
+  const { data, report, lossless } = absorb(md, p);
+  assert.equal(lossless, false);
+  assert.equal(report.changed, 0);
+  assert.equal(report.orphans.length, 1);
+  assert.equal(report.orphans[0].id, original.id);
+  assert.equal(report.newEntries.length, 1);
+  assert.equal(report.newEntries[0].period, '2021-2024');
+  assert.equal(absorb(md, pairOrphan(data, report.orphans[0].id, report.newEntries[0].id)).lossless, true);
+});
+
+test('a removed entry is one orphan with the stored id and no new entry', () => {
+  const p = absorb(fixture('cv-example-shape.md'), null).data;
+  const md = edit(fixture('cv-example-shape.md'), /### DataStartup Inc[\s\S]*?(?=## Projects)/, '');
+  const { report, lossless } = absorb(md, p);
+  assert.equal(lossless, false);
+  assert.equal(report.removed, 1);
+  assert.equal(report.orphans[0].id, experience(p, 'DataStartup Inc').id);
+  assert.deepEqual(report.newEntries, []);
+});
+
+test('a hard-wrapped lead paragraph is not lossless though the report is otherwise empty', () => {
+  const p = prior();
+  const { report, lossless } = absorb(edit(resumeToCvMarkdown(p), 'Joined as the second hire.', 'Joined as the\nsecond hire.'), p);
+  assert.equal(lossless, false);
+  assert.deepEqual(report.orphans, []);
+  assert.deepEqual(report.newEntries, []);
+  assert.deepEqual(report.unparsed, []);
+});
+
+test('an H1 without the CV prefix absorbs lossless and records titlePrefix false', () => {
+  const md = edit(fixture('cv-example-shape.md'), '# CV -- Alex Chen', '# Alex Chen');
+  const { data, lossless } = absorb(md, null);
+  assert.equal(lossless, true);
+  assert.equal(data.basics.name, 'Alex Chen');
+  assert.equal(data.careerOps.cvStyle.titlePrefix, false);
+  assert.equal(resumeToCvMarkdown(data), md);
+  assert.equal(absorb(fixture('cv-example-shape.md'), null).data.careerOps.cvStyle.titlePrefix, true);
+  assert.equal(sample().careerOps.cvStyle.titlePrefix, true, 'the default style keeps the prefix');
+});
+
+test('the save gate refuses editor drafts whose cv.md cannot absorb back', () => {
+  const emptyPosition = prior();
+  experience(emptyPosition, 'Cascade Studios').position = '';
+  assert.equal(absorb(resumeToCvMarkdown(emptyPosition), emptyPosition).lossless, false, 'an empty position');
+  const dashedCompany = prior();
+  experience(dashedCompany, 'Cascade Studios').company = 'Cascade -- Studios';
+  assert.equal(absorb(resumeToCvMarkdown(dashedCompany), dashedCompany).lossless, false, 'a company containing the dash');
+});
+
+test('pairOrphan on a redated role moves it out of its company, and the item goes with its last role', () => {
+  const p = prior();
+  const northwind = experience(p, 'Northwind Games');
+  const roleIds = northwind.roles.map((r) => r.id);
+  const once = edit(resumeToCvMarkdown(p), '\n2016 – 2018\n', '\n2015 – 2018\n');
+  const first = absorb(once, p);
+  assert.deepEqual(first.report.orphans.map((o) => o.id), [roleIds[1]]);
+  const paired = pairOrphan(first.data, roleIds[1], first.report.newEntries[0].id);
+  assert.deepEqual(experience(paired, 'Northwind Games').roles.map((r) => r.id), [roleIds[0]]);
+  assert.equal(absorb(once, paired).lossless, true);
+
+  const twice = edit(once, '\n2018 – 2020\n', '\n2018 – 2021\n');
+  const second = absorb(twice, absorb(once, paired).data);
+  assert.deepEqual(second.report.orphans.map((o) => o.id), [roleIds[0]]);
+  const emptied = pairOrphan(second.data, roleIds[0], second.report.newEntries[0].id);
+  assert.equal(emptied.sections.experience.items.some((i) => i.id === northwind.id), false, 'the item left with no roles is removed');
+  assert.equal(absorb(twice, emptied).lossless, true);
+});
+
+test('a cv.md with CRLF line endings absorbs lossless', () => {
+  const { lossless, report } = absorb(fixture('cv-example-shape.md').replace(/\n/g, '\r\n'), null);
+  assert.equal(lossless, true);
+  assert.deepEqual(report.unparsed, []);
+});

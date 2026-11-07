@@ -8,10 +8,10 @@
  *   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
  *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
  *
- * Exit codes: 0 ok, 1 usage or read error, 3 the lossless gate failed (nothing
- * written), 4 save with a stale --expected-cv-sha (cv.md untouched).
+ * Exit codes: 0 ok, 1 any other error, 3 the lossless gate failed (nothing
+ * written), 4 save with a stale --expected-cv-sha (nothing written).
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
@@ -52,6 +52,13 @@ function readDraft(path) {
 
 const describe = (ref) => (ref.company !== undefined ? `${ref.company} / ${ref.position} / ${ref.period}` : `${ref.section}: ${ref.name}`);
 
+function printFindings(report) {
+  for (const o of report.orphans) console.log(`  orphan ${o.id}: ${describe(o)} (in resume.json, not in cv.md)`);
+  for (const n of report.newEntries) console.log(`  new entry ${n.id}: ${describe(n)}`);
+  for (const u of report.unparsed) console.log(`  unparsed line ${u.line}: ${u.text}`);
+  if (report.orphans.length && report.newEntries.length) console.log('  A renamed or redated entry: node resume.mjs pair <orphanId> <newId>');
+}
+
 function printReport({ report, lossless }, json, extra = {}) {
   if (json) {
     console.log(JSON.stringify({ ...report, lossless, ...extra }, null, 2));
@@ -59,11 +66,8 @@ function printReport({ report, lossless }, json, extra = {}) {
   }
   console.log(`cv.md ${lossless ? 'absorbs losslessly' : 'does not absorb losslessly'}${extra.written ? '; data/resume.json written' : extra.written === false && !lossless ? '; nothing written' : ''}`);
   console.log(`  kept ${report.kept}, changed ${report.changed}, added ${report.added}, removed ${report.removed}`);
-  for (const o of report.orphans) console.log(`  orphan ${o.id}: ${describe(o)} (in resume.json, not in cv.md)`);
-  for (const n of report.newEntries) console.log(`  new entry ${n.id}: ${describe(n)}`);
-  for (const u of report.unparsed) console.log(`  unparsed line ${u.line}: ${u.text}`);
-  if (report.orphans.length && report.newEntries.length) console.log('  A renamed or redated entry: node resume.mjs pair <orphanId> <newId>');
-  if (report.unparsed.length) console.log('  Lines outside the cv.md grammar: node resume.mjs adopt shows the normalised file');
+  printFindings(report);
+  if (!lossless) console.log('  To see how cv.md differs from the file regenerated from it: node resume.mjs adopt');
 }
 
 /** A unified-style line diff with two lines of context, from a longest common subsequence. */
@@ -107,7 +111,7 @@ async function absorbCommand(root, json) {
     printReport(result, json, { written: false });
     return 3;
   }
-  // A pending sha left by a refused save no longer describes this data.
+  // A pending sha left by a save that stopped before writing cv.md no longer describes this data.
   markInSync(result.data, cvSha);
   const written = !prior || serialize(prior) !== serialize(result.data);
   if (written) await writeResume(root, result.data);
@@ -120,17 +124,19 @@ async function adoptCommand(root, confirm) {
   const cv = readCv(root);
   const result = absorb(cv, readResume(root));
   const generated = resumeToCvMarkdown(result.data);
-  for (const u of result.report.unparsed) console.log(`unparsed line ${u.line}: ${u.text}`);
+  printFindings(result.report);
+  if (result.report.orphans.length) console.log('  --confirm writes the orphaned entries back into cv.md');
   console.log(generated === cv ? 'cv.md is already in the generated shape' : lineDiff(cv, generated));
   if (!confirm) {
-    console.log('\nNothing written. Run node resume.mjs adopt --confirm to replace cv.md (a copy is kept as cv.md.bak).');
+    console.log('\nNothing written. Run node resume.mjs adopt --confirm to replace cv.md (a copy is kept as cv.md.bak, or a timestamped .bak when that exists).');
     return 0;
   }
-  writeFileAtomic(`${cvPath}.bak`, cv);
+  const bak = existsSync(`${cvPath}.bak`) ? `${cvPath}.${Date.now()}.bak` : `${cvPath}.bak`;
+  writeFileAtomic(bak, cv);
   replaceUserFile(cvPath, generated);
   markInSync(result.data, sha256(generated));
   await writeResume(root, result.data);
-  console.log('\ncv.md replaced (previous copy in cv.md.bak); data/resume.json written');
+  console.log(`\ncv.md replaced (previous copy in ${bak}); data/resume.json written`);
   return 0;
 }
 
@@ -176,7 +182,7 @@ function exportCommand(root, kind, args) {
     const { payload, unmapped } = resumeToPayload(data, { hide: list(flagValue(args, '--hide')), hideItems: list(flagValue(args, '--hide-item')) });
     text = JSON.stringify(hasFlag(args, '--json') && !out ? { payload, unmapped } : payload, null, 2) + '\n';
   }
-  if (out) writeFileSync(out, text);
+  if (out) writeFileAtomic(out, text);
   else process.stdout.write(text);
   return 0;
 }
@@ -192,13 +198,13 @@ async function saveCommand(root, args) {
     return 3;
   }
   const cvPath = join(root, 'cv.md');
-  data.careerOps.pendingCvSha256 = sha256(generated);
-  await writeResume(root, data);
   const current = existsSync(cvPath) ? sha256(readFileSync(cvPath, 'utf8')) : '';
   if (current !== expected) {
-    console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current }) : `cv.md changed since the draft was opened (sha ${current}); cv.md untouched`);
+    console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current }) : `cv.md changed since the draft was opened (sha ${current}); nothing written`);
     return 4;
   }
+  data.careerOps.pendingCvSha256 = sha256(generated);
+  await writeResume(root, data);
   replaceUserFile(cvPath, generated);
   markInSync(data, sha256(generated));
   await writeResume(root, data);
@@ -210,8 +216,8 @@ export async function main(args) {
   validateFlags(args, FLAGS, USAGE, { valueFlags: VALUE_FLAGS, requireOperand: true });
   const positional = args.filter((a, i) => !a.startsWith('-') && !VALUE_FLAGS.includes(args[i - 1]));
   const [command, ...rest] = positional;
-  const root = getCareerOpsRoot();
   try {
+    const root = getCareerOpsRoot();
     switch (command) {
       case 'absorb': return await absorbCommand(root, hasFlag(args, '--json'));
       case 'adopt': return await adoptCommand(root, hasFlag(args, '--confirm'));
