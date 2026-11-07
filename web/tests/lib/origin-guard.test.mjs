@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import "../helpers/web-ts-alias-loader.mjs";
+import "../helpers/next-server-stub.mjs";
 import {
   normalizeHost,
   isLoopbackHost,
@@ -343,4 +345,85 @@ test("the guard still works with no allowedOrigins passed at all", () => {
     allowedHosts: parseAllowedHosts(""),
   });
   assert.equal(d.ok, true);
+});
+
+// --- checkRequest: top-level navigations from another site -----------------
+
+const navigate = (fields) =>
+  checkRequest({
+    origin: null,
+    host: "localhost:3000",
+    allowedHosts: parseAllowedHosts(""),
+    secFetchDest: "document",
+    pathname: "/pipeline",
+    ...fields,
+  });
+
+test("GET navigate cross-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate" }).ok, true);
+});
+
+test("GET navigate same-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "same-site", method: "GET", secFetchMode: "navigate" }).ok, true);
+});
+
+test("HEAD navigate cross-site passes", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "HEAD", secFetchMode: "navigate" }).ok, true);
+});
+
+test("POST cross-site is refused", () => {
+  const d = navigate({ secFetchSite: "cross-site", method: "POST", secFetchMode: "navigate", origin: "https://evil.example.com" });
+  assert.equal(d.ok, false);
+  assert.equal(d.status, 403);
+});
+
+test("GET cross-site with Sec-Fetch-Mode cors is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "cors" }).ok, false);
+});
+
+test("GET cross-site with no Sec-Fetch-Mode is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: null }).ok, false);
+});
+
+test("a cross-site iframe navigation (Sec-Fetch-Dest iframe) is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", secFetchDest: "iframe" }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", secFetchDest: null }).ok, false);
+});
+
+test("a cross-site navigation to an /api route is refused", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: "/api/portals/verify" }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: "/api/healthz" }).ok, false);
+});
+
+test("a navigation with no pathname is refused (the /api exclusion fails closed)", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: undefined }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: null }).ok, false);
+});
+
+test("navigation does not bypass the Host filter", () => {
+  const d = navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", host: "192.168.1.50:3000" });
+  assert.equal(d.ok, false);
+  assert.equal(d.status, 403);
+});
+
+test("same-origin and none still pass when method and secFetchMode are omitted", () => {
+  assert.equal(navigate({ secFetchSite: "same-origin", origin: "http://localhost:3000" }).ok, true);
+  assert.equal(navigate({ secFetchSite: "none" }).ok, true);
+});
+
+test("proxy.ts hands the guard the method, Sec-Fetch-Mode, Sec-Fetch-Dest and path", async () => {
+  const { proxy } = await import("@/proxy.ts");
+  const request = (method, pathname) => ({
+    method,
+    headers: new Headers({
+      host: "localhost:3000",
+      "sec-fetch-site": "cross-site",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-dest": "document",
+    }),
+    nextUrl: new URL(`http://localhost:3000${pathname}`),
+  });
+  assert.equal(proxy(request("GET", "/pipeline")).status, 200);
+  assert.equal(proxy(request("GET", "/api/healthz")).status, 403);
+  assert.equal(proxy(request("POST", "/pipeline")).status, 403);
 });

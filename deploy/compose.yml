@@ -1,0 +1,19 @@
+# A local smoke run of the server image against a scratch data root.
+# Never a deployment manifest.
+services:
+  career-ops-web:
+    image: career-ops-server:dev
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "127.0.0.1:${CAREER_OPS_SMOKE_PORT:-3000}:3000"
+    environment:
+      - CAREER_OPS_ROOT=/data
+      - CAREER_OPS_WEB_ALLOWED_HOSTS=career-ops-web
+      - CLAUDE_CODE_OAUTH_TOKEN
+    volumes:
+      - "${CAREER_OPS_SMOKE_ROOT:-./smoke-data}:/data"
+    shm_size: 1g
+    tmpfs:
+      - /tmp

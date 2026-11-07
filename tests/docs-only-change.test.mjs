@@ -227,7 +227,8 @@ test('every step of a skipped leg is skipped, apart from the one saying why', ()
 });
 
 test('the optional jobs skip on a docs-only PR, and a failed classifier runs them', () => {
-  for (const name of ['cv-visual', 'tool-suites', 'upgrade-gate', 'dependency-audit']) {
+  // Fork: 'publish' is the publish service's job (PR-12).
+  for (const name of ['cv-visual', 'tool-suites', 'upgrade-gate', 'dependency-audit', 'publish']) {
     const job = jobs[name];
     assert.equal(job.needs, 'changes', name);
     assert.match(job.if, /!cancelled\(\)/, name);
