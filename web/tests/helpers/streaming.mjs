@@ -27,8 +27,11 @@ export async function settled(page, action) {
       { timeout: TIMEOUT_MS },
     );
   } catch (err) {
-    const ids = await page.evaluate((selector) => [...document.querySelectorAll(selector)].map((el) => el.id), HIDDEN_SEGMENT).catch(() => []);
-    throw new Error(`streaming reveal did not finish within ${TIMEOUT_MS} ms; still hidden: ${ids.join(", ") || "(none)"}`, { cause: err });
+    const state = await page.evaluate((selector) => ({
+      readyState: document.readyState,
+      ids: [...document.querySelectorAll(selector)].map((el) => el.id),
+    }), HIDDEN_SEGMENT).catch(() => ({ readyState: "unknown", ids: [] }));
+    throw new Error(`streaming reveal did not finish within ${TIMEOUT_MS} ms; readyState ${state.readyState}, still hidden: ${state.ids.join(", ") || "(none)"}`, { cause: err });
   }
   return result;
 }

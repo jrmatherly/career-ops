@@ -119,7 +119,11 @@ function startServer(root, port, log) {
   return { child, exited };
 }
 
-const SEGMENT_DELAY_MS = Number(process.env.BROWSER_SUITES_SEGMENT_DELAY_MS) || 0;
+const SEGMENT_DELAY_MS = Number(process.env.BROWSER_SUITES_SEGMENT_DELAY_MS ?? 0);
+if (!Number.isInteger(SEGMENT_DELAY_MS) || SEGMENT_DELAY_MS < 0) {
+  console.error(`❌ BROWSER_SUITES_SEGMENT_DELAY_MS must be a whole number of milliseconds, not "${process.env.BROWSER_SUITES_SEGMENT_DELAY_MS}"`);
+  process.exit(1);
+}
 
 async function waitReady(url, server) {
   const deadline = Date.now() + READY_TIMEOUT_MS;

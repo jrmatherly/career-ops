@@ -18,6 +18,10 @@ export function startDelayProxy(upstreamPort, delayMs) {
     const headers = { ...req.headers };
     delete headers["accept-encoding"]; // the split needs plain bytes
     const up = http.request({ host: "127.0.0.1", port: upstreamPort, path: req.url, method: req.method, headers }, (ur) => {
+      // A browser that navigates away mid-stream resets the socket; neither side's
+      // error may become an unhandled event that takes the runner down.
+      ur.on("error", () => res.destroy());
+      res.on("error", () => up.destroy());
       // RSC payloads are text/x-component; only the document carries the segment.
       if (!String(ur.headers["content-type"]).includes("text/html")) { res.writeHead(ur.statusCode, ur.headers); ur.pipe(res); return; }
       const h = { ...ur.headers };
