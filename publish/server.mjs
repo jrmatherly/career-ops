@@ -210,19 +210,19 @@ export function createServer(config) {
   ];
 
   const server = http.createServer(async (req, res) => {
+    let matched = null;
     try {
       const { pathname } = new URL(req.url, 'http://local');
       for (const r of routes) {
         const m = r.method === req.method && pathname.match(r.pattern);
-        if (m) return await r.handler(req, res, m);
+        if (m) { matched = r; return await r.handler(req, res, m); }
       }
       plain(res, 404, 'Not found');
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
-      // A feedback token is a bearer secret, so the log keeps the route shape only.
-      const path = String(req.url).split('?')[0].replace(/^\/f\/.+/, '/f/[token]');
-      console.error('request failed', { method: req.method, path, client: clientKey(req, config) }, e);
+      // A feedback token is a bearer secret, so the log names the route pattern and nothing from the URL.
+      console.error('request failed', { method: req.method, route: matched?.pattern.source ?? 'unmatched', client: clientKey(req, config) }, e);
       plain(res, 500, 'Internal error');
     }
   });
