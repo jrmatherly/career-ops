@@ -1,0 +1,5 @@
+# DL3008 wants apt-get packages pinned to a version. Ubuntu drops old package
+# versions from the archive within weeks, so a pin breaks the build rather than
+# making it reproducible. The base image digest pin is the reproducibility guarantee.
+ignored:
+  - DL3008
