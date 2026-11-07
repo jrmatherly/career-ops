@@ -287,8 +287,9 @@ jobs:
     name: "📤 Publish service"
     # The share-page service under publish/ has its own package.json and its
     # own node:test suite; nothing under the root tests/ imports it, so the
-    # test job never exercises it. Runs on the Node floor (lib/node-floor.mjs),
-    # like the test job. Not a required check.
+    # test job never exercises it. Runs on the service's own floor, 22.16:
+    # Better Auth's node:sqlite dialect calls StatementSync.columns(), which
+    # 22.13 (the root floor, lib/node-floor.mjs) lacks. Not a required check.
     needs: changes
     # Skipped on a docs-only PR for the reason given on cv-visual.
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
@@ -302,14 +303,14 @@ jobs:
       - name: "🟢 Set up Node"
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22.13'
-      # The service itself has no dependencies, but the share CLI imports
-      # root modules that need js-yaml and spawns resume.mjs, which needs zod,
-      # so the root install runs here as in the test job. The
-      # root .gitignore ignores every package-lock.json but web/'s, so there is
-      # no lockfile for `npm ci`. The day publish/ itself gets a dependency,
-      # un-ignore publish/package-lock.json and add `npm --prefix publish ci`.
+          node-version: '22.16'
+      # The share CLI imports root modules that need js-yaml and spawns
+      # resume.mjs, which needs zod, so the root install runs here as in the
+      # test job; the root has no lockfile (the root .gitignore ignores it).
       - name: "📦 Install root dependencies"
         run: npm install --ignore-scripts
+      # The service's own dependencies (Better Auth), from its tracked lockfile.
+      - name: "📦 Install publish dependencies"
+        run: npm --prefix publish ci --ignore-scripts
       - name: "🧪 Publish service tests"
         run: npm --prefix publish test

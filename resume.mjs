@@ -8,10 +8,12 @@
  *   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
  *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
  *   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
+ *   node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]
  *
  * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
  * 3 the lossless gate failed (nothing written), 4 save with a stale
- * --expected-cv-sha (nothing written).
+ * --expected-cv-sha (nothing written). check is advisory: it exits 0 whatever
+ * it finds, and 3 only while the absorb gate fails, like export.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -24,6 +26,7 @@ import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
 import { detectFormat, FORMATS, ImportError, importResume } from './lib/resume/import/detect.mjs';
+import { CHECK_RULE_IDS, checkResume } from './lib/resume/check.mjs';
 
 const USAGE = `Usage:
   node resume.mjs absorb [--json]
@@ -31,8 +34,9 @@ const USAGE = `Usage:
   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
   node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
-  node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]`;
-const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--format'];
+  node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
+  node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]`;
+const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--format', '--ignore'];
 const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--replace-cv', '--help', '-h'];
 
 class UsageError extends Error {}
@@ -166,19 +170,20 @@ async function pairCommand(root, ids) {
   return 0;
 }
 
+/** The --in draft, or cv.md absorbed in memory; null (after printing the report) while the gate fails. */
+function loadData(root, args, json = false) {
+  const inPath = flagValue(args, '--in');
+  if (inPath) return readDraft(inPath);
+  const result = absorb(readCv(root), readResume(root));
+  if (result.lossless) return result.data;
+  printReport(result, json, { written: false });
+  return null;
+}
+
 function exportCommand(root, kind, args) {
   if (kind !== 'cv-md' && kind !== 'payload') throw new UsageError('export takes cv-md or payload');
-  const inPath = flagValue(args, '--in');
-  let data;
-  if (inPath) data = readDraft(inPath);
-  else {
-    const result = absorb(readCv(root), readResume(root));
-    if (!result.lossless) {
-      printReport(result, false, { written: false });
-      return 3;
-    }
-    data = result.data;
-  }
+  const data = loadData(root, args);
+  if (!data) return 3;
   const out = flagValue(args, '--out');
   let text;
   if (kind === 'cv-md') text = resumeToCvMarkdown(data);
@@ -213,6 +218,25 @@ async function saveCommand(root, args) {
   markInSync(data, sha256(generated));
   await writeResume(root, data);
   console.log(json ? JSON.stringify({ written: true, cvSha256: data.careerOps.cvSha256 }) : 'cv.md and data/resume.json written');
+  return 0;
+}
+
+function checkCommand(root, args) {
+  const ignore = list(flagValue(args, '--ignore'));
+  const unknown = ignore.filter((id) => !CHECK_RULE_IDS.includes(id));
+  if (unknown.length) throw new UsageError(`unknown rule id ${unknown.join(', ')}; --ignore takes ${CHECK_RULE_IDS.join(', ')}`);
+  const json = hasFlag(args, '--json');
+  const data = loadData(root, args, json);
+  if (!data) return 3;
+  const report = checkResume(data, { ignore });
+  if (!report.templateKnown) console.error(`resume: template "${data.careerOps.template}" is not in lib/resume/template-layouts.mjs; the layout rules assume one column with no sidebar`);
+  if (json) {
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+  console.log(`Check score ${report.score}/100 (${report.passedRules} of ${report.totalRules} rules pass)`);
+  for (const f of report.findings) console.log(`${f.id} ${f.category} ${f.path}  ${f.message}`);
+  if (report.ignored.length) console.log(`${report.ignored.length} ignored: ${report.ignored.map((f) => `${f.id} ${f.path}`).join(', ')}`);
   return 0;
 }
 
@@ -291,6 +315,7 @@ export async function main(args) {
       case 'export': return exportCommand(root, rest[0], args);
       case 'save': return await saveCommand(root, args);
       case 'import': return await importCommand(root, rest[0], args);
+      case 'check': return checkCommand(root, args);
       default: throw new UsageError(command ? `unknown command: ${command}` : 'no command given');
     }
   } catch (err) {
