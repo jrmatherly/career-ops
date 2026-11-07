@@ -1,52 +1,55 @@
 import { runCoreCli } from "@/lib/core-cli";
 import { readJsonObject } from "@/lib/json-body";
-import { adoptInputsSha, failure, usageResponse } from "@/lib/resume-cli";
+import { adoptInputsSha, failure, usageResponse, validSha } from "@/lib/resume-cli";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SHA_RE = /^[0-9a-f]{64}$/;
 const DIFF_START = "--- cv.md";
 const SAME_SHAPE = "cv.md is already in the generated shape";
 
 // shortcut: resume.mjs adopt has no --json; switch to it when it does
-function parseAdopt(stdout: string): { findings: string[]; diff: string | null } | null {
+function parseDiff(stdout: string): { diff: string | null } | null {
   const lines = stdout.split("\n");
-  const same = lines.indexOf(SAME_SHAPE);
-  const start = same === -1 ? lines.indexOf(DIFF_START) : same;
-  if (start === -1) return null;
-  const findings = lines
-    .slice(0, start)
-    .filter((l) => l.startsWith("  ") && !l.includes("node resume.mjs") && !l.includes("--confirm"))
-    .map((l) => l.trim());
-  if (same !== -1) return { findings, diff: null };
+  if (lines.includes(SAME_SHAPE)) return { diff: null };
+  const start = lines.indexOf(DIFF_START);
   const end = lines.findIndex((l, i) => i > start && l === "" && lines[i + 1]?.startsWith("Nothing written"));
-  return end === -1 ? null : { findings, diff: lines.slice(start, end).join("\n") };
+  return start === -1 || end === -1 ? null : { diff: lines.slice(start, end).join("\n") };
+}
+
+async function adopt(req: Request): Promise<Response> {
+  const body = await readJsonObject<{ confirm?: unknown; expectedSha?: unknown }>(req);
+  if (!body || (body.confirm !== undefined && body.confirm !== true)) return Response.json({ error: "body must be {} or { confirm: true, expectedSha }" }, { status: 400 });
+  if (body.confirm === true && !validSha(body.expectedSha)) return Response.json({ error: "expectedSha must be sha256 hex" }, { status: 400 });
+
+  const before = await adoptInputsSha();
+  if (!before) return Response.json({ error: "cv.md not found" }, { status: 404 });
+
+  if (body.confirm !== true) {
+    const r = await runCoreCli("resume", ["adopt"]);
+    if (r.code !== 0) return usageResponse(r) ?? failure(r, "adopt");
+    if ((await adoptInputsSha()) !== before) return Response.json({ error: "cv.md or data/resume.json changed while the diff was computed; try again" }, { status: 409 });
+    const parsed = parseDiff(r.stdout);
+    if (parsed) return Response.json({ inputsSha: before, ...parsed });
+    console.error(`resume.mjs adopt: output not in the expected shape\n${r.stdout.slice(-2000)}`);
+    return Response.json({ error: "could not read the adopt diff; see the server log" }, { status: 502 });
+  }
+
+  if (before !== body.expectedSha) return Response.json({ error: "cv.md or data/resume.json changed since the diff was shown; review the new diff before adopting" }, { status: 409 });
+  // The sha check and the CLI's read of cv.md and resume.json are not atomic; a write in between is adopted unseen.
+  const r = await runCoreCli("resume", ["adopt", "--confirm"]);
+  // Exit 0 means cv.md was replaced; the message only names the backup.
+  if (r.code === 0) return Response.json({ ok: true, message: r.stdout.split("\n").find((l) => l.startsWith("cv.md replaced")) ?? "cv.md replaced" });
+  return usageResponse(r) ?? failure(r, "adopt", ". cv.md may have changed: reload before trying again.");
 }
 
 export async function POST(req: Request) {
-  const body = await readJsonObject<{ confirm?: unknown; expectedSha?: unknown }>(req);
-  if (!body || (body.confirm !== undefined && body.confirm !== true)) return Response.json({ error: "body must be {} or { confirm: true, expectedSha }" }, { status: 400 });
-
-  if (body.confirm !== true) {
-    const before = await adoptInputsSha();
-    if (!before) return Response.json({ error: "cv.md not found" }, { status: 404 });
-    const r = await runCoreCli("resume", ["adopt"]);
-    if ((await adoptInputsSha()) !== before) return Response.json({ error: "cv.md or data/resume.json changed while the diff was computed; try again" }, { status: 409 });
-    const parsed = r.code === 0 ? parseAdopt(r.stdout) : null;
-    if (parsed) return Response.json({ inputsSha: before, ...parsed });
-    return usageResponse(r) ?? failure(r, "adopt");
+  try {
+    return await adopt(req);
+  } catch (err) {
+    // adoptInputsSha rethrows anything but a missing file (EACCES, EISDIR); answer JSON, not Next's HTML 500.
+    console.error("resume adopt failed", err);
+    const code = (err as NodeJS.ErrnoException).code;
+    return Response.json({ error: code ? `could not read cv.md or data/resume.json (${code})` : "resume adopt failed; see the server log" }, { status: 500 });
   }
-
-  if (typeof body.expectedSha !== "string" || !SHA_RE.test(body.expectedSha)) return Response.json({ error: "expectedSha must be sha256 hex" }, { status: 400 });
-  const current = await adoptInputsSha();
-  if (!current) return Response.json({ error: "cv.md not found" }, { status: 404 });
-  if (current !== body.expectedSha) return Response.json({ error: "cv.md or data/resume.json changed since the diff was shown; review the new diff before adopting" }, { status: 409 });
-  // The sha check and the CLI's own read of cv.md are not atomic; a write in between is adopted unseen.
-  const r = await runCoreCli("resume", ["adopt", "--confirm"]);
-  if (r.code === 0) {
-    const message = r.stdout.split("\n").find((l) => l.startsWith("cv.md replaced"));
-    if (message) return Response.json({ ok: true, message });
-  }
-  return usageResponse(r) ?? failure(r, "adopt", ". cv.md may have changed: reload before trying again.");
 }

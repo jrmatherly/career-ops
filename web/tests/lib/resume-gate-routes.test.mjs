@@ -5,6 +5,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -54,6 +55,7 @@ const postAdopt = (body) => call(adopt.POST, body);
 
 let orphanId;
 let newId;
+let inSyncId;
 
 test("a renamed company reads back as one orphan and one new entry", async () => {
   assert.equal((await get()).body.lossless, true);
@@ -64,15 +66,38 @@ test("a renamed company reads back as one orphan and one new entry", async () =>
   assert.equal(body.report.newEntries.length, 1);
   orphanId = body.report.orphans[0].id;
   newId = body.report.newEntries[0].id;
+  inSyncId = body.data.sections.experience.items.find((e) => e.company === "TechFin Corp").id;
 });
 
 test("pair rejects malformed, flag-like, duplicate and unknown ids with 400", async () => {
-  for (const body of ["not json", {}, { pairs: [] }, { pairs: [[orphanId]] }, { pairs: [["--confirm", "x"]] }, { pairs: [[orphanId, "-x"]] }, { pairs: [[orphanId, newId], [orphanId, newId]] }]) {
+  for (const body of ["not json", {}, { pairs: [] }, { pairs: [[orphanId]] }, { pairs: [["--confirm", "x"]] }, { pairs: [[orphanId, "-x"]] }, { pairs: [[orphanId, newId], [orphanId, newId]] }, { pairs: [[orphanId, newId], [inSyncId, newId]] }]) {
     assert.equal((await postPair(body)).status, 400, JSON.stringify(body));
   }
   const unknown = await postPair({ pairs: [["nope", newId]] });
   assert.equal(unknown.status, 400);
-  assert.match(unknown.body.error, /no entry with id nope/);
+  assert.match(unknown.body.error, /nope is not a pairable orphan/);
+});
+
+test("pair refuses ids the current report does not offer, and writes nothing", async () => {
+  const keptSidecar = readFileSync(sidecar, "utf8");
+  // An in-sync entry is not an orphan: pairOrphan would move its id onto the new entry.
+  for (const [pairs, re] of [[[[inSyncId, newId]], /is not a pairable orphan/], [[[orphanId, orphanId]], /is not a new entry/], [[["experience", newId]], /is not a pairable orphan/]]) {
+    const { status, body } = await postPair({ pairs });
+    assert.equal(status, 400, JSON.stringify(pairs));
+    assert.match(body.error, re);
+  }
+  const kept = readFileSync(cvPath, "utf8");
+  writeFileSync(cvPath, kept.replace("**ML/AI:**", "**ML and AI:**"));
+  try {
+    const skill = (await get()).body.report.newEntries.find((e) => e.section === "skills");
+    assert.ok(skill, "the renamed skill is a new entry");
+    const cross = await postPair({ pairs: [[orphanId, skill.id]] });
+    assert.equal(cross.status, 400);
+    assert.match(cross.body.error, /different kinds/);
+  } finally {
+    writeFileSync(cvPath, kept);
+  }
+  assert.equal(readFileSync(sidecar, "utf8"), keptSidecar);
 });
 
 test("pair that leaves the gate failing is 422 with the report and writes nothing", async () => {
@@ -83,6 +108,7 @@ test("pair that leaves the gate failing is 422 with the report and writes nothin
     const { status, body } = await postPair({ pairs: [[orphanId, newId]] });
     assert.equal(status, 422);
     assert.match(body.output, /unparsed line/);
+    assert.doesNotMatch(body.output, /node resume\.mjs/);
     assert.equal(readFileSync(sidecar, "utf8"), keptSidecar);
   } finally {
     writeFileSync(cvPath, kept);
@@ -96,6 +122,7 @@ test("pair keeps the old id and makes cv.md lossless", async () => {
   assert.equal(reopened.body.lossless, true);
   const entry = reopened.body.data.sections.experience.items.find((e) => e.company === "DataStartupCo Inc");
   assert.equal(entry.id, orphanId);
+  assert.equal((await postPair({ pairs: [[orphanId, newId]] })).status, 409, "nothing left to pair");
 });
 
 let preview;
@@ -107,8 +134,6 @@ test("adopt preview shows the findings and the diff and writes nothing", async (
   const { status, body } = await postAdopt({});
   assert.equal(status, 200, JSON.stringify(body));
   assert.match(body.inputsSha, /^[0-9a-f]{64}$/);
-  assert.ok(body.findings.some((f) => f.startsWith("unparsed line")), JSON.stringify(body.findings));
-  assert.ok(!body.findings.some((f) => f.includes("node resume.mjs")));
   assert.ok(body.diff.startsWith("--- cv.md\n"));
   assert.match(body.diff, /^-- stray bullet without a bold lead$/m);
   assert.doesNotMatch(body.diff, /Nothing written/);
@@ -150,8 +175,23 @@ test("adopt confirm with the preview's sha replaces cv.md and keeps a backup", a
   assert.match(body.message, /^cv\.md replaced/);
   assert.equal(readFileSync(`${cvPath}.bak`, "utf8"), cvBefore);
   assert.doesNotMatch(readFileSync(cvPath, "utf8"), /stray bullet/);
+  const written = JSON.parse(readFileSync(sidecar, "utf8"));
+  assert.equal(written.careerOps.cvSha256, createHash("sha256").update(readFileSync(cvPath)).digest("hex"), "adopt wrote resume.json for the new cv.md");
   assert.equal((await get()).body.lossless, true);
   assert.equal((await postAdopt({})).body.diff, null);
+});
+
+test("adopt works on a cv.md that was never absorbed", async () => {
+  rmSync(sidecar);
+  writeFileSync(cvPath, readFileSync(cvPath, "utf8") + STRAY);
+  const shown = await postAdopt({});
+  assert.equal(shown.status, 200, JSON.stringify(shown.body));
+  assert.ok(shown.body.diff);
+  assert.equal(existsSync(sidecar), false, "preview writes no sidecar");
+  const done = await postAdopt({ confirm: true, expectedSha: shown.body.inputsSha });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.ok(existsSync(sidecar));
+  assert.equal((await get()).body.lossless, true);
 });
 
 test("adopt without cv.md is a 404", async () => {
@@ -164,7 +204,7 @@ test("adopt without cv.md is a 404", async () => {
   }
 });
 
-// Read as text: the panel is a client component that pulls in React.
+// Read as text: node --experimental-strip-types cannot load .tsx.
 test("the design panel has one field per STYLE_VAR_MAP key", async () => {
   const { STYLE_VAR_MAP } = await import(pathToFileURL(join(codeRoot, "theme-style.mjs")).href);
   const source = readFileSync(join(codeRoot, "web", "src", "components", "resume", "design-panel.tsx"), "utf8");

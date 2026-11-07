@@ -47,7 +47,7 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
 // A route that throws answers with an HTML error page, not JSON.
 const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
-export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
+export function ResumeEditor({ templates, templatesError }: { templates: TemplateOption[]; templatesError?: string }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
   const [html, setHtml] = useState("");
   // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
@@ -58,6 +58,8 @@ export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
   const editDelay = useRef(300);
   // Bumped after a pairing or an adoption so the editor reloads cv.md.
   const [generation, setGeneration] = useState(0);
+  // What the last pairing or adoption reported, such as where the cv.md backup went.
+  const [notice, setNotice] = useState<string | null>(null);
   const requestNo = useRef(0);
 
   useEffect(() => {
@@ -112,7 +114,13 @@ export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  const resolved = (message?: string) => {
+    setNotice(message ?? null);
+    setGeneration((g) => g + 1);
+  };
+
   const edit = (next: ResumeDraft, delay = 300) => {
+    setNotice(null);
     performance.mark("resume-edit");
     edited.current = true;
     editDelay.current = delay;
@@ -144,13 +152,18 @@ export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
         Edit your CV as structured sections. Save writes <code className="text-foreground">cv.md</code>.
       </p>
 
+      {notice && (
+        <p role="status" className="mt-4 text-sm text-foreground">
+          {notice}
+        </p>
+      )}
       {status.kind === "loading" && <p className="mt-6 text-sm text-muted">Loading…</p>}
       {status.kind === "error" && (
         <p role="alert" className="mt-6 text-sm text-red-700 dark:text-red-300">
           {status.message}
         </p>
       )}
-      {status.kind === "readonly" && <GatePanel key={generation} report={state.report} absorbed={state.data !== null} onResolved={() => setGeneration((g) => g + 1)} />}
+      {status.kind === "readonly" && <GatePanel key={generation} report={state.report} absorbed={state.data !== null} onResolved={resolved} />}
 
       {editable && data && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -175,6 +188,11 @@ export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
                 Design
               </h2>
               <TemplatePicker templates={templates} value={data.careerOps?.template ?? "default"} onChange={(v) => edit(setField(data, ["careerOps", "template"], v), 0)} />
+              {templatesError && (
+                <p role="alert" className="text-xs text-red-700 dark:text-red-300">
+                  Templates could not be listed: {templatesError}
+                </p>
+              )}
               <DesignPanel style={data.careerOps?.style ?? {}} onChange={(v) => edit(setField(data, ["careerOps", "style"], v))} />
             </section>
 

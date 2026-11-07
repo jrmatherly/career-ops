@@ -4,6 +4,8 @@ import path from "node:path";
 import { careerOpsRoot } from "@/lib/career-ops";
 import type { CliResult } from "@/lib/core-cli";
 
+export const validSha = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
+
 export const usageMessage = (r: CliResult) => (r.code === 1 && r.stderr.startsWith("resume: ") ? r.stderr.split("\n")[0].slice("resume: ".length) : null);
 
 export function failure(r: CliResult, what: string, advice = "") {

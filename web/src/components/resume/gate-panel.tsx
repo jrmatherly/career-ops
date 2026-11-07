@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SELECT } from "@/components/resume/template-picker";
+import { candidatesFor } from "@/lib/resume-pairing.mjs";
 
 export type Entry = { id: string; section?: string; name?: string; company?: string; position?: string; period?: string };
 export type Report = { orphans?: Entry[]; newEntries?: Entry[]; unparsed?: { line: number; text: string }[] };
@@ -22,23 +23,25 @@ const post = async (url: string, body: object): Promise<{ ok: boolean; body: { e
   return { ok: res.ok, body: await res.json().catch(() => ({ error: `HTTP ${res.status}` })) };
 };
 
-const sameKind = (a: Entry, b: Entry) => (a.company !== undefined && b.company !== undefined) || (a.section !== undefined && a.section === b.section);
-
 const DIFF_TINT = (line: string) =>
   line.startsWith("+") && !line.startsWith("+++") ? "bg-green-500/10 text-green-800 dark:text-green-400" : line.startsWith("-") && !line.startsWith("---") ? "bg-red-500/10 text-red-800 dark:text-red-400" : "";
 
-export function GatePanel({ report, absorbed, onResolved }: { report: Report | null; absorbed: boolean; onResolved: () => void }) {
+export function GatePanel({ report, absorbed, onResolved }: { report: Report | null; absorbed: boolean; onResolved: (message?: string) => void }) {
   const orphans = report?.orphans ?? [];
   const newEntries = report?.newEntries ?? [];
   const unparsed = report?.unparsed ?? [];
   const [state, setState] = useState<PanelState>({ kind: "idle" });
-  const [choices, setChoices] = useState<Record<string, string>>(() =>
-    orphans.length === 1 && newEntries.length === 1 && sameKind(orphans[0], newEntries[0]) ? { [orphans[0].id]: newEntries[0].id } : {},
-  );
+  // The same rules the pair route enforces, so the selects offer only pairs it accepts.
+  const candidates = (o: Entry): Entry[] => candidatesFor({ orphans, newEntries }, o);
+  const pairable = orphans.filter((o) => candidates(o).length > 0);
+  const [choices, setChoices] = useState<Record<string, string>>(() => {
+    const only = pairable.length === 1 ? candidates(pairable[0]) : [];
+    return only.length === 1 ? { [pairable[0].id]: only[0].id } : {};
+  });
+  const taken = new Set(Object.values(choices));
 
   // resume.mjs pair re-runs the gate, which fails while any line is unreadable.
-  const canPair = absorbed && orphans.length > 0 && newEntries.length > 0 && unparsed.length === 0;
-  const canAdopt = unparsed.length > 0 || (orphans.length > 0 && newEntries.length === 0);
+  const canPair = absorbed && pairable.length > 0 && unparsed.length === 0;
   const pairs = Object.entries(choices).filter(([, n]) => n);
   const busy = state.kind === "busy";
 
@@ -53,9 +56,9 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
       setState({ kind: "error", message: (err as Error).message });
     }
   };
-  const pair = () => run("/api/resume/pair", { pairs }, onResolved);
+  const pair = () => run("/api/resume/pair", { pairs }, () => onResolved());
   const previewAdopt = () => run("/api/resume/adopt", {}, (b) => setState({ kind: "preview", diff: b.diff, inputsSha: b.inputsSha }));
-  const confirmAdopt = (sha: string) => run("/api/resume/adopt", { confirm: true, expectedSha: sha }, onResolved);
+  const confirmAdopt = (sha: string) => run("/api/resume/adopt", { confirm: true, expectedSha: sha }, (b) => onResolved(b.message));
 
   const list = (title: string, entries: Entry[]) =>
     entries.length ? (
@@ -76,9 +79,8 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
       <p role="status" className="text-sm text-foreground">
         <code>cv.md</code> does not read back into the editor without loss, so the editor is read-only.{" "}
         {canPair && "If an entry was renamed or redated, it shows in both lists below: pair the two to keep its history. "}
-        {absorbed && !canPair && orphans.length > 0 && newEntries.length > 0 && "Renamed entries can be paired once every line of cv.md reads: fix the unreadable lines and reload, or adopt. "}
-        {canAdopt && "Adopting rewrites cv.md in the shape the editor saves. "}
-        {!canPair && !canAdopt && "Fix the lines listed below in cv.md and reload. "}
+        {absorbed && pairable.length > 0 && unparsed.length > 0 && "Renamed entries can be paired once every line of cv.md reads: fix the unreadable lines and reload, or adopt. "}
+        Adopting rewrites cv.md in the shape the editor saves.
       </p>
       {list("Entries only in data/resume.json", orphans)}
       {list("Entries only in cv.md", newEntries)}
@@ -98,18 +100,20 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
       {canPair && (
         <div className="space-y-3 border-t border-border pt-4">
           <h3 className="text-sm font-medium text-foreground">Renamed entries</h3>
-          {orphans.map((o) => (
+          {pairable.map((o) => (
             <div key={o.id} className="min-w-0">
               <label htmlFor={`pair-${o.id}`} className="mb-1 block text-xs font-medium text-muted">
                 {entryText(o)} is now
               </label>
               <select id={`pair-${o.id}`} value={choices[o.id] ?? ""} onChange={(e) => setChoices({ ...choices, [o.id]: e.target.value })} className={`${SELECT} w-full`}>
                 <option value="">Not renamed</option>
-                {newEntries.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {entryText(n)}
-                  </option>
-                ))}
+                {candidates(o)
+                  .filter((n) => !taken.has(n.id) || choices[o.id] === n.id)
+                  .map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {entryText(n)}
+                    </option>
+                  ))}
               </select>
             </div>
           ))}
@@ -119,39 +123,38 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
         </div>
       )}
 
-      {canAdopt && (
-        <div className="space-y-3 border-t border-border pt-4">
-          {state.kind === "preview" ? (
-            <>
-              {state.diff === null ? (
-                <p className="text-sm text-foreground">cv.md is already in the generated shape.</p>
-              ) : (
-                <pre aria-label="Changes to cv.md" tabIndex={0} className="max-h-96 overflow-auto rounded-md border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-foreground">
-                  {state.diff.split("\n").map((line, i) => (
-                    <span key={i} className={`block whitespace-pre ${DIFF_TINT(line)}`}>
-                      {line || " "}
-                    </span>
-                  ))}
-                </pre>
-              )}
-              {orphans.length > 0 && <p className="text-sm text-foreground">Entries only in data/resume.json are written back into cv.md, so a renamed entry would appear twice.</p>}
-              <p className="text-sm text-foreground">Nothing is written until you confirm. cv.md is kept as a .bak copy.</p>
-              <div className="flex flex-wrap gap-2">
-                <Button autoFocus type="button" onClick={() => confirmAdopt(state.inputsSha)}>
-                  Confirm adopt
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setState({ kind: "idle" })}>
-                  Cancel
-                </Button>
-              </div>
-            </>
-          ) : (
-            <Button type="button" variant="outline" onClick={previewAdopt} disabled={busy}>
-              Adopt the regenerated cv.md
-            </Button>
-          )}
-        </div>
-      )}
+      {/* Adopt is offered on every gate failure: absorb also fails on text it reads but would rewrite, which no list above shows. */}
+      <div className="space-y-3 border-t border-border pt-4">
+        {state.kind === "preview" ? (
+          <>
+            {state.diff === null ? (
+              <p className="text-sm text-foreground">cv.md is already in the generated shape.</p>
+            ) : (
+              <pre aria-label="Changes to cv.md" tabIndex={0} className="max-h-96 overflow-auto rounded-md border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-foreground">
+                {state.diff.split("\n").map((line, i) => (
+                  <span key={i} className={`block whitespace-pre ${DIFF_TINT(line)}`}>
+                    {line || " "}
+                  </span>
+                ))}
+              </pre>
+            )}
+            {orphans.length > 0 && <p className="text-sm text-foreground">Entries only in data/resume.json are written back into cv.md, so a renamed entry would appear twice.</p>}
+            <p className="text-sm text-foreground">Nothing is written until you confirm. cv.md is kept as a .bak copy.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button autoFocus type="button" onClick={() => confirmAdopt(state.inputsSha)}>
+                Confirm adopt
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setState({ kind: "idle" })}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        ) : (
+          <Button type="button" variant="outline" onClick={previewAdopt} disabled={busy}>
+            Adopt the regenerated cv.md
+          </Button>
+        )}
+      </div>
 
       {busy && (
         <p role="status" className="text-sm text-muted">
