@@ -14,3 +14,5 @@ THIRD_PARTY_NOTICES.md
 .hadolint.yaml
 # publish/ is claimed ahead of PR-12 of the Reactive Resume convergence plan, which creates it.
 publish/
+# deploy/ is the hosted server image (PR-17 of the Reactive Resume convergence plan).
+deploy/
