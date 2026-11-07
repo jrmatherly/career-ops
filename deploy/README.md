@@ -34,7 +34,7 @@ The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). Until jrmatherly/career-ops#18 lands, it must hold `data/applications.md` before the first boot: the mount point is itself named `data`, so with no tracker the fallback is `/data/applications.md`, the workspace resolver treats `/data` as a `data/` subdirectory and returns `/`, and the PDF server dies on `mkdir /output`. |
+| `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). An empty volume is fine since jrmatherly/career-ops#18: before it, a mount point named `data` with no `data/applications.md` made the tracker fallback `/data/applications.md`, the workspace resolver treated `/data` as a `data/` subdirectory and returned `/`, and the PDF server died on `mkdir /output`. |
 | `CAREER_OPS_WEB_ALLOWED_HOSTS` | `<public host> career-ops-web` | A hostname makes `web/src/lib/bind-host.mjs` bind `0.0.0.0`, which a container needs. The request guard admits only these hosts and loopback. |
 | `CAREER_OPS_CLI` | `claude` | Preset in the image. |
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this or `ANTHROPIC_API_KEY`. Pass it as a secret, never in the image. |
@@ -65,9 +65,8 @@ when a dev server holds 3000, since Docker Desktop does not report the clash).
 `CAREER_OPS_SMOKE_ROOT` is required and must point outside the checkout: a
 root inside it would sit in the build context, where the root-anchored
 `.dockerignore` patterns do not reach, and a rebuild would bake it in.
-Put a `cv.md` in the scratch root first (`examples/cv-example.md` works) and
-an empty tracker at `data/applications.md` (the header from AGENTS.md step 4,
-see the contract row above), then:
+Put a `cv.md` in the scratch root first (`examples/cv-example.md` works),
+then:
 
 ```bash
 CAREER_OPS_SMOKE_ROOT=/tmp/career-ops-smoke docker compose -f deploy/compose.yml up
