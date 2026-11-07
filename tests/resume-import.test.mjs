@@ -153,7 +153,7 @@ test('json-resume names a bad date in words and counts the entries its filters d
 test('docx text reads only the headers a section references, drops hidden and deleted runs, decodes entities', () => {
   const bytes = zip({
     '[Content_Types].xml': '<Types/>',
-    'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>Body line</w:t></w:r><w:r><w:rPr><w:vanish/></w:rPr><w:t>HIDDEN</w:t></w:r></w:p><w:p><w:del><w:r><w:delText>DELETED</w:delText></w:r></w:del><w:r><w:t>Visible &amp; &#8211; ok</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>tabbed</w:t></w:r></w:p><w:sectPr><w:headerReference r:id="rId1"/></w:sectPr></w:body></w:document>',
+    'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>Body line</w:t></w:r><w:r><w:t><<w:x>script></w:t></w:r><w:r><w:rPr><w:vanish/></w:rPr><w:t>HIDDEN</w:t></w:r></w:p><w:p><w:del><w:r><w:delText>DELETED</w:delText></w:r></w:del><w:r><w:t>Visible &amp; &#8211; ok</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>tabbed</w:t></w:r></w:p><w:sectPr><w:headerReference r:id="rId1"/></w:sectPr></w:body></w:document>',
     'word/_rels/document.xml.rels': '<Relationships><Relationship Id="rId1" Target="header1.xml"/><Relationship Id="rId9" Target="header2.xml"/></Relationships>',
     'word/header1.xml': '<w:hdr><w:p><w:r><w:t>Morgan Testwell</w:t></w:r></w:p></w:hdr>',
     'word/header2.xml': '<w:hdr><w:p><w:r><w:t>STALE HEADER</w:t></w:r></w:p></w:hdr>',
@@ -161,7 +161,7 @@ test('docx text reads only the headers a section references, drops hidden and de
   const text = extractDocxText(bytes);
   assert.match(text, /^Morgan Testwell\n/);
   assert.match(text, /Visible & – ok\ttabbed/);
-  for (const gone of ['STALE HEADER', 'HIDDEN', 'DELETED']) assert.ok(!text.includes(gone), `${gone} leaked`);
+  for (const gone of ['STALE HEADER', 'HIDDEN', 'DELETED', '<script']) assert.ok(!text.includes(gone), `${gone} leaked`);
 });
 
 test('plain text groups the section shapes the fixture does not use, and keeps header prose as the summary', () => {
