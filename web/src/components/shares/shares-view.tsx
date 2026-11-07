@@ -6,7 +6,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Share } from "@/lib/shares";
+import type { PullResponse, Share } from "@/lib/shares";
 
 const PUBLISH_CMD = "node publish/share.mjs publish --slug <name> --from-resume";
 
@@ -15,7 +15,8 @@ const pulledLabel = (at: string) => (Number.isNaN(Date.parse(at)) ? at : `${at.s
 
 export function SharesView({ shares, error }: { shares: Share[]; error: string | null }) {
   const router = useRouter();
-  const [pulling, setPulling] = useState<string | null>(null);
+  // Which pull is in flight: one slug, or every share from Pull all.
+  const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
   // An object, so a repeat of the same message is a new toast and restarts its timer.
   const [toast, setToast] = useState<{ text: string } | null>(null);
 
@@ -27,17 +28,20 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
 
   async function pull(slug?: string) {
     if (pulling) return;
-    setPulling(slug ?? "*");
+    setPulling(slug ? { slug } : { all: true });
     try {
       const res = await fetch("/api/shares/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slug ? { slug } : {}) });
-      const data = (await res.json().catch(() => null)) as { error?: string; missing?: string[] } | null;
-      if (!res.ok) {
-        setToast({ text: `Pull failed: ${data?.error ?? `HTTP ${res.status}`}` });
+      const data = (await res.json().catch(() => null)) as PullResponse | null;
+      if (!res.ok || !data || !("ok" in data)) {
+        setToast({ text: `Pull failed: ${data && "error" in data ? data.error : `HTTP ${res.status}`}` });
         return;
       }
       // The CLI skips a share the service no longer has and still exits 0; say so, or the row just stays stale.
-      if (data?.missing?.length) {
-        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop the record with node publish/share.mjs delete --slug <slug>` });
+      // When nothing answered at all, the likelier cause is the URL, not deleted shares: never advise deleting then.
+      if (data.missing.length && data.pulled === 0) {
+        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the data root's .env before deleting anything.` });
+      } else if (data.missing.length) {
+        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}` });
       }
       router.refresh();
     } catch (err) {
@@ -59,7 +63,7 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
         </div>
         {shares.length > 0 && (
           <Button variant="outline" size="sm" onClick={() => void pull()} disabled={pulling !== null}>
-            {pulling === "*" ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+            {pulling && "all" in pulling ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             Pull all
           </Button>
         )}
@@ -96,7 +100,7 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
             </thead>
             <tbody>
               {shares.map((s) => (
-                <SharesRow key={s.slug} share={s} pulling={pulling} onPull={() => void pull(s.slug)} />
+                <SharesRow key={s.slug} share={s} busy={pulling !== null && ("all" in pulling || pulling.slug === s.slug)} disabled={pulling !== null} onPull={() => void pull(s.slug)} />
               ))}
             </tbody>
           </table>
@@ -114,9 +118,7 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
   );
 }
 
-// pulling: null when idle, a slug, or "*" while Pull all runs.
-function SharesRow({ share: s, pulling, onPull }: { share: Share; pulling: string | null; onPull: () => void }) {
-  const busy = pulling === s.slug || pulling === "*";
+function SharesRow({ share: s, busy, disabled, onPull }: { share: Share; busy: boolean; disabled: boolean; onPull: () => void }) {
   return (
     <>
       <tr className="border-t border-border align-top">
@@ -137,13 +139,13 @@ function SharesRow({ share: s, pulling, onPull }: { share: Share; pulling: strin
         <td className="px-3 py-2 text-right tabular-nums">{s.pulled ? s.pulled.comments : "—"}</td>
         <td className="px-3 py-2 text-muted">{s.pulled ? pulledLabel(s.pulled.at) : "never"}</td>
         <td className="px-3 py-2 text-right">
-          <Button variant="outline" size="sm" onClick={onPull} disabled={pulling !== null} aria-label={`Pull ${s.slug}`}>
+          <Button variant="outline" size="sm" onClick={onPull} disabled={disabled || !s.pullable} aria-label={`Pull ${s.slug}`} title={s.pullable ? undefined : "This slug starts with a dash; use Pull all or the CLI"}>
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
             Pull
           </Button>
         </td>
       </tr>
-      {/* pull writes a header-only file for a share with no comments; nothing to show then */}
+      {/* pull writes a header and a note line, no comment blocks, for a share with no comments; nothing to show then */}
       {s.feedback && s.pulled?.comments ? (
         <tr className="border-t border-border/50 bg-surface/40">
           <td colSpan={9} className="px-3 py-2">

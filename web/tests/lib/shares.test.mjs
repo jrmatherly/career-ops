@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import "../helpers/web-ts-alias-loader.mjs";
 
 const codeRoot = mkdtempSync(join(tmpdir(), "co-shares-code-"));
@@ -34,12 +35,13 @@ const record = (slug, extra = {}) => ({
 });
 
 // Exits and prints what the next run should, as set in stand-in.json.
-const standIn = (exitCode, stderr = "") => {
-  writeFileSync(join(codeRoot, "stand-in.json"), JSON.stringify({ exitCode, stderr }));
+const standIn = (exitCode, stderr = "", stdout = "") => {
+  writeFileSync(join(codeRoot, "stand-in.json"), JSON.stringify({ exitCode, stderr, stdout }));
   writeFileSync(join(codeRoot, "publish", "share.mjs"), `import { readFileSync, writeFileSync } from "node:fs";
 const plan = JSON.parse(readFileSync(${JSON.stringify(join(codeRoot, "stand-in.json"))}, "utf8"));
 writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));
 if (plan.stderr) process.stderr.write(plan.stderr);
+if (plan.stdout) process.stdout.write(plan.stdout);
 process.exit(plan.exitCode);
 `);
 };
@@ -83,11 +85,12 @@ test("a present shares.json yields one row per slug with the feedback file as te
   writeFileSync(sharesFile, JSON.stringify({
     alpha: record("alpha", { source: { kind: "html", ref: "/tmp/cv.html" }, hideContacts: true, hide: { sections: ["education"], items: ["work-1"] }, hasPassword: true, pulled: { at: "2026-11-07T07:05:08.727Z", views: 3, comments: 1 } }),
     beta: record("beta"),
+    "-draft": record("-draft"),
     "Not A Slug": record("x"),
   }));
   const { shares, error } = readShares(dataRoot);
   assert.equal(error, null);
-  assert.deepEqual(shares.map((s) => s.slug), ["alpha", "beta"], "a key outside the CLI's slug rule is skipped");
+  assert.deepEqual(shares.map((s) => s.slug), ["alpha", "beta", "-draft"], "a key the CLI could have written is listed; one outside its rule is skipped");
   assert.deepEqual(shares[0], {
     slug: "alpha",
     url: "http://127.0.0.1:8099/s/alpha",
@@ -96,8 +99,10 @@ test("a present shares.json yields one row per slug with the feedback file as te
     hasPassword: true,
     pulled: { at: "2026-11-07T07:05:08.727Z", views: 3, comments: 1 },
     feedback,
+    pullable: true,
   });
-  assert.deepEqual(shares[1], { slug: "beta", url: "http://127.0.0.1:8099/s/beta", source: "resume", overlay: "", hasPassword: false, pulled: null, feedback: null });
+  assert.deepEqual(shares[1], { slug: "beta", url: "http://127.0.0.1:8099/s/beta", source: "resume", overlay: "", hasPassword: false, pulled: null, feedback: null, pullable: true });
+  assert.equal(shares[2].pullable, false, "a leading-dash slug is listed but cannot be passed as --slug");
 });
 
 test("a malformed shares.json reports an error and no rows, and a partial record never throws", () => {
@@ -107,20 +112,29 @@ test("a malformed shares.json reports an error and no rows, and a partial record
   assert.match(bad.error, /not valid JSON/);
   writeFileSync(sharesFile, "[]");
   assert.match(readShares(dataRoot).error, /not a record/);
-  writeFileSync(sharesFile, JSON.stringify({ gamma: null, delta: { pulled: { views: "7" } } }));
+  writeFileSync(sharesFile, JSON.stringify({ gamma: null, delta: { pulled: { views: "7" } }, eps: { pulled: { at: "2026-11-07T00:00:00.000Z", views: "7", comments: "abc" } } }));
   const { shares, error } = readShares(dataRoot);
   assert.equal(error, null);
   assert.equal(shares[0].slug, "gamma");
   assert.equal(shares[1].pulled, null, "a pulled block without a timestamp counts as never pulled");
+  assert.deepEqual(shares[2].pulled, { at: "2026-11-07T00:00:00.000Z", views: 7, comments: 0 }, "counts are coerced, a corrupt one reads 0");
+  rmSync(sharesFile, { force: true });
+  mkdirSync(sharesFile);
+  const unreadable = readShares(dataRoot);
+  rmSync(sharesFile, { recursive: true, force: true });
+  assert.deepEqual(unreadable.shares, []);
+  assert.match(unreadable.error, /could not be read/, "a non-ENOENT read failure is an error, not an empty page");
 });
 
 test("pull runs share.mjs pull, with --slug only when one is given; a bad slug is refused first", async () => {
   standIn(0);
   const all = await post({});
   assert.equal(all.status, 200);
-  assert.deepEqual(all.body, { ok: true, missing: [] });
+  assert.deepEqual(all.body, { ok: true, missing: [], pulled: 0 });
   assert.deepEqual(all.argv, ["pull"]);
-  assert.equal((await post({ slug: "a".repeat(64) })).status, 200, "64 characters is the limit, not past it");
+  const max = await post({ slug: "a".repeat(64) });
+  assert.equal(max.status, 200, "64 characters is the limit, not past it");
+  assert.deepEqual(max.argv, ["pull", "--slug", "a".repeat(64)]);
   for (const raw of ["not json", "[\"alpha\"]", "\"alpha\""]) {
     const r = await post(raw, true);
     assert.equal(r.status, 400, raw);
@@ -139,11 +153,13 @@ test("pull runs share.mjs pull, with --slug only when one is given; a bad slug i
   }
 });
 
-test("a share the service no longer has comes back as missing on a successful pull", async () => {
-  standIn(0, "publish: alpha is not on the server; run delete --slug alpha to drop the record\npublish: beta is not on the server; run delete --slug beta to drop the record\n");
+test("a share the service no longer has comes back as missing on a successful pull, with the count that did answer", async () => {
+  standIn(0, "publish: alpha is not on the server; run delete --slug alpha to drop the record\npublish: beta is not on the server; run delete --slug beta to drop the record\n", "gamma views 3 comments 1\n");
   const r = await post({});
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { ok: true, missing: ["alpha", "beta"] });
+  assert.deepEqual(r.body, { ok: true, missing: ["alpha", "beta"], pulled: 1 });
+  standIn(0, "publish: warning: something harmless\n");
+  assert.deepEqual((await post({})).body, { ok: true, missing: [], pulled: 0 }, "other stderr on exit 0 is logged, not reported");
 });
 
 test("a refused key is a 503, rate limiting a 429 and a service error a 502, none naming a URL", async () => {
@@ -153,13 +169,15 @@ test("a refused key is a 503, rate limiting a 429 and a service error a 502, non
     ["publish: GET /api/shares/alpha/stats answered 429 (rate limited)\n", 429, /rate limit/],
     ["publish: GET /api/shares/alpha/stats answered 500\n", 502, /did not answer/],
     ["publish: GET http://127.0.0.1:8099/api/shares/alpha/stats answered 200 with a non-JSON body; is PUBLISH_URL the publish service?\n", 502, /did not answer/],
+    ["publish: lock timeout: /home/u/root/data/shares.json.lock held > 10000ms\n", 503, /try again shortly/],
+    ["publish: /home/u/root/data/shares.json is not valid JSON: Unexpected token\n", 500, /not valid JSON/],
   ];
   for (const [stderr, status, message] of cases) {
     standIn(1, stderr);
     const r = await post({ slug: "alpha" });
     assert.equal(r.status, status, stderr);
     assert.match(r.body.error, message);
-    assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api/);
+    assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api|\/home/);
   }
 });
 
@@ -192,10 +210,10 @@ test("a data-only root (no share.mjs) is a 503 before anything runs", async () =
   assert.equal(r.argv, null);
 });
 
-// The classes above are regexes over share.mjs's wording; these three run the real CLI
+// The classes above are regexes over share.mjs's wording; these cases run the real CLI
 // (CAREER_OPS_CODE_ROOT at the checkout) so a reworded message fails here, not in the UI.
-// None needs the service: the record check, the env check and a refused connection all
-// happen before or instead of a real request.
+// None needs the service: the record check and the env check happen before any request,
+// the third hits a port nothing listens on, and the fourth a server that answers 404 to everything.
 test("the real share.mjs produces the 404, 503 and 502 classes the route reads", async () => {
   const checkout = join(import.meta.dirname, "..", "..", "..");
   const env = { ...process.env };
@@ -219,6 +237,17 @@ test("the real share.mjs produces the 404, 503 and 502 classes the route reads",
     process.env.PUBLISH_API_KEY = "cops_test";
     const refused = await post({ slug: "alpha" });
     assert.equal(refused.status, 502, JSON.stringify(refused.body));
+    // A host that is not the service (or a share it lost) answers 404; the CLI skips the share and exits 0.
+    const gone = createHttpServer((req, res) => { res.statusCode = 404; res.end("{}"); });
+    await new Promise((r) => gone.listen(0, "127.0.0.1", r));
+    process.env.PUBLISH_URL = `http://127.0.0.1:${gone.address().port}`;
+    try {
+      const r = await post({ slug: "alpha" });
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+      assert.deepEqual(r.body, { ok: true, missing: ["alpha"], pulled: 0 });
+    } finally {
+      await new Promise((r) => gone.close(r));
+    }
   } finally {
     for (const k of ["CAREER_OPS_CODE_ROOT", "PUBLISH_URL", "PUBLISH_API_KEY"]) {
       if (env[k] === undefined) delete process.env[k];
@@ -232,5 +261,6 @@ test("the nav lists /shares right after /board, where PR-14 appended it", () => 
   const source = readFileSync(new URL("../../src/lib/nav-items.ts", import.meta.url), "utf8");
   const items = source.slice(source.indexOf("NAV_ITEMS"), source.indexOf("];"));
   const entries = [...items.matchAll(/\{ href: "([^"]+)", label: "([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
+  assert.ok(entries.includes("/board Board"), `nav-items.ts no longer matches the one-line entry shape: ${entries.join(" | ")}`);
   assert.equal(entries[entries.indexOf("/board Board") + 1], "/shares Shares");
 });
