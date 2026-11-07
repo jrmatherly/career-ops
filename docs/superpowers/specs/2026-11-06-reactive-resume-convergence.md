@@ -10,7 +10,7 @@ Reactive Resume (RR) is at `reactive-resume/reactive-resume`, MIT, v6.1.0 releas
 - Public share links and multi-user capability, while keeping career-ops's agent-first file contract.
 - Better Auth for every authentication need.
 - Migration of the operator's own RR data. The operator runs RR v6 at `resume.matherly.net` (Kubernetes, Postgres 18, Pocket ID OIDC, R2) and keeps exports at `~/dev/job-search/matherly-ats.json` and `matherly-resume.json` (RR v6 resume JSON, templates `scizor` and `azurill`), plus `~/dev/job-search/jobs/applications.csv` (8 rows, RR CSV import shape).
-- No upstream issues. Every change gets a row in the deviations table of `.claude/skills/upstream-review/SKILL.md` so upstream can still be merged and cherry-picked.
+- No upstream issues, and no limit on divergence. The fork changes whatever the goal needs. Every diverged path gets a row in the deviations table of `.claude/skills/upstream-review/SKILL.md` with a rule for how an upstream hunk to it is handled (adopt, adapt, keep or skip), so upstream changes can still be reviewed and cherry-picked with a clear basis.
 
 ## What exists today
 
@@ -108,7 +108,7 @@ The operator runs upstream's plugin. The fork is installed from the `jrmatherly/
 ## Constraints
 
 - A new tracked file must be claimed by `SYSTEM_PATHS`, `USER_PATHS` or `config/local-paths.txt`. Fork-local root scripts, new `lib/` modules and `publish/` go in `config/local-paths.txt` (`SYSTEM_PATHS` names `lib/` files one by one, so nothing new falls under it). Files inside shipped directories are covered by that directory's entry and get a deviations row. New `data/` files are covered and get a `DATA_CONTRACT.md` row.
-- Every diverged upstream path gets a deviations row. `tests/fork-deviations-covered.test.mjs` diffs HEAD, so it runs after committing.
+- Every diverged path gets a deviations row that opens with its hunk rule and names the fork test pinning it. The first PR adds a convergence block to the skill's rules, including that an upstream feature overlapping one built here is a comparison review, never a silent merge. `tests/fork-deviations-covered.test.mjs` diffs HEAD, so it runs after committing.
 - New scripts resolve the root through `path-resolver.mjs`, use `isMainModule`, and never write the tracker except through `merge-tracker.mjs` and `set-status.mjs`. Reconstructed history goes to `status-log.tsv` with source `backfill`.
 - Headless workers never gain write tools. An AI "improve this" feature follows the CV Studio rewrite route pattern.
 - Conventional Commits with a scope. Before push, `node scripts/check-syntax.mjs` and `node test-all.mjs --quick`. Changes under `dashboard/` or to `states.yml` also need `go -C dashboard test ./...`.
