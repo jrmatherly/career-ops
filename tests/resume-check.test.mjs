@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ import { TEMPLATE_LAYOUTS } from '../lib/resume/template-layouts.mjs';
 
 const CLI = fileURLToPath(new URL('../resume.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/resume/sample.json', import.meta.url));
+const EXAMPLE = fileURLToPath(new URL('./fixtures/resume/cv-example-shape.md', import.meta.url));
 const NOW = new Date('2024-06-15T00:00:00Z');
 // RR's azurill prints a sidebar column; onyx is one column. Career-ops has no such template, so tests inject them.
 const LAYOUTS = {
@@ -241,8 +242,20 @@ test('structure rules flag content that is never placed on a page', () => {
     }];
   });
   assert.deepEqual(lint(data).findings.map(strip), [{
-    id: 'SECTION_MISSING_FROM_LAYOUT', severity: 'error', path: 'sections.education', key: 'SECTION_MISSING_FROM_LAYOUT:/sections/education', params: { section: 'education' },
+    id: 'SECTION_MISSING_FROM_LAYOUT', severity: 'error', path: 'sections.education', key: 'SECTION_MISSING_FROM_LAYOUT:/sections/education', params: { section: 'education', name: 'education' },
   }]);
+});
+
+test('section messages name a custom section by its title, not its id', () => {
+  const data = makeResume((resume) => {
+    resume.customSections = [{
+      id: 'c0ffee12-aaaa', type: 'experience', title: 'Consulting', icon: '', columns: 2, hidden: false,
+      keepTogether: false, startOnNewPage: false, items: [experienceItem({ id: 'c1' })],
+    }];
+  });
+  const missing = lint(data).findings.find((f) => f.id === 'SECTION_MISSING_FROM_LAYOUT');
+  assert.equal(missing.message, 'The Consulting section never prints. It has entries but isn\'t placed on a page.');
+  assert.equal(missing.params.section, 'c0ffee12-aaaa');
 });
 
 test('structure rules flag an experience entry with no narrative', () => {
@@ -294,7 +307,7 @@ test('layout rules flag a two-column template printing a sidebar, naming its sec
     resume.metadata.layout.pages = [{ fullWidth: false, main: ['experience'], sidebar: ['skills'] }];
   });
   const found = lint(data).findings.find((f) => f.id === 'TWO_COLUMN_LAYOUT');
-  assert.deepEqual(found.params, { sections: 'skills' });
+  assert.deepEqual(found.params, { sections: 'skills', names: 'skills' });
   assert.equal(found.path, 'metadata.layout.pages');
 });
 
@@ -531,8 +544,8 @@ test('check prints a score below 100 and the missing email, and --ignore drops i
 
   const ignored = run(root, 'check', '--in', draft, '--ignore', 'MISSING_EMAIL');
   assert.equal(ignored.status, 0, ignored.stderr);
-  assert.ok(!ignored.stdout.includes('MISSING_EMAIL'));
-  assert.match(ignored.stdout, /^1 ignored$/m);
+  assert.ok(!ignored.stdout.split('\n').some((line) => line.startsWith('MISSING_EMAIL ')), ignored.stdout);
+  assert.match(ignored.stdout, /^1 ignored: MISSING_EMAIL basics\.email$/m);
 }));
 
 test('check --ignore with an unknown id exits 1 naming the valid ids', () => withRoot((root) => {
@@ -547,6 +560,49 @@ test('check reports reversed dates on an experience period', () => withRoot((roo
   assert.equal(r.status, 0, r.stderr);
   assert.ok(JSON.parse(r.stdout).findings.some((f) => f.id === 'REVERSED_PERIOD' && f.path === 'sections.experience.items.0.period'));
   assert.ok(!JSON.parse(run(root, 'check', '--in', SAMPLE, '--json').stdout).findings.some((f) => f.id === 'REVERSED_PERIOD'));
+}));
+
+test('check without --in absorbs cv.md in memory, writing nothing', () => withRoot((root) => {
+  writeFileSync(join(root, 'cv.md'), readFileSync(EXAMPLE, 'utf8'));
+  const r = run(root, 'check', '--json');
+  assert.equal(r.status, 0, r.stderr);
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.totalRules, 23);
+  assert.ok(report.findings.some((f) => f.id === 'MISSING_PHONE'), r.stdout);
+  assert.equal(existsSync(join(root, 'data', 'resume.json')), false);
+}));
+
+test('check without --in exits 3 while the absorb gate fails', () => withRoot((root) => {
+  writeFileSync(join(root, 'cv.md'), readFileSync(EXAMPLE, 'utf8').replace('## Professional Summary', 'Stray line.\n\n## Professional Summary'));
+  const r = run(root, 'check', '--json');
+  assert.equal(r.status, 3);
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.lossless, false);
+  assert.equal(report.totalRules, undefined);
+}));
+
+test('check --ignore takes a comma list, and --json moves the findings to ignored', () => withRoot((root) => {
+  const draft = writeSample(root, (json) => {
+    json.basics.email = '';
+    json.basics.phone = '';
+  });
+  const before = JSON.parse(run(root, 'check', '--in', draft, '--json').stdout);
+  const r = run(root, 'check', '--in', draft, '--json', '--ignore', 'MISSING_EMAIL,MISSING_PHONE');
+  assert.equal(r.status, 0, r.stderr);
+  const report = JSON.parse(r.stdout);
+  assert.deepEqual(report.ignored.map((f) => f.id).sort(), ['MISSING_EMAIL', 'MISSING_PHONE']);
+  assert.ok(!report.findings.some((f) => f.id === 'MISSING_EMAIL' || f.id === 'MISSING_PHONE'));
+  assert.equal(report.passedRules, before.passedRules + 2);
+  assert.match(run(root, 'check', '--in', draft, '--ignore', 'MISSING_EMAIL,MISSING_PHONE').stdout, /^2 ignored: MISSING_EMAIL basics\.email, MISSING_PHONE basics\.phone$/m);
+}));
+
+test('check names a template outside the layout table on stderr', () => withRoot((root) => {
+  const draft = writeSample(root, (json) => (json.careerOps = { ...json.careerOps, template: 'my-own-template' }));
+  const r = run(root, 'check', '--in', draft, '--json');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stderr, /template "my-own-template" is not in lib\/resume\/template-layouts\.mjs/);
+  assert.equal(JSON.parse(r.stdout).templateKnown, false);
+  assert.equal(run(root, 'check', '--in', SAMPLE).stderr, '');
 }));
 
 test('every rule id is produced by some fixture above', () => {
