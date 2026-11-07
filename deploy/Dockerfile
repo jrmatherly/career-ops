@@ -25,7 +25,7 @@ RUN npm ci --no-audit --no-fund --prefix web && rm -rf /root/.npm
 COPY . .
 RUN npm --prefix web run build
 
-# The image optimizer is the one next start write under .next; /data is the volume mount point.
+# next start may write its image-optimizer cache under .next/cache; /data is the volume mount point.
 RUN mkdir -p /home/app /data /app/web/.next/cache && chown 1000:1000 /home/app /data /app/web/.next/cache
 
 ENV NODE_ENV=production \

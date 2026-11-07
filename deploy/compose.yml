@@ -13,7 +13,7 @@ services:
       - CAREER_OPS_WEB_ALLOWED_HOSTS=career-ops-web
       - CLAUDE_CODE_OAUTH_TOKEN
     volumes:
-      - "${CAREER_OPS_SMOKE_ROOT:-./smoke-data}:/data"
+      - "${CAREER_OPS_SMOKE_ROOT:?set CAREER_OPS_SMOKE_ROOT to a scratch data root outside the checkout}:/data"
     shm_size: 1g
     tmpfs:
       - /tmp

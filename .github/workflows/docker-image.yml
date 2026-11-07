@@ -12,6 +12,7 @@ name: "🐳 Docker images"
 # Every push to main builds, with no path filter: the server image copies the
 # whole checkout, so any commit changes it. The other two rebuild from the
 # layer cache when their inputs did not change.
+# On a pull request that touches image inputs the images build without pushing.
 #
 # Tags: `latest` on main, `sha-<short>` on every build, the git tag on `v*` tags.
 # The first push creates each package as private; make them public in the
@@ -21,6 +22,17 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    paths:
+      - Dockerfile
+      - 'deploy/**'
+      - .dockerignore
+      - .hadolint.yaml
+      - package.json
+      - web/package.json
+      - web/package-lock.json
+      - tests/cv-visual/Dockerfile
+      - .github/workflows/docker-image.yml
   workflow_dispatch:
 
 permissions:
@@ -69,6 +81,7 @@ jobs:
       - name: "🧰 Set up Buildx"
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: "🔐 Log in to GHCR"
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
@@ -88,7 +101,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
           platforms: ${{ matrix.platforms }}
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           provenance: mode=max
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}
