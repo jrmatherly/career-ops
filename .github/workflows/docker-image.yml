@@ -18,6 +18,7 @@ on:
     tags: ['v*']
     paths:
       - Dockerfile
+      - .hadolint.yaml
       - .dockerignore
       - package.json
       - tests/cv-visual/Dockerfile
