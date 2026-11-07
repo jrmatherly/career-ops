@@ -17,7 +17,7 @@
 - Upstream's three test files are taken with `git cherry-pick -x` so the next merge absorbs them by patch id; our own edits avoid those three files.
 - Every fork file inside `web/tests/` gets a row in the deviations table of `.claude/skills/upstream-review/SKILL.md` (Notes cell opens with KEEP), including the helper and the proxy.
 - No `test.retry`, no sleeps as the fix, no change to the runner's one-retry policy in `web/tests/browser-suites.mjs`.
-- App-made worktrees can carry a stale `node_modules`: symlink `/Users/jason/dev/career-ops/node_modules` in and copy `web/node_modules` with `cp -cR` (Turbopack refuses a symlink).
+- App-made worktrees can carry a stale `node_modules`: symlink the main checkout's `node_modules` in and copy `web/node_modules` with `cp -cR` (Turbopack refuses a symlink).
 
 ## Review Focus
 
