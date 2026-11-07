@@ -68,9 +68,9 @@
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.5;
-    color: #1a1a2e;
-    background: #ffffff;
+    line-height: var(--line-height, 1.5);
+    color: var(--text-color, #1a1a2e);
+    background: var(--background-color, #ffffff);
     padding: 0;
     margin: 0;
     /* Disable ligatures here as well; see the * rule above. */
@@ -91,7 +91,7 @@
   }
 
   .header h1 {
-    font-family: var(--font-family);
+    font-family: var(--heading-font-family, var(--font-family));
     font-size: 28px;
     font-weight: 700;
     color: #1a1a2e;
@@ -167,12 +167,12 @@
 
   /* === SECTIONS === */
   .section {
-    margin-bottom: 18px;
+    margin-bottom: var(--section-gap, 18px);
   }
 
   .section-title {
-    font-family: var(--font-family);
-    font-size: 12px;
+    font-family: var(--heading-font-family, var(--font-family));
+    font-size: var(--heading-font-size, 12px);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -220,7 +220,7 @@
 
   /* === WORK EXPERIENCE === */
   .job {
-    margin-bottom: 14px;
+    margin-bottom: var(--item-gap, 14px);
   }
 
   .job-header {
@@ -282,7 +282,7 @@
 
   /* === PROJECTS === */
   .project {
-    margin-bottom: 12px;
+    margin-bottom: var(--item-gap, 12px);
   }
 
   .project-title {

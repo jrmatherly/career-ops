@@ -61,9 +61,9 @@ version: 1.0.0
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.47;
-    color: #1b1b1b;
-    background: #ffffff;
+    line-height: var(--line-height, 1.47);
+    color: var(--text-color, #1b1b1b);
+    background: var(--background-color, #ffffff);
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
   }
@@ -96,6 +96,7 @@ version: 1.0.0
   }
 
   .header h1 {
+    font-family: var(--heading-font-family, inherit);
     font-size: 24px;
     font-weight: 700;
     /* Wide tracking inserts spaces inside names in extracted PDF text. */
@@ -140,10 +141,11 @@ version: 1.0.0
   }
 
   /* === SECTIONS === */
-  .section { margin-bottom: 12px; }
+  .section { margin-bottom: var(--section-gap, 12px); }
 
   .section-title {
-    font-size: 10px;
+    font-family: var(--heading-font-family, inherit);
+    font-size: var(--heading-font-size, 10px);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -183,7 +185,7 @@ version: 1.0.0
      Two-row header: company + dates, then role + location. The builder emits
      .job-role and .job-location as separate block divs, so the role floats left
      and the location's shortened line box right-aligns beside it. */
-  .job { margin-bottom: 11px; }
+  .job { margin-bottom: var(--item-gap, 11px); }
   .job:last-child { margin-bottom: 0; }
 
   .job-header {
@@ -243,7 +245,7 @@ version: 1.0.0
   .job li { margin-bottom: 2.5px; }
 
   /* === PROJECTS === */
-  .project { margin-bottom: 7px; }
+  .project { margin-bottom: var(--item-gap, 7px); }
 
   .project-title {
     font-size: 11px;

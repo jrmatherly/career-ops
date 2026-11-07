@@ -62,9 +62,9 @@ version: 1.0.0
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.42;
-    color: #000000;
-    background: #ffffff;
+    line-height: var(--line-height, 1.42);
+    color: var(--text-color, #000000);
+    background: var(--background-color, #ffffff);
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
   }
@@ -96,6 +96,7 @@ version: 1.0.0
   }
 
   .header h1 {
+    font-family: var(--heading-font-family, inherit);
     font-size: 26px;
     font-weight: 400;
     letter-spacing: 0.005em;
@@ -139,10 +140,11 @@ version: 1.0.0
   /* === SECTIONS ===
      Uppercase + a rule directly beneath, matching \titlerule in the original.
      Synthetic small caps split words into differently sized PDF text runs. */
-  .section { margin-bottom: 8px; }
+  .section { margin-bottom: var(--section-gap, 8px); }
 
   .section-title {
-    font-size: 11px;
+    font-family: var(--heading-font-family, inherit);
+    font-size: var(--heading-font-size, 11px);
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -171,7 +173,7 @@ version: 1.0.0
      block divs, so the role is floated left and the location's shortened line
      box is right-aligned beside it — this reproduces the original's tabular
      look without needing a wrapper element. */
-  .job { margin-bottom: 7px; }
+  .job { margin-bottom: var(--item-gap, 7px); }
   .job:last-child { margin-bottom: 0; }
 
   .job-header {
@@ -228,7 +230,7 @@ version: 1.0.0
   }
 
   /* === PROJECTS === */
-  .project { margin-bottom: 5px; }
+  .project { margin-bottom: var(--item-gap, 5px); }
 
   .project-title {
     font-size: 10.5px;

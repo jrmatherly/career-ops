@@ -41,9 +41,9 @@ sections: all
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.5;
-    color: #1a1a2e;
-    background: #ffffff;
+    line-height: var(--line-height, 1.5);
+    color: var(--text-color, #1a1a2e);
+    background: var(--background-color, #ffffff);
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
   }
@@ -61,7 +61,7 @@ sections: all
   }
 
   .header h1 {
-    font-family: var(--font-family);
+    font-family: var(--heading-font-family, var(--font-family));
     font-size: 24px;
     font-weight: 700;
     color: #1a1a2e;
@@ -99,12 +99,12 @@ sections: all
 
   /* SECTIONS */
   .section {
-    margin-bottom: 16px;
+    margin-bottom: var(--section-gap, 16px);
   }
 
   .section-title {
-    font-family: var(--font-family);
-    font-size: 12px;
+    font-family: var(--heading-font-family, var(--font-family));
+    font-size: var(--heading-font-size, 12px);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -150,7 +150,7 @@ sections: all
 
   /* WORK EXPERIENCE - ATS-friendly sequential layout */
   .job {
-    margin-bottom: 14px;
+    margin-bottom: var(--item-gap, 14px);
   }
 
   .job-role {
@@ -201,7 +201,7 @@ sections: all
 
   /* PROJECTS */
   .project {
-    margin-bottom: 10px;
+    margin-bottom: var(--item-gap, 10px);
   }
 
   .project-title {

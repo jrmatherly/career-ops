@@ -197,10 +197,13 @@ spend_tier: standard
 # (Optional) Visual theming for the generated CV and cover-letter PDFs (#1837).
 # Each token is injected as a CSS custom property that overrides the template
 # default — omit the block (or any key) to keep the built-in look unchanged.
-# Only these seven keys are recognized; anything else is ignored.
+# Only these eighteen keys are recognized; anything else is ignored.
 # style:
 #   accent_color:     "#2563eb"           # section headings, competency tags, project badges
 #   secondary_color:  "#111827"           # company/institution names, header gradient's 2nd stop
+#   tag_color:        "#0e7490"           # competency-tag text
+#   tag_bg:           "#ecfeff"           # competency-tag and project-tech fill
+#   tag_border:       "#a5f3fc"           # competency-tag border
 #   font_family:      "Outfit, Inter, sans-serif"
 #   font_size:        "10pt"              # base body text size
 #   margin:           "0.5in"             # page margin (@page)
@@ -210,6 +213,14 @@ spend_tier: standard
 #                                         # description can leave above its tech line, at the cost of a
 #                                         # bottom gap (and a page, on a CV already near its budget).
 #                                         # "auto" lets projects split. Unset: the template's own default
+#   heading_font_family: "Georgia, serif" # your name and the section titles
+#   heading_font_size: "13px"             # section titles (your name keeps its own size)
+#   line_height:      "1.45"              # body line spacing
+#   section_gap:      "16px"              # space below each section
+#   item_gap:         "12px"              # space below each job and project
+#   text_color:       "#1f2937"           # body text
+#   background_color: "#ffffff"           # page background
+#   sidebar_width:    "110px"             # section-title rail (compact template only)
 
 cv:
   output_format: "html" # "html" (default), "latex", or "text" (tailored markdown, no PDF)

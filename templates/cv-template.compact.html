@@ -32,7 +32,7 @@ version: 1.0.0
     /* Must match generate-pdf.mjs's PDF_PAGE_MARGIN — the real @page margin is
        appended later by injectPrintPageCss reading this same variable. */
     --page-margin: 0.6in;
-    --rail-width: 96px;
+    --rail-width: var(--sidebar-width, 96px);
     /* #3242: unchanged default — see templates/cv-template.html. */
     --job-break-inside: auto;
     /* Whether a Projects entry may split across a page break. Unchanged
@@ -60,9 +60,9 @@ version: 1.0.0
   body {
     font-family: var(--font-family);
     font-size: var(--font-size);
-    line-height: 1.38;
-    color: #191c22;
-    background: #ffffff;
+    line-height: var(--line-height, 1.38);
+    color: var(--text-color, #191c22);
+    background: var(--background-color, #ffffff);
     font-variant-ligatures: none;
     font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
   }
@@ -93,6 +93,7 @@ version: 1.0.0
   }
 
   .header h1 {
+    font-family: var(--heading-font-family, inherit);
     font-size: 19px;
     font-weight: 700;
     letter-spacing: -0.005em;
@@ -151,13 +152,14 @@ version: 1.0.0
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    margin-bottom: 6px;
+    margin-bottom: var(--section-gap, 6px);
   }
 
   .section-title {
+    font-family: var(--heading-font-family, inherit);
     flex: 0 0 var(--rail-width);
     width: var(--rail-width);
-    font-size: 8.5px;
+    font-size: var(--heading-font-size, 8.5px);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -189,7 +191,7 @@ version: 1.0.0
   }
 
   /* === WORK EXPERIENCE === */
-  .job { margin-bottom: 5px; }
+  .job { margin-bottom: var(--item-gap, 5px); }
   .job:last-child { margin-bottom: 0; }
 
   .job-header {
@@ -253,7 +255,7 @@ version: 1.0.0
   }
 
   /* === PROJECTS === */
-  .project { margin-bottom: 4px; }
+  .project { margin-bottom: var(--item-gap, 4px); }
 
   .project-title {
     font-size: 9.5px;
