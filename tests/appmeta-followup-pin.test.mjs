@@ -5,7 +5,7 @@
  * Run: node test-all.mjs --only appmeta-followup-pin
  */
 
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, run, NODE, ROOT, rmSync } from './helpers.mjs';
@@ -24,7 +24,22 @@ try {
   else process.env.CAREER_OPS_PROFILE = PRIOR_PROFILE;
 }
 
-const tmp = mkdtempSync(join(tmpdir(), 'co-pin-'));
+const TRACKER = [
+  '| # | Date | Company | Role | Score | Status | PDF | Report | Notes |',
+  '|---|---|---|---|---|---|---|---|---|',
+  '| 3 | 2026-10-01 | Acme Corp | Backend Engineer | 4.2/5 | Interview | ❌ | — | — |',
+  '| 5 | 2026-10-02 | Globex | Platform Engineer | 4.0/5 | Applied | ❌ | — | — |',
+  '| 6 | 2026-10-03 | Initech | Data Engineer | 3.9/5 | Applied | ❌ | — | — |',
+  '| 12 | 2026-10-05 | Northwind Traders | SRE | 4.1/5 | Applied | ❌ | — | — |',
+  '',
+].join('\n');
+function withTracker(root) {
+  mkdirSync(join(root, 'data'), { recursive: true });
+  writeFileSync(join(root, 'data', 'applications.md'), TRACKER);
+  return root;
+}
+
+const tmp = withTracker(mkdtempSync(join(tmpdir(), 'co-pin-')));
 const cli = (...args) => run(NODE, [join(ROOT, 'followup-pin.mjs'), ...args], { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: tmp } });
 const file = join(tmp, 'data', 'follow-ups.md');
 
@@ -47,6 +62,13 @@ try {
 
   if (cli('--num', '3', '--date', '2026-02-30') === null) pass('impossible date exits non-zero');
   else fail('impossible date accepted');
+  if (cli('--num', '99', '--date', '2026-12-01') === null) pass('a number with no tracker row exits non-zero');
+  else fail('missing tracker row accepted');
+
+  const elsewhere = join(tmp, 'elsewhere', 'follow-ups.md');
+  const envOut = run(NODE, [join(ROOT, 'followup-pin.mjs'), '--num', '5', '--date', '2026-12-03'], { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: tmp, CAREER_OPS_FOLLOWUPS: elsewhere } });
+  if (envOut && parseNextOverrides(readFileSync(elsewhere, 'utf-8')).get(5)?.date === '2026-12-03' && !readFileSync(file, 'utf-8').includes('#5 ')) pass('CAREER_OPS_FOLLOWUPS wins over the data root, as followup-cadence reads it');
+  else fail(`env pin: ${JSON.stringify(envOut)}`);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

@@ -15,6 +15,21 @@ import { loadCanonicalStates } from '../tracker-utils.mjs';
 
 console.log('\napplication-meta sidecar — readMeta/setMeta and app-meta.mjs');
 
+const TRACKER = [
+  '| # | Date | Company | Role | Score | Status | PDF | Report | Notes |',
+  '|---|---|---|---|---|---|---|---|---|',
+  '| 3 | 2026-10-01 | Acme Corp | Backend Engineer | 4.2/5 | Interview | ❌ | — | — |',
+  '| 5 | 2026-10-02 | Globex | Platform Engineer | 4.0/5 | Applied | ❌ | — | — |',
+  '| 6 | 2026-10-03 | Initech | Data Engineer | 3.9/5 | Applied | ❌ | — | — |',
+  '| 12 | 2026-10-05 | Northwind Traders | SRE | 4.1/5 | Applied | ❌ | — | — |',
+  '',
+].join('\n');
+function withTracker(root) {
+  mkdirSync(join(root, 'data'), { recursive: true });
+  writeFileSync(join(root, 'data', 'applications.md'), TRACKER);
+  return root;
+}
+
 const tmp = mkdtempSync(join(tmpdir(), 'co-appmeta-'));
 const opts = { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: tmp } };
 const cli = (...args) => run(NODE, [join(ROOT, 'app-meta.mjs'), ...args], opts);
@@ -46,7 +61,7 @@ try {
   if (row.split('\t').length === 5 && row.includes('tab here newline')) pass('tabs and newlines are stripped from cells');
   else fail(`cell not sanitized: ${JSON.stringify(row)}`);
 
-  const cliRoot = mkdtempSync(join(tmpdir(), 'co-appmeta-cli-'));
+  const cliRoot = withTracker(mkdtempSync(join(tmpdir(), 'co-appmeta-cli-')));
   const cliOpts = { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: cliRoot } };
   const c = (...args) => run(NODE, [join(ROOT, 'app-meta.mjs'), ...args], cliOpts);
   const setOut = c('set', '12', 'lane', 'Phone screen', '--source', 'cli');
@@ -62,6 +77,19 @@ try {
   else fail(`dump output: ${JSON.stringify(dump)}`);
   if (c('set', '12', 'bogus', 'x') === null) pass('set with an unknown key exits non-zero');
   else fail('set with an unknown key succeeded');
+  if (c('set', '99', 'lane', 'x') === null) pass('set for a number with no tracker row exits non-zero');
+  else fail('set for a missing tracker row succeeded');
+  threw = false;
+  try { await setMeta(cliRoot, 12, 'lane', '  '); } catch { threw = true; }
+  if (threw) pass('empty value throws instead of overriding the lane'); else fail('empty value accepted');
+  threw = false;
+  try { await setMeta(cliRoot, 12, 'closed_at', 'soon'); } catch { threw = true; }
+  if (threw) pass('closed_at that is not a date throws'); else fail('bad closed_at accepted');
+  writeFileSync(join(cliRoot, 'data', 'application-meta.tsv'), `${readFileSync(join(cliRoot, 'data', 'application-meta.tsv'), 'utf-8')}12\t2026-11-01\tlane\n12\t2026-11-01\tcolour\tred\tmanual\n`);
+  const skipped = [];
+  readMeta(cliRoot, skipped);
+  if (skipped.length === 2) pass('a short row and an unknown-key row are reported, not dropped in silence');
+  else fail(`skipped: ${JSON.stringify(skipped)}`);
   rmSync(cliRoot, { recursive: true, force: true });
   if (cli('get') === null) pass('get without a num exits non-zero');
   else fail('get without a num succeeded');

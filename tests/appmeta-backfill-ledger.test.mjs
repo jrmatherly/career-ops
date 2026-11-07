@@ -5,7 +5,7 @@
  * Run: node test-all.mjs --only appmeta-backfill-ledger
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, ROOT, rmSync } from './helpers.mjs';
@@ -35,6 +35,17 @@ try {
   const backfill = parsed.observations.filter((o) => o.source === 'backfill');
   if (backfill.length === 2 && backfill.every((o) => o.dayMath === false) && parsed.unparseable.length === 0 && parsed.unknownSources.length === 0) pass('parseStatusLog reads them, excluded from day math');
   else fail(`parsed: ${JSON.stringify(parsed)}`);
+
+  for (const [bad, label] of [[{ num: 3, date: '2026-13-45', to: 'Applied' }, 'impossible date'], [{ num: 3, date: '2026-10-01', to: 'Phone screen' }, 'non-canonical state'], [{ num: 'x', date: '2026-10-01', to: 'Applied' }, 'non-integer num'], [{ num: 3, date: '2026-10-01' }, 'missing to']]) {
+    let threw = false;
+    try { await appendBackfillRows(tracker, [bad]); } catch { threw = true; }
+    if (threw && readFileSync(ledger, 'utf-8').split('\n').length === 4) pass(`${label} throws and writes nothing`); else fail(`${label} accepted`);
+  }
+  const emptyTracker = join(tmp, 'empty', 'applications.md');
+  mkdirSync(join(tmp, 'empty'));
+  writeFileSync(emptyTracker, '');
+  if (await appendBackfillRows(emptyTracker, []) === 0 && !existsSync(join(tmp, 'empty', 'status-log.tsv'))) pass('no rows: no lock, no file');
+  else fail('empty rows created a ledger');
 
   const lock = await acquireTrackerLock(trackerLockDirFor(canonicalizeTrackerPath(tracker)), { timeoutMs: 300 });
   let settled = false;

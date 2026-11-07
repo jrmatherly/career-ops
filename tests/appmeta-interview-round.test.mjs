@@ -6,7 +6,7 @@
  * Run: node test-all.mjs --only appmeta-interview-round
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, run, NODE, ROOT, rmSync } from './helpers.mjs';
@@ -50,6 +50,10 @@ try {
   if (lines[onsiteIdx].includes('2026-12-08 09:30 America/New_York (240m)') && lines[onsiteIdx].endsWith('| #3 in tracker; bring / laptop |')) pass('--duration and --notes land in their cells');
   else fail(`row: ${lines[onsiteIdx]}`);
 
+  const again = add('--num', '3', '--kind', 'onsite', '--at', '2026-12-08T09:30', '--tz', 'America/New_York', '--duration', '240', '--notes', 'bring | laptop');
+  if (again === lines[onsiteIdx] && readFileSync(file, 'utf-8') === second) pass('repeating an add is a no-op that prints the existing row');
+  else fail(`repeat: ${JSON.stringify(again)}`);
+
   const parsed = parseActiveInterviews(second);
   if (parsed.length === 2 && parsed.every((r) => r.Notes.includes('#3 in tracker'))) pass('parseActiveInterviews reads both rows');
   else fail(`parsed: ${JSON.stringify(parsed)}`);
@@ -78,6 +82,24 @@ try {
   else fail('bad --tz accepted');
   if (add('--num', '3', '--kind', 'chat', '--at', '2026-12-01T14:00', '--tz', 'UTC') === null) pass('unknown --kind exits non-zero');
   else fail('bad --kind accepted');
+  if (add('--num', '3', '--kind', 'technical', '--at', '2026-12-01T14:00') === null) pass('--at without --tz exits non-zero');
+  else fail('--at without --tz accepted');
+  if (add('--num', '3', '--kind', 'technical', '--at', '2026-12-01T14:00', '--tz', 'UTC', '--ics', ics) === null) pass('both --at and --ics exits non-zero');
+  else fail('both --at and --ics accepted');
+  const before = readFileSync(file, 'utf-8');
+  if (add('--num', '3', '--kind', 'technical', '--at', '2026-12-01T14:00', '--tz', 'UTC', '--participants', '(Recruiter)') === null && readFileSync(file, 'utf-8') === before) pass('a nameless participant is refused before anything is written');
+  else fail('nameless participant accepted or the row was written');
+
+  const c = makeRoot(); roots.push(c);
+  writeFileSync(join(c, 'active-interviews.md'), '| Company | Role | Date | Status | Interviewer | Notes |\n|---|---|---|---|---|---|\n| Globex | PM | 2026-10-01 | Done | Sam | [process-friction] late |\n');
+  const rootOut = cliIn(c)('--num', '3', '--kind', 'onsite', '--at', '2026-12-02T10:00', '--tz', 'UTC');
+  const rootFile = readFileSync(join(c, 'active-interviews.md'), 'utf-8');
+  const rootRows = parseActiveInterviews(rootFile);
+  if (rootOut === '| Acme Corp | Backend Engineer | 2026-12-02 10:00 UTC (60m) | Scheduled | — | #3 in tracker |' && !existsSync(join(c, 'data', 'active-interviews.md')) && rootRows.length === 2 && rootRows[1].Date === '2026-12-02 10:00 UTC (60m)' && rootRows[1].Notes === '#3 in tracker') pass('a root-level file with its own column order gets the row in that order, and no data/ copy is created');
+  else fail(`root-level: out=${JSON.stringify(rootOut)} file=${JSON.stringify(rootFile)}`);
+  writeFileSync(join(c, 'active-interviews.md'), '| Company | Role | When |\n|---|---|---|\n');
+  if (cliIn(c)('--num', '3', '--kind', 'onsite', '--at', '2026-12-02T10:00', '--tz', 'UTC') === null) pass('a table without Date/Time or Notes columns is refused');
+  else fail('row written into a table the readers cannot match');
 } finally {
   for (const r of roots) rmSync(r, { recursive: true, force: true });
 }

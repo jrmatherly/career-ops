@@ -5,7 +5,7 @@
  * Run: node test-all.mjs --only appmeta-events
  */
 
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, run, NODE, ROOT, rmSync } from './helpers.mjs';
@@ -13,8 +13,23 @@ import { readEvents, addEvent } from '../lib/application-events.mjs';
 
 console.log('\napplication-events sidecar — readEvents/addEvent and app-events.mjs');
 
+const TRACKER = [
+  '| # | Date | Company | Role | Score | Status | PDF | Report | Notes |',
+  '|---|---|---|---|---|---|---|---|---|',
+  '| 3 | 2026-10-01 | Acme Corp | Backend Engineer | 4.2/5 | Interview | ❌ | — | — |',
+  '| 5 | 2026-10-02 | Globex | Platform Engineer | 4.0/5 | Applied | ❌ | — | — |',
+  '| 6 | 2026-10-03 | Initech | Data Engineer | 3.9/5 | Applied | ❌ | — | — |',
+  '| 12 | 2026-10-05 | Northwind Traders | SRE | 4.1/5 | Applied | ❌ | — | — |',
+  '',
+].join('\n');
+function withTracker(root) {
+  mkdirSync(join(root, 'data'), { recursive: true });
+  writeFileSync(join(root, 'data', 'applications.md'), TRACKER);
+  return root;
+}
+
 const tmp = mkdtempSync(join(tmpdir(), 'co-appevents-'));
-const cliRoot = mkdtempSync(join(tmpdir(), 'co-appevents-cli-'));
+const cliRoot = withTracker(mkdtempSync(join(tmpdir(), 'co-appevents-cli-')));
 const cli = (...args) => run(NODE, [join(ROOT, 'app-events.mjs'), ...args], { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: cliRoot } });
 
 try {
@@ -49,6 +64,8 @@ try {
   else fail(`list: ${JSON.stringify({ listed, listed5 })}`);
   if (cli('add', '5', 'gossip', 'x') === null) pass('CLI add with an unknown kind exits non-zero');
   else fail('CLI add with an unknown kind succeeded');
+  if (cli('add', '99', 'note', 'x') === null) pass('CLI add for a number with no tracker row exits non-zero');
+  else fail('CLI add for a missing tracker row succeeded');
 } finally {
   rmSync(tmp, { recursive: true, force: true });
   rmSync(cliRoot, { recursive: true, force: true });

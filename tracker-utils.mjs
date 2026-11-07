@@ -894,16 +894,33 @@ export function appendLedgerRows(path, text) {
  * Append backfilled transitions (source `backfill`) to the status-log.tsv
  * beside `trackerPath`. appendLedgerRows alone is unlocked, so this holds the
  * tracker lock that set-status.mjs takes before it appends to the same ledger.
+ * Rows are checked first (positive tracker number, real date, canonical states
+ * or `-`), because parseStatusLog quarantines a bad row without a word.
  *
  * @param {string} trackerPath - The applications tracker.
  * @param {{num:number, date:string, from?:string|null, to:string, note?:string}[]} rows
  * @returns {Promise<number>} Rows written.
  */
 export async function appendBackfillRows(trackerPath, rows) {
+  if (rows.length === 0) return 0;
+  const states = loadCanonicalStates(new URL('templates/states.yml', import.meta.url));
+  const state = (v, column) => {
+    if (v == null || v === '-') return '-';
+    const canonical = resolveCanonicalState(String(v), states);
+    if (!canonical) throw new Error(`appendBackfillRows: ${column} "${v}" is not a canonical state`);
+    return canonical;
+  };
+  const text = rows.map(({ num, date, from, to, note }) => {
+    if (!Number.isInteger(num) || num <= 0) throw new Error(`appendBackfillRows: tracker number must be a positive integer, got "${num}"`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+      throw new Error(`appendBackfillRows: date must be a real YYYY-MM-DD, got "${date}"`);
+    }
+    if (to == null || to === '-') throw new Error('appendBackfillRows: every row needs a to-state');
+    return `${num}\t${date}\t${state(from, 'from')}\t${state(to, 'to')}\tbackfill\t${String(note ?? '').replace(/[\t\r\n]+/g, ' ')}\n`;
+  }).join('');
   const tracker = canonicalizeTrackerPath(trackerPath);
   const lock = await acquireTrackerLock(trackerLockDirFor(tracker), { tracker });
   try {
-    const text = rows.map(({ num, date, from, to, note }) => `${num}\t${date}\t${from ?? '-'}\t${to}\tbackfill\t${String(note ?? '').replace(/[\t\r\n]+/g, ' ')}\n`).join('');
     appendLedgerRows(join(dirname(tracker), 'status-log.tsv'), text);
   } finally {
     lock.release();
