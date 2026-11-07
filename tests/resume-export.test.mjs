@@ -94,6 +94,13 @@ test('resume-export: json-resume of the RR sample parses with the importer and l
   assert.ok(document.work.some((w) => w.name === custom.items[0].company), 'custom experience merged into work');
 });
 
+test('resume-export: json-resume leaves a hidden picture out', () => {
+  const data = sampleData();
+  assert.equal(resumeToJsonResume(data).document.basics.image, data.picture.url);
+  data.picture.hidden = true;
+  assert.equal('image' in resumeToJsonResume(data).document.basics, false);
+});
+
 test('resume-export: --hide experience and --hide-item leave entries out of DOCX and JSON Resume', () => withRoot((root) => {
   const data = sampleData();
   const names = companies(data);
