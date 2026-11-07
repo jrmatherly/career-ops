@@ -84,12 +84,34 @@ test("a 503 that is not lock contention reverts at once with the route's own mes
   assert.deepEqual(h.waits, []);
 });
 
-test("a request that never reaches the server reverts once with a plain message", async () => {
+test("a request that loses the server reverts once and says the outcome is unknown", async () => {
   const h = harness([]);
   const offline = async () => { throw new TypeError("Failed to fetch"); };
   const result = await dropCard(h.state, card, "OFFER", h.update, { request: offline, wait: h.wait });
   assert.equal(result.outcome, "reverted");
-  assert.match(result.error, /^Could not reach career-ops/);
+  assert.match(result.error, /^Lost contact with career-ops before the save was confirmed/);
   assert.deepEqual(h.waits, []);
   assert.deepEqual(h.seen, ["Offer", "Applied"]);
+});
+
+test("two cards in flight settle independently, whichever answers first", async () => {
+  let state = { rows: [card, other], holds: new Map() };
+  const update = (fn) => { state = fn(state); };
+  let releaseA;
+  const gateA = new Promise((r) => { releaseA = r; });
+  const request = async (_url, init) => {
+    const { n, status } = JSON.parse(init.body);
+    if (n === "7") {
+      await gateA;
+      return new Response(JSON.stringify({ error: "row changed" }), { status: 409 });
+    }
+    return new Response(JSON.stringify({ ok: true, status }), { status: 200 });
+  };
+  const pA = dropCard(state, card, "OFFER", update, { request });
+  const pB = dropCard(state, other, "REJECTED", update, { request });
+  assert.deepEqual(await pB, { outcome: "saved", status: "Rejected" });
+  releaseA();
+  assert.equal((await pA).outcome, "reverted");
+  assert.deepEqual(state.rows.map((r) => [r.n, r.status]), [["7", "Applied"], ["8", "Rejected"]]);
+  assert.deepEqual([...state.holds].map(([k, h]) => [k, h.phase]), [[applicationKey(card), "failed"]]);
 });

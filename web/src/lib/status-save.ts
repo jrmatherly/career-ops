@@ -51,7 +51,8 @@ export async function saveWithRetry(
       }
       // The lock-timeout body names the lock directory, an absolute server path, so it stays out of the toast.
       if (reply === "busy") return { ok: false, error: "The tracker stayed busy, so the card moved back. Try again in a moment." };
-      if (reply === "none") return { ok: false, error: "Could not reach career-ops, so the card moved back. Check that the web server is running." };
+      // fetch also rejects when the connection drops after the server took the POST.
+      if (reply === "none") return { ok: false, error: "Lost contact with career-ops before the save was confirmed, so the card moved back. Refresh to see whether it was applied." };
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   }

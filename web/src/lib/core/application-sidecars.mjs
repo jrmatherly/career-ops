@@ -1,9 +1,9 @@
-// The web's own readers for the files beside the tracker that PR-08's writers
-// fill: data/application-meta.tsv, data/application-events.tsv,
-// data/active-interviews.md, data/contacts.tsv, the follow-up pins in
-// data/follow-ups.md and data/offers/<slug>/terms.md. Text in, plain data out,
-// no fs: the web never imports root modules (lib/application-meta.mjs is the
-// writer these mirror), and the page reads the files itself.
+// The web's own readers for the files beside the tracker: the PR-08 sidecars
+// (data/application-meta.tsv, data/application-events.tsv, data/active-interviews.md,
+// the follow-up pins in data/follow-ups.md, data/offers/<slug>/terms.md) and
+// data/contacts.tsv. Text in, plain data out, no fs: the web never imports root
+// modules (lib/application-meta.mjs is the writer these mirror), and the page
+// reads the files itself.
 
 import { dayInstant, zonedInstant } from "../next-step.mjs";
 
@@ -64,7 +64,9 @@ const splitRow = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").spl
 const isTableLine = (line) => /^\s*\|.*\|\s*$/.test(line);
 const TRACKER_REF_RE = /#\s*(\d+)\s+in\s+tracker/i;
 // interview-round.mjs writes `YYYY-MM-DD HH:MM <IANA tz> (<n>m)`; older rows carry less.
-const WHEN_RE = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?(?:\s+([A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)+|UTC))?(?:\s*\((\d+)\s*m\))?/;
+// The zone is any name Intl may accept (America/New_York, UTC, EST, Japan); one it
+// rejects falls back to UTC in zonedInstant.
+const WHEN_RE = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}:\d{2}))?(?:\s+([A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+)*))?(?:\s*\((\d+)\s*m\))?/;
 
 /**
  * Rounds in the first table of data/active-interviews.md, keyed to the tracker
@@ -99,6 +101,8 @@ export function parseActiveInterviews(md) {
       round: col(cells, "round"),
       when,
       at: at && !Number.isNaN(at.getTime()) ? at.toISOString() : null,
+      // The round's own wall-clock time, the clock events and status rows are written in.
+      local: m ? (m[2] ? `${m[1]}T${m[2].padStart(5, "0")}` : m[1]) : "",
       durationMinutes: m?.[4] ? Number(m[4]) : 60,
       interviewer: col(cells, "interviewer"),
       status: col(cells, "status"),
@@ -228,7 +232,7 @@ export function joinApplication(app, sources) {
   const timeline = [
     ...log.map((r) => ({ at: r.date, kind: "status", text: `${r.from || "—"} → ${r.to}${r.note ? ` (${r.note})` : ""}`, source: r.source })),
     ...events.map((e) => ({ at: e.at, kind: e.kind, text: e.text, source: e.source })),
-    ...interviews.map((r) => ({ at: r.at ?? r.when, kind: "interview", text: [r.round, r.interviewer, r.status].filter(Boolean).join(" · "), source: "" })),
+    ...interviews.map((r) => ({ at: r.local || r.when, kind: "interview", text: [r.round, r.interviewer, r.status].filter(Boolean).join(" · "), source: "" })),
   ].sort((a, b) => sortKey(b.at).localeCompare(sortKey(a.at)));
   return {
     num,

@@ -33,7 +33,7 @@ const STAGES = new Set(["EVALUATED", ...AWAITING_REPLY, "INTERVIEW", "OFFER", ..
  *   | { kind: "closed" }} NextStep
  */
 
-/** A whole day sits at noon UTC, RR's convention, so no timezone moves it to another day. */
+/** A whole day sits at noon UTC, RR's convention; show it with timeZone "UTC" so no zone moves it to another day. */
 export function dayInstant(date) {
   const day = String(date ?? "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
@@ -163,7 +163,9 @@ export function nextStep(app, events, interviews, now = new Date(), timeZone = "
   if (token === "INTERVIEW") {
     // Rounds that ended during this visit, counted from when they ended. Same-day
     // rounds count by day, like contact: a whole-day stage date sits at noon.
-    const ended = visitSince === undefined ? [] : rounds.map(interviewEnd).filter((end) => dayNumber(end) >= dayNumber(visitSince));
+    // With the visit start unknown (a backfill row) every recorded round counts;
+    // RR counts none, which reads "Schedule interview" after a round has happened.
+    const ended = rounds.map(interviewEnd).filter((end) => visitSince === undefined || dayNumber(end) >= dayNumber(visitSince));
     if (ended.length === 0) return { kind: "no-interview", days };
     const quiet = daysBetween(new Date(Math.max(...ended, contacted)), now);
     return quiet >= FOLLOW_UP_AFTER_DAYS ? { kind: "no-reply", days: quiet, after: "interview" } : { kind: "interview-feedback", days };

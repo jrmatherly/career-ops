@@ -10,6 +10,7 @@ export const BOARD_COLUMNS = PIPELINE_TABS.filter((tab) => !NOT_STAGES.has(tab))
 
 // The canonical label (templates/states.yml) a drop onto each column saves and
 // the column shows. /api/status echoes exactly this, which saveStatus checks.
+/** @type {Record<string, string>} */
 const COLUMN_STATUS = {
   EVALUATED: "Evaluated",
   APPLIED: "Applied",
@@ -23,10 +24,13 @@ const COLUMN_STATUS = {
   SKIP: "SKIP",
 };
 
-/** @param {string} tab */
+/** @param {string} tab @returns {string | null} */
 export const columnStatus = (tab) => COLUMN_STATUS[tab] ?? null;
 
-/** The column a status sits in, or null for a status no stage tab lists. */
+/**
+ * The column a status sits in, or null for a status no stage tab lists.
+ * @param {string} status
+ */
 export const columnOf = (status) => BOARD_COLUMNS.find((tab) => rowOnPipelineTab(status, tab)) ?? null;
 
 /**
@@ -61,7 +65,7 @@ export function groupByColumn(rows, meta) {
  * @param {string} [timeZone]
  */
 export function nextStepLabel(step, timeZone = "UTC") {
-  const day = (at) => at.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone });
+  const day = (at, zone = timeZone) => at.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: zone });
   const waited = (days) => (days === null ? "" : ` · ${days}d`);
   switch (step.kind) {
     case "interview":
@@ -78,7 +82,8 @@ export function nextStepLabel(step, timeZone = "UTC") {
       return "Schedule interview";
     case "offer":
       if (!step.respondBy) return "Decide on offer";
-      return step.overdue ? `Offer reply overdue · ${day(step.respondBy)}` : `Reply by ${day(step.respondBy)}`;
+      // respondBy is a whole day at noon UTC (dayInstant); the viewer's zone would move it east of UTC+12.
+      return step.overdue ? `Offer reply overdue · ${day(step.respondBy, "UTC")}` : `Reply by ${day(step.respondBy, "UTC")}`;
     case "not-applied":
       return "Not applied";
     default:

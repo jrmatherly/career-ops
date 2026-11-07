@@ -17,10 +17,18 @@ test("the stage clock starts at the last ledger row into the current stage, else
   assert.deepEqual(stageSince(app("Applied", [entered("Evaluated", "2026-09-01")])), new Date("2026-08-01T12:00:00Z"));
 });
 
-test("a backfilled stage date is unknown, so it makes no elapsed-time or no-reply claim", () => {
+test("a backfilled stage date is unknown: no elapsed-time claim, but known contact still dates the silence", () => {
   const a = app("Applied", [entered("Applied", "2026-01-01", "backfill")]);
   assert.equal(stageSince(a), null);
   assert.deepEqual(nextStep(a, [], [], now), { kind: "waiting", days: null });
+  // RR's "dates silence from known contact without inventing an imported stage date".
+  assert.deepEqual(nextStep(a, [contact("2026-10-20T12:00:00Z")], [], now), { kind: "no-reply", days: 11 });
+});
+
+test("a backfilled Interview stage counts every recorded round", () => {
+  const a = app("Interview", [entered("Interview", "2026-01-01", "backfill")]);
+  assert.deepEqual(nextStep(a, [], [round("2026-10-30T10:00:00Z")], now), { kind: "interview-feedback", days: null });
+  assert.deepEqual(nextStep(a, [], [], now), { kind: "no-interview", days: null });
 });
 
 test("ten quiet days after applying or a first reply is no-reply; fewer is waiting", () => {

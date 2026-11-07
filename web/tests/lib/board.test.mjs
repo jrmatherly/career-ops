@@ -44,6 +44,12 @@ test("next-step labels", () => {
   assert.equal(nextStepLabel({ kind: "offer", days: 1, respondBy: at, overdue: false, terms: true }), "Reply by Nov 3");
   assert.equal(nextStepLabel({ kind: "offer", days: 1, respondBy: null, overdue: false, terms: false }), "Decide on offer");
   assert.equal(nextStepLabel({ kind: "closed" }), "Closed");
+  const day = new Date("2026-11-03T12:00:00Z"); // dayInstant("2026-11-03")
+  assert.equal(nextStepLabel({ kind: "offer", days: 1, respondBy: day, overdue: false, terms: true }, "Pacific/Auckland"), "Reply by Nov 3", "a whole day keeps its date east of UTC+12");
+  assert.equal(nextStepLabel({ kind: "no-interview", days: 2 }), "Schedule interview");
+  assert.equal(nextStepLabel({ kind: "interview-feedback", days: 2 }), "Awaiting feedback");
+  assert.equal(nextStepLabel({ kind: "not-applied" }), "Not applied");
+  assert.equal(nextStepLabel({ kind: "follow-up", at, note: "", overdue: false }), "Follow up Nov 3");
   assert.equal(nextStepLabel({ kind: "interview", at: new Date("2026-11-04T02:00:00Z") }, "America/Los_Angeles"), "Interview Nov 3");
 });
 

@@ -78,6 +78,9 @@ test("interview rounds join by the #N in tracker reference and read the zone and
     [12, "screening", "2026-10-10T12:00:00.000Z", 60],
   ]);
   assert.equal(rounds[0].interviewer, "Pat (EM)");
+  assert.equal(rounds[0].local, "2026-12-01T14:00", "the wall-clock time the timeline sorts and shows");
+  const [single] = parseActiveInterviews("| Round | Date/Time | Notes |\n|---|---|---|\n| screen | 2026-11-10 14:00 EST (30m) | #12 in tracker |\n");
+  assert.deepEqual([single.at, single.durationMinutes], ["2026-11-10T19:00:00.000Z", 30], "a single-word zone is still a zone");
   assert.deepEqual(parseActiveInterviews("no table here"), []);
 });
 

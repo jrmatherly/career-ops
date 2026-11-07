@@ -57,8 +57,9 @@ function readOffers(dir: string) {
 /** Every file the board joins, read once per request. */
 export function readSources() {
   const root = careerOpsRoot();
-  // PR-08's writers and the contacts and follow-up writers always use <root>/data;
-  // only the status log sits beside the tracker, which readStatusLog follows.
+  // The sidecar and contacts writers use <root>/data, and data/follow-ups.md is
+  // the file /followups reads (followupsLogPath). Only the status log sits beside
+  // the tracker, through readStatusLog.
   const data = path.join(root, "data");
   // interview-round.mjs writes the root-level file when only that one exists.
   const interviews = read(path.join(data, "active-interviews.md")) ?? read(path.join(root, "active-interviews.md"));

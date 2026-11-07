@@ -23,7 +23,8 @@ export function Board({ cards }: { cards: BoardCard[] }) {
   const [state, setState] = useState<BoardSaveState<BoardCard>>(() => ({ rows: cards, holds: new Map() }));
   const [seen, setSeen] = useState(cards);
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  // An object, so a repeat of the same message is a new toast and restarts its timer.
+  const [toast, setToast] = useState<{ text: string } | null>(null);
   // dropCard checks holds in the render-time state; two drops before a re-render would both pass it.
   const inFlight = useRef(new Set<string>());
 
@@ -52,7 +53,7 @@ export function Board({ cards }: { cards: BoardCard[] }) {
     const result = await dropCard(state, row, tab, setState).finally(() => inFlight.current.delete(key));
     // A reverted move refreshes too: a 504 or an unconfirmed 200 may still have written the tracker.
     if (result.outcome !== "noop") router.refresh();
-    if (result.outcome === "reverted") setToast(result.error);
+    if (result.outcome === "reverted") setToast({ text: `${row.company}: ${result.error}` });
   }
 
   return (
@@ -83,11 +84,11 @@ export function Board({ cards }: { cards: BoardCard[] }) {
           ))}
         </div>
       )}
-      {open && openKey && <ApplicationSheet card={open} onClose={() => setOpenKey(null)} onMove={(tab) => void move(openKey, tab)} />}
+      {open && openKey && <ApplicationSheet card={open} saving={state.holds.get(openKey)?.phase === "pending"} onClose={() => setOpenKey(null)} onMove={(tab) => void move(openKey, tab)} />}
       {toast && (
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
           <p role="status" className="max-w-full break-words rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
-            {toast}
+            {toast.text}
           </p>
         </div>
       )}

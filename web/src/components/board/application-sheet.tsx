@@ -77,7 +77,7 @@ function MetaForm({ n, metaKey, label }: { n: string; metaKey: "lane" | "tag"; l
   );
 }
 
-export function ApplicationSheet({ card, onClose, onMove }: { card: BoardCard; onClose: () => void; onMove: (tab: string) => void }) {
+export function ApplicationSheet({ card, saving, onClose, onMove }: { card: BoardCard; saving: boolean; onClose: () => void; onMove: (tab: string) => void }) {
   const titleId = useId();
   const { detail } = card;
   const offerFields = Object.entries(detail.offer?.fields ?? {});
@@ -134,10 +134,10 @@ export function ApplicationSheet({ card, onClose, onMove }: { card: BoardCard; o
       </Link>
 
       {/* The touch path: HTML5 drag does not fire on most phone browsers. */}
-      <Section title="Move to">
+      <Section title={saving ? "Move to (saving…)" : "Move to"}>
         <div className="flex flex-wrap gap-2">
           {BOARD_COLUMNS.filter((tab) => tab !== here).map((tab) => (
-            <Button key={tab} type="button" variant="outline" size="sm" onClick={() => onMove(tab)} className="max-sm:min-h-[44px]">
+            <Button key={tab} type="button" variant="outline" size="sm" disabled={saving} onClick={() => onMove(tab)} className="max-sm:min-h-[44px]">
               {columnStatus(tab)}
             </Button>
           ))}
