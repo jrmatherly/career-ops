@@ -95,8 +95,9 @@ export function getIn(value, path) {
 }
 
 /**
- * Immutable set along `path`. Writing `period` or `date` drops the sibling `dates`, which the parser would
- * otherwise regenerate them from; it then re-derives `dates` and reformats the text (`2019 - 2024` gets an en dash).
+ * Immutable set along `path`. Writing `period` or `date` drops the sibling `dates`, so the CLI's parser re-derives
+ * `dates` from the new text instead of rewriting the text from the stale `dates`; it also reformats the text
+ * (`2019 - 2024` gets an en dash).
  */
 export function setField(data, path, value) {
   if (path.length === 0) return value;
@@ -161,7 +162,7 @@ export function addCustomSection(data, type, id, title) {
   return { ...data, customSections: [...(data.customSections ?? []), section] };
 }
 
-// shortcut: mirrors lib/resume/to-cv-md.mjs mdToHtml because web code cannot import root lib; share it if a third copy appears.
+// shortcut: mirrors lib/resume/to-cv-md.mjs's converter (stripTags, htmlToMd, mdToHtml) because client code cannot import root lib; resume-form.test.mjs pins the two copies together; share it if a third copy appears.
 const unescapeHtml = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
 const escapeHtml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const BLOCK_TAG_RE = /<\/?(?:p|li|ul|ol|div|h[1-6]|blockquote)\b[^>]*>|<br\s*\/?>/gi;
@@ -206,14 +207,18 @@ function mdToHtml(md) {
   });
 }
 
+const DESCRIPTION_BLOCK_RE = /<(ul|ol)\b[^>]*>([\s\S]*?)<\/\1>|<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+
 /** Description HTML as editable lines: one per paragraph, `- ` per list item. */
 export function descriptionToText(html) {
   const lines = [];
-  for (const m of String(html ?? "").matchAll(/<(ul|ol)\b[^>]*>([\s\S]*?)<\/\1>|<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+  for (const m of String(html ?? "").matchAll(DESCRIPTION_BLOCK_RE)) {
     if (m[1]) for (const li of m[2].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)) lines.push(`- ${htmlToMd(li[1])}`);
     else lines.push(htmlToMd(m[3]));
   }
-  if (lines.length === 0 && html) lines.push(htmlToMd(html));
+  // Text outside <p>/<ul>/<ol> (an imported <blockquote>, bare text) is kept as one closing paragraph, out of its original order, rather than lost on the first edit.
+  const rest = htmlToMd(String(html ?? "").replace(DESCRIPTION_BLOCK_RE, " "));
+  if (rest) lines.push(rest);
   return lines.filter((l) => l && l !== "- ").join("\n");
 }
 

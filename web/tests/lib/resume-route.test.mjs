@@ -61,6 +61,8 @@ const withEditedBullet = (data) => {
   return next;
 };
 
+const descriptionOf = (data) => data.sections.experience.items[1].description;
+
 let opened;
 
 test("GET absorbs cv.md and returns the lossless draft with its sha and report", async () => {
@@ -113,6 +115,11 @@ test("PUT with the right sha writes the edit into cv.md; the old sha then confli
   assert.equal(stale.status, 409);
   assert.match(stale.body.error, /cv\.md changed/);
   assert.equal(readFileSync(cvPath, "utf8"), after, "a stale save leaves cv.md alone");
+
+  const reopened = await get();
+  assert.equal(reopened.body.lossless, true, "a saved cv.md absorbs back losslessly");
+  assert.equal(reopened.body.cvMdSha, saved.body.cvMdSha);
+  assert.match(descriptionOf(reopened.body.data), new RegExp(EDITED));
 });
 
 test("GET after a dates line changed on disk is read-only with one orphan", async () => {
@@ -123,6 +130,18 @@ test("GET after a dates line changed on disk is read-only with one orphan", asyn
   assert.equal(body.cvMdSha, null);
   assert.equal(body.report.orphans.length, 1);
   assert.equal(body.report.orphans[0].company, "DataStartup Inc");
+});
+
+test("GET without cv.md is a 404", async () => {
+  const kept = readFileSync(cvPath, "utf8");
+  rmSync(cvPath);
+  try {
+    const { status, body } = await get();
+    assert.equal(status, 404);
+    assert.equal(body.error, "cv.md not found");
+  } finally {
+    writeFileSync(cvPath, kept);
+  }
 });
 
 test("the nav lists /resume as its last destination", async () => {

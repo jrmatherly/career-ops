@@ -39,12 +39,13 @@ function reducer(state: State, a: Action): State {
     case "failed":
       return { ...state, status: { kind: "error", message: a.message } };
     case "edit":
-      // A conflict stays until reload: the draft's base sha is stale whatever is typed next.
-      return { ...state, data: a.data, status: state.status.kind === "conflict" ? state.status : { kind: "editing" } };
+      // A conflict stays until reload (the draft's base sha is stale), and a save in flight stays until it answers.
+      return { ...state, data: a.data, status: state.status.kind === "conflict" || state.status.kind === "saving" ? state.status : { kind: "editing" } };
     case "saving":
       return { ...state, status: { kind: "saving" } };
     case "saved":
-      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, status: { kind: "saved" } };
+      // Edits typed while the save was in flight are not in cv.md yet.
+      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, status: state.data === a.data ? { kind: "saved" } : { kind: "editing" } };
     case "conflict":
       return { ...state, status: { kind: "conflict", message: a.message } };
     case "invalid":
@@ -61,6 +62,9 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
   { key: "website", label: "Website", kind: "website" },
 ];
 
+// A route that throws answers with an HTML error page, not JSON.
+const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+
 const entryText = (e: Entry) => (e.section ? `${e.section}: ${e.name ?? ""}` : [e.company, e.position, e.period].filter(Boolean).join(", "));
 
 export function ResumeEditor() {
@@ -75,7 +79,7 @@ export function ResumeEditor() {
     let live = true;
     fetch("/api/resume")
       .then(async (res) => {
-        const body = await res.json();
+        const body = await readBody(res);
         if (!live) return;
         if (!res.ok) return dispatch({ type: "failed", message: body.error ?? `HTTP ${res.status}` });
         dispatch({ type: "loaded", data: body.data, cvMdSha: body.cvMdSha, report: body.report, lossless: body.lossless });
@@ -95,7 +99,7 @@ export function ResumeEditor() {
       const n = ++requestNo.current;
       try {
         const res = await fetch("/api/resume/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) });
-        const body = await res.json();
+        const body = await readBody(res);
         if (n !== requestNo.current) return;
         if (!res.ok) return setPreviewError(body.error ?? `HTTP ${res.status}`);
         setPreviewError(null);
@@ -134,9 +138,10 @@ export function ResumeEditor() {
     dispatch({ type: "saving" });
     try {
       const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha }) });
-      const body = await res.json();
+      const body = await readBody(res);
       if (res.ok) dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
-      else if (res.status === 409) dispatch({ type: "conflict", message: body.error });
+      // A 500 from save may come after cv.md was written, so it locks like a conflict until reload.
+      else if (res.status === 409 || res.status >= 500) dispatch({ type: "conflict", message: body.error ?? `HTTP ${res.status}` });
       else dispatch({ type: "invalid", message: body.error ?? `HTTP ${res.status}` });
     } catch (err) {
       dispatch({ type: "invalid", message: (err as Error).message });
@@ -251,7 +256,7 @@ function ReadOnlyReport({ report }: { report: Report | null }) {
   return (
     <Card className="mt-6 space-y-4">
       <p role="status" className="text-sm text-foreground">
-        <code>cv.md</code> no longer matches <code>data/resume.json</code>, so the editor is read-only. Pairing changed entries with their saved versions arrives in a later release.
+        <code>cv.md</code> no longer matches <code>data/resume.json</code>, so the editor is read-only. A renamed or redated entry is paired with <code>node resume.mjs pair &lt;orphanId&gt; &lt;newId&gt;</code>; <code>node resume.mjs adopt</code> shows how cv.md differs from the regenerated file.
       </p>
       {list("Entries only in data/resume.json", report?.orphans)}
       {list("Entries only in cv.md", report?.newEntries)}

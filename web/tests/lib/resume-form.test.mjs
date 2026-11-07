@@ -92,6 +92,8 @@ test("setField sets along a path and drops dates when writing period", () => {
   const company = setField(d, ["sections", "experience", "items", 0, "company"], "Z");
   assert.ok(company.sections.experience.items[0].dates, "other fields keep dates");
   assert.equal(setField(d, ["basics", "name"], "Sam").basics.name, "Sam");
+  const award = setField({ items: [{ date: "2020", dates: { start: "2020" } }] }, ["items", 0, "date"], "2021").items[0];
+  assert.deepEqual(award, { date: "2021" }, "writing date drops dates too");
 });
 
 test("toggleHidden flips a section, or one item when an id is given", () => {
@@ -129,6 +131,7 @@ test("description converts bold, emphasis, links and escapes, paragraphs before 
   assert.equal(textToDescription(""), "");
   assert.equal(textToDescription("- a\n- \n-"), "<ul><li><p>a</p></li></ul>", "a bullet still being typed does not split the list");
   assert.equal(descriptionToText("<p><<b>script>x</p>"), "x", "a tag split by another tag is stripped");
+  assert.equal(descriptionToText("<p>a</p>tail text<blockquote>q</blockquote>"), "a\ntail text q", "text outside p/ul/ol is kept, not lost on the first edit");
 });
 
 test("website text edits url and label together", () => {

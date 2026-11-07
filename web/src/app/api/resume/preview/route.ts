@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     if (r.code !== 0) throw new Error();
     payload = JSON.parse(r.stdout);
   } catch {
-    return Response.json({ error: r.spawnFailed ? "could not start resume.mjs" : r.stderr.slice(-2000) || `resume.mjs exited ${r.code}` }, { status: 500 });
+    console.error(`resume.mjs export payload: exit ${r.code}${r.spawnFailed ? " (spawn failed)" : ""}\n${r.stderr.slice(-2000)}`);
+    return Response.json({ error: r.spawnFailed ? "could not start resume.mjs" : `resume.mjs export failed (exit ${r.code}); see the server log` }, { status: 500 });
   }
   const co = ((data as { careerOps?: CareerOps }).careerOps ?? {}) as CareerOps;
   // careerOps.template 'default' means "no template choice"; renderCv rejects it as a name.
