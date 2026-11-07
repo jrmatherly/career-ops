@@ -4,7 +4,7 @@ Subagent research report, 2026-11-06. Model output: claims carry file:line evide
 
 # Reactive Resume v6 reuse assessment for career-ops
 
-Paths below are relative to the RR clone (`RR/` = `.../scratchpad/rr/repo`) or to `/Users/jason/dev/career-ops` (`CO/`). RR is MIT, "Copyright (c) 2026 Amruth Pillai" (RR/LICENSE:1-3): vendoring needs the copyright and licence notice kept. Everything labelled (inference) is not directly checked.
+Paths below are relative to the RR clone (`RR/` = `.../scratchpad/rr/repo`) or to `~/dev/career-ops` (`CO/`). RR is MIT, "Copyright (c) 2026 Amruth Pillai" (RR/LICENSE:1-3): vendoring needs the copyright and licence notice kept. Everything labelled (inference) is not directly checked.
 
 ## 1. Resume schema
 
