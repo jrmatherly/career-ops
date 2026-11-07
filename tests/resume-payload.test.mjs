@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,19 +81,25 @@ test('each entry carries its ResumeData path, indexed before hidden items are dr
 test('build-cv-html emits each path as data-resume-path, and the same render without paths differs by nothing else', () => {
   const dir = mkdtempSync(join(tmpdir(), 'resume-payload-html-'));
   try {
-    const render = (payload, name) => {
+    const shipped = fileURLToPath(new URL('../templates/cv-template.html', import.meta.url));
+    // A template with no sections/ beside it renders through the builders' built-in markup instead of the partials.
+    const bare = join(dir, 'bare-template.html');
+    copyFileSync(shipped, bare);
+    const render = (payload, name, template) => {
       const input = join(dir, `${name}.json`);
       const output = join(dir, `${name}.html`);
       writeFileSync(input, JSON.stringify(payload));
-      execFileSync(process.execPath, [fileURLToPath(new URL('../build-cv-html.mjs', import.meta.url)), input, output], { stdio: 'pipe' });
+      execFileSync(process.execPath, [fileURLToPath(new URL('../build-cv-html.mjs', import.meta.url)), input, output, template], { stdio: 'pipe' });
       return readFileSync(output, 'utf8');
     };
     const { payload } = resumeToPayload(sample());
-    const html = render(payload, 'with');
-    const expected = [payload.candidate.path, ...['experience', 'projects', 'education', 'certifications', 'awards', 'skills'].flatMap((k) => payload[k].map((e) => e.path))];
-    assert.deepEqual([...html.matchAll(/ data-resume-path="([^"]*)"/g)].map((m) => m[1]).sort(), expected.sort());
+    const expected = [payload.candidate.path, ...['experience', 'projects', 'education', 'certifications', 'awards', 'skills'].flatMap((k) => payload[k].map((e) => e.path))].sort();
     const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k === 'path' ? undefined : v)));
-    assert.equal(html.replace(/ data-resume-path="[^"]*"/g, ''), render(strip(payload), 'without'));
+    for (const [label, template] of [['partials', shipped], ['built-in', bare]]) {
+      const html = render(payload, `with-${label}`, template);
+      assert.deepEqual([...html.matchAll(/ data-resume-path="([^"]*)"/g)].map((m) => m[1]).sort(), expected, label);
+      assert.equal(html.replace(/ data-resume-path="[^"]*"/g, ''), render(strip(payload), `without-${label}`, template), label);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

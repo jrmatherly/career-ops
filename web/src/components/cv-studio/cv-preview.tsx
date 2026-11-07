@@ -3,20 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { contentHeightPx, frameHeightAfterProbe, frameHeightPx, PREVIEW_PAGE_PX, previewPageCount } from "@/lib/cv-studio/page-estimate.mjs";
 import { previewHtml } from "@/lib/cv-studio/preview-html.mjs";
+import { markerTargets } from "@/lib/resume-markers.mjs";
 
 const PAGE_WIDTH = 816;
 
-export type PreviewMarker = { path: string; severity: string };
+export type MarkerSeverity = "error" | "warning" | "info";
+export type PreviewMarker = { path: string; severity: MarkerSeverity };
 
-/** The element paths a marker lands on: its own path or longest dotted prefix, else every path under it, else none. */
-export function markerTargets(paths: string[], marker: string): string[] {
-  let best: string | null = null;
-  for (const p of paths) if ((p === marker || marker.startsWith(`${p}.`)) && (best === null || p.length > best.length)) best = p;
-  if (best !== null) return [best];
-  return [...new Set(paths.filter((p) => p.startsWith(`${marker}.`)))];
-}
-
-const RANK: Record<string, number> = { error: 3, warning: 2, info: 1 };
+const RANK: Record<MarkerSeverity, number> = { error: 3, warning: 2, info: 1 };
 
 const MARKER_CSS = `
 [data-resume-marker] { outline-offset: 2px; }
@@ -83,7 +77,7 @@ export function CvPreview({ html, markers, pinned }: { html: string; markers?: P
     const paths = [...byPath.keys()];
     const targets = (marker: string) => markerTargets(paths, marker).flatMap((p) => byPath.get(p)!);
     // Least severe first, so the most severe marker on an element is written last.
-    const ranked = [...markers].sort((a, b) => (RANK[a.severity] ?? 0) - (RANK[b.severity] ?? 0));
+    const ranked = [...markers].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
     for (const m of ranked) for (const el of targets(m.path)) el.setAttribute("data-resume-marker", m.severity);
     if (!pinned || !markers.some((m) => m.path === pinned.path)) return;
     const hits = targets(pinned.path);

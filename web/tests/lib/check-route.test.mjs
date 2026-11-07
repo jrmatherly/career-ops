@@ -9,6 +9,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "../helpers/web-ts-alias-loader.mjs";
+import { markerTargets } from "../../src/lib/resume-markers.mjs";
+import { parseResume } from "../../../lib/resume/schema.mjs";
+import { resumeToPayload } from "../../../lib/resume/to-payload.mjs";
 
 const codeRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const dataRoot = mkdtempSync(join(tmpdir(), "resume-check-data-"));
@@ -82,4 +85,33 @@ test("a draft the CLI rejects is a 400 with the CLI's message", async () => {
   assert.equal(status, 400);
   assert.match(body.error, /not a valid resume \(basics\.email: /);
   assert.equal((await post({ data: {} })).status, 400);
+});
+
+test("markerTargets: own path or longest prefix, else entries under the nearest ancestor down to a section", () => {
+  const paths = ["basics", "sections.experience.items.1", "sections.experience.items.10", "sections.experience.items.2.roles.0", "sections.experience.items.2.roles.1", "customSections.0.items.0"];
+  assert.deepEqual(markerTargets(paths, "basics.email"), ["basics"]);
+  assert.deepEqual(markerTargets(paths, "sections.profiles.items.0.website.url"), ["basics"], "profiles print in the contact row");
+  assert.deepEqual(markerTargets(paths, "sections.experience.items.1.period"), ["sections.experience.items.1"]);
+  assert.deepEqual(markerTargets(paths, "sections.experience.items.10.period"), ["sections.experience.items.10"]);
+  assert.deepEqual(markerTargets(paths, "sections.experience.items.2.period"), ["sections.experience.items.2.roles.0", "sections.experience.items.2.roles.1"]);
+  assert.deepEqual(markerTargets(paths, "customSections.0.title"), ["customSections.0.items.0"]);
+  assert.deepEqual(markerTargets(paths, "sections.volunteer.columns"), [], "a section with no rendered entries outlines nothing, never every section");
+  for (const none of ["summary.content", "metadata.typography.body.fontSize", "picture"]) assert.deepEqual(markerTargets(paths, none), [], none);
+});
+
+test("every entry-level finding resolves to a block of the payload the preview renders", async () => {
+  const data = sample();
+  data.sections.experience.items[0].hidden = true;
+  const northwind = data.sections.experience.items[1];
+  northwind.period = "";
+  northwind.roles[0].period = "sometime";
+  data.customSections[0].items[0].period = "2024 - 2020";
+  const { body } = await post({ data });
+  const entryFindings = body.report.findings.filter((f) => /^(sections|customSections)\.[^.]+\.items\.\d+/.test(f.path));
+  assert.ok(entryFindings.some((f) => f.path === "sections.experience.items.1.period"), "the company-level period finding is present");
+  assert.ok(entryFindings.some((f) => f.path.includes(".roles.0.")), "a role finding is present");
+  assert.ok(entryFindings.some((f) => f.path.startsWith("customSections.0.items.0")), "a custom-section finding is present");
+  const { payload } = resumeToPayload(parseResume(data).data);
+  const rendered = [payload.candidate.path, ...["experience", "projects", "education", "certifications", "awards", "skills"].flatMap((k) => (payload[k] ?? []).map((e) => e.path))];
+  for (const f of entryFindings) assert.ok(markerTargets(rendered, f.path).length > 0, `${f.id} at ${f.path} outlines nothing`);
 });

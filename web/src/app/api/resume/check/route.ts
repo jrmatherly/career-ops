@@ -25,9 +25,11 @@ export async function POST(req: Request) {
   if (data === null || typeof data !== "object" || Array.isArray(data)) return Response.json({ error: "body must be { data: object }" }, { status: 400 });
   const r = await withDraftFile(data, (file) => runCoreCli("resume", ["check", "--in", file, "--json"]));
   if (r.code !== 0) return usageResponse(r) ?? failure(r, "check");
+  let report: { findings?: unknown } | null;
   try {
-    return Response.json({ report: JSON.parse(r.stdout) });
+    report = JSON.parse(r.stdout);
   } catch {
     return unreadable(r, "check");
   }
+  return Array.isArray(report?.findings) ? Response.json({ report }) : unreadable(r, "check");
 }

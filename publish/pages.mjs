@@ -14,6 +14,7 @@ export function feedbackPage(snapshotHtml, token) {
 
 export function hideContacts(html) {
   return html
-    .replace(/<div class="contact-row">[\s\S]*?<\/div>/g, '')
+    // Other attributes may sit beside class (build-cv-html adds data-resume-path), so match the class, not the exact tag.
+    .replace(/<div\b[^>]*\sclass="contact-row"[^>]*>[\s\S]*?<\/div>/g, '')
     .replace(/<a\b[^>]*href=(?:"(?:mailto|tel):[^"]*"|'(?:mailto|tel):[^']*'|(?:mailto|tel):[^\s>]*)[^>]*>[\s\S]*?<\/a>/gi, '');
 }
