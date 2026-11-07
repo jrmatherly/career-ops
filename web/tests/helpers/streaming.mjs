@@ -1,6 +1,7 @@
 // tests/helpers/streaming.mjs — wait out React's streaming reveal after a navigation.
-// React 19.2 keeps the server copy of a streamed segment in `div#S:0[hidden]` for
-// up to 300 ms after `load` while hydration paints the client copy; Playwright's
+// When a frame paints before a streamed segment arrives, React 19.2 keeps the
+// server copy in `div#S:0[hidden]` until its throttled reveal about 300 ms into the
+// page, past `load`, while hydration paints the client copy; Playwright's
 // strict mode counts hidden elements, so a locator sees two of everything and a
 // height read sees the one-viewport shell. page.goto resolves on `load`, inside
 // that window. See docs/superpowers/research/2026-11-07-web-browser-suite-flakes/REPORT.md.
@@ -10,8 +11,11 @@ const TIMEOUT_MS = 10_000;
 
 /**
  * Runs a navigation (`() => page.goto(url)` or `() => page.reload()`), then waits
- * until no hidden streamed segment remains and the document is complete. One
- * `waitForFunction`, so it survives the reload it was wrapped around.
+ * until no hidden streamed segment remains and the document is complete (goto and
+ * reload resolve on `load` by default; the readyState check keeps a caller who
+ * passes `waitUntil: "commit"` from passing before the segment has streamed in).
+ * The wait is one in-page `waitForFunction`, which Playwright re-runs in the new
+ * document if a late navigation lands mid-poll instead of throwing.
  *
  * @template T
  * @param {import("playwright-core").Page} page
@@ -27,11 +31,19 @@ export async function settled(page, action) {
       { timeout: TIMEOUT_MS },
     );
   } catch (err) {
-    const state = await page.evaluate((selector) => ({
-      readyState: document.readyState,
-      ids: [...document.querySelectorAll(selector)].map((el) => el.id),
-    }), HIDDEN_SEGMENT).catch(() => ({ readyState: "unknown", ids: [] }));
-    throw new Error(`streaming reveal did not finish within ${TIMEOUT_MS} ms; readyState ${state.readyState}, still hidden: ${state.ids.join(", ") || "(none)"}`, { cause: err });
+    if (err?.name !== "TimeoutError") throw err; // a closed page or crashed renderer is its own story
+    // evaluate has no timeout of its own; a wedged renderer must not hang the runner.
+    const state = await Promise.race([
+      page.evaluate((selector) => ({
+        readyState: document.readyState,
+        ids: [...document.querySelectorAll(selector)].map((el) => el.id),
+      }), HIDDEN_SEGMENT),
+      new Promise((resolve) => setTimeout(() => resolve({ unreadable: "evaluate did not answer within 2 s" }), 2_000)),
+    ]).catch((e) => ({ unreadable: e.message }));
+    const detail = state.unreadable
+      ? `page unreadable (${state.unreadable})`
+      : `readyState ${state.readyState}, still hidden: ${state.ids.join(", ") || "(none)"}`;
+    throw new Error(`streaming reveal did not finish within ${TIMEOUT_MS} ms; ${detail}`, { cause: err });
   }
   return result;
 }

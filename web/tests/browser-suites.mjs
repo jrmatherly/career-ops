@@ -22,7 +22,9 @@
 //   node tests/browser-suites.mjs inbox-undo      # suites whose name contains it
 //
 // BROWSER_SUITES_SEGMENT_DELAY_MS=100 puts tests/helpers/delay-proxy.mjs in front
-// of each suite's server, so the streaming reveal race reproduces on every load.
+// of each suite's server, so the streaming reveal race reproduces on every
+// streamed document load; a suite whose pages never streamed a segment fails
+// the run, since a green result would then prove nothing.
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -230,6 +232,7 @@ async function attempt(name) {
     else if (code !== 0) problem = { message: `exited ${code}`, retryable: true };
     else if (!tests) problem = { message: "ran no tests", retryable: false };
     else if (skipped === null || todo === null) problem = { message: "the reporter printed no skipped/todo counts", retryable: false };
+    else if (proxy && proxy.splits === 0) problem = { message: "the delay proxy held back no segment: no HTML response carried `<div hidden id=\"S:`, so the delayed run reproduced nothing", retryable: false };
   } catch (err) {
     problem = { message: err.message, retryable: true };
   } finally {

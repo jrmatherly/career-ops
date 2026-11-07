@@ -47,3 +47,30 @@ test("a rejected action rejects settled without waiting", async () => {
   await assert.rejects(settled(page, async () => { throw new Error("net::ERR_CONNECTION_REFUSED"); }), /ERR_CONNECTION_REFUSED/);
   assert.deepEqual(page.calls, []);
 });
+
+test("a timed-out wait reports readyState and the hidden ids, with the timeout as cause", async () => {
+  const timeout = Object.assign(new Error("Timeout 10000ms exceeded"), { name: "TimeoutError" });
+  const page = {
+    async waitForFunction() { throw timeout; },
+    async evaluate(fn) { return { readyState: "interactive", ids: ["S:0"] }; },
+  };
+  await assert.rejects(settled(page, async () => {}), (err) => {
+    assert.match(err.message, /within 10000 ms; readyState interactive, still hidden: S:0/);
+    assert.equal(err.cause, timeout);
+    return true;
+  });
+});
+
+test("a wait that fails for another reason is rethrown unchanged", async () => {
+  const closed = new Error("Target page, context or browser has been closed");
+  const page = { async waitForFunction() { throw closed; }, async evaluate() { assert.fail("must not read the page"); } };
+  await assert.rejects(settled(page, async () => {}), (err) => err === closed);
+});
+
+test("an unreadable page is named as such instead of reported as having nothing hidden", async () => {
+  const page = {
+    async waitForFunction() { throw Object.assign(new Error("Timeout"), { name: "TimeoutError" }); },
+    async evaluate() { throw new Error("Execution context was destroyed"); },
+  };
+  await assert.rejects(settled(page, async () => {}), /page unreadable \(Execution context was destroyed\)/);
+});
