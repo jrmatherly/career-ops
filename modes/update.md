@@ -4,7 +4,7 @@ When the user runs `/career-ops update`, execute this interactive update flow.
 
 ## Step 1 — Check for Updates
 
-Run `node update-system.mjs check --force` and parse the JSON output. `--force` because the user asked: a release they said no to earlier is shown too.
+Run `node update-system.mjs check --channel main --force` and parse the JSON output. `--channel main` because this fork cuts no releases: its updates are commits on `main`, and the default release channel can only answer `offline`. `--force` because the user asked: a version they said no to earlier is shown too.
 
 - If `up-to-date`: Tell the user "career-ops is up to date (v{version})." and stop.
 - If `offline`: Tell the user "Cannot reach GitHub to check for updates. Try again later." and stop.
@@ -17,10 +17,10 @@ Run `node update-system.mjs check --force` and parse the JSON output. `--force` 
 
 ## Step 2 — Show What Changed
 
-Show the user what will change: the release `apply` installs, `career-ops-v{remote}`, not `main`. Run:
+Show the user what will change: the fork's `main` (`remote_commit` in the check output), which `apply --channel main` installs. Run:
 
 ```bash
-git fetch https://github.com/career-ops-hq/career-ops.git career-ops-v{remote} || {
+git fetch https://github.com/jrmatherly/career-ops.git refs/heads/main || {
   echo "Failed to fetch latest changes. Cannot generate an accurate diff preview."
   exit 1
 }
@@ -36,7 +36,7 @@ git diff HEAD..FETCH_HEAD --stat -- modes/ CLAUDE.md AGENTS.md CODEX.md GEMINI.m
 
 Present to the user as a clear summary:
 
-> **Update available: v{local} → v{remote}**
+> **Update available: v{local} → v{remote}** ({local_sha} → first 8 of {remote_commit}; omit the parenthesis when `remote_commit` is absent)
 >
 > **Changes summary:**
 > - Modes: {N} files changed (list which ones)
@@ -50,9 +50,9 @@ Present to the user as a clear summary:
 >
 > Your personal files (CV, profile, tracker, reports) will NOT be touched.
 
-`changelog` can come back empty, either because the release carries no notes or because the check resolved the version without reading the releases API. Do not render the **Changelog:** line when that happens — a lone `> **Changelog:**` with nothing under it reads as a failure, and nothing failed. Use this in place of those two lines:
+`changelog` is always empty on this fork (it publishes no releases, so there are no notes to read). Do not render the **Changelog:** line when that happens — a lone `> **Changelog:**` with nothing under it reads as a failure, and nothing failed. Use this in place of those two lines:
 
-> **Changelog:** not available for v{remote}. The release notes are at https://github.com/career-ops-hq/career-ops/releases
+> **Changelog:** not available for v{remote}. This fork publishes no release notes; the commit log is at https://github.com/jrmatherly/career-ops/commits/main
 
 If the user wants details on specific files, show the actual diff for those files using `git diff HEAD..FETCH_HEAD -- {path}`.
 
@@ -77,7 +77,7 @@ Ask the user for confirmation:
 If yes:
 1. Capture the current commit as a run-specific pre-update baseline before apply runs, e.g. `PRE_UPDATE_REF=$(git rev-parse HEAD)`. `update-system.mjs apply` also creates a fresh `backup-pre-update-{local}-{UTC stamp}` branch on each run, but the captured ref is what step 7 reads.
 2. **Save local CLAUDE.md additions.** CLAUDE.md is a system file. When this install has changed it, `apply` keeps the local version by default: it lists CLAUDE.md under "Keeping your versions" and writes `CLAUDE.md.bak`. It replaces CLAUDE.md with the two-line template (`@AGENTS.md` + the local-additions comment) only with `--force`, or when it does not see the change as a local edit. Before applying, read the current CLAUDE.md and save everything after that two-line header, so step 4 can put it back if apply replaced the file. If CLAUDE.md has nothing beyond the two-line header, note that there is nothing to restore.
-3. Run `node update-system.mjs apply --confirm`, capturing its exit code without stopping on failure yet — the restore in step 4 must run either way. The `--confirm` flag is required so scheduled checks can never install files silently.
+3. Run `node update-system.mjs apply --channel main --confirm`, capturing its exit code without stopping on failure yet — the restore in step 4 must run either way. The `--confirm` flag is required so scheduled checks can never install files silently.
 4. **Restore local CLAUDE.md additions if apply removed them**, whether step 3 succeeded or failed. Re-read CLAUDE.md. If the content saved in step 2 is still in it, which is the default because `apply` kept your version, leave the file as it is: appending the content again would duplicate it, and every later update would add another copy. Only if the saved content is missing, append it after the two-line header.
 5. Now check the exit code captured in step 3:
    - If non-zero, treat apply as failed. Show the captured output and offer:
@@ -115,7 +115,7 @@ If yes:
 
 If no:
 1. Run `node update-system.mjs dismiss --version {remote}`
-2. Tell the user they will be asked again when a newer release is out, and can run `/career-ops update` anytime to check again.
+2. Tell the user they will be asked again when `main` carries a newer version, and can run `/career-ops update` anytime to check again.
 
 ## Step 5 — Rollback (if requested)
 
