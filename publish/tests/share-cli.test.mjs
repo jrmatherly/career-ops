@@ -75,7 +75,7 @@ test('publish --html inlines images, hides contacts, and pull writes only shares
   assert.match(live.text, /src="data:image\/png;base64,/, 'the local image was inlined');
 
   const { token } = await api('POST', '/api/shares/a/feedback-links');
-  await fetch(`${new URL(pub.stdout.trim()).origin}/f/${token}`, { method: 'POST', redirect: 'manual', body: new URLSearchParams({ authorName: 'Bea\n# forged', body: 'Tighten the summary.\r## not a heading\u2028# nor this' }) });
+  await fetch(`${new URL(pub.stdout.trim()).origin}/f/${token}`, { method: 'POST', redirect: 'manual', body: new URLSearchParams({ authorName: 'Bea\n#\u0085forged', body: 'Tighten the summary.\r## not a heading\u2028# nor this' }) });
   const [comment] = await api('GET', '/api/shares/a/feedback');
 
   const pull = await cli(['pull']);
@@ -91,6 +91,10 @@ test('publish --html inlines images, hides contacts, and pull writes only shares
   assert.equal(typeof record.pulled.views, 'number');
   assert.equal(record.pulled.comments, 1);
   assert.doesNotMatch(readFileSync(join(root, 'data', 'shares.json'), 'utf8'), /"pw"/, 'the password is never stored');
+
+  ok(await cli(['republish', '--slug', 'a']), 'republish');
+  const kept = await api('GET', '/api/shares/a/stats');
+  assert.deepEqual([kept.hasPassword, kept.hideContacts], [true, true], 'republish keeps the password and hide-contacts');
 });
 
 test('from-resume: hide overlay, lossless gate, republish reapplies the overlay, delete', async (t) => {
@@ -103,6 +107,11 @@ test('from-resume: hide overlay, lossless gate, republish reapplies the overlay,
   assert.deepEqual(shares().r.hide.sections, ['education']);
   assert.equal(shares().r.source.kind, 'resume');
   assert.ok(existsSync(join(root, 'data', 'resume.json')), 'publish absorbed cv.md into the sidecar, pinning item ids');
+  const { id, name } = JSON.parse(readFileSync(join(root, 'data', 'resume.json'), 'utf8')).sections.projects.items[0];
+  assert.match((await page('r')).text, new RegExp(name), 'the item shows without an overlay');
+  ok(await cli(['publish', '--slug', 'r3', '--from-resume', '--hide-item', id]), 'publish --hide-item');
+  assert.doesNotMatch((await page('r3')).text, new RegExp(name), 'the item hidden by id is off the page');
+  assert.deepEqual(shares().r3.hide.items, [id]);
 
   const badTemplate = await cli(['publish', '--slug', 'r2', '--from-resume', '--template', 'no-such-template']);
   assert.equal(badTemplate.status, 1, 'an unknown template is refused');
@@ -129,6 +138,9 @@ test('from-resume: hide overlay, lossless gate, republish reapplies the overlay,
   assert.match(del.stdout, /^deleted r$/m);
   assert.equal('r' in shares(), false, 'record removed');
   assert.equal((await page('r', {})).status, 401, 'the page is gone');
+  const gone = await cli(['delete', '--slug', 'r']);
+  ok(gone, 'delete of a share the server no longer has');
+  assert.match(gone.stderr, /not on the server/);
 });
 
 test('service config comes from the data root .env, and a rejected token is named by status only', async (t) => {
@@ -136,6 +148,7 @@ test('service config comes from the data root .env, and a rejected token is name
   writeFileSync(join(root, '.env'), `PUBLISH_URL=${base}\nPUBLISH_OWNER_TOKEN='${OWNER}'\n`);
   ok(await cli(['publish', '--slug', 'e', '--html', htmlDir()], {}), 'publish with config from .env');
   ok(await cli(['stats'], {}), 'stats with config from .env');
+  assert.equal(existsSync(join(root, 'data', 'share-feedback')), false, 'stats writes nothing');
   const wrong = await cli(['stats'], { PUBLISH_OWNER_TOKEN: 'wrong-token-value' });
   assert.equal(wrong.status, 1, wrong.stderr);
   assert.match(wrong.stderr, /401/, 'stderr names the status');
@@ -155,4 +168,10 @@ test('from-studio prefers the CV Studio edited output over a newer plain render'
   ok(await cli(['publish', '--slug', 's', '--from-studio', '7']), 'publish --from-studio');
   assert.match((await page('s')).text, /marker-edited/, 'the edited file was published');
   assert.deepEqual(shares().s.source, { kind: 'studio', ref: '7' });
+
+  rmSync(join(root, 'output', 'cv-alex-007-acme-edited.html'));
+  writeFileSync(join(root, 'output', 'cv-alex-007-acme-ats.html'), fixture('marker-ats'));
+  utimesSync(join(root, 'output', 'cv-alex-007-acme-ats.html'), new Date(2e12), new Date(2e12));
+  ok(await cli(['publish', '--slug', 's2', '--from-studio', '7']), 'publish --from-studio without an edited copy');
+  assert.match((await page('s2')).text, /marker-plain/, 'the newer ATS copy is never published');
 });
