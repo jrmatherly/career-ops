@@ -37,10 +37,8 @@ import { isMainModule } from './lib/is-main-module.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 export const CANONICAL = 'https://github.com/jrmatherly/career-ops.git';
-// Every tag this gate upgrades from was cut upstream (the fork cuts none), so
-// its embedded updater fetches career-ops-hq or, before the move, santifer;
-// all must resolve to the local mirror or an upgrade-from-old-tag scenario
-// silently reaches the real network.
+// Every tag this gate upgrades from was cut upstream, so its embedded updater
+// fetches one of these; each must resolve to the mirror or the leg reaches the real network.
 export const CANONICAL_LEGACY = ['https://github.com/career-ops-hq/career-ops.git', 'https://github.com/santifer/career-ops.git'];
 const GITHUB_API_HOST = 'api.github.com';
 // What apply() prints when its cross-check against the GitHub ref API gets no
@@ -79,7 +77,8 @@ function buildMirror(work, targetSha) {
 function writeGitConfig(work, mirror) {
   const cfg = join(work, 'gitconfig');
   const url = pathToFileURL(mirror).href;
-  writeFileSync(cfg, `[user]\n\tname = upgrade-tests\n\temail = upgrade-tests@career-ops.test\n[url "${url}"]\n${[CANONICAL, ...CANONICAL_LEGACY].map((u) => `\tinsteadOf = ${u}\n`).join('')}[safe]\n\tdirectory = *\n`);
+  const rewrites = [CANONICAL, ...CANONICAL_LEGACY].map((u) => `\tinsteadOf = ${u}\n`).join('');
+  writeFileSync(cfg, `[user]\n\tname = upgrade-tests\n\temail = upgrade-tests@career-ops.test\n[url "${url}"]\n${rewrites}[safe]\n\tdirectory = *\n`);
   // Read by curl through CURL_HOME (see hermeticEnv): sends api.github.com to a
   // closed local port, so the ref API cannot answer. Only that host, and only
   // curl: apply() also runs npm, which the leg needs and which curl config

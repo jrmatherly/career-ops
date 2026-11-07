@@ -82,7 +82,7 @@ On the first message of each session, run silently:
 node update-system.mjs check
 ```
 
-This fork (`jrmatherly/career-ops`) cuts no releases, so this check is silent: it reports `offline` (GitHub answers 404 for a repository with no releases) and an update is never offered from it. The supported update is the fork's own `main`: `node update-system.mjs check --channel main` reports whether `origin/main` has moved, and `node update-system.mjs apply --channel main --confirm` installs it. Upstream (`career-ops-hq/career-ops`) releases reach this fork only through a maintainer's upstream review, never through this updater. The release-channel wording below is upstream's and describes what `check` would do if a release were ever published here.
+This fork (`jrmatherly/career-ops`) cuts no releases, so this check is silent: it reports `offline` (GitHub answers 404 for a repository with no releases) and an update is never offered from it. The supported update is the fork's own `main`: `node update-system.mjs check --channel main` reports whether `origin/main` has moved, and `node update-system.mjs apply --channel main --confirm` installs it; upstream releases arrive only through a maintainer's upstream review.
 
 If `{"status": "update-available", "local": ..., "remote": ..., "changelog": ...}` → tell the user:
 

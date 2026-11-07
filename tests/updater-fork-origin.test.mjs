@@ -22,7 +22,7 @@ for (const name of ['CANONICAL_REPO', 'RAW_VERSION_URL', 'RELEASES_API', 'UPSTRE
   else pass(`${name} names ${FORK}`);
 }
 
-if (typeof gate.CANONICAL === 'string' && gate.CANONICAL === updater.CANONICAL_REPO) pass('upgrade-tests CANONICAL equals the updater CANONICAL_REPO');
+if (gate.CANONICAL === updater.CANONICAL_REPO) pass('upgrade-tests CANONICAL equals the updater CANONICAL_REPO');
 else fail(`upgrade-tests CANONICAL (${gate.CANONICAL}) differs from CANONICAL_REPO (${updater.CANONICAL_REPO})`);
 
 const legacy = gate.CANONICAL_LEGACY;

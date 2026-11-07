@@ -128,8 +128,7 @@ function isLegacyReexec() {
   }
 }
 
-// This fork's own repository, not upstream's: an update must never install
-// career-ops-hq's tarball over the fork's system layer (tests/updater-fork-origin.test.mjs).
+// This fork's own repository; upstream's tarball must never be installed (tests/updater-fork-origin.test.mjs).
 export const CANONICAL_REPO = 'https://github.com/jrmatherly/career-ops.git';
 // Local snapshot of a withheld update's index, including preserved files.
 // A ref stays out of git status and contributor branches; trust it only while

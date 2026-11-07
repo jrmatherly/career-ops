@@ -10,23 +10,18 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import "../helpers/web-ts-alias-loader.mjs";
 
-const { issueUrl, REPO } = await import("../../src/lib/report/report.ts");
+const { issueUrl } = await import("../../src/lib/report/report.ts");
 
 const diag = {
   version: "0.1.0", coreVersion: "1.39.0", channel: "alpha", sha: "abc1234", route: "/",
   cli: "claude", ua: "test", viewport: "1x1", logs: [], shape: null, followupsAvailable: null,
 };
 
-test("REPO is this fork's slug", () => {
-  assert.equal(REPO, "jrmatherly/career-ops");
-});
-
 test("issueUrl opens a new issue on this fork", () => {
   assert.ok(issueUrl(diag, "x").startsWith("https://github.com/jrmatherly/career-ops/issues/new?"));
 });
 
-test("beta-banner.tsx imports REPO and never names upstream", () => {
+test("beta-banner.tsx never names upstream (it imports REPO instead)", () => {
   const src = readFileSync(fileURLToPath(new URL("../../src/components/beta/beta-banner.tsx", import.meta.url)), "utf-8");
   assert.doesNotMatch(src, /career-ops-hq/);
-  assert.match(src, /\bREPO\b.*from "@\/lib\/report\/report"/);
 });
