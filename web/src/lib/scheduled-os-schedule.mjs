@@ -24,6 +24,14 @@ export function nextQuarterHour(now) {
   return new Date((Math.floor(now.getTime() / QUARTER_MS) + 1) * QUARTER_MS).toISOString();
 }
 
+function tickIso(tickMtimeMs) {
+  return typeof tickMtimeMs === "number" ? new Date(tickMtimeMs).toISOString() : null;
+}
+
+export function externalScheduleStatus({ description, tickMtimeMs }) {
+  return { exists: true, enabled: true, status: description || "External scheduler", nextRun: null, lastRun: tickIso(tickMtimeMs) };
+}
+
 export function osScheduleStatus({ platform, crontabText, launchctlExitCode, tickMtimeMs, now }) {
   let parsed;
   if (platform === "linux") parsed = parseCrontab(crontabText);
@@ -31,7 +39,7 @@ export function osScheduleStatus({ platform, crontabText, launchctlExitCode, tic
   else return { ...EMPTY_TASK };
 
   if (!parsed.exists) return { ...EMPTY_TASK };
-  const lastRun = typeof tickMtimeMs === "number" ? new Date(tickMtimeMs).toISOString() : null;
+  const lastRun = tickIso(tickMtimeMs);
   if (!parsed.enabled) return { exists: true, enabled: false, status: "Disabled", nextRun: null, lastRun };
   return { exists: true, enabled: true, status: "Ready", nextRun: nextQuarterHour(now), lastRun };
 }
