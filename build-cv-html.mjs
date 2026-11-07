@@ -468,6 +468,13 @@ function buildCompetencies(entries, partial) {
     .join('\n      ');
 }
 
+// Tags the entry's first element with its ResumeData path so the web preview can
+// outline the block a Check finding names. No path, no change to the markup.
+function withResumePath(html, path) {
+  if (typeof path !== 'string' || !path) return html;
+  return html.replace(/<[a-zA-Z][\w-]*/, tag => `${tag} data-resume-path="${escapeHtml(path)}"`);
+}
+
 function buildExperience(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
@@ -481,7 +488,7 @@ function buildExperience(entries, partial) {
       const context = e.context
         ? `\n    <div class="job-context">${escapeHtml(e.context)}</div>`
         : '';
-      return `<div class="job">
+      return withResumePath(`<div class="job">
     <div class="job-header">
       <span class="job-company">${escapeHtml(e.company)}</span>
       <span class="job-period">${escapeHtml(e.dates || e.period || '')}</span>
@@ -490,7 +497,7 @@ function buildExperience(entries, partial) {
     <ul>
 ${bullets}
     </ul>
-  </div>`;
+  </div>`, e.path);
     }).join('\n  ');
   }
 
@@ -503,14 +510,14 @@ ${bullets}
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''), present: Boolean(e.location) }],
       ['CONTEXT_BLOCK', { value: escapeHtml(e.context || ''), present: Boolean(e.context) }],
     ]);
-    return fillEntry(entryTemplate, blocks, {
+    return withResumePath(fillEntry(entryTemplate, blocks, {
       COMPANY: escapeHtml(e.company || ''),
       PERIOD: escapeHtml(e.dates || e.period || ''),
       ROLE: escapeHtml(e.role || ''),
       LOCATION: escapeHtml(e.location || ''),
       CONTEXT: escapeHtml(e.context || ''),
       BULLETS: bullets,
-    }, blockValues);
+    }, blockValues), e.path);
   }).join('\n  ');
 }
 
@@ -536,9 +543,9 @@ function buildProjects(entries, partial) {
       const tech = e.tech
         ? `\n    <div class="project-tech">${escapeHtml(e.tech)}</div>`
         : '';
-      return `<div class="project">
+      return withResumePath(`<div class="project">
     <div class="project-title">${nameHtml}${badge}</div>${desc}${tech}
-  </div>`;
+  </div>`, e.path);
     }).join('\n  ');
   }
 
@@ -573,12 +580,12 @@ function buildProjects(entries, partial) {
       entryBlocks = new Map(blocks);
       entryBlocks.set('DESC_BLOCK', { ...descBlock, present });
     }
-    return fillEntry(entryTemplate, entryBlocks, {
+    return withResumePath(fillEntry(entryTemplate, entryBlocks, {
       NAME:  nameHtml,
       BADGE: escapeHtml(e.badge || ''),
       DESC:  escapeHtml(descText),
       TECH:  escapeHtml(e.tech || ''),
-    }, blockValues);
+    }, blockValues), e.path);
   }).join('\n  ');
 }
 
@@ -595,12 +602,12 @@ function buildEducation(entries, partial) {
       const desc = e.description
         ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
         : '';
-      return `<div class="edu-item">
+      return withResumePath(`<div class="edu-item">
     <div class="edu-header">
       <div class="edu-title">${escapeHtml(e.title)}${org}</div>
       <div class="edu-year">${escapeHtml(e.year || '')}</div>
     </div>${location}${desc}
-  </div>`;
+  </div>`, e.path);
     }).join('\n  ');
   }
 
@@ -611,13 +618,13 @@ function buildEducation(entries, partial) {
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''),    present: Boolean(e.location) }],
       ['DESC_BLOCK',     { value: escapeHtml(e.description || ''), present: Boolean(e.description) }],
     ]);
-    return fillEntry(entryTemplate, blocks, {
+    return withResumePath(fillEntry(entryTemplate, blocks, {
       TITLE:    escapeHtml(e.title || ''),
       ORG:      escapeHtml(e.org || ''),
       LOCATION: escapeHtml(e.location || ''),
       YEAR:     escapeHtml(e.year || ''),
       DESC:     escapeHtml(e.description || ''),
-    }, blockValues);
+    }, blockValues), e.path);
   }).join('\n  ');
 }
 
@@ -627,11 +634,11 @@ function buildCertifications(entries, partial) {
     return entries.filter(e => hasRequiredFields(e, 'certifications', 'html')).map(e => {
       const org = e.org ? `<span class="cert-org">${escapeHtml(e.org)}</span>` : '<span class="cert-org"></span>';
       const year = e.year ? `<span class="cert-year">${escapeHtml(e.year)}</span>` : '<span class="cert-year"></span>';
-      return `<div class="cert-item">
+      return withResumePath(`<div class="cert-item">
       <span class="cert-title">${escapeHtml(e.title)}</span>
       ${org}
       ${year}
-    </div>`;
+    </div>`, e.path);
     }).join('\n    ');
   }
 
@@ -643,11 +650,11 @@ function buildCertifications(entries, partial) {
       ['ORG_BLOCK',  { value: escapeHtml(e.org || ''),  present: Boolean(e.org) }],
       ['YEAR_BLOCK', { value: escapeHtml(e.year || ''), present: Boolean(e.year) }],
     ]);
-    return fillEntry(entryTemplate, blocks, {
+    return withResumePath(fillEntry(entryTemplate, blocks, {
       TITLE: escapeHtml(e.title || ''),
       ORG:   escapeHtml(e.org || ''),
       YEAR:  escapeHtml(e.year || ''),
-    }, blockValues);
+    }, blockValues), e.path);
   }).join('\n    ');
 }
 
@@ -661,11 +668,11 @@ function buildAwards(entries, partial) {
     return entries.filter(e => hasRequiredFields(e, 'awards', 'html')).map(e => {
       const org = e.org ? `<span class="award-org">${escapeHtml(e.org)}</span>` : '<span class="award-org"></span>';
       const year = e.year ? `<span class="award-year">${escapeHtml(e.year)}</span>` : '<span class="award-year"></span>';
-      return `<div class="award-item">
+      return withResumePath(`<div class="award-item">
       <span class="award-title">${escapeHtml(e.title)}</span>
       ${org}
       ${year}
-    </div>`;
+    </div>`, e.path);
     }).join('\n    ');
   }
 
@@ -677,11 +684,11 @@ function buildAwards(entries, partial) {
       ['ORG_BLOCK',  { value: escapeHtml(e.org || ''),  present: Boolean(e.org) }],
       ['YEAR_BLOCK', { value: escapeHtml(e.year || ''), present: Boolean(e.year) }],
     ]);
-    return fillEntry(entryTemplate, blocks, {
+    return withResumePath(fillEntry(entryTemplate, blocks, {
       TITLE: escapeHtml(e.title || ''),
       ORG:   escapeHtml(e.org || ''),
       YEAR:  escapeHtml(e.year || ''),
-    }, blockValues);
+    }, blockValues), e.path);
   }).join('\n    ');
 }
 
@@ -708,7 +715,7 @@ function buildSkills(categories, partial) {
       const cat = c.category
         ? `<span class="skill-category">${escapeHtml(c.category)}:</span> `
         : '';
-      return `    <div class="skill-item">${cat}${escapeHtml(joinItems(c.items))}</div>`;
+      return withResumePath(`    <div class="skill-item">${cat}${escapeHtml(joinItems(c.items))}</div>`, c.path);
     }).join('\n');
     return `<div class="skills-grid">\n${items}\n  </div>`;
   }
@@ -720,10 +727,10 @@ function buildSkills(categories, partial) {
     const blockValues = new Map([
       ['CATEGORY_BLOCK', { value: escapeHtml(c.category || ''), present: Boolean(c.category) }],
     ]);
-    return fillEntry(entryTemplate, blocks, {
+    return withResumePath(fillEntry(entryTemplate, blocks, {
       CATEGORY:    escapeHtml(c.category || ''),
       ITEMS_TEXT:  escapeHtml(joinItems(c.items)),
-    }, blockValues);
+    }, blockValues), c.path);
   }).join('\n');
   return `<div class="skills-grid">\n${items}\n  </div>`;
 }
@@ -764,7 +771,7 @@ function buildContactRow(candidate) {
   // independent box on both the flex and the inline path, so wrapping could put
   // a separator at the start of a line; generated content belongs to the item
   // before it and cannot be separated from it by a line break.
-  return `<div class="contact-row">\n      ${items.join('\n      ')}\n    </div>`;
+  return withResumePath(`<div class="contact-row">\n      ${items.join('\n      ')}\n    </div>`, c.path);
 }
 
 function buildPhoto(candidate, name) {

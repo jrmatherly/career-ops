@@ -6,12 +6,33 @@ import { previewHtml } from "@/lib/cv-studio/preview-html.mjs";
 
 const PAGE_WIDTH = 816;
 
-export function CvPreview({ html }: { html: string }) {
+export type PreviewMarker = { path: string; severity: string };
+
+/** The element paths a marker lands on: its own path or longest dotted prefix, else every path under it, else none. */
+export function markerTargets(paths: string[], marker: string): string[] {
+  let best: string | null = null;
+  for (const p of paths) if ((p === marker || marker.startsWith(`${p}.`)) && (best === null || p.length > best.length)) best = p;
+  if (best !== null) return [best];
+  return [...new Set(paths.filter((p) => p.startsWith(`${marker}.`)))];
+}
+
+const RANK: Record<string, number> = { error: 3, warning: 2, info: 1 };
+
+const MARKER_CSS = `
+[data-resume-marker] { outline-offset: 2px; }
+[data-resume-marker="error"] { outline: 2px solid rgba(220, 38, 38, 0.85); }
+[data-resume-marker="warning"] { outline: 2px dashed rgba(217, 119, 6, 0.85); }
+[data-resume-marker="info"] { outline: 1px dotted rgba(2, 132, 199, 0.85); }
+[data-resume-pinned] { outline-width: 3px; outline-style: solid; background-color: rgba(37, 99, 235, 0.08); }
+`;
+
+export function CvPreview({ html, markers, pinned }: { html: string; markers?: PreviewMarker[]; pinned?: { path: string; seq: number } | null }) {
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(0.7);
   const [contentPx, setContentPx] = useState(0);
   const [framePx, setFramePx] = useState(0);
+  const scrolledSeq = useRef<number | null>(null);
 
   useEffect(() => {
     const el = box.current;
@@ -37,6 +58,46 @@ export function CvPreview({ html }: { html: string }) {
     if (nextFrame > 0) setFramePx(nextFrame);
   };
 
+  const mark = () => {
+    const doc = frame.current?.contentDocument;
+    if (!doc) return;
+    for (const el of doc.querySelectorAll("[data-resume-marker], [data-resume-pinned]")) {
+      el.removeAttribute("data-resume-marker");
+      el.removeAttribute("data-resume-pinned");
+    }
+    let style = doc.querySelector("style[data-resume-markers]");
+    if (!markers?.length) return style?.remove();
+    if (!style) {
+      style = doc.createElement("style");
+      style.setAttribute("data-resume-markers", "");
+      style.textContent = MARKER_CSS;
+      doc.head.append(style);
+    }
+    const byPath = new Map<string, Element[]>();
+    for (const el of doc.querySelectorAll("[data-resume-path]")) {
+      const p = el.getAttribute("data-resume-path")!;
+      const list = byPath.get(p);
+      if (list) list.push(el);
+      else byPath.set(p, [el]);
+    }
+    const paths = [...byPath.keys()];
+    const targets = (marker: string) => markerTargets(paths, marker).flatMap((p) => byPath.get(p)!);
+    // Least severe first, so the most severe marker on an element is written last.
+    const ranked = [...markers].sort((a, b) => (RANK[a.severity] ?? 0) - (RANK[b.severity] ?? 0));
+    for (const m of ranked) for (const el of targets(m.path)) el.setAttribute("data-resume-marker", m.severity);
+    if (!pinned || !markers.some((m) => m.path === pinned.path)) return;
+    const hits = targets(pinned.path);
+    for (const el of hits) el.setAttribute("data-resume-pinned", "");
+    const outer = box.current;
+    if (!outer || !hits.length || scrolledSeq.current === pinned.seq) return;
+    scrolledSeq.current = pinned.seq;
+    // The iframe is as tall as its document, so a rect inside it is a document offset; the box sees it scaled.
+    outer.scrollTo({ top: hits[0].getBoundingClientRect().top * scale - 16, behavior: "smooth" });
+    outer.scrollIntoView({ block: "nearest" });
+  };
+
+  useEffect(mark, [markers, pinned]);
+
   const frameHeight = framePx > 0 ? framePx : PREVIEW_PAGE_PX;
   const pages = previewPageCount(contentPx);
 
@@ -52,7 +113,10 @@ export function CvPreview({ html }: { html: string }) {
             ref={frame}
             title="Tailored CV preview"
             srcDoc={previewHtml(html)}
-            onLoad={measure}
+            onLoad={() => {
+              measure();
+              mark();
+            }}
             sandbox="allow-same-origin"
             style={{ width: PAGE_WIDTH, height: frameHeight, transform: `scale(${scale})`, transformOrigin: "top left", border: 0 }}
           />
