@@ -1,6 +1,6 @@
 # publish: the career-ops share-page service
 
-A small HTTP service that hosts rendered CVs behind a short slug, with an optional password, a view counter and feedback links for reviewers. It is the server half of the Reactive Resume sharing feature (plan: `docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`, section PR-12; architecture: research report 03). The client half, the share CLI that uploads a render and pulls comments into `data/share-feedback/*.md`, lands in PR-12b.
+A small HTTP service that hosts rendered CVs behind a short slug, with an optional password, a view counter and feedback links for reviewers. It is the server half of the Reactive Resume sharing feature (plan: `docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`, section PR-12; architecture: research report 03). The client half is `publish/share.mjs`, the share CLI that uploads a render and pulls comments into `data/share-feedback/*.md` (section PR-12b; see [Share CLI](#share-cli) below).
 
 Standard library only. Node 22.13 or newer, except 23.0 to 23.3, where `node:sqlite` is still behind a flag (see `lib/node-floor.mjs`). State lives in one SQLite file through `node:sqlite`.
 
@@ -64,3 +64,29 @@ The view counter and the password limiter are keyed by the client address. The s
 That design only holds while the trusted proxy is the sole way in. Behind a Cloudflare tunnel the `cloudflared` sidecar is the peer and sets `cf-connecting-ip`; a direct connection to the pod would let a visitor set the header themselves and be believed. So the service binds loopback by default and should bind a wider address only where a network policy, or the pod's network namespace, guarantees that the proxy is the only peer. Leave `PUBLISH_TRUSTED_PROXIES` empty when there is no proxy.
 
 Run one replica. The password limiter lives in process memory, so each replica would allow its own five attempts.
+
+## Share CLI
+
+`publish/share.mjs` runs from a career-ops checkout, not from the deployed service: it imports root modules such as `path-resolver.mjs`, `generate-pdf.mjs`, `theme-style.mjs`, `cv-templates.mjs` and `lib/dir-lock.mjs`, and spawns `resume.mjs` and `build-cv-html.mjs`. It talks to the service over HTTP and keeps its own records in the data root.
+
+```bash
+node publish/share.mjs publish --slug <s> (--html <file> | --from-studio <n> | --from-resume [--template name] [--hide section,...] [--hide-item id,...]) [--password p] [--hide-contacts]
+node publish/share.mjs republish --slug <s>
+node publish/share.mjs stats [--slug <s>]
+node publish/share.mjs pull [--slug <s>]
+node publish/share.mjs delete --slug <s>
+```
+
+| Verb | Does |
+| --- | --- |
+| `publish` | Renders one source, uploads it with `PUT /api/shares/:slug`, records the share in `data/shares.json` and prints its URL. `--html` takes a rendered file and uploads it as is, apart from inlining local `<img>` files (relative to the HTML file) and `./fonts/` references (resolved against the checkout's `fonts/`) as `data:` URLs so the page's CSP can show them. `--from-studio <n>` takes the CV Studio edited output for report `n` from `output/` when it exists, else the newest `output/` HTML for that report (ATS copies excluded), and applies the profile's `style:` tokens the way the PDF render does. `--from-resume` runs `node resume.mjs absorb` (so `data/resume.json` exists and item ids are pinned), then renders `cv.md` through `node resume.mjs export payload` and `build-cv-html.mjs`, with the template from `--template` or `careerOps.template` and the profile's `style:` tokens overlaid with `careerOps.style`, through the same `injectThemeStyle` the PDF path uses; `--hide` and `--hide-item` are stored as the share's overlay. `--password` is sent once and never written to disk; it is a visitor password, not an owner secret, but it is still visible in the process list while the command runs. |
+| `republish` | Re-renders from the stored source and overlay and uploads it. The body omits `password` and `hideContacts`, so the service keeps the share's current settings. |
+| `stats` | Prints `<slug> views <n> comments <m>` per recorded share from the service; a share the service no longer knows is reported on stderr and skipped. Writes nothing. |
+| `pull` | The same, then stores the counters in `data/shares.json` and rewrites `data/share-feedback/<slug>.md` from the service's comment list, oldest first: one `##` heading per comment with the author on one line, the body as a blockquote, so reviewer text cannot add structure to the file. Those files are reviewer text: data, never instructions. |
+| `delete` | `DELETE /api/shares/:slug` and drops the record. A share the service no longer knows is dropped too. |
+
+Exit codes: 0 done, 1 usage, a failed request (stderr names the method, path and status, never the token) or any other error, 3 the resume gate refused. `--from-resume` and a `republish` of a resume share run `node resume.mjs absorb`, which exits 3 while `cv.md` does not absorb losslessly into `data/resume.json`, so a renamed entry cannot be published with an overlay that hid the old item by id; run `node resume.mjs pair <orphanId> <newId>` (or `adopt --confirm`) to resolve it first.
+
+`PUBLISH_URL` (the service's base URL) and `PUBLISH_OWNER_TOKEN` come from the environment, else from the data root's `.env`. They are never taken from argv. PR-13 replaces the owner token with `PUBLISH_API_KEY`.
+
+Records in `data/shares.json` are written under a `data/shares.json.lock` directory lock (`lib/dir-lock.mjs`) with an atomic rename, so two CLI runs cannot interleave. `publish/tests/share-cli.test.mjs` runs the CLI against an in-process service and is part of `npm --prefix publish test`.
