@@ -5,6 +5,10 @@ import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { apiKey } from '@better-auth/api-key';
 
 export const PROVIDER_ID = 'pocket-id';
+const KEY_PREFIX = 'cops_';
+const KEY_LENGTH = 64;
+// The plugin's default generator draws KEY_LENGTH letters; anything else is not a key and is refused before a lookup.
+export const KEY_SHAPE = new RegExp(`^${KEY_PREFIX}[A-Za-z]{${KEY_LENGTH}}$`);
 
 // One normalisation for every allow-list check: sign-in here, and each key and session use in server.mjs.
 export function emailAllowList(allowedEmails) {
@@ -26,7 +30,8 @@ function authOptions({ db, baseURL, secret, pocketId, allowedEmails, clientIpHea
     disabledPaths: ['/api-key/create', '/api-key/update'],
     // Key creation on the account page needs a sign-in younger than this.
     session: { freshAge: 24 * 3600 },
-    account: { encryptOAuthTokens: true },
+    // Cookie state, so an anonymous /account/sign-in writes no verification row.
+    account: { encryptOAuthTokens: true, storeStateStrategy: 'cookie' },
     rateLimit: { enabled: true, storage: 'database' },
     // server.mjs overwrites this header with the address it resolved, so a client cannot hand Better Auth's limiter a spoofed one.
     advanced: { ipAddress: { ipAddressHeaders: [clientIpHeader] } },
@@ -39,7 +44,8 @@ function authOptions({ db, baseURL, secret, pocketId, allowedEmails, clientIpHea
         config: [{ providerId: PROVIDER_ID, ...pocketId, scopes: ['openid', 'email', 'profile'] }],
       }),
       apiKey({
-        defaultPrefix: 'cops_',
+        defaultPrefix: KEY_PREFIX,
+        defaultKeyLength: KEY_LENGTH,
         enableSessionForAPIKeys: false,
         rateLimit: { enabled: true, maxRequests: 1000, timeWindow: 3600e3 },
       }),

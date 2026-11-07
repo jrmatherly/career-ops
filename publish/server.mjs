@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { toNodeHandler, fromNodeHeaders } from 'better-auth/node';
 import { isAPIError } from 'better-auth/api';
 import { openDb } from './db.mjs';
-import { createAuth, migrate, authConfigFromEnv, requiredEnv, emailAllowList, PROVIDER_ID } from './auth.mjs';
+import { createAuth, migrate, authConfigFromEnv, requiredEnv, emailAllowList, KEY_SHAPE, PROVIDER_ID } from './auth.mjs';
 import { passwordForm, feedbackPage, hideContacts } from './pages.mjs';
 import { signInPage, accountPage } from './pages/account.mjs';
 
@@ -115,7 +115,9 @@ export function createServer(config) {
   const isAllowed = emailAllowList(config.auth.allowedEmails);
   const allowedUser = async (userId) => {
     const user = await (await auth.$context).adapter.findOne({ model: 'user', where: [{ field: 'id', value: userId }] });
-    return !!user && isAllowed(user.email);
+    if (user && isAllowed(user.email)) return true;
+    console.error('allow-list refused a valid key', { userId });
+    return false;
   };
   const accessValue = (slug, pwHash, exp) => `${exp}.${sign(`${slug}|${pwHash}|${exp}`)}`;
 
@@ -156,7 +158,8 @@ export function createServer(config) {
 
   // One verdict per request: a missing key, an unknown key and a key without the permission all read as 'refused'.
   async function keyVerdict(key, permission) {
-    if (typeof key !== 'string' || !key) return 'refused';
+    // A malformed key would cost a lookup and an error line from Better Auth; it cannot be a key, so it stops here.
+    if (typeof key !== 'string' || !KEY_SHAPE.test(key)) return 'refused';
     await ready;
     let code;
     try {
@@ -184,7 +187,9 @@ export function createServer(config) {
   const sessionOf = async (req) => {
     await ready;
     const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
-    return session && isAllowed(session.user.email) ? session : null;
+    if (!session || isAllowed(session.user.email)) return session;
+    console.error('allow-list refused a valid session', { userId: session.user.id });
+    return null;
   };
   const trustedOrigin = async (req) => (await auth.$context).isTrustedOrigin(String(req.headers.origin ?? ''));
   // Account writes need a cookie session and a request from the service's own origin; anything else gets the sign-in page.

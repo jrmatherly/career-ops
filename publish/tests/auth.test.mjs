@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer as createHttpServer } from 'node:http';
 import { readConfig, createServer } from '../server.mjs';
+import { KEY_SHAPE } from '../auth.mjs';
 import { AUTH_ENV, makeUser, makeKey, sessionCookie } from './helpers.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'publish-auth-test-'));
@@ -21,9 +22,9 @@ async function boot(t, env = {}, { user: withUser = true } = {}) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const call = async (method, path, { key, body, headers = {} } = {}) => {
+  const call = async (method, path, { key, body, raw, headers = {} } = {}) => {
     const r = await fetch(base + path, {
-      method, redirect: 'manual', body: body && JSON.stringify(body),
+      method, redirect: 'manual', body: raw ?? (body && JSON.stringify(body)),
       headers: { ...(key && { 'x-api-key': key }), ...(body && { 'Content-Type': 'application/json' }), ...headers },
     });
     const text = await r.text();
@@ -281,13 +282,69 @@ test('dropping an email from the allow-list stops its keys and sessions', async 
   const cookie = await sessionCookie(first.server, first.user.id);
   assert.equal((await first.call('PUT', '/api/shares/me', { key, body: { html } })).status, 200);
   // A second service on the same database stands in for a restart with a different allow-list.
-  const server = createServer(readConfig({ ...AUTH_ENV, PUBLISH_DB: join(dir, `db-${count}.sqlite`), PUBLISH_ALLOWED_EMAILS: 'someone-else@example.com' }));
-  await server.ready;
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
-  const base = AUTH_BASE(server);
-  const stats = await fetch(`${base}/api/shares/me/stats`, { headers: { 'x-api-key': key } });
-  assert.equal(stats.status, 401);
-  assert.deepEqual(await stats.json(), { error: 'api key required' }, 'the same refusal as any bad key');
-  assert.equal((await fetch(`${base}/account`, { headers: { Cookie: cookie } })).status, 401, 'the open session is refused too');
+  const { call } = await boot(t, { PUBLISH_DB: join(dir, `db-${count}.sqlite`), PUBLISH_ALLOWED_EMAILS: 'someone-else@example.com' }, { user: false });
+  refused(await call('GET', '/api/shares/me/stats', { key }), 'stats with a dropped owner');
+  refused(await call('PUT', '/api/shares/me', { key, body: { html } }), 'upload with a dropped owner');
+  assert.equal((await call('GET', '/account', { headers: { Cookie: cookie } })).status, 401, 'the open session is refused too');
+});
+
+test('an upload key neither opens a password-protected share nor skips the view count', async (t) => {
+  const { server, call, user } = await boot(t);
+  const upload = await makeKey(server, user.id, ['upload']);
+  const manage = await makeKey(server, user.id, ['manage']);
+  await call('PUT', '/api/shares/pw', { key: upload, body: { html, password: 'hunter22' } });
+  await call('PUT', '/api/shares/open', { key: upload, body: { html } });
+  assert.equal((await call('GET', '/s/pw', { key: upload })).status, 401, 'upload is not an owner preview');
+  assert.equal((await call('GET', '/s/pw', { key: manage })).status, 200, 'manage is');
+  assert.equal((await call('GET', '/s/open', { key: upload })).status, 200);
+  assert.equal(JSON.parse((await call('GET', '/api/shares/open/stats', { key: manage })).text).views, 1, 'the upload-key view counted');
+});
+
+test('a user cannot revoke another user\'s key, and an unknown key id is a 4xx', async (t) => {
+  const { server, call, user } = await boot(t, { PUBLISH_ALLOWED_EMAILS: 'ada@example.com,bob@example.com' });
+  const adaKey = await makeKey(server, user.id, ['manage']);
+  const [adaRow] = await (await server.auth.$context).adapter.findMany({ model: 'apikey', where: [{ field: 'referenceId', value: user.id }] });
+  const bob = await makeUser(server, 'bob@example.com');
+  const bobCookie = await sessionCookie(server, bob.id);
+  const revoke = (keyId) => call('POST', '/account/keys/revoke', { headers: { Cookie: bobCookie, Origin: ORIGIN, 'Content-Type': 'application/x-www-form-urlencoded' }, raw: new URLSearchParams({ keyId }) });
+  for (const keyId of [adaRow.id, 'no-such-key']) {
+    const r = await revoke(keyId);
+    assert.ok(r.status >= 400 && r.status < 500, `revoke ${keyId === adaRow.id ? "ada's key" : 'unknown id'} answered ${r.status}`);
+  }
+  assert.equal((await call('GET', '/api/shares/none/stats', { key: adaKey })).status, 404, "ada's key still works");
+});
+
+test('an expired or disabled key gets the bad-key 401', async (t) => {
+  const { server, call, user } = await boot(t);
+  const ctx = await server.auth.$context;
+  for (const update of [{ expiresAt: new Date(Date.now() - 1000) }, { enabled: false }]) {
+    const key = await makeKey(server, user.id, ['manage']);
+    const [row] = (await ctx.adapter.findMany({ model: 'apikey' })).slice(-1);
+    await ctx.adapter.update({ model: 'apikey', where: [{ field: 'id', value: row.id }], update });
+    refused(await call('GET', '/api/shares/none/stats', { key }), JSON.stringify(update));
+  }
+});
+
+test('a returning Pocket ID user dropped from the allow-list is refused at sign-in', async (t) => {
+  const provider = await fakeProvider(t, 'ada@example.com');
+  const first = await boot(t, provider, { user: false });
+  assert.ok((await signInThroughCallback(first.call)).session, 'first sign-in creates and links the account');
+  const later = await boot(t, { ...provider, PUBLISH_DB: join(dir, `db-${count}.sqlite`), PUBLISH_ALLOWED_EMAILS: 'someone-else@example.com' }, { user: false });
+  const { location, session } = await signInThroughCallback(later.call);
+  assert.equal(session, undefined, 'the linked account is re-checked on sign-in');
+  assert.match(location, /error=/);
+  assert.doesNotMatch(location, /unable_to_get_user_info|invalid_code|state/, `refused by the allow-list: ${location}`);
+});
+
+test('starting sign-in writes no database row', async (t) => {
+  const { server, call } = await boot(t, await fakeProvider(t, 'ada@example.com'), { user: false });
+  for (let i = 0; i < 3; i++) assert.equal((await call('GET', '/account/sign-in')).status, 303);
+  assert.equal((await (await server.auth.$context).adapter.findMany({ model: 'verification' })).length, 0, 'OAuth state lives in a cookie');
+});
+
+test('only a cops_ key of the generated shape reaches the key store', async (t) => {
+  const { server, user } = await boot(t);
+  const key = await makeKey(server, user.id, ['upload']);
+  assert.match(key, KEY_SHAPE, 'generated keys match');
+  for (const junk of ['cops_', `cops_${'a'.repeat(63)}`, `cops_${'a'.repeat(65)}`, `cops_${'a'.repeat(63)}1`, `xyz_${'a'.repeat(64)}`]) assert.doesNotMatch(junk, KEY_SHAPE, junk.slice(0, 12));
 });
