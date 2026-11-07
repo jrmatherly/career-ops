@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { request } from 'node:http';
 import { readConfig, createServer, clientKey } from '../server.mjs';
 import { hideContacts } from '../pages.mjs';
 
@@ -56,8 +57,69 @@ test('password gate: wrong 401, right 303 plus cookie, cookie 200, password chan
   const page = await get('/s/pw', { Cookie: cookie });
   assert.equal(page.status, 200, 'cookie opens the page');
   assert.match(await page.text(), /v1/);
+  const [, exp, mac] = cookie.match(/^s_pw=(\d+)\.(.+)$/);
+  assert.equal((await get('/s/pw', { Cookie: `s_pw=${Number(exp) + 1}.${mac}` })).status, 401, 'an edited expiry breaks the MAC');
+  assert.equal((await get('/s/pw', AUTH)).status, 200, 'the owner token opens the page without the password');
+  t.mock.timers.enable({ apis: ['Date'], now: Number(exp) + 1 });
+  assert.equal((await get('/s/pw', { Cookie: cookie })).status, 401, 'the cookie stops working server-side after ten minutes');
+  t.mock.timers.reset();
   await api('PUT', '/api/shares/pw', { html: fixture('v1'), password: 'hunter23' });
   assert.equal((await get('/s/pw', { Cookie: cookie })).status, 401, 'password change invalidates the cookie');
+});
+
+test('every /api/ route refuses a missing or wrong owner token with the same 401 body', async (t) => {
+  const { get, api } = await boot(t);
+  const base = { 'Content-Type': 'application/json' };
+  const calls = [['PUT', '/api/shares/x', JSON.stringify({ html: fixture('x') })], ['GET', '/api/shares/x/stats'], ['POST', '/api/shares/x/feedback-links'], ['GET', '/api/shares/x/feedback'], ['DELETE', '/api/shares/x']];
+  for (const [method, path, body] of calls) {
+    for (const headers of [base, { ...base, Authorization: 'Bearer wrong' }, { ...base, Authorization: `Bearer ${OWNER}x` }]) {
+      const r = await fetch(`${(await get('/')).url.replace(/\/$/, '')}${path}`, { method, headers, body });
+      assert.equal(r.status, 401, `${method} ${path} ${headers.Authorization ?? 'no token'}`);
+      assert.deepEqual(await r.json(), { error: 'owner token required' });
+    }
+  }
+  assert.equal((await get('/s/x')).status, 401, 'the refused PUT published nothing');
+  assert.equal((await api('GET', '/api/shares/x/stats')).status, 404);
+});
+
+test('PUT refuses an oversized body, bad JSON, missing html and non-boolean hideContacts', async (t) => {
+  const { get, api } = await boot(t);
+  const origin = (await get('/')).url.replace(/\/$/, '');
+  const put = (body, extra = {}, duplex) => fetch(`${origin}/api/shares/big`, { method: 'PUT', headers: { ...AUTH, 'Content-Type': 'application/json', ...extra }, body, duplex });
+  // Headers only: the server refuses on Content-Length and closes, so a body already in flight would be reset.
+  const big = await new Promise((resolve, reject) => {
+    const req = request(`${origin}/api/shares/big`, { method: 'PUT', headers: { ...AUTH, 'Content-Type': 'application/json', 'Content-Length': (4 << 20) + 1 } }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body, connection: res.headers.connection }));
+    });
+    req.on('error', reject);
+    req.flushHeaders();
+  });
+  assert.deepEqual(big, { status: 413, body: 'Payload too large', connection: 'close' });
+  const streamed = await put(new Blob(['x'.repeat((4 << 20) + 1)]).stream(), {}, 'half').catch((e) => e.cause?.code);
+  assert.ok(streamed === 'ECONNRESET' || streamed === 'EPIPE' || streamed.status === 413, `a chunked oversize body is cut off (${streamed.status ?? streamed})`);
+  assert.deepEqual([(await put('{not json')).status, (await (await put('{not json')).json()).error], [400, 'body must be JSON']);
+  assert.equal((await api('PUT', '/api/shares/big', { html: '' })).body.error, 'html required');
+  assert.equal((await api('PUT', '/api/shares/big', { html: 'x', password: 5 })).body.error, 'password must be a string');
+  assert.equal((await api('PUT', '/api/shares/big', { html: 'x', hideContacts: 'true' })).body.error, 'hideContacts must be a boolean');
+  assert.equal((await get('/s/big')).status, 401, 'nothing was published');
+});
+
+test('republishing without password or hideContacts keeps both; sending them changes them; nothing hidden is reported', async (t) => {
+  const { get, api } = await boot(t);
+  const first = await api('PUT', '/api/shares/keep', { html: fixture('v1'), password: 'pw', hideContacts: true });
+  assert.deepEqual([first.body.hasPassword, first.body.hideContacts], [true, true]);
+  const again = await api('PUT', '/api/shares/keep', { html: fixture('v2') });
+  assert.deepEqual([again.body.hasPassword, again.body.hideContacts], [true, true], 'a re-render keeps its protection');
+  assert.equal((await get('/s/keep')).status, 401, 'still password protected');
+  const cleared = await api('PUT', '/api/shares/keep', { html: fixture('v3'), password: null, hideContacts: false });
+  assert.deepEqual([cleared.body.hasPassword, cleared.body.hideContacts], [false, false]);
+  const served = await (await get('/s/keep')).text();
+  assert.ok(served.includes('ada@example.com'), 'contacts are back');
+  const nothing = await api('PUT', '/api/shares/plain', { html: '<html><body><h1>No contacts</h1></body></html>', hideContacts: true });
+  assert.equal(nothing.body.hideContacts, false, 'hideContacts is reported true only when something was removed');
+  assert.equal((await api('GET', '/api/shares/plain/stats')).body.hideContacts, false);
 });
 
 test('view counting: two clients x10 is 2, owner 0, crawler 0, 50 parallel distinct keys add 50', async (t) => {
@@ -199,9 +261,10 @@ test('share pages carry the CSP and privacy headers', async (t) => {
 });
 
 test('delete removes the share: /s/ is 401 form, stats 404, old feedback token 404', async (t) => {
-  const { get, api } = await boot(t);
+  const { get, post, api } = await boot(t);
   await api('PUT', '/api/shares/gone', { html: fixture('gone') });
   const { body: { token } } = await api('POST', '/api/shares/gone/feedback-links');
+  assert.equal((await post(`/f/${token}`, { authorName: 'Rita', body: 'Old comment.' })).status, 303);
   const unknownForm = await (await get('/s/never-existed')).text();
   assert.deepEqual(await api('DELETE', '/api/shares/gone'), { status: 200, body: { deleted: 'gone' } });
   const s = await get('/s/gone');
@@ -214,6 +277,7 @@ test('delete removes the share: /s/ is 401 form, stats 404, old feedback token 4
   assert.equal((await api('DELETE', '/api/shares/gone')).status, 404, 'second delete is 404');
   await api('PUT', '/api/shares/gone', { html: fixture('gone') });
   assert.equal((await get(`/f/${token}`)).status, 404, 'republishing the same HTML does not revive the old token');
+  assert.deepEqual((await api('GET', '/api/shares/gone/feedback')).body, [], 'the old comments did not carry over to the reused slug');
 });
 
 test('clientKey folds an IPv6 address into its /64 and keeps IPv4 as is', () => {
@@ -224,6 +288,7 @@ test('clientKey folds an IPv6 address into its /64 and keeps IPv4 as is', () => 
   assert.equal(key('127.0.0.1', '2001:db8:1:2::a'), '2001:0db8:0001:0002::/64');
   assert.equal(key('::1'), '0000:0000:0000:0000::/64');
   assert.equal(key('::ffff:203.0.113.9'), '203.0.113.9', 'IPv4-mapped peer keeps its IPv4 form');
+  assert.equal(key('127.0.0.1', '::ffff:203.0.113.9'), '203.0.113.9', 'IPv4-mapped header value keeps its IPv4 form');
   assert.equal(key('10.0.0.5', '203.0.113.1'), '10.0.0.5', 'an untrusted peer never gets the header');
 });
 

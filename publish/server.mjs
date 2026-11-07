@@ -51,7 +51,7 @@ function ipv6Prefix(ip) {
 // The header is only as honest as the hop that set it, so it is read only from a known proxy peer.
 export function clientKey(req, config) {
   const peer = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
-  const forwarded = config.trustedProxies.has(peer) && String(req.headers[config.clientIpHeader] ?? '').split(',')[0].trim();
+  const forwarded = config.trustedProxies.has(peer) && String(req.headers[config.clientIpHeader] ?? '').split(',')[0].trim().replace(/^::ffff:/, '');
   const ip = forwarded || peer;
   return ip.includes(':') ? ipv6Prefix(ip) : ip;
 }
@@ -151,14 +151,20 @@ export function createServer(config) {
     { method: 'PUT', pattern: route(`/api/shares/${SLUG}`), handler: owner(async (req, res, m) => {
       const text = await readBody(req, 4 << 20);
       let payload;
-      try { payload = JSON.parse(text); } catch { throw new HttpError(400, 'Body must be JSON'); }
+      try { payload = JSON.parse(text); } catch { return json(res, 400, { error: 'body must be JSON' }); }
       const { html: raw, password, hideContacts: hide } = payload ?? {};
       if (typeof raw !== 'string' || !raw) return json(res, 400, { error: 'html required' });
       if (password != null && typeof password !== 'string') return json(res, 400, { error: 'password must be a string' });
-      const html = hide === true ? hideContacts(raw) : raw;
+      if (hide !== undefined && typeof hide !== 'boolean') return json(res, 400, { error: 'hideContacts must be a boolean' });
+      // A field left out keeps the share's current setting, so a re-render never drops its protection by omission.
+      const current = db.getShare(m[1]);
+      const hiding = hide ?? !!current?.hide_contacts;
+      const html = hiding ? hideContacts(raw) : raw;
+      const hidden = hiding && html !== raw;
+      const pwHash = password === undefined ? current?.pw_hash ?? null : password ? await hashPassword(password) : null;
       const sha = sha256(html).toString('hex');
-      db.publish(m[1], sha, html, password ? await hashPassword(password) : null, hide === true);
-      return json(res, 200, { slug: m[1], sha, url: `/s/${m[1]}` });
+      db.publish(m[1], sha, html, pwHash, hidden);
+      return json(res, 200, { slug: m[1], sha, url: `/s/${m[1]}`, hasPassword: !!pwHash, hideContacts: hidden });
     }) },
     { method: 'GET', pattern: route(`/api/shares/${SLUG}/stats`), handler: withShare((req, res, s) => json(res, 200, {
       slug: s.slug, views: s.views, hasPassword: !!s.pw_hash, hideContacts: !!s.hide_contacts, sha: s.html_sha, updated: s.updated,
@@ -214,7 +220,7 @@ export function createServer(config) {
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
-      console.error(e);
+      console.error(`${req.method} ${req.url} from ${clientKey(req, config)}:`, e);
       plain(res, 500, 'Internal error');
     }
   });

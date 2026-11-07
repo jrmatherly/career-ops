@@ -29,7 +29,11 @@ export function openDb(path) {
   };
   const tx = (fn) => {
     db.exec('BEGIN');
-    try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; }
+    try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) {
+      // SQLite rolls back on its own after a disk-full or I/O error; a failing ROLLBACK must not replace that error.
+      try { db.exec('ROLLBACK'); } catch (r) { console.error('rollback after', e, 'failed:', r); }
+      throw e;
+    }
   };
 
   return {

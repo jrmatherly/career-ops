@@ -287,9 +287,8 @@ jobs:
     name: "📤 Publish service"
     # The share-page service under publish/ has its own package.json and its
     # own node:test suite; nothing under the root tests/ imports it, so the
-    # test job never exercises it. It runs on the Node floor because the
-    # service is deployed alone and must work on the lowest version the
-    # project supports. Not a required check.
+    # test job never exercises it. Runs on the Node floor (lib/node-floor.mjs),
+    # like the test job. Not a required check.
     needs: changes
     # Skipped on a docs-only PR for the reason given on cv-visual.
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
