@@ -33,7 +33,7 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/import/reactive-resume-json.mjs` from `packages/import/src/reactive-resume-json.tsx` (PR-03)
 - `lib/resume/import/detect.mjs` from `apps/web/src/features/resume/import/read-file.ts` lines 32-115 (`detectJsonImportKind` and the magic-byte sniffing), plus the `importResume` dispatcher, which is ours (PR-03)
 
-The import files are hand-ported JavaScript (types removed, `generateId()` replaced by `crypto.randomUUID()`, i18n macros removed), not `stripTypeScriptTypes` output, so their line numbers do not match the clone's.
+The import files are hand-ported JavaScript (types removed, `generateId()` replaced by `crypto.randomUUID()`, `read-file.ts`'s i18n macros removed), not `stripTypeScriptTypes` output, so their line numbers do not match the clone's.
 
 ### Licence text
 

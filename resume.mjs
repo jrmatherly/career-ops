@@ -75,7 +75,7 @@ function printReport({ report, lossless }, json, extra = {}) {
 }
 
 /** A unified-style line diff with two lines of context, from a longest common subsequence. */
-function lineDiff(before, after) {
+function lineDiff(before, after, label = 'generated from data/resume.json') {
   const a = before.replace(/\n$/, '').split('\n');
   const b = after.replace(/\n$/, '').split('\n');
   const lcs = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
@@ -91,7 +91,7 @@ function lineDiff(before, after) {
     else lines.push(`+${b[j++]}`);
   }
   const near = (k) => lines.slice(Math.max(0, k - 2), k + 3).some((l) => l[0] !== ' ');
-  const out = ['--- cv.md', '+++ generated from data/resume.json'];
+  const out = ['--- cv.md', `+++ ${label}`];
   lines.forEach((line, k) => {
     if (near(k)) out.push(line);
     else if (out.at(-1) !== '@@') out.push('@@');
@@ -226,10 +226,10 @@ async function importCommand(root, file, args) {
   } catch (err) {
     throw new ImportError(`${file}: ${err.code === 'ENOENT' ? 'no such file' : err.message}`);
   }
-  const format = forced ?? detectFormat(buffer, basename(file));
-  if (format === 'unknown') throw new ImportError(`${file}: not a Reactive Resume JSON, JSON Resume, LinkedIn export zip or .docx`);
   let imported;
   try {
+    const format = forced ?? detectFormat(buffer, basename(file));
+    if (format === 'unknown') throw new ImportError('not a Reactive Resume JSON, JSON Resume, LinkedIn export zip or .docx');
     imported = importResume(buffer, format);
   } catch (err) {
     if (err instanceof ImportError) err.message = `${file}: ${err.message}`;
@@ -253,7 +253,10 @@ async function importCommand(root, file, args) {
   const json = existsSync(jsonPath) ? readFileSync(jsonPath, 'utf8') : null;
   if (cv !== null) {
     console.log('cv.md exists; import would replace it:');
-    console.log(lineDiff(cv, generated));
+    console.log(lineDiff(cv, generated, `generated from ${basename(file)}`));
+  } else {
+    console.log('cv.md to be written:');
+    console.log(generated);
   }
   if (json !== null) console.log('data/resume.json exists; import would replace it');
   const existing = [cv !== null && 'cv.md', json !== null && 'data/resume.json'].filter(Boolean);
@@ -261,7 +264,7 @@ async function importCommand(root, file, args) {
     console.log(`Nothing written. Add --confirm${existing.length ? ' --replace-cv' : ''}`);
     return 0;
   }
-  if (existing.length && !hasFlag(args, '--replace-cv')) throw new ImportError(`${existing.join(' and ')} exist${existing.length === 1 ? 's' : ''}; add --replace-cv to replace (a copy is kept as .bak); import never merges two CVs`);
+  if (existing.length && !hasFlag(args, '--replace-cv')) throw new ImportError(`${existing.join(' and ')} exist${existing.length === 1 ? 's' : ''}; add --replace-cv to replace (a copy is kept as .bak, or a timestamped .bak when one exists); import never merges two CVs`);
   const backup = (path, text) => {
     const bak = existsSync(`${path}.bak`) ? `${path}.${Date.now()}.bak` : `${path}.bak`;
     writeFileAtomic(bak, text);
@@ -291,7 +294,7 @@ export async function main(args) {
       default: throw new UsageError(command ? `unknown command: ${command}` : 'no command given');
     }
   } catch (err) {
-    console.error(`resume: ${err.message}`);
+    console.error(err instanceof UsageError || err instanceof ImportError ? `resume: ${err.message}` : err.stack);
     if (err instanceof UsageError) console.error(USAGE);
     return err instanceof ImportError ? 2 : 1;
   }
