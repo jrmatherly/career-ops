@@ -26,6 +26,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run keyword-match` | `keyword-match.mjs` | Report which keywords from a report the CV actually covers (read-only; never edits the CV) |
 | `npm run calibrate` | `calibrate.mjs` | Compare your evaluation scores with recorded outcomes (read-only) |
 | `npm run career-profile` | `career-profile.mjs` | Import CV facts into `data/career-profile.yml` (preview by default; `--review` to save) |
+| `node resume.mjs absorb` | `resume.mjs` | Absorb `cv.md` into `data/resume.json`, saving only when regenerating `cv.md` from the result reproduces the file (exit 3 otherwise, nothing written) |
 | `npm run upskill` | `upskill.mjs` | Aggregate skill-gap map from tracked reports (or `--url-text <url\|file>` for a single-JD targeted gap analysis) |
 | `npm run add` | `add-entry.mjs` | Dedup + insert a `/career-ops add` entry into cv.md / article-digest.md |
 | `npm run update:check` | `update-system.mjs check` | Check for a newer published release |
@@ -528,6 +529,28 @@ npm run career-profile -- verify-cv --payload base.json --selection selection.js
 ```
 
 `prepare-cv` and `verify-cv` also take `--profile <path>` to read a different career profile.
+
+---
+
+## resume
+
+`resume.mjs` keeps `data/resume.json`, a Reactive Resume v6 JSON with career-ops fields under one `careerOps` key, in step with `cv.md`. `cv.md` stays the canonical fact file. The JSON holds what markdown cannot carry (item ids, hidden flags, links, structured dates, role grouping, the template and style). Fork-only (Reactive Resume convergence, PR-02).
+
+```bash
+node resume.mjs absorb [--json]
+node resume.mjs adopt [--confirm]
+node resume.mjs pair <orphanId> <newId>
+node resume.mjs export cv-md|payload [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
+node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+```
+
+- `absorb` reads `cv.md`, matches each experience entry on company plus dates (the key `cv-title-check.mjs` uses, so a retitle is a changed entry and only a changed company or dates makes an orphan), aligns bullets by longest common subsequence, and writes the JSON only when regenerating `cv.md` from it reproduces the file line for line. Otherwise it prints the report (orphans, new entries, unparsed lines) and exits 3 with nothing written. Orphans are never dropped.
+- `adopt` is the first run for a `cv.md` outside the shape `examples/cv-example.md` uses. It prints the unparsed lines and the diff between `cv.md` and the regenerated file, and with `--confirm` writes the normalised `cv.md` (a `cv.md.bak` is kept) and the JSON. This is the one path that writes `cv.md` from the JSON.
+- `pair` tells a rename apart from a delete plus an add: the new entry takes the orphan's id, hidden flag, link and structured dates.
+- `export cv-md` prints the regenerated markdown; `export payload` prints the `build-cv-html.mjs` payload (`--hide` and `--hide-item` leave sections or items out of one render; `--json` adds `unmapped`, the sections the payload has no slot for). Without `--in` it absorbs first and refuses with exit 3 while the gate fails; with `--in` it reads the given JSON and does not touch the data root.
+- `save` writes a JSON draft back: it records the pending `cv.md` hash in the JSON, writes `cv.md` only if the current file's sha256 equals `--expected-cv-sha` (exit 4 otherwise, nothing written), then clears the pending hash. A crash between the two writes leaves the pending hash set, and the next `absorb` recognises that `cv.md` as already saved.
+
+`node doctor.mjs` warns when `data/resume.json` records a hash other than the current `cv.md`.
 
 ---
 

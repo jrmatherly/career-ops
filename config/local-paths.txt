@@ -13,3 +13,6 @@ FORK.md
 THIRD_PARTY_NOTICES.md
 # publish/ is claimed ahead of PR-12 of the Reactive Resume convergence plan, which creates it.
 publish/
+# Reactive Resume convergence, PR-02: the resume model absorbed from cv.md.
+resume.mjs
+lib/resume/
