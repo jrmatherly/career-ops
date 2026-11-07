@@ -2226,3 +2226,15 @@ Runs:       — no data (data/scan-runs.tsv missing; created by the next scan)
 * `filtered_country_eligibility` — dropped by `country_eligibility_filter` (#2093)
 
 As the project is in continuous development, to parse for a stat we recommend doing it by column header instead of position. A file created by an older release keeps its old header while new rows carry the current columns; `node migrate-scan-runs.mjs` reports the mismatch, and `node migrate-scan-runs.mjs --apply` rewrites the file onto the current header after saving `<file>.bak`.
+
+---
+
+## POST /api/cv-render (web)
+
+Renders a `build-cv-html.mjs` payload to HTML from the web app, for a live preview, without writing under `output/`. The body is `{ "payload": <build-cv-html payload>, "template": "<name>", "style": { ... } }`; `template` and `style` are optional. The route validates the payload with `lib/cv-payload-schema.mjs`, resolves the template name through `cv-templates.mjs` (the profile's `cv.template`, else `standard`, when absent), spawns `build-cv-html.mjs` through `runCoreCli`, and injects the profile `style:` block with the request's `style` on top, the same tokens and precedence `generate-pdf.mjs` applies at PDF time. `style` accepts the keys of the profile `style:` block, including the eight design tokens `heading_font_family`, `heading_font_size`, `line_height`, `section_gap`, `item_gap`, `text_color`, `background_color` and `sidebar_width`.
+
+```bash
+curl -X POST localhost:3000/api/cv-render -H 'content-type: application/json' -d @body.json
+```
+
+Returns `200 { "html": "...", "warnings": [...] }`. An invalid payload is `400 { "error": "invalid payload", "issues": [...] }` with the validator's messages; an unknown template or a body that is not a JSON object is `400 { "error": "..." }`; a render that fails is `500`, and one that outruns the CLI timeout is `503`. With no `style` and no `style:` block in `config/profile.yml`, the HTML is byte for byte what `build-cv-html.mjs` writes.

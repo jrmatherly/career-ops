@@ -16,6 +16,14 @@
  *     font_size:        "10pt"
  *     margin:           "0.5in"
  *     job_break_inside: "avoid"
+ *     heading_font_family: "Georgia, serif"
+ *     heading_font_size: "13px"
+ *     line_height:      "1.45"
+ *     section_gap:      "16px"
+ *     item_gap:         "12px"
+ *     text_color:       "#1f2937"
+ *     background_color: "#ffffff"
+ *     sidebar_width:    "110px"
  *
  * These are injected as CSS custom properties into the rendered HTML before it
  * hits the PDF pipeline. The templates read them via `var(--x, <default>)`, so a
@@ -68,6 +76,14 @@ export const STYLE_VAR_MAP = {
   // page before it — and on a CV already near its page budget, that gap can
   // cost a page. That trade is why this is opt-in rather than a new default.
   project_break_inside: '--project-break-inside',
+  heading_font_family: '--heading-font-family', // the name and section titles
+  heading_font_size:   '--heading-font-size',   // section titles only; the name keeps its size
+  line_height:         '--line-height',
+  section_gap:         '--section-gap',         // space below each section
+  item_gap:            '--item-gap',            // space below each job and project entry
+  text_color:          '--text-color',
+  background_color:    '--background-color',
+  sidebar_width:       '--sidebar-width',       // only templates with a section rail (compact)
 };
 
 /**
@@ -128,7 +144,8 @@ export function styleTokensFrom(style) {
   const out = {};
   if (!style || typeof style !== 'object' || Array.isArray(style)) return out;
   for (const [key, cssVar] of Object.entries(STYLE_VAR_MAP)) {
-    const v = style[key];
+    // A bare YAML number (line_height: 1.45) is as valid as the quoted form.
+    const v = Number.isFinite(style[key]) ? String(style[key]) : style[key];
     if (typeof v === 'string' && v.trim()) out[cssVar] = v.trim();
   }
   return out;
