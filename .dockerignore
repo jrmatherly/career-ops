@@ -10,7 +10,6 @@ batch/tracker-additions
 jds/*
 !jds/.gitkeep
 reports
-.env
 .update-dismissed
 .update-lock
 *.log
@@ -46,7 +45,7 @@ templates/cv-*.html
 templates/cover-*.html
 !templates/cover-letter-template*.html
 
-# Gitignored local working trees
+# Local working trees and editor state
 private
 .codegraph
 .remember
@@ -54,6 +53,18 @@ private
 .claude/worktrees
 .claude/settings.local.json
 .tmp-*
+
+# Secrets and local-only files (mirrors .gitignore)
+**/.env
+**/.env*.local
+**/.career-ops.env
+.mcp.json
+.claude/memory
+.opencode/settings.local.json
+.opencode/memory
+.hermes.md
+.direnv
+.resolved-prompt-*
 
 # Build output
 **/.next

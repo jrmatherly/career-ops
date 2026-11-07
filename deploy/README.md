@@ -15,14 +15,18 @@ it for `linux/amd64` on every push to `main`, with provenance and an SBOM.
   `next build`.
 - `@anthropic-ai/claude-code` installed globally at a pinned version, so
   `claude` is on `PATH`. `DISABLE_AUTOUPDATER=1` keeps it at that version.
-- `tini` as PID 1. The server spawns the PDF server and scheduler runs as
-  detached children, and `tini` reaps them. A pod stop ends the container as
+- `tini` as PID 1. `web/server.mjs` spawns the PDF server and the web's
+  `/api/scheduler` route spawns scheduler runs, both detached, and `tini`
+  reaps them. A pod stop ends the container as
   soon as `web/server.mjs` dies, so `next` and any run in flight get no
   graceful shutdown today.
 - No Go toolchain, no TeX. The dashboard TUI and the LaTeX CV path are not
-  in this image. Neither is the apply flow: it launches a headed browser
-  through the web's own `playwright-core`, whose Chromium revision is not the
-  one the base image ships.
+  in this image. Neither is the apply flow: it wants a headed Google Chrome,
+  or failing that the Chromium revision of the web's own `playwright-core`,
+  and the image has no Chrome, no display and not that revision.
+- No `.claude/settings.json` or hooks: they are user-layer entries that
+  `.dockerignore` excludes, so `claude -p` runs in the pod with no session
+  hooks.
 
 The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 
@@ -30,7 +34,7 @@ The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). Until the tracker-path fix lands in core, it must hold `data/applications.md` before the first boot: the mount point is itself named `data`, so with no tracker the fallback is `/data/applications.md`, the workspace resolver treats `/data` as a `data/` subdirectory and returns `/`, and the PDF server dies on `mkdir /output`. |
+| `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). Until jrmatherly/career-ops#18 lands, it must hold `data/applications.md` before the first boot: the mount point is itself named `data`, so with no tracker the fallback is `/data/applications.md`, the workspace resolver treats `/data` as a `data/` subdirectory and returns `/`, and the PDF server dies on `mkdir /output`. |
 | `CAREER_OPS_WEB_ALLOWED_HOSTS` | `<public host> career-ops-web` | A hostname makes `web/src/lib/bind-host.mjs` bind `0.0.0.0`, which a container needs. The request guard admits only these hosts and loopback. |
 | `CAREER_OPS_CLI` | `claude` | Preset in the image. |
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this or `ANTHROPIC_API_KEY`. Pass it as a secret, never in the image. |
@@ -58,6 +62,9 @@ docker run --rm career-ops-server:dev claude --version
 The compose file runs the image against a scratch data root and publishes the
 port on loopback only, at `CAREER_OPS_SMOKE_PORT` (default 3000; pick another
 when a dev server holds 3000, since Docker Desktop does not report the clash).
+`CAREER_OPS_SMOKE_ROOT` is required and must point outside the checkout: a
+root inside it would sit in the build context, where the root-anchored
+`.dockerignore` patterns do not reach, and a rebuild would bake it in.
 Put a `cv.md` in the scratch root first (`examples/cv-example.md` works) and
 an empty tracker at `data/applications.md` (the header from AGENTS.md step 4,
 see the contract row above), then:
@@ -71,7 +78,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: localhost' http://127.0.0.1:
 ```
 
 Expect `200`. The PDF server runs detached and logs nothing on exit, so
-also check `docker compose exec career-ops-web ps -e` lists
+also check `docker compose exec career-ops-web ps -ef` lists
 `generate-pdf.mjs --pdf-server`. The compose file is a smoke stack, not a
 deployment manifest.
 The cluster manifests live in the home-cluster repository.
