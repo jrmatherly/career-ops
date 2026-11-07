@@ -20,6 +20,11 @@
 //
 //   node tests/browser-suites.mjs                 # every suite
 //   node tests/browser-suites.mjs inbox-undo      # suites whose name contains it
+//
+// BROWSER_SUITES_SEGMENT_DELAY_MS=100 puts tests/helpers/delay-proxy.mjs in front
+// of each suite's server, so the streaming reveal race reproduces on every
+// streamed document load; a suite whose pages never streamed a segment fails
+// the run, since a green result would then prove nothing.
 
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -27,6 +32,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { startDelayProxy } from "./helpers/delay-proxy.mjs";
 import { REQUIRE_WEB_SERVER_ENV } from "./helpers/live-server.mjs";
 
 const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -115,6 +121,12 @@ function startServer(root, port, log) {
   return { child, exited };
 }
 
+const SEGMENT_DELAY_MS = Number(process.env.BROWSER_SUITES_SEGMENT_DELAY_MS ?? 0);
+if (!Number.isInteger(SEGMENT_DELAY_MS) || SEGMENT_DELAY_MS < 0) {
+  console.error(`❌ BROWSER_SUITES_SEGMENT_DELAY_MS must be a whole number of milliseconds, not "${process.env.BROWSER_SUITES_SEGMENT_DELAY_MS}"`);
+  process.exit(1);
+}
+
 async function waitReady(url, server) {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let gone = null;
@@ -188,17 +200,22 @@ async function attempt(name) {
   const file = path.join("tests", "lib", `${name}.browser.test.mjs`);
   let root;
   let server;
+  let proxy;
   let logPath;
   let problem = null;
   try {
     root = makeRoot(suite.fixture);
     const port = await freePort();
-    const url = `http://127.0.0.1:${port}`;
+    let url = `http://127.0.0.1:${port}`;
     logPath = path.join(root, "..", `${path.basename(root)}-server.log`);
     const log = fs.openSync(logPath, "w");
     server = startServer(root, port, log);
     fs.closeSync(log);
     await waitReady(url, server);
+    if (SEGMENT_DELAY_MS) {
+      proxy = await startDelayProxy(port, SEGMENT_DELAY_MS);
+      url = `http://127.0.0.1:${proxy.address().port}`;
+    }
     // FORCE_COLOR=0: an inherited FORCE_COLOR colors the reporter's summary
     // lines, and count() would then find no tests.
     const env = { ...process.env, [REQUIRE_WEB_SERVER_ENV]: "1", FORCE_COLOR: "0" };
@@ -215,9 +232,11 @@ async function attempt(name) {
     else if (code !== 0) problem = { message: `exited ${code}`, retryable: true };
     else if (!tests) problem = { message: "ran no tests", retryable: false };
     else if (skipped === null || todo === null) problem = { message: "the reporter printed no skipped/todo counts", retryable: false };
+    else if (proxy && proxy.splits === 0) problem = { message: "the delay proxy held back no segment: no HTML response carried `<div hidden id=\"S:`, so the delayed run reproduced nothing", retryable: false };
   } catch (err) {
     problem = { message: err.message, retryable: true };
   } finally {
+    if (proxy) { proxy.closeAllConnections(); proxy.close(); }
     if (server) await stop(server);
     if (problem && logPath && fs.existsSync(logPath)) {
       console.log(`--- ${name} server log ---\n${fs.readFileSync(logPath, "utf8").slice(-8_000)}`);
