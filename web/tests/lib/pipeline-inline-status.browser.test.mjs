@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.PIPELINE_STATUS_TEST_URL;
 const root = process.env.PIPELINE_STATUS_TEST_ROOT;
@@ -54,7 +55,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: liveS
     }
   }
 
-  await page.goto(`${origin.origin}/pipeline?tab=ALL`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline?tab=ALL`));
   await edit(11).waitFor();
   await until(async () => await visibleRows.count() === 3);
   assert.equal(await visibleRows.count(), 3);
@@ -132,7 +133,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: liveS
     assert.match(fs.readFileSync(tracker, "utf8"), /Fixture Alpha.*Applied/);
     release();
     await page.unrouteAll({ behavior: "wait" });
-    await page.reload();
+    await settled(page, () => page.reload());
     assert.equal(await row(11).count(), 0);
     await tab("APPLIED").click();
     await edit(11).waitFor();
@@ -183,26 +184,26 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: liveS
       return text.includes("3.8/5 | Offer") && text.includes("3.6/5 | Rejected");
     });
     await page.unrouteAll({ behavior: "wait" });
-    await page.reload();
+    await settled(page, () => page.reload());
     assert.match(await row(12).innerText(), /Offer/);
     assert.match(await row(13).innerText(), /Rejected/);
   });
 
   await t.test("detail-page dropdown retains the saved animation and persists", async () => {
-    await page.goto(`${origin.origin}/pipeline/11`);
+    await settled(page, () => page.goto(`${origin.origin}/pipeline/11`));
     const detailSelect = page.getByLabel("status", { exact: true });
     await detailSelect.waitFor();
     assert.equal(await detailSelect.inputValue(), "Applied");
     assert.equal(await page.getByRole("button", { name: /^Edit status/ }).count(), 0);
     await detailSelect.selectOption("Responded");
     await page.locator(".animate-terminal-popup").filter({ hasText: "saved" }).waitFor();
-    await page.reload();
+    await settled(page, () => page.reload());
     assert.equal(await detailSelect.inputValue(), "Responded");
   });
 
   await t.test("narrow-screen editor stays reachable by horizontal scroll; inbox has no editor", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${origin.origin}/pipeline?tab=ALL`);
+    await settled(page, () => page.goto(`${origin.origin}/pipeline?tab=ALL`));
     await edit(11).click();
     await select(11).waitFor();
     assert.equal(await select(11).evaluate((element) => element.getBoundingClientRect().height >= 44), true);

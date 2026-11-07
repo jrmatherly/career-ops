@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.PIPELINE_RETURN_TEST_URL;
 const root = process.env.PIPELINE_RETURN_TEST_ROOT;
@@ -26,7 +27,7 @@ test("Pipeline detail links preserve the list context", { skip: liveServerSkip("
   const query = "tab=EVALUATED&min=3.5&sort=company&dir=1&q=Fixture";
   const back = () => page.getByRole("link", { name: "Pipeline", exact: true }).filter({ has: page.locator("svg.lucide-arrow-left") });
 
-  await page.goto(`${origin.origin}/pipeline?tab=EVALUATED&min=3.5&sort=company&dir=1`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline?tab=EVALUATED&min=3.5&sort=company&dir=1`));
   const search = page.getByPlaceholder("Search company or role…");
   await search.fill("Fixture"); // detail links include this immediately; the list URL catches up after a short pause
   const row = page.locator("tbody tr").filter({ has: page.getByRole("link", { name: "#11", exact: true }) });
@@ -37,7 +38,7 @@ test("Pipeline detail links preserve the list context", { skip: liveServerSkip("
   await row.getByRole("link", { name: "Engineer", exact: true }).click();
   await back().waitFor();
   assert.equal(await back().getAttribute("href"), `/pipeline?${query}`);
-  await page.reload(); // the return context survives reloads and copied links
+  await settled(page, () => page.reload()); // the return context survives reloads and copied links
   await back().click();
   await search.waitFor();
   assert.equal(new URL(page.url()).search.slice(1), query);
@@ -54,7 +55,7 @@ test("Pipeline detail links preserve the list context", { skip: liveServerSkip("
   await search.waitFor();
   assert.equal(await search.inputValue(), "");
 
-  await page.goto(`${origin.origin}/pipeline/11`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline/11`));
   await back().waitFor();
   assert.equal(await back().getAttribute("href"), "/pipeline");
   assert.deepEqual(errors, []);

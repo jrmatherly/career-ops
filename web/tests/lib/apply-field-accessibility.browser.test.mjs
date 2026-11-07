@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.APPLY_FIELDS_TEST_URL;
 
@@ -36,7 +37,7 @@ test("application review labels, requirements and confirmation descriptions", { 
     await route.fulfill({ contentType: "application/x-ndjson", body: JSON.stringify({ t: "done", count: fields.length, answers: Object.fromEntries(fields.map((f) => [f.id, { value: f.type === "checkbox" ? "true" : f.type === "select" || f.type === "radio" ? "Yes" : "", needs_confirmation: f.id === "text" || f.id === "checkbox" }])) }) + "\n" });
   });
   await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ cliId: "fixture-cli" })));
-  await page.goto(`${origin.origin}/apply`);
+  await settled(page, () => page.goto(`${origin.origin}/apply`));
   await page.getByPlaceholder("Paste an application form URL (Ashby, Lever, Greenhouse…)").fill("https://example.com/fictional-application");
   await page.getByRole("button", { name: "Read form", exact: true }).click();
   await page.getByRole("button", { name: "Pre-fill from my CV", exact: true }).waitFor();

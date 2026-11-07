@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.ACCESSIBLE_NAMES_TEST_URL;
 test("visible labels are part of accessible names, and shell content sits in landmarks", { skip: liveServerSkip("ACCESSIBLE_NAMES_TEST_URL"), timeout: 120_000 }, async (t) => {
@@ -49,7 +50,7 @@ test("visible labels are part of accessible names, and shell content sits in lan
   const launcher = page.locator("button", { hasText: /^co\s*Ask\b/ });
   const pill = page.getByText("0.0.0-fixture · alpha");
   for (const route of ["/", "/followups"]) {
-    await page.goto(`${origin.origin}${route}`);
+    await settled(page, () => page.goto(`${origin.origin}${route}`));
     await t.test(`${route}: the assistant launcher's name starts with its visible label`, async () => {
       await launcher.waitFor();
       const text = await voiceControlLabel(launcher);
@@ -85,7 +86,7 @@ test("visible labels are part of accessible names, and shell content sits in lan
   });
 
   const jobsLoaded = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/scheduled-jobs");
-  await page.goto(`${origin.origin}/scheduled-scans`);
+  await settled(page, () => page.goto(`${origin.origin}/scheduled-scans`));
   await jobsLoaded;
   await t.test("/scheduled-scans: heading levels never skip", async () => {
     await page.getByText("No scheduled scans found").waitFor();

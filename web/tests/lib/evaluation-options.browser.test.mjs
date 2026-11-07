@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 import { FULL_EVALUATION } from "../../src/lib/evaluation-options.mjs";
 
 const url = process.env.EVALUATION_OPTIONS_TEST_URL;
@@ -34,7 +35,7 @@ test("evaluation choices survive navigation and reach pasted-URL and shortlist w
     await page.getByRole("button", { name: "Evaluate", exact: true }).click();
     await request;
   }
-  await page.goto(url);
+  await settled(page, () => page.goto(url));
   await page.getByText("Evaluation options · full evaluation", { exact: true }).click();
   const options = page.getByRole("group", { name: "Evaluation sections" });
   assert.equal(await options.getByRole("checkbox").count(), FULL_EVALUATION.length);
@@ -46,12 +47,12 @@ test("evaluation choices survive navigation and reach pasted-URL and shortlist w
   await scoreQuick("https://example.com/fixture-fit-only");
   assert.deepEqual(requests.at(-1).evaluationSections, []);
   await options.getByRole("checkbox", { name: /Interview preparation/ }).check();
-  await page.reload();
+  await settled(page, () => page.reload());
   await page.getByText("Evaluation options · 1 optional sections", { exact: true }).click();
   assert.equal(await options.getByRole("checkbox", { name: /Interview preparation/ }).isChecked(), true);
   assert.equal(await options.getByRole("checkbox", { checked: true }).count(), 1);
 
-  await page.goto(`${url}/pipeline`);
+  await settled(page, () => page.goto(`${url}/pipeline`));
   await page.locator("li:visible").filter({ hasText: "Fixture Alpha" }).getByRole("button", { name: /Save/ }).click();
   await page.getByRole("button", { name: /^Score 1 ·/ }).click();
   assert.equal(await options.getByRole("checkbox", { name: /Interview preparation/ }).isChecked(), true);

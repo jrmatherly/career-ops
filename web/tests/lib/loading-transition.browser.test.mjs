@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
+import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.LOADING_TRANSITION_TEST_URL;
 const root = process.env.LOADING_TRANSITION_TEST_ROOT;
@@ -50,7 +51,7 @@ test("loading transitions keep context and only latest requests settle Today", {
   // all-clear is observable; writes still use the canonical status API.
   // Check the server, not just the local marker: a misconfigured test URL
   // must never direct fixture mutations at a personal tracker.
-  await page.goto(`${origin.origin}/pipeline?tab=ALL`);
+  await settled(page, () => page.goto(`${origin.origin}/pipeline?tab=ALL`));
   await page.getByRole("button", { name: /^Edit status/ }).first().waitFor();
   assert.equal(await page.locator("tbody tr").count(), 3);
   for (const [n, company] of [["11", "Fixture Alpha"], ["12", "Fixture Beta"], ["13", "Fixture Gamma"]]) {
@@ -64,7 +65,7 @@ test("loading transitions keep context and only latest requests settle Today", {
   const baseline = fs.readFileSync(tracker, "utf8");
 
   await t.test("Pipeline filter keeps heading, search, tabs and result skeletons", async (subtest) => {
-    await page.goto(`${origin.origin}/pipeline?tab=ALL`);
+    await settled(page, () => page.goto(`${origin.origin}/pipeline?tab=ALL`));
     await page.getByRole("button", { name: /^Edit status/ }).first().waitFor();
     const pending = gate();
     let held = false;
@@ -88,7 +89,7 @@ test("loading transitions keep context and only latest requests settle Today", {
   });
 
   await t.test("Follow-ups query transition retains page context", async (subtest) => {
-    await page.goto(`${origin.origin}/followups`);
+    await settled(page, () => page.goto(`${origin.origin}/followups`));
     await page.locator('tbody[aria-busy="false"]').waitFor();
     const pending = gate();
     let held = false;
@@ -123,7 +124,7 @@ test("loading transitions keep context and only latest requests settle Today", {
       await pending.promise;
       await route.fulfill({ json: endpoint === "/api/followups" ? emptyFollowups : emptyFresh });
     });
-    await page.goto(origin.origin);
+    await settled(page, () => page.goto(origin.origin));
     await page.getByRole("button", { name: "Retry updates" }).waitFor();
     assert.equal(await heading.innerText(), "Some updates are unavailable.");
     assert.equal(await updatesAlert.isVisible(), true);
@@ -146,7 +147,7 @@ test("loading transitions keep context and only latest requests settle Today", {
         ? { available: false, metadata: null, entries: [], nextUpcoming: null }
         : emptyFresh,
     }));
-    await page.goto(origin.origin);
+    await settled(page, () => page.goto(origin.origin));
     await page.getByRole("button", { name: "Retry updates" }).waitFor();
     assert.equal(await heading.innerText(), "Some updates are unavailable.");
     assert.match(await updatesAlert.innerText(), /Follow-ups could not be loaded/);
@@ -174,7 +175,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     const started = (index) => until(() => ["/api/followups", "/api/whats-new"].every((endpoint) => gates.has(`${index}:${endpoint}`)));
     const release = (index) => { for (const endpoint of ["/api/followups", "/api/whats-new"]) gates.get(`${index}:${endpoint}`).release(); };
     const refetch = () => page.evaluate(() => window.dispatchEvent(new Event("co-job-done")));
-    await page.reload();
+    await settled(page, () => page.reload());
     await started(1);
     release(1);
     await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
