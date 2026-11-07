@@ -1,6 +1,6 @@
 import { runCoreCli } from "@/lib/core-cli";
 import { readJsonObject } from "@/lib/json-body";
-import { failure, usageResponse } from "@/lib/resume-cli";
+import { failure, unreadable, usageResponse } from "@/lib/resume-cli";
 import { pairProblem } from "@/lib/resume-pairing.mjs";
 
 export const runtime = "nodejs";
@@ -23,19 +23,21 @@ export async function POST(req: Request) {
   const pairs = parsePairs(body?.pairs);
   if (!pairs) return Response.json({ error: "body must be { pairs: [orphanId, newId][] }, each id once" }, { status: 400 });
 
+  // shortcut: a second spawn checks the ids because resume.mjs pair accepts any two; drop it once pair validates ids itself.
   const a = await runCoreCli("resume", ["absorb", "--json"]);
-  if (a.code === 0) return Response.json({ error: "cv.md already reads back losslessly; nothing to pair" }, { status: 409 });
+  if (a.code === 0) return Response.json({ error: "cv.md already reads back losslessly; reload to edit" }, { status: 409 });
   if (a.code !== 3) return usageResponse(a) ?? failure(a, "absorb");
   let report: { orphans: unknown[]; newEntries: unknown[] };
   try {
     const parsed = JSON.parse(a.stdout);
     report = { orphans: parsed.orphans ?? [], newEntries: parsed.newEntries ?? [] };
   } catch {
-    return failure(a, "absorb");
+    return unreadable(a, "absorb");
   }
   const problem = pairs.map((p) => pairProblem(report, p)).find(Boolean);
   if (problem) return Response.json({ error: `${problem}; reload and pick again` }, { status: 400 });
 
+  // The check and resume.mjs pair read cv.md separately; an edit in between is checked against the earlier report.
   const r = await runCoreCli("resume", ["pair", ...pairs.flat()]);
   if (r.code === 0) return Response.json({ ok: true });
   if (r.code === 3) return Response.json({ error: "Still not lossless after pairing; nothing written.", output: r.stdout.split("\n").filter((l) => !l.includes("node resume.mjs")).join("\n") }, { status: 422 });

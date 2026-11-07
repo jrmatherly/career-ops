@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { SELECT } from "@/components/resume/template-picker";
 import { candidatesFor } from "@/lib/resume-pairing.mjs";
 
-export type Entry = { id: string; section?: string; name?: string; company?: string; position?: string; period?: string };
+type Entry = { id: string; section?: string; name?: string; company?: string; position?: string; period?: string };
 export type Report = { orphans?: Entry[]; newEntries?: Entry[]; unparsed?: { line: number; text: string }[] };
 
 type PanelState =
@@ -15,7 +15,7 @@ type PanelState =
   | { kind: "preview"; diff: string | null; inputsSha: string }
   | { kind: "error"; message: string; output?: string };
 
-export const entryText = (e: Entry) => (e.section ? `${e.section}: ${e.name ?? ""}` : [e.company, e.position, e.period].filter(Boolean).join(", "));
+const entryText = (e: Entry) => (e.section ? `${e.section}: ${e.name ?? ""}` : [e.company, e.position, e.period].filter(Boolean).join(", "));
 
 // A route that throws answers with an HTML error page, not JSON.
 const post = async (url: string, body: object): Promise<{ ok: boolean; body: { error?: string; [key: string]: any } }> => {
@@ -26,7 +26,7 @@ const post = async (url: string, body: object): Promise<{ ok: boolean; body: { e
 const DIFF_TINT = (line: string) =>
   line.startsWith("+") && !line.startsWith("+++") ? "bg-green-500/10 text-green-800 dark:text-green-400" : line.startsWith("-") && !line.startsWith("---") ? "bg-red-500/10 text-red-800 dark:text-red-400" : "";
 
-export function GatePanel({ report, absorbed, onResolved }: { report: Report | null; absorbed: boolean; onResolved: (message?: string) => void }) {
+export function GatePanel({ report, onResolved }: { report: Report | null; onResolved: (message?: string) => void }) {
   const orphans = report?.orphans ?? [];
   const newEntries = report?.newEntries ?? [];
   const unparsed = report?.unparsed ?? [];
@@ -40,8 +40,8 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
   });
   const taken = new Set(Object.values(choices));
 
-  // resume.mjs pair re-runs the gate, which fails while any line is unreadable.
-  const canPair = absorbed && pairable.length > 0 && unparsed.length === 0;
+  // resume.mjs pair re-runs the gate, which fails while any line is unreadable. Orphans exist only once data/resume.json does.
+  const canPair = pairable.length > 0 && unparsed.length === 0;
   const pairs = Object.entries(choices).filter(([, n]) => n);
   const busy = state.kind === "busy";
 
@@ -57,7 +57,12 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
     }
   };
   const pair = () => run("/api/resume/pair", { pairs }, () => onResolved());
-  const previewAdopt = () => run("/api/resume/adopt", {}, (b) => setState({ kind: "preview", diff: b.diff, inputsSha: b.inputsSha }));
+  const previewAdopt = () =>
+    run("/api/resume/adopt", {}, (b) =>
+      typeof b.inputsSha === "string" && (b.diff === null || typeof b.diff === "string")
+        ? setState({ kind: "preview", diff: b.diff, inputsSha: b.inputsSha })
+        : setState({ kind: "error", message: "The adopt preview came back in an unexpected shape" }),
+    );
   const confirmAdopt = (sha: string) => run("/api/resume/adopt", { confirm: true, expectedSha: sha }, (b) => onResolved(b.message));
 
   const list = (title: string, entries: Entry[]) =>
@@ -79,7 +84,7 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
       <p role="status" className="text-sm text-foreground">
         <code>cv.md</code> does not read back into the editor without loss, so the editor is read-only.{" "}
         {canPair && "If an entry was renamed or redated, it shows in both lists below: pair the two to keep its history. "}
-        {absorbed && pairable.length > 0 && unparsed.length > 0 && "Renamed entries can be paired once every line of cv.md reads: fix the unreadable lines and reload, or adopt. "}
+        {pairable.length > 0 && unparsed.length > 0 && "Renamed entries can be paired once every line of cv.md reads: fix the unreadable lines and reload, or adopt. "}
         Adopting rewrites cv.md in the shape the editor saves.
       </p>
       {list("Entries only in data/resume.json", orphans)}
@@ -128,26 +133,33 @@ export function GatePanel({ report, absorbed, onResolved }: { report: Report | n
         {state.kind === "preview" ? (
           <>
             {state.diff === null ? (
-              <p className="text-sm text-foreground">cv.md is already in the generated shape.</p>
+              <>
+                <p className="text-sm text-foreground">cv.md is already in the generated shape, so there is nothing to adopt.</p>
+                <Button autoFocus type="button" onClick={() => onResolved()}>
+                  Reload
+                </Button>
+              </>
             ) : (
-              <pre aria-label="Changes to cv.md" tabIndex={0} className="max-h-96 overflow-auto rounded-md border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-foreground">
-                {state.diff.split("\n").map((line, i) => (
-                  <span key={i} className={`block whitespace-pre ${DIFF_TINT(line)}`}>
-                    {line || " "}
-                  </span>
-                ))}
-              </pre>
+              <>
+                <pre aria-label="Changes to cv.md" tabIndex={0} className="max-h-96 overflow-auto rounded-md border border-border bg-surface p-3 font-mono text-xs leading-relaxed text-foreground">
+                  {state.diff.split("\n").map((line, i) => (
+                    <span key={i} className={`block whitespace-pre ${DIFF_TINT(line)}`}>
+                      {line || " "}
+                    </span>
+                  ))}
+                </pre>
+                {orphans.length > 0 && <p className="text-sm text-foreground">Entries only in data/resume.json are written back into cv.md, so a renamed entry would appear twice.</p>}
+                <p className="text-sm text-foreground">Nothing is written until you confirm. cv.md is kept as a .bak copy.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button autoFocus type="button" onClick={() => confirmAdopt(state.inputsSha)}>
+                    Confirm adopt
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setState({ kind: "idle" })}>
+                    Cancel
+                  </Button>
+                </div>
+              </>
             )}
-            {orphans.length > 0 && <p className="text-sm text-foreground">Entries only in data/resume.json are written back into cv.md, so a renamed entry would appear twice.</p>}
-            <p className="text-sm text-foreground">Nothing is written until you confirm. cv.md is kept as a .bak copy.</p>
-            <div className="flex flex-wrap gap-2">
-              <Button autoFocus type="button" onClick={() => confirmAdopt(state.inputsSha)}>
-                Confirm adopt
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setState({ kind: "idle" })}>
-                Cancel
-              </Button>
-            </div>
           </>
         ) : (
           <Button type="button" variant="outline" onClick={previewAdopt} disabled={busy}>

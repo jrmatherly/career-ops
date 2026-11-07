@@ -15,6 +15,12 @@ export function failure(r: CliResult, what: string, advice = "") {
   return Response.json({ error: cause + advice }, { status: 500 });
 }
 
+/** A CLI run that exited as expected but printed something this route cannot read: logged with its stdout, answered 502. */
+export function unreadable(r: CliResult, what: string) {
+  console.error(`resume.mjs ${what}: output not in the expected shape\n${r.stdout.slice(-2000)}`);
+  return Response.json({ error: `could not read the ${what} output; see the server log` }, { status: 502 });
+}
+
 /** A usage error as 404 (cv.md missing) or 400, or null when `r` is not one. */
 export function usageResponse(r: CliResult) {
   const usage = usageMessage(r);
@@ -33,5 +39,6 @@ const readOrNull = (file: string) =>
 export async function adoptInputsSha(): Promise<string | null> {
   const [cv, json] = await Promise.all([readOrNull("cv.md"), readOrNull(path.join("data", "resume.json"))]);
   if (!cv) return null;
-  return createHash("sha256").update(cv).update("\0").update(json ?? "").digest("hex");
+  const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+  return sha(Buffer.from(`${sha(cv)} ${json === null ? "absent" : sha(json)}`));
 }

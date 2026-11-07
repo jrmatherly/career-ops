@@ -6,7 +6,7 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -81,7 +81,8 @@ test("pair rejects malformed, flag-like, duplicate and unknown ids with 400", as
 test("pair refuses ids the current report does not offer, and writes nothing", async () => {
   const keptSidecar = readFileSync(sidecar, "utf8");
   // An in-sync entry is not an orphan: pairOrphan would move its id onto the new entry.
-  for (const [pairs, re] of [[[[inSyncId, newId]], /is not a pairable orphan/], [[[orphanId, orphanId]], /is not a new entry/], [[["experience", newId]], /is not a pairable orphan/]]) {
+  // The second pair is the bad one: every pair is checked, not only the first.
+  for (const [pairs, re] of [[[[orphanId, newId], [inSyncId, "0ae6a548"]], /is not a pairable orphan/], [[[inSyncId, newId]], /is not a pairable orphan/], [[[orphanId, orphanId]], /is not a new entry/], [[["experience", newId]], /is not a pairable orphan/]]) {
     const { status, body } = await postPair({ pairs });
     assert.equal(status, 400, JSON.stringify(pairs));
     assert.match(body.error, re);
@@ -181,7 +182,8 @@ test("adopt confirm with the preview's sha replaces cv.md and keeps a backup", a
   assert.equal((await postAdopt({})).body.diff, null);
 });
 
-test("adopt works on a cv.md that was never absorbed", async () => {
+test("adopt works on a cv.md that was never absorbed, and keeps the first backup", async () => {
+  const firstBackup = readFileSync(`${cvPath}.bak`, "utf8");
   rmSync(sidecar);
   writeFileSync(cvPath, readFileSync(cvPath, "utf8") + STRAY);
   const shown = await postAdopt({});
@@ -191,7 +193,27 @@ test("adopt works on a cv.md that was never absorbed", async () => {
   const done = await postAdopt({ confirm: true, expectedSha: shown.body.inputsSha });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.ok(existsSync(sidecar));
+  assert.equal(readFileSync(`${cvPath}.bak`, "utf8"), firstBackup, "an existing cv.md.bak is never overwritten");
+  assert.match(done.body.message, /cv\.md\.\d+\.bak/);
   assert.equal((await get()).body.lossless, true);
+});
+
+test("adopt answers bodies that are not an object, or a confirm that is not true, with 400", async () => {
+  for (const body of ["[]", '"x"', "null", { confirm: false }, { confirm: "yes" }]) assert.equal((await postAdopt(body)).status, 400, JSON.stringify(body));
+});
+
+test("an unreadable data/resume.json is a JSON 500 naming the error", async () => {
+  const kept = readFileSync(sidecar);
+  rmSync(sidecar);
+  mkdirSync(sidecar);
+  try {
+    const { status, body } = await postAdopt({});
+    assert.equal(status, 500);
+    assert.match(body.error, /EISDIR/);
+  } finally {
+    rmSync(sidecar, { recursive: true });
+    writeFileSync(sidecar, kept);
+  }
 });
 
 test("adopt without cv.md is a 404", async () => {

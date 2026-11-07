@@ -163,7 +163,7 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
           {status.message}
         </p>
       )}
-      {status.kind === "readonly" && <GatePanel key={generation} report={state.report} absorbed={state.data !== null} onResolved={resolved} />}
+      {status.kind === "readonly" && <GatePanel key={generation} report={state.report} onResolved={resolved} />}
 
       {editable && data && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">

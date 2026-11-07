@@ -46,7 +46,7 @@ export function DesignPanel({ style, onChange }: { style: Record<string, string>
       <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]">Colors, fonts and spacing</summary>
       <div className="space-y-4 border-t border-border p-3">
         <p className="text-xs text-muted">
-          Values here override <code className="text-foreground">config/profile.yml</code>&apos;s <code className="text-foreground">style:</code> for this resume. Leave a field empty to keep the template&apos;s value.
+          Values here override <code className="text-foreground">config/profile.yml</code>&apos;s <code className="text-foreground">style:</code> for this resume. An empty field uses profile.yml&apos;s value, or the template&apos;s when profile.yml sets none.
         </p>
         {BY_GROUP.map(({ group, fields }) => (
           <fieldset key={group} className="space-y-3">
@@ -55,6 +55,7 @@ export function DesignPanel({ style, onChange }: { style: Record<string, string>
               {fields.map((f) => {
                 const id = `design-${f.key}`;
                 const value = style[f.key] ?? "";
+                const hex = HEX.test(value);
                 return (
                   <div key={f.key} className="min-w-0">
                     <label htmlFor={id} className="mb-1 block text-xs font-medium text-muted">
@@ -68,9 +69,9 @@ export function DesignPanel({ style, onChange }: { style: Record<string, string>
                       </select>
                     ) : (
                       <div className="flex gap-2">
-                        <input id={id} type="text" value={value} placeholder={f.placeholder} onChange={(e) => set(f.key, e.target.value)} className={INPUT} />
+                        <input id={id} type="text" value={value} placeholder={f.placeholder && `e.g. ${f.placeholder}`} onChange={(e) => set(f.key, e.target.value)} className={INPUT} />
                         {f.kind === "color" && (
-                          <input type="color" aria-label={`${f.label} picker`} value={HEX.test(value) ? value.toLowerCase() : (f.placeholder ?? "#000000")} onChange={(e) => set(f.key, e.target.value)} className="h-9 w-10 shrink-0 cursor-pointer rounded-md border border-border bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]" />
+                          <input type="color" aria-label={`${f.label} picker`} value={hex ? value.toLowerCase() : "#000000"} onChange={(e) => set(f.key, e.target.value)} className={`${hex ? "" : "opacity-40 "}h-9 w-10 shrink-0 cursor-pointer rounded-md border border-border bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]`} />
                         )}
                       </div>
                     )}

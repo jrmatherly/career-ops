@@ -1,6 +1,6 @@
 import { runCoreCli } from "@/lib/core-cli";
 import { readJsonObject } from "@/lib/json-body";
-import { adoptInputsSha, failure, usageResponse, validSha } from "@/lib/resume-cli";
+import { adoptInputsSha, failure, unreadable, usageResponse, validSha } from "@/lib/resume-cli";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,8 +31,7 @@ async function adopt(req: Request): Promise<Response> {
     if ((await adoptInputsSha()) !== before) return Response.json({ error: "cv.md or data/resume.json changed while the diff was computed; try again" }, { status: 409 });
     const parsed = parseDiff(r.stdout);
     if (parsed) return Response.json({ inputsSha: before, ...parsed });
-    console.error(`resume.mjs adopt: output not in the expected shape\n${r.stdout.slice(-2000)}`);
-    return Response.json({ error: "could not read the adopt diff; see the server log" }, { status: 502 });
+    return unreadable(r, "adopt");
   }
 
   if (before !== body.expectedSha) return Response.json({ error: "cv.md or data/resume.json changed since the diff was shown; review the new diff before adopting" }, { status: 409 });
