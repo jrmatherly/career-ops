@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { strFromU8, unzipSync } from 'fflate';
 import { ownRootEnv, rmSync } from './helpers.mjs';
+import { absorb } from '../lib/resume/absorb.mjs';
 import { importResume } from '../lib/resume/import/detect.mjs';
 import { parseJSONResume } from '../lib/resume/import/json-resume.mjs';
 import { resumeToPayload } from '../lib/resume/to-payload.mjs';
@@ -82,6 +83,14 @@ test('resume-export: json-resume parses with the importer and round-trips the fi
   assert.doesNotThrow(() => parseJSONResume(document));
   const d2 = importResume(Buffer.from(JSON.stringify(document)), 'json-resume').data;
   assert.deepEqual(withoutIds(withoutCareerOps(d2)), withoutIds(withoutCareerOps(d1)));
+});
+
+test('resume-export: json-resume keeps a lone year and the profile link text through an import', () => {
+  const cv = readFileSync(fixture('cv-example-shape.md'), 'utf8');
+  const { document } = resumeToJsonResume(absorb(cv, null).data);
+  const { generated } = importResume(Buffer.from(JSON.stringify(document)), 'json-resume');
+  assert.match(generated, /- MS Computer Science, UT Austin \(2018\)$/m, 'a graduation year does not turn into an ongoing range');
+  assert.match(generated, /^\*\*LinkedIn:\*\* linkedin\.com\/in\/alexchen$/m, 'profile shows its link text, not the network name');
 });
 
 test('resume-export: json-resume of the RR sample parses with the importer and lists custom sections it cannot carry', () => {
