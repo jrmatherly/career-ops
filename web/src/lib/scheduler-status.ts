@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { readLockStatus } from "./scheduled-jobs-store.mjs";
-import { osScheduleStatus } from "./scheduled-os-schedule.mjs";
+import { externalScheduleStatus, osScheduleStatus } from "./scheduled-os-schedule.mjs";
 import { scheduledRunnerResourcePath, scheduledStorePath } from "./scheduled-runner-path.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -16,6 +16,10 @@ export type SchedulerStatus = {
   platform: NodeJS.Platform;
   available: boolean;
   running: boolean;
+  // installed mirrors task.exists; description is set only when source is "external".
+  source: "os" | "external";
+  installed: boolean;
+  description: string | null;
   task: {
     exists: boolean;
     enabled: boolean;
@@ -27,16 +31,36 @@ export type SchedulerStatus = {
 
 const EMPTY_TASK: SchedulerStatus["task"] = { exists: false, enabled: false, status: null, nextRun: null, lastRun: null };
 
-function readTickMtimeMs(): number | null {
+export function schedulerTickPath(root = careerOpsRoot()): string {
+  return scheduledStorePath(root) + ".tick";
+}
+
+let warnedSchedulerValue: string | null = null;
+
+/** Who owns the schedule: the OS task the install scripts create, or something outside the host that drives POST /api/scheduler. */
+export function schedulerSource(): SchedulerStatus["source"] {
+  const value = (process.env.CAREER_OPS_SCHEDULER ?? "").trim().toLowerCase();
+  if (value === "external") return "external";
+  if (value && warnedSchedulerValue !== value) {
+    warnedSchedulerValue = value;
+    console.warn(`career-ops web: CAREER_OPS_SCHEDULER=${JSON.stringify(value)} is not a known value (only "external" is); reading the OS schedule instead.`);
+  }
+  return "os";
+}
+
+function readTickMtimeMs(root: string): number | null {
+  const tick = schedulerTickPath(root);
   try {
-    return fs.statSync(scheduledStorePath(careerOpsRoot()) + ".tick").mtimeMs;
-  } catch {
+    return fs.statSync(tick).mtimeMs;
+  } catch (error) {
+    // A missing tick means no run yet; any other error is a data-volume problem worth seeing.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn(`career-ops web: cannot read ${tick}:`, error);
     return null;
   }
 }
 
-async function readUnixTask(platform: "darwin" | "linux"): Promise<SchedulerStatus["task"]> {
-  const tickMtimeMs = readTickMtimeMs();
+async function readUnixTask(root: string, platform: "darwin" | "linux"): Promise<SchedulerStatus["task"]> {
+  const tickMtimeMs = readTickMtimeMs(root);
   const now = new Date();
   if (platform === "linux") {
     let crontabText = "";
@@ -60,8 +84,8 @@ async function readUnixTask(platform: "darwin" | "linux"): Promise<SchedulerStat
   return osScheduleStatus({ platform, crontabText: "", launchctlExitCode, tickMtimeMs, now });
 }
 
-async function readTask(): Promise<SchedulerStatus["task"]> {
-  if (process.platform === "darwin" || process.platform === "linux") return readUnixTask(process.platform);
+async function readTask(root: string): Promise<SchedulerStatus["task"]> {
+  if (process.platform === "darwin" || process.platform === "linux") return readUnixTask(root, process.platform);
   if (process.platform !== "win32") return { ...EMPTY_TASK };
 
   const script = [
@@ -102,10 +126,17 @@ export async function schedulerStatus(): Promise<SchedulerStatus> {
   const runner = path.join(resolveCodeRoot(process.cwd(), process.env), "web", "scripts", "scheduled-jobs-runner.mjs");
   const runnerLock = scheduledRunnerResourcePath(scheduledStorePath(root));
   const lock = readLockStatus(runnerLock, { staleMs: 25 * 60 * 1_000 * 3 + 60_000 });
+  const source = schedulerSource();
+  const external = source === "external";
+  const description = external ? process.env.CAREER_OPS_SCHEDULER_DESCRIPTION?.trim() || null : null;
+  const task = external ? externalScheduleStatus({ description, tickMtimeMs: readTickMtimeMs(root) }) : await readTask(root);
   return {
     platform: process.platform,
     available: fs.existsSync(runner),
     running: lock.active && !lock.stale,
-    task: await readTask(),
+    source,
+    installed: task.exists,
+    description,
+    task,
   };
 }

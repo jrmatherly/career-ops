@@ -124,6 +124,19 @@ directory. The definitions live in `data/scheduled-jobs.json` under the data
 root; `CAREER_OPS_SCHEDULED_JOBS_PATH` moves that file, and a relative value
 resolves against the data root.
 
+When something outside this machine's OS scheduler fires the runs (a Kubernetes
+CronJob that POSTs `/api/scheduler` every 15 minutes, say), set
+`CAREER_OPS_SCHEDULER=external` so the Scheduled scans page reports the schedule
+as installed ("Task enabled") instead of "Task not installed". With it set the
+app never reads `crontab` or `launchctl`, and each accepted `POST /api/scheduler`
+touches the `.tick` marker beside `data/scheduled-jobs.json` once the runner has
+started, the marker the cron line touches, so "Last OS check" stays right. Without
+it a manual "Check due jobs now" click leaves "Last OS check" alone, so a broken
+cron line still shows. A short note in `CAREER_OPS_SCHEDULER_DESCRIPTION` comes
+back from `GET /api/scheduler` as `description` and `task.status`; the page does
+not render it yet. Any other value of `CAREER_OPS_SCHEDULER` is logged once and
+read as the OS schedule.
+
 ## Development
 
 ```bash
@@ -228,7 +241,15 @@ hostile ones; and a `0.0.0.0` bind is IPv4-only, so an opted-in IPv6 address wil
 pass the filter with nothing listening for it.
 
 The guard covers page routes as well as `/api/*` (`src/proxy.ts`'s matcher spans
-everything but build assets). That is not about the bind: a page you visit can
+everything but build assets). One request shape passes the cross-origin check: a
+`GET` or `HEAD` page navigation, `Sec-Fetch-Mode: navigate` with
+`Sec-Fetch-Dest: document`, which is a link click or the redirect back from a
+login page on another site. A top-level navigation cannot carry a body or a
+custom header, so it is not the CSRF this layer refuses, and without it the first
+page after an OIDC login arrives as `cross-site` and gets a JSON 403. The
+exemption stops at pages: a cross-site `POST`, a `GET` made by a page's `fetch()`
+(`Sec-Fetch-Mode: cors`), a framed page (`Sec-Fetch-Dest: iframe`) and any
+navigation to `/api/*` are still refused, and the Host filter still applies. That is not about the bind: a page you visit can
 re-resolve its own domain to `127.0.0.1` and read the dashboard from your own
 browser as same-origin, which a loopback bind does nothing to stop. The `Host`
 header on that request carries the attacker's domain, which is what refuses it.
@@ -250,6 +271,11 @@ its own opens the socket while the allow-list stays empty, which is the one
 combination with no honest reading: the guard then refuses LAN clients that
 identify themselves truthfully and admits any that spell `Host: localhost`. The
 launcher says so on startup rather than doing it quietly.
+
+`GET /api/healthz` answers `{ "ok": true }` for a liveness or readiness probe. It
+reads no file and starts no process, so a probe can hit it as often as it likes.
+The guard still runs in front of it, so the probe's `Host` has to be loopback or a
+name in `CAREER_OPS_WEB_ALLOWED_HOSTS`.
 
 Use it on a network you trust, and prefer an SSH tunnel
 (`ssh -L 3000:127.0.0.1:3000 you@box`) where you can — that needs no env var at
