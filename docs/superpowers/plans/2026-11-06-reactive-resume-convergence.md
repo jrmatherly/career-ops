@@ -4,7 +4,7 @@
 
 **Goal:** Bring Reactive Resume v6's resume model, importers, Check rules, design controls, richer application tracking with a board view, DOCX export, and public share links with reviewer feedback into this career-ops fork, while every agent and script keeps reading the same markdown, TSV and YAML files.
 
-**Architecture:** `cv.md` stays the canonical CV. One new derived file, `data/resume.json` in Reactive Resume v6 JSON, is absorbed from it behind a lossless gate and carries what markdown cannot, and the CV payload is derived from the pair. Tracker detail lives in two append-only TSV sidecars keyed by tracker number, read by a new board page that writes through the existing `/api/status` path. Public sharing is a fork-local `publish/` service with Better Auth that serves pre-rendered, script-free CV HTML and returns view counts and comments into `data/`. The fork diverges from upstream wherever the goal needs it. What keeps upstream syncs workable is the upstream-review skill, so every PR records its divergence there with a rule for how an upstream hunk to that path is handled.
+**Architecture:** `cv.md` stays the canonical CV. One new derived file, `data/resume.json` in Reactive Resume v6 JSON, is absorbed from it behind a lossless gate and carries what markdown cannot, and the CV payload is derived from the pair. Tracker detail lives in two append-only TSV sidecars keyed by tracker number, read by a new board page that writes through the existing `/api/status` path. Public sharing is a fork-local `publish/` service with Better Auth that serves pre-rendered, script-free CV HTML and returns view counts and comments into `data/`. Both career-ops and the publish service run on the operator's Kubernetes home cluster, career-ops as one pod whose process owns every write to the data volume, behind Pocket ID at the gateway. The fork diverges from upstream wherever the goal needs it. What keeps upstream syncs workable is the upstream-review skill, so every PR records its divergence there with a rule for how an upstream hunk to that path is handled.
 
 **Tech Stack:** Node 24 `.mjs` core with `node:sqlite`, `node:test` suites under `tests/`, Next.js 16 and React 19 in `web/`, zod 4, fflate, docx, better-auth 1.7 with `@better-auth/api-key`, Playwright for PDF and visual tests, chrome-devtools MCP for live checks.
 
@@ -14,7 +14,7 @@
 
 One box is one unit of work. Every box names the evidence that checks it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
 
-The program runs under `superpowers:subagent-driven-development` or `superpowers:executing-plans`, as the operator chooses. For a jstack-style run it maps onto `<jstack>/skills/j-mode/playbooks/autopilot-full.md`, one owner per PR, the operator merging. PR-06, PR-06b, PR-07, PR-10 and PR-14 change an interaction and stop at merge-ready for the operator's review.
+The program runs under `superpowers:subagent-driven-development` or `superpowers:executing-plans`, as the operator chooses. For a jstack-style run it maps onto `<jstack>/skills/j-mode/playbooks/autopilot-full.md`, one owner per PR, the operator merging. PR-06, PR-06b, PR-07, PR-10, PR-14 and PR-19 change an interaction or a live deployment and stop at merge-ready for the operator's review.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -43,6 +43,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 3. An RR CSV row whose stage is `closed` with no reason, and one with a blank Application Date. The importer must land the first as Discarded and skip the second as never submitted, and say so in the preview. Test in PR-09.
 4. A board drop onto the same column, and a drop answered with HTTP 503 (the route's mapping of exit 4 from `set-status.mjs`). The first is a no-op with no ledger row, the second retries three times and then reverts. Unit-tested in `web/tests/lib/status-save.test.mjs` in PR-10.
 5. A visitor rotating `X-Forwarded-For` behind the tunnel. The publish service must take the client key from `cf-connecting-ip` only when the peer is a trusted proxy, and count one view. Test in PR-12.
+6. The first navigation after the Pocket ID redirect, which carries `Sec-Fetch-Site: cross-site` or `same-site`. The guard must let a `GET` with `Sec-Fetch-Mode: navigate` through and still refuse a cross-site `POST`. Test in PR-18.
 
 ---
 
@@ -59,7 +60,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [ ] One owner per PR, in the order and with the dependencies below. A PR starts only after its parents merge.
 - [ ] Hold the file boundaries named in each PR's Files block. Two owners never touch the same file, except the shared append-only files in Global Constraints.
-- [ ] Hold the review gate on PR-06, PR-06b, PR-07, PR-10 and PR-14.
+- [ ] Hold the review gate on PR-06, PR-06b, PR-07, PR-10, PR-14 and PR-19.
 
 | PR | Task | Depends on | Review gate |
 | --- | --- | --- | --- |
@@ -81,8 +82,11 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 | PR-14 | Add the shares page to the web app | PR-12b | operator |
 | PR-15 | Package the publish service for deployment | PR-13 | none |
 | PR-16 | Fix the root Dockerfile lint findings | PR-01 | none |
+| PR-17 | Build the hosted career-ops image | PR-16 | none |
+| PR-18 | Make the web app safe to host | PR-01 | none |
+| PR-19 | Deploy career-ops and the publish service to the home cluster | PR-15, PR-17, PR-18 | operator |
 
-PR-02, PR-05, PR-08, PR-12 and PR-16 are independent and can start together after PR-01.
+PR-02, PR-05, PR-08, PR-12, PR-16 and PR-18 are independent and can start together after PR-01. PR-19 lands in `~/dev/home-cluster`, not in this repo, and gets its own plan there when PR-17 ships.
 
 ### PR mechanics, for every PR
 
@@ -1132,7 +1136,7 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 - [ ] Edit `publish/README.md` with the environment variables and the Pocket ID callback `https://<host>/api/auth/callback/pocket-id`.
 - [ ] Edit the deviations table.
 
-**Interfaces.** Produces the image the home-cluster manifests reference. The manifests themselves are a follow-up in `~/dev/home-cluster`, outside this plan.
+**Interfaces.** Produces the image PR-19's manifests reference.
 
 **Build.**
 
@@ -1223,10 +1227,198 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 
 ---
 
+## Build the hosted career-ops image (PR-17)
+
+**Depends on.** PR-16.
+
+**Files.**
+
+- [ ] Create `deploy/Dockerfile` (fork-local; the root `Dockerfile` stays the development image).
+- [ ] Create `deploy/compose.yml` (a local smoke run of the image with a bind-mounted scratch data root, bound to `127.0.0.1:3000`).
+- [ ] Create `deploy/README.md`.
+- [ ] Create `tests/server-image.test.mjs` (reads the Dockerfile and compose file only).
+- [ ] Edit `.github/workflows/docker-image.yml` to build and push `ghcr.io/jrmatherly/career-ops-server` for `linux/amd64` (the cluster is amd64) with hadolint, provenance and SBOM like the other images.
+- [ ] Edit `config/local-paths.txt` to add `deploy/`, and the deviations table.
+
+**Interfaces.**
+
+- The image starts from the same digest-pinned Playwright jammy base as the root `Dockerfile` (Chromium for `generate-pdf.mjs --pdf-server`), copies the repo to `/app`, runs `npm ci` at the root and in `web/`, runs `npm run build` in `web/`, installs `@anthropic-ai/claude-code` globally at a pinned version so `findBin` sees it in `/usr/local/bin`, drops Go and TeX, runs as uid 1000 with `HOME=/home/app`, sets `NODE_ENV=production`, `DISABLE_AUTOUPDATER=1`, `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`, and uses `ENTRYPOINT ["/usr/bin/tini","--"]` with `CMD ["node","web/server.mjs","start"]`. It exposes 3000. It passes hadolint with the PR-16 config.
+- Runtime contract, documented in `deploy/README.md`. `CAREER_OPS_ROOT=/data` (the volume), `CAREER_OPS_WEB_ALLOWED_HOSTS="<public host> career-ops-web"` (a hostname makes `bind-host.mjs` bind `0.0.0.0`), `CAREER_OPS_CLI=claude`, exactly one of `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`, a writable `/home/app` for `~/.claude`, an emptyDir at `/tmp`, a memory-backed emptyDir at `/dev/shm`, one replica and `Recreate`.
+
+**Build.**
+
+- [ ] **Step 1.** Write `tests/server-image.test.mjs` asserting the `FROM` digest equals the root Dockerfile's, `next build` runs, the Claude CLI install is version-pinned, the user is 1000, `DISABLE_AUTOUPDATER=1` is set, no `GO_VERSION` or `texlive` appears, and the compose file binds `127.0.0.1`. Run. Expect fail.
+- [ ] **Step 2.** Write the Dockerfile and compose file. Run the test and `hadolint deploy/Dockerfile`. Expect pass and no output.
+- [ ] **Step 3.** `docker build -f deploy/Dockerfile -t career-ops-server:dev .` then `docker compose -f deploy/compose.yml up` with a scratch data root holding `examples/cv-example.md` as `cv.md`. Expect the ready line and `curl -H 'Host: localhost' http://127.0.0.1:3000/api/version` returning 200.
+- [ ] **Step 4.** Add the workflow job. Commit `build(deploy): add the hosted career-ops image`.
+
+**You see.**
+
+- [ ] `docker run --rm career-ops-server:dev claude --version` prints the pinned version and the compose stack answers `/api/version`.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] `tests/server-image.test.mjs` passes. Run `node test-all.mjs --only server-image`.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Four lanes on `sonnet medium` at the PR head, per the boot recipe.
+
+- [ ] Lane 1. Regression lane against trunk. Trunk has no server image. Run the compose stack and open `http://127.0.0.1:3000` in Chrome with the scratch root. Save `home.png`. Pass when the Today page renders with the example CV.
+- [ ] Lane 2. Trigger a PDF render for a report in the scratch root through the web. Save `pdf.txt`. Pass when a PDF lands in `/data/output` through the pdf server socket.
+- [ ] Lane 3. With `CLAUDE_CODE_OAUTH_TOKEN` set from the operator's `claude setup-token` (operator step, never logged), run one evaluation through `/api/run`. Save `run.txt`. Pass when the run completes and the tracker gains a row.
+- [ ] Lane 4. `curl -X POST -H 'Host: career-ops-web' http://127.0.0.1:3000/api/scheduler`. Save `tick.txt`. Pass when it returns 202 and `data/scheduled-jobs.json` records a run.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] Metric. Image size and cold start to the ready line.
+- [ ] Probe. `docker images` and the container log timestamps. Absolute budget.
+- [ ] Baseline. Record the root development image size for scale.
+- [ ] Rule. Under 2.5 GB and ready in under 15 s.
+
+**Review gate.** None. PR-17 is not review-gated.
+
+**Merge.**
+
+- [ ] Every Verify box above checked with its evidence at the exact head SHA.
+- [ ] Review comments triaged.
+- [ ] Rebased onto current `main` after verification.
+- [ ] The operator merges.
+
+---
+
+## Make the web app safe to host (PR-18)
+
+**Depends on.** PR-01.
+
+**Files.**
+
+- [ ] Create `web/src/app/api/healthz/route.ts` (returns 200 with `{ ok: true }`, touches no file and spawns nothing).
+- [ ] Edit `web/src/lib/origin-guard.mjs` so a `GET` or `HEAD` whose `Sec-Fetch-Mode` is `navigate` passes the `Sec-Fetch-Site` check (a navigation cannot carry a body or a custom header, so it is not the CSRF the guard exists for); everything else keeps the current rule. Mirror the change into `web/src/lib/core/` if the guard is mirrored there.
+- [ ] Edit `web/src/lib/scheduler-status.ts` and `web/src/lib/scheduled-os-schedule.mjs` so `CAREER_OPS_SCHEDULER=external` reports the schedule as installed with the description from `CAREER_OPS_SCHEDULER_DESCRIPTION`, and edit `web/src/app/api/scheduler/route.ts` to touch the `.tick` marker so `lastRun` is right.
+- [ ] Edit `web/tests/lib/origin-guard.test.mjs` (or create it), create `web/tests/lib/healthz.test.mjs` and `web/tests/lib/scheduler-external.test.mjs`.
+- [ ] Edit `web/README.md` exposure section and the deviations table (`origin-guard.mjs`, `scheduler-status.ts`, `scheduled-os-schedule.mjs`, `api/scheduler/route.ts` rows, each naming the hunk).
+
+**Interfaces.**
+
+- `checkRequest` keeps its signature. New behaviour only when `method` is `GET` or `HEAD` and `sec-fetch-mode` is `navigate`.
+- `schedulerStatus()` returns `{ installed: true, source: "external", description }` when the env is set, without shelling out to `crontab` or `launchctl`.
+
+**Build.**
+
+- [ ] **Step 1.** Write the guard test cases `GET navigate cross-site passes`, `GET navigate same-site passes`, `POST cross-site is refused`, `GET cross-site with Sec-Fetch-Mode cors is refused`, `existing same-origin and none cases unchanged`. Run. Expect fail on the first two.
+- [ ] **Step 2.** Implement the guard change. Run. Expect pass, plus the existing guard suite unchanged.
+- [ ] **Step 3.** Write and implement the healthz and scheduler tests and routes. Run `cd web && npm test`. Expect pass.
+- [ ] **Step 4.** Commit `feat(web): add healthz, external scheduler status and navigation-safe origin guard`.
+
+**You see.**
+
+- [ ] `curl -H 'Host: localhost' -H 'Sec-Fetch-Site: cross-site' -H 'Sec-Fetch-Mode: navigate' http://127.0.0.1:3000/` returns 200, and the same with `-X POST` returns 403.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] The three suites and the existing guard suites pass. Run `cd web && npm test`.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Four lanes on `sonnet medium` at the PR head, per the boot recipe.
+
+- [ ] Lane 1. Regression lane against trunk. On trunk and head, from a page on another origin, submit a form POST to `/api/status`. Save `csrf-trunk.txt`, `csrf-head.txt`. Pass when both are 403.
+- [ ] Lane 2. From another origin, follow a link to `/pipeline`. Save `navigate.png`. Pass when head renders the page and trunk returns the JSON 403.
+- [ ] Lane 3. `curl http://127.0.0.1:3000/api/healthz` 100 times. Save `healthz.txt`. Pass when every response is 200 and no file in the scratch root changed.
+- [ ] Lane 4. Start the web with `CAREER_OPS_SCHEDULER=external`, open `/scheduled-scans`. Save `scheduler.png`. Pass when the page reports the external schedule and `lastRun` updates after a POST to `/api/scheduler`.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] Metric. `/api/healthz` latency p99 over 200 requests, and `/` latency at trunk and head.
+- [ ] Probe. `curl -w %{time_total}` loops, interleaved.
+- [ ] Baseline. Record `/` at trunk first.
+- [ ] Rule. `/` within 5 percent of trunk. `/api/healthz` p99 under 20 ms.
+
+**Review gate.** None. PR-18 is not review-gated.
+
+**Merge.**
+
+- [ ] Every Verify box above checked with its evidence at the exact head SHA.
+- [ ] Review comments triaged.
+- [ ] Rebased onto current `main` after verification.
+- [ ] The operator merges.
+
+---
+
+## Deploy career-ops and the publish service to the home cluster (PR-19)
+
+**Depends on.** PR-15, PR-17, PR-18.
+
+**Files.** All in `~/dev/home-cluster`, the house way (edit `.j2` templates, never rendered files; `just configure` renders and encrypts; restore unchanged sops files). This PR gets its own plan in that repo when PR-17 ships; this section is its contract.
+
+- [ ] Create `template/config/kubernetes/apps/career-ops/{kustomization,namespace}.yaml.j2` and `career-ops/career-ops/{ks.yaml.j2, app/{kustomization,ocirepository,helmrelease,secret.sops,networkpolicy,securitypolicy,oidc-secret.sops,scan-cronjob,backup-cronjob}.yaml.j2}`.
+- [ ] Create `career-ops/publish/{ks.yaml.j2, app/{kustomization,ocirepository,helmrelease,secret.sops,networkpolicy,backup-cronjob}.yaml.j2}`.
+- [ ] Edit `template/scripts/validate.py` (a `CareerOps` model with `_all_or_none`, a `career_ops_enabled` property keyed on the OIDC client secret, cross-field rules requiring `pocket_id_enabled`, `ingress.mode != "none"` and `volume_backup_enabled`), `cluster.sample.toml` (a `[career_ops]` block), `cluster.schema.json` (regenerated), `.github/template-tests/valid/public.toml` and one invalid fixture with `# expect:`.
+- [ ] Create `.claude/rules/apps/career-ops.md` and add the index line in `CLAUDE.md`.
+- [ ] Edit `.renovaterc.json5` so the two GHCR images are digest-pinned and automerged like the docs image.
+
+**Interfaces.**
+
+- `[career_ops]` fields. `oidc_client_id`, `oidc_client_secret` (the Pocket ID client, callback `https://career.<domain>/oauth2/callback`), `claude_oauth_token` (from `claude setup-token`, one year), `publish_api_key`, `publish_auth_secret`, `publish_oidc_client_id`, `publish_oidc_client_secret` (a second Pocket ID client, callback `https://cv.<domain>/api/auth/callback/pocket-id`), `public: bool` (also attach the dashboard route to `envoy-external`; default internal only).
+- career-ops HelmRelease on bjw-s app-template 5.3.0. Image `ghcr.io/jrmatherly/career-ops-server:latest@sha256:...`, one replica, `strategy: Recreate`, uid 1000, `readOnlyRootFilesystem` with emptyDirs at `/tmp` and `/home/app/.cache`, a memory `emptyDir` at `/dev/shm` sized 1Gi, requests 250m and 1Gi, limit 3Gi. Env per PR-17's contract, the token from the sops Secret with `reloader.stakater.com/auto`. Persistence `data` is a `local-path` RWO claim of 10Gi at `/data` with `forceRename: career-ops-data` and `retain: true`, and a second claim `home` at `/home/app` for `~/.claude`. Probes httpGet `/api/healthz` with `httpHeaders: [{ name: Host, value: localhost }]`. Route `career.${SECRET_DOMAIN}` on `envoy-internal`, and on `envoy-external` when `public`, with `timeouts.request: 900s` to cover the 800-second `/api/run` stream.
+- SecurityPolicy copied from `media/shared/app/securitypolicy.yaml.j2` with `targetRefs` to the dashboard route, Pocket ID issuer and endpoints, scopes `openid profile email groups`, and the JWT rule allowing the `cluster_admins` group.
+- NetworkPolicy admits TCP 3000 only from the `network` namespace and from pods labelled `career-ops.io/role: scan-tick`.
+- CronJob `career-ops-scan-tick`, `*/15 * * * *`, `concurrencyPolicy: Forbid`, a digest-pinned curl image, running `curl -fsS -X POST -H 'Host: career-ops-web' http://career-ops-web.career-ops.svc:3000/api/scheduler`, restricted-compliant. No scan runs outside the web pod.
+- CronJob `career-ops-backup` on the house `volume-backup` pattern, nightly tar of `/data` to the rustfs bucket with the 7-day prune, mounting the same claim (it lands on the web pod's node).
+- Publish HelmRelease. Image `ghcr.io/jrmatherly/career-ops-publish:latest@sha256:...`, one replica, `Recreate`, a `local-path` claim `publish-data` with `forceRename` and `retain` for `publish.db`, env `BETTER_AUTH_URL=https://cv.${SECRET_DOMAIN}`, `PUBLISH_BIND=0.0.0.0`, `PUBLISH_TRUSTED_PROXIES` set to the pod CIDR, `PUBLISH_CLIENT_IP_HEADER=x-forwarded-for` (Envoy sets it from the Cloudflare connection, and the ClientTrafficPolicy already trusts the pod CIDR), secrets from sops. Route `cv.${SECRET_DOMAIN}` on `envoy-external` with no SecurityPolicy, because share pages are public and the service has its own Better Auth. NetworkPolicy admits only the `network` namespace. Its own nightly backup CronJob with the sqlite `VACUUM INTO` step the house pattern uses.
+- Migration, operator steps. Create the two Pocket ID clients. Run `claude setup-token` on the Mac and paste the token into `cluster.toml`. After the first deploy, `kubectl cp ~/career-ops-data` into the claim (or restore from a tar), set `CAREER_OPS_ROOT` on the Mac to a scratch root, and stop the launchd scan agent with `web/scripts/install-scan-schedule.sh --uninstall`.
+
+**Build.**
+
+- [ ] **Step 1.** In `~/dev/home-cluster`, write the plan for this PR with the writing-plans skill from this contract, then the validator change with a failing fixture test first (`uv run --locked pytest template/scripts/test_validate.py -q`).
+- [ ] **Step 2.** Write the templates, run `just configure`, restore unchanged sops files, run `oxfmt --check`. Expect clean.
+- [ ] **Step 3.** Commit and push; watch Flux reconcile. Expect both pods Ready.
+- [ ] **Step 4.** Run the migration steps. Expect the dashboard at `career.<domain>` behind Pocket ID showing the 58 rows.
+
+**You see.**
+
+- [ ] `kubectl -n career-ops get pods` shows `career-ops-web` and `publish` Running, and the next `*/15` tick leaves a run in `/data/data/scheduled-jobs.json`.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] `uv run --locked pytest template/scripts/test_validate.py -q` passes with the new fixtures, and the Stop hook renders every valid fixture.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet medium` at the PR head, per the boot recipe.
+
+- [ ] Lane 1. Regression lane against trunk. Trunk is the Mac deployment. Open the Mac web and the cluster web on `/pipeline` with the same data. Save `mac.png`, `cluster.png`. Pass when the rows match.
+- [ ] Lane 2. Sign in through Pocket ID from a fresh browser profile. Save `login.png`. Pass when the first page after the redirect renders, not a 403.
+- [ ] Lane 3. From a pod in another namespace, `curl -H 'Host: localhost' http://career-ops-web.career-ops.svc:3000/`. Save `netpol.txt`. Pass when the connection is refused.
+- [ ] Lane 4. Wait for a scheduled tick. Save `tick.txt`. Pass when `scheduled-jobs.json` records a run by the web pod and `data/pipeline.md` gains rows.
+- [ ] Lane 5. Run one evaluation from the cluster web. Save `run.png`. Pass when the SSE stream survives past 15 seconds and the run completes.
+- [ ] Lane 6. Render a PDF. Save `pdf.txt`. Pass when the file appears under `/data/output`.
+- [ ] Lane 7. Delete the web pod. Save `restart.txt`. Pass when the new pod comes Ready, the data is intact, and no stale lock directory remains after the first write.
+- [ ] Lane 8. Publish a share from the Mac CLI with the cluster URL and open `cv.<domain>/s/<slug>` from a phone off the LAN. Save `share.png`. Pass when it renders under the CSP.
+- [ ] Lane 9. Trigger the backup CronJob by hand. Save `backup.txt`. Pass when a tar lands in the bucket and lists `data/applications.md`.
+- [ ] Lane 10. Open the Mac plugin's apply flow against the cluster data root over the tunnel is out of scope; instead run `node doctor.mjs --json` inside the pod. Save `doctor.json`. Pass when it reports the data root and the Claude CLI.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+
+- [ ] Metric. Largest Contentful Paint of `/pipeline` on the Mac and on the cluster through the gateway.
+- [ ] Probe. `performance_start_trace` with reload on each, interleaved.
+- [ ] Baseline. Record the Mac first.
+- [ ] Rule. Cluster within 2x the Mac over the tunnel.
+
+**Review gate.** The operator reviews before merge.
+
+- [ ] Copy lanes 2, 4 and 8 screenshots into `private/review/pr-19-review-<slug>.png`.
+- [ ] Record a 60 second video of the login, a scheduled tick and a share page. Save it as `private/review/pr-19-review.mp4`.
+- [ ] Post them in chat. Stop at merge-ready. Wait for the operator's click.
+
+**Merge.**
+
+- [ ] Every Verify box above checked with its evidence at the exact head SHA.
+- [ ] Review comments triaged.
+- [ ] Rebased onto current `main` of `home-cluster` after verification.
+- [ ] The operator merges.
+
+---
+
 ## Close the program
 
 - [ ] Every box above is checked with its evidence.
-- [ ] Run the two migration steps and retire `~/dev/job-search/tools/build_cv_md.py`, `push_tailored.py` and `rebuild_career.py` (a note in that repo's README, outside this plan).
+- [ ] Run the migration steps (resume import, tracker import, data root to the cluster) and retire `~/dev/job-search/tools/build_cv_md.py`, `push_tailored.py` and `rebuild_career.py` (a note in that repo's README, outside this plan).
 - [ ] Move this plan and the spec to their `completed/` folders.
 - [ ] Reply to the operator with what landed, what the lanes proved, and what stays deferred.
 
@@ -1256,6 +1448,8 @@ Three throwaway prototypes under the session scratchpad settled the architecture
 - **Reusing `followup-seed.mjs` for RR follow-up dates.** Its `--date` is the apply date the cadence counts from, and it refuses rows that are not Applied. A pin-line writer is the right shape.
 - **Editing `pipeline-view.tsx` to extract the save hook.** `reduceHeldSave` and `applySavedStatus` are already separate modules, so the board reuses them and the 1050-line view stays untouched.
 - **A drag-and-drop dependency for the board.** Native HTML5 drag with a keyboard path covers the one interaction.
+- **A scan CronJob in its own pod.** `lib/dir-lock.mjs` judges staleness by `process.kill(pid, 0)` and the owner record has no host identity, so a second PID namespace reads a live lock as stale and races the web on `pipeline.md`. A curl trigger to `/api/scheduler` keeps every writer in one process. Adding host identity to the lock is deferred until a separate scan pod is needed.
+- **In-app Better Auth for the dashboard.** The cluster already fronts apps with an Envoy Gateway SecurityPolicy against Pocket ID, and the dashboard is single-tenant either way.
 - **Running publish tests from the root `tests/`.** They would import `publish/node_modules`, which the root install does not have, and fail CI. They live in `publish/tests/` with their own job.
 - **ODT export, PDF import, account trash, the AI coach and discovery scheduler, the mobile app, CSV export of the board, `.ics` export per interview.** Out of scope, each a possible later program.
 
@@ -1271,6 +1465,9 @@ Three throwaway prototypes under the session scratchpad settled the architecture
 - **The publish service is internet-facing** (PR-12 to PR-15). The public surface is script-free HTML, a password form and a comment form. The owner keeps the CSP, the proxy-only IP trust, the limiters, the loopback bind and the untrusted-feedback rule, and never routes the dashboard through it. Better Auth's `ipAddressHeaders` trusts the header whatever the peer, so the bind and the tunnel are what make it safe.
 - **Secrets** (PR-13). `BETTER_AUTH_SECRET`, the Pocket ID client secret and API keys live only in `.env` files and Kubernetes Secrets. The pre-commit hook refuses new gitignored files, and `no-user-data.yml` runs on push.
 - **Migration against real data** (PR-03, PR-09). Both steps are dry-run first and never committed. The owner diffs the generated `cv.md` before `--confirm --replace-cv`.
+- **One process owns the data volume** (PR-17, PR-19). A second replica, a rolling update, or any job that writes `/data` from another pod races the file locks. The owner keeps one replica, `Recreate`, and only curl in the tick CronJob; the backup job reads only.
+- **The gateway is the access control** (PR-19). The origin guard is a CSRF filter and admits any client that sends `Host: localhost`. The NetworkPolicy admitting only the `network` namespace and the tick job is what keeps the OIDC gate meaningful; a lane checks it from another namespace.
+- **The Claude token** (PR-17, PR-19). A one-year OAuth token in a sops Secret; rotation is a `cluster.toml` edit and the reloader restarts the pod. Never both a token and an API key.
 - **Node version** (PR-12, PR-15). `node:sqlite` is Release Candidate. The image pins Node 24 by digest.
 
 ## Appendix D. Links and reading list

@@ -9,6 +9,7 @@ Reactive Resume (RR) is at `reactive-resume/reactive-resume`, MIT, v6.1.0 releas
 - All four feature families. A typed resume model with imports, a kanban tracker with a richer application record, a Check mode with a design editor, and sharing with exports.
 - Public share links and multi-user capability, while keeping career-ops's agent-first file contract.
 - Better Auth for every authentication need.
+- Nothing hosted on the operator's Mac. career-ops itself (the web app, scheduled scans, evaluations and PDF generation) runs on the operator's Kubernetes home cluster (`~/dev/home-cluster`, Talos, Flux, Envoy Gateway, Pocket ID, where Reactive Resume already runs), and so does the publish service.
 - Migration of the operator's own RR data. The operator runs RR v6 at `resume.matherly.net` (Kubernetes, Postgres 18, Pocket ID OIDC, R2) and keeps exports at `~/dev/job-search/matherly-ats.json` and `matherly-resume.json` (RR v6 resume JSON, templates `scizor` and `azurill`), plus `~/dev/job-search/jobs/applications.csv` (8 rows, RR CSV import shape).
 - No upstream issues, and no limit on divergence. The fork changes whatever the goal needs. Every diverged path gets a row in the deviations table of `.claude/skills/upstream-review/SKILL.md` with a rule for how an upstream hunk to it is handled (adopt, adapt, keep or skip), so upstream changes can still be reviewed and cherry-picked with a clear basis.
 
@@ -60,6 +61,18 @@ Rejected. Publishing through the operator's RR instance (keeps sharing in a seco
 
 The publish service uses Better Auth 1.7 mounted with `toNodeHandler` on `node:http`, with the built-in Kysely adapter over a `node:sqlite` `DatabaseSync` (the same driver the service uses for its own tables, no native build, `npx auth migrate` works against it). Plugins are `@better-auth/api-key` for CLI uploads (keys carry `permissions: { share: ["upload"] }`, the service calls `verifyApiKey` itself and strips `x-api-key` before any cookie lookup, session mocking stays off, a real per-key budget replaces the 10-per-day default), and `genericOAuth` with `discoveryUrl` to Pocket ID and `disableSignUp: true`. Email and password sign-in is never enabled. A `validateUserInfo` allow-list of emails gates who may sign in. `twoFactor` and `@better-auth/passkey` are optional later additions. A prototype on better-auth 1.7.14 ran the migration, served `/api/auth/ok`, and resolved both an `x-api-key` header and a signed session cookie.
 
+### career-ops runs on the home cluster as one pod
+
+The web app, its scheduled scans, and the evaluations and PDF renders it spawns run in one container on the cluster, with the data root on a persistent volume. Research found the repo already separates the code root from the data root, binds `0.0.0.0` when `CAREER_OPS_WEB_ALLOWED_HOSTS` names a hostname, passes the pod environment to the AI CLI it spawns, and has a `POST /api/scheduler` route that runs the scheduled-scan runner. What is missing is an image that contains the built web app and an AI CLI (today's image is a development container that bind-mounts the checkout and holds no CLI), a health route, and a way to run scheduled scans that does not break the file locks.
+
+The locks are the deciding constraint. `lib/dir-lock.mjs` judges a lock stale by `process.kill(pid, 0)` on the owner's pid, and the owner record carries no host or pod identity. Two pods have separate PID namespaces, so a scan CronJob in its own pod would read the web pod's live lock as stale, delete it, and race the web on `pipeline.md` and `scan-history.tsv`. Every writer therefore stays inside the web pod. Scheduled scans are triggered by a tiny CronJob that only POSTs to `/api/scheduler`; the runner then starts as a child of the web process, where the locks work as designed. One replica with `strategy: Recreate`, because the web also keeps an in-memory tracker-write registry that assumes one process.
+
+Authentication for the dashboard is the cluster's house pattern, an Envoy Gateway `SecurityPolicy` with OIDC against Pocket ID in front of the route, so career-ops gains no login code. A NetworkPolicy admits only the gateway's namespace and the trigger CronJob, because the app's origin guard is a CSRF filter, not access control, and any pod that reaches the pod IP would bypass the gateway. The Claude Code CLI authenticates headless with a long-lived OAuth token from `claude setup-token` (the operator's subscription) held in a Secret; an API key is the alternative, never both. The guard's `Sec-Fetch-Site` rule refuses `cross-site` and `same-site`, which is what the first navigation after an OIDC redirect carries, so a small guard change lets `GET` navigations through while keeping the CSRF protection on everything else.
+
+Two features stay on the Mac. The apply flow needs a headed browser, and batch mode passes the blanket permission flag that AGENTS.md confines to local use. The Claude Code plugin install from PR-01 remains for those, and for terminal sessions; the hosted web is the daily surface.
+
+Rejected. A scan CronJob in its own pod sharing the volume (the lock race above; only safe after adding host identity to the lock owner, which is deferred). A sidecar with a shared process namespace (safe, but more manifest than a curl trigger). Moving the data root to NFS (adds risk, buys nothing for one pod). In-app Better Auth for the dashboard (the gateway already does it, and the dashboard stays single-tenant either way).
+
 ### Multi-user is sharing-only first
 
 Accounts live only on the publish service. Each person runs career-ops locally and uploads rendered CVs with their own API key, which is how Reactive Resume's own API works. This changes no upstream file and the prototype already proves the key path.
@@ -103,7 +116,7 @@ Vendored RR code keeps the MIT notice (copyright Amruth Pillai) in a `THIRD_PART
 
 ### Install path
 
-The operator runs upstream's plugin. The fork is installed from the `jrmatherly/career-ops` GitHub marketplace, the route `docs/CLAUDE_PLUGIN.md` documents for a fork, so daily use tracks the fork's `main` and never the branch a dev checkout happens to have, and user data cannot land in the checkout.
+Daily use is the hosted web app on the cluster. The fork is also installed from the `jrmatherly/career-ops` GitHub marketplace, the route `docs/CLAUDE_PLUGIN.md` documents for a fork, for the apply flow, batch mode and terminal sessions; it tracks the fork's `main` and never the branch a dev checkout happens to have, and user data cannot land in the checkout. The existing data root `~/career-ops-data` is copied to the cluster volume once, then the Mac copy is retired.
 
 ## Constraints
 
@@ -117,4 +130,4 @@ The operator runs upstream's plugin. The fork is installed from the `jrmatherly/
 
 ## Out of scope
 
-RR's mobile app, Forme templates, PDF import, the AI coach and discovery scheduler, ODT export, account trash, and a custom-domain feature on the publish service. Each is a possible later program.
+Running the apply flow or batch mode on the cluster, a scan pod of its own, and multi-replica web. RR's mobile app, Forme templates, PDF import, the AI coach and discovery scheduler, ODT export, account trash, and a custom-domain feature on the publish service. Each is a possible later program.
