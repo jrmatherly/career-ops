@@ -36,14 +36,16 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
       <MobileNav followupsEnabled={followupsEnabled} />
       <div className="flex min-h-screen">
         <aside className="sticky top-0 hidden print:hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface/30 p-4 md:flex">
-          <Link href="/" className="mb-8 flex items-center gap-2.5 px-1">
+          <Link href="/" className="mb-6 flex items-center gap-2.5 px-1">
             <CoMark size={32} />
             <span className={`${instrumentSerif.className} relative -top-px text-2xl font-normal tracking-tight text-landing`}>
               career-ops
             </span>
           </Link>
           <CommandPalette followupsEnabled={followupsEnabled} />
-          <nav className="flex flex-col gap-1">
+          {/* At md-tall the fixed Ask button sits over the sidebar's foot and the footer reserves room for it, so the
+              nav scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
+          <nav className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
             {visibleNavItems(followupsEnabled).map(({ href, label, icon: Icon, chip }) => {
               const active = isActivePath(href, pathname);
               return (
@@ -71,7 +73,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
 
           <WorkerPills />
 
-          <div className="mt-auto space-y-3 pb-16 pt-4 md-tall:pb-40">
+          <div className="mt-auto space-y-3 pb-16 pt-3 md-tall:pb-30">
             <UsageMeter />
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-1">
