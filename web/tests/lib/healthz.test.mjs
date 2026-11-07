@@ -4,13 +4,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import "../helpers/next-server-stub.mjs";
 
 const ROUTE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "src", "app", "api", "healthz", "route.ts");
 
 test("GET /api/healthz answers 200 with { ok: true } and no-store", async () => {
-  const { GET } = await import(ROUTE);
+  // A file URL, not the path: on Windows a bare "D:\\..." path reads as a "d:" URL scheme.
+  const { GET } = await import(pathToFileURL(ROUTE).href);
   const res = await GET();
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("cache-control"), "no-store");
