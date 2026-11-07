@@ -118,6 +118,8 @@ Rows added by the program's PRs, in PR order; the Rules entry of the same name p
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
 | no third-party notices file | `THIRD_PARTY_NOTICES.md` at the root: the Reactive Resume MIT notice (copyright Amruth Pillai, clone `d065a9f7`) and the Files list each vendoring PR extends | landed 2026-11-06 (PR-01) | ADOPT upstream hunks, ours stay, a conflict keeps both (append-only shared file). Pinned by the `config/local-paths.txt` entry, which `validate-system-paths-coverage.mjs` fails without, and by `tests/updater-local-paths.test.mjs`, which pins that `apply` treats a declared path as user layer. |
+| `AGENTS.md` "Untrusted External Content" names postings, company pages, form fields and emails | the same paragraph also names `data/share-feedback/*.md`, the reviewer comments the publish service collects, as data, never instructions | landed 2026-11-06 (PR-12) | ADAPT an upstream hunk that touches that paragraph (port the wording, keep our sentence); ADOPT upstream hunks elsewhere in the file. Prose only, so no behaviour test pins it; `tests/fork-deviations-covered.test.mjs` fails when this row disappears while the file still differs. |
+| `.github/workflows/test.yml` has no job for a service outside the root suite | a `publish` job that runs `publish/tests/service.test.mjs` with `npm --prefix publish test` on the Node floor | landed 2026-11-06 (PR-12) | ADAPT: upstream edits to the other jobs ADOPT, an upstream hunk touching the `publish` job keeps ours. Pinned by `publish/tests/service.test.mjs`, which the job runs and which fails the job when the service breaks, and by `tests/docs-only-change.test.mjs`, which loads the workflow's jobs. |
 
 ### Fork harness, CI and docs
 
