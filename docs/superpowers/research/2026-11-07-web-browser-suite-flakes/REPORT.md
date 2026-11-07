@@ -79,3 +79,20 @@ Every suite calls `page.goto(url)` with no `waitUntil`, so it waits for `load` o
 ## Upstream
 
 `career-ops-hq/career-ops` PR 6641 (open, green, awaiting review, head `dcc65b70`) reached the same diagnosis for `back-link-scroll`, `pipeline-inline-status` and `pipeline-window` and fixed the tests only (visible-scoped locators, re-read height per step, poll for counts). It does not cover `inbox-undo` or `inbox-keys`, and leaves the "why a hidden copy" question open; this report answers it.
+
+## Follow-up run, 2026-11-07 (PR 32)
+
+PR 31's full delayed run named six more suites on the race. Each was run alone under `BROWSER_SUITES_SEGMENT_DELAY_MS=100 node tests/browser-suites.mjs <suite>` in `web/` at `d072aff1`, and each failed on the first attempt and on the runner's retry, so the failures are deterministic under the proxy, not flaky. Line numbers are `main`'s before the wrap.
+
+| Suite | Failing line | Error |
+|-------|--------------|-------|
+| `accessible-names` | `:91` | strict mode, `getByText('No scheduled scans found')` resolved to 2 elements |
+| `apply-field-accessibility` | `:40` | strict mode, the form-URL placeholder resolved to 2 elements |
+| `evaluation-options` | `:38` | strict mode, `getByText('Evaluation options · full evaluation')` resolved to 2 elements |
+| `loading-transition` | `:55` | `tbody tr` count 6, expected 3 (3 visible rows plus the 3 in the hidden `S:0` copy) |
+| `pipeline-inline-status` | `:194` | strict mode, `getByLabel('status', { exact: true })` resolved to 2 elements |
+| `pipeline-return` | `:31` | strict mode, `getByPlaceholder('Search company or role…')` resolved to 2 elements |
+
+Fix: every `page.goto` / `page.reload` in the six files (21 sites) wrapped in `settled()`, nothing else changed. After: each suite 3 of 3 under the proxy with no second-run warning; the full runner 36 of 36 with the proxy off. `pipeline-inline-status` keeps PR 6641's visible-scoped row and edit-button locators as a second guard; the two unscoped lookups there (`tab()` and `getByLabel("status")`) are what the wrap fixes.
+
+Scope: the 28 other suites still call `goto`/`reload` bare. They passed PR 31's full delayed run, so they are not shown to sit on the race; they were not wrapped.
