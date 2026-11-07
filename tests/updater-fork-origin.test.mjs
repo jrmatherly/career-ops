@@ -1,7 +1,7 @@
 // tests/updater-fork-origin.test.mjs — the updater tracks this fork
 // (jrmatherly/career-ops), never upstream: `check` at every session start must
 // not prompt for an upstream release, and `apply` must never install upstream's
-// tarball over the fork's system layer. The upgrade gate's mirror rewrites the
+// tree over the fork's system layer. The upgrade gate's mirror rewrites the
 // same URL, and must keep rewriting the two upstream URLs that old tags embed.
 // Plan: docs/superpowers/plans/2026-11-07-upstream-decoupling.md, Task 1.
 import { pass, fail } from './helpers.mjs';
@@ -38,7 +38,7 @@ import { join } from 'path';
 import { ROOT } from './helpers.mjs';
 
 const mode = readFileSync(join(ROOT, 'modes', 'update.md'), 'utf-8');
-if (!/career-ops-v\{remote\}\s*\|\|/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/heads\/main/.test(mode)) pass('modes/update.md fetches the fork\'s refs/heads/main, not a release tag');
+if (!/career-ops-v\{remote\}/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/heads\/main/.test(mode)) pass('modes/update.md fetches the fork\'s refs/heads/main, not a release tag');
 else fail('modes/update.md still fetches a career-ops-v{remote} tag (the fork has none)');
 if (/check --channel main --force/.test(mode) && /apply --channel main --confirm/.test(mode)) pass('modes/update.md checks and applies on --channel main');
 else fail('modes/update.md check/apply commands do not name --channel main');

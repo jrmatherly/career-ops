@@ -4,7 +4,7 @@ When the user runs `/career-ops update`, execute this interactive update flow.
 
 ## Step 1 — Check for Updates
 
-Run `node update-system.mjs check --channel main --force` and parse the JSON output. `--channel main` because this fork cuts no releases: its updates are commits on `main`, and the default release channel can only answer `offline`. `--force` because the user asked: a release they said no to earlier is shown too.
+Run `node update-system.mjs check --channel main --force` and parse the JSON output. `--channel main` because this fork cuts no releases: its updates are commits on `main`, and the default release channel can only answer `offline`. `--force` because the user asked: a version they said no to earlier is shown too.
 
 - If `up-to-date`: Tell the user "career-ops is up to date (v{version})." and stop.
 - If `offline`: Tell the user "Cannot reach GitHub to check for updates. Try again later." and stop.
@@ -36,7 +36,7 @@ git diff HEAD..FETCH_HEAD --stat -- modes/ CLAUDE.md AGENTS.md CODEX.md GEMINI.m
 
 Present to the user as a clear summary:
 
-> **Update available: v{local} → v{remote}** ({local_sha} → first 8 of {remote_commit})
+> **Update available: v{local} → v{remote}** ({local_sha} → first 8 of {remote_commit}; omit the parenthesis when `remote_commit` is absent)
 >
 > **Changes summary:**
 > - Modes: {N} files changed (list which ones)
@@ -50,7 +50,7 @@ Present to the user as a clear summary:
 >
 > Your personal files (CV, profile, tracker, reports) will NOT be touched.
 
-`changelog` can come back empty, either because the release carries no notes or because the check resolved the version without reading the releases API. Do not render the **Changelog:** line when that happens — a lone `> **Changelog:**` with nothing under it reads as a failure, and nothing failed. Use this in place of those two lines:
+`changelog` is always empty on this fork (it publishes no releases, so there are no notes to read). Do not render the **Changelog:** line when that happens — a lone `> **Changelog:**` with nothing under it reads as a failure, and nothing failed. Use this in place of those two lines:
 
 > **Changelog:** not available for v{remote}. This fork publishes no release notes; the commit log is at https://github.com/jrmatherly/career-ops/commits/main
 
@@ -115,7 +115,7 @@ If yes:
 
 If no:
 1. Run `node update-system.mjs dismiss --version {remote}`
-2. Tell the user they will be asked again when a newer release is out, and can run `/career-ops update` anytime to check again.
+2. Tell the user they will be asked again when `main` carries a newer version, and can run `/career-ops update` anytime to check again.
 
 ## Step 5 — Rollback (if requested)
 

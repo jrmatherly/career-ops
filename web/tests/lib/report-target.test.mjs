@@ -3,7 +3,7 @@
 // fork bug at career-ops-hq. Plan:
 // docs/superpowers/plans/2026-11-07-upstream-decoupling.md, Task 3.
 //
-// Run:  node --test tests/lib/report-target.test.mjs
+// Run:  npm test   (or node --experimental-strip-types --test tests/lib/report-target.test.mjs)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
