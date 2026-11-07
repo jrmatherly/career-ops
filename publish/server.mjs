@@ -220,7 +220,7 @@ export function createServer(config) {
     } catch (e) {
       if (res.headersSent) return res.destroy();
       if (e instanceof HttpError) return plain(res, e.status, e.message, e.status === 413 ? { Connection: 'close' } : {});
-      console.error(`${req.method} ${req.url} from ${clientKey(req, config)}:`, e);
+      console.error('request failed', { method: req.method, url: req.url, client: clientKey(req, config) }, e);
       plain(res, 500, 'Internal error');
     }
   });
