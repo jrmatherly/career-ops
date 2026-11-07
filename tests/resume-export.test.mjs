@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,7 @@ import { parseJSONResume } from '../lib/resume/import/json-resume.mjs';
 import { resumeToPayload } from '../lib/resume/to-payload.mjs';
 import { payloadToDocx } from '../lib/resume/export/docx.mjs';
 import { resumeToJsonResume } from '../lib/resume/export/json-resume.mjs';
+import { main } from '../resume.mjs';
 
 const CLI = fileURLToPath(new URL('../resume.mjs', import.meta.url));
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/resume/${name}`, import.meta.url));
@@ -138,3 +139,65 @@ test('resume-export: docx to a pipe writes the zip bytes to stdout', () => withR
   assert.equal(r.status, 0, String(r.stderr));
   assert.ok(documentXml(r.stdout).includes('David Kowalski'));
 }));
+
+test('resume-export: json-resume flattens roles, honours hidden flags and keeps a current role ongoing', () => {
+  const data = sampleData();
+  const { document } = resumeToJsonResume(data);
+  const northwind = document.work.filter((w) => w.name === 'Northwind Games');
+  assert.deepEqual(northwind.map((w) => [w.position, w.startDate, w.endDate]), [['Lead Engineer', '2018', '2020'], ['Engineer', '2016', '2018']]);
+  assert.ok(!document.work.some((w) => w.name === 'Secret Corp'), 'a hidden item stays out');
+  const back = importResume(Buffer.from(JSON.stringify(document)), 'json-resume').data;
+  assert.equal(back.sections.experience.items.find((i) => i.company === 'Cascade Studios').dates.present, true, 'a current role comes back ongoing');
+
+  const [lead] = data.sections.experience.items.find((i) => i.company === 'Northwind Games').roles;
+  const positions = resumeToJsonResume(data, { hideItems: [lead.id] }).document.work.filter((w) => w.name === 'Northwind Games').map((w) => w.position);
+  assert.deepEqual(positions, ['Engineer'], 'a hidden role drops only that role');
+
+  data.sections.awards.hidden = true;
+  data.summary.hidden = true;
+  data.sections.profiles.items[0].hidden = true;
+  const hidden = resumeToJsonResume(data).document;
+  assert.equal('awards' in hidden, false, 'a hidden section stays out');
+  assert.equal('summary' in hidden.basics, false, 'a hidden summary stays out');
+  assert.deepEqual(hidden.basics.profiles.map((p) => p.network), ['LinkedIn'], 'a hidden profile stays out');
+  assert.equal('profiles' in resumeToJsonResume(sampleData(), { hide: ['profiles'] }).document.basics, false, '--hide profiles');
+});
+
+test('resume-export: a hidden item stays out of the DOCX', async () => {
+  const xml = documentXml(await payloadToDocx(resumeToPayload(sampleData()).payload));
+  assert.ok(!xml.includes('Secret Corp'));
+});
+
+test('resume-export: CLI json-resume names a custom section it cannot carry on stderr', () => withRoot((root) => {
+  const data = sampleData();
+  data.customSections.push({ ...structuredClone(data.customSections[0]), id: 'cover', type: 'cover-letter', title: 'Cover note', items: [{ id: 'c1', hidden: false, recipient: '', content: '<p>Hi</p>' }] });
+  const input = join(root, 'in.json');
+  writeFileSync(input, JSON.stringify(data));
+  const r = run(root, 'export', 'json-resume', '--in', input, '--out', join(root, 'out.json'));
+  assert.equal(r.status, 0, String(r.stderr));
+  assert.match(String(r.stderr), /not in the JSON Resume: Cover note/);
+}));
+
+test('resume-export: docx refuses a terminal stdout and writes nothing', async () => {
+  const { isTTY } = process.stdout;
+  const errors = [];
+  const { error } = console;
+  process.stdout.isTTY = true;
+  console.error = (...a) => errors.push(a.join(' '));
+  try {
+    assert.equal(await main(['export', 'docx', '--in', SAMPLE]), 1);
+  } finally {
+    process.stdout.isTTY = isTTY;
+    console.error = error;
+  }
+  assert.match(errors.join('\n'), /docx is binary; add --out/);
+});
+
+test('resume-export: json-resume keeps summary and award bullets as lines in their summary', () => {
+  const data = sampleData();
+  data.summary.content = '<p>Lead</p><ul><li><p>Cut cloud spend 30%</p></li></ul>';
+  data.sections.awards.items[0].description = '<p>Award lead</p><ul><li><p>Award bullet</p></li></ul>';
+  const { document } = resumeToJsonResume(data);
+  assert.equal(document.basics.summary, 'Lead\n- Cut cloud spend 30%');
+  assert.equal(document.awards[0].summary, 'Award lead\n- Award bullet');
+});
