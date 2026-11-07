@@ -1,0 +1,12 @@
+{
+  "revision": 3,
+  "lanes": [
+    { "id": "saved", "category": "saved", "label": null, "color": "#8D8C80", "position": 0, "systemKey": "saved", "closedReason": null, "retiredAt": null },
+    { "id": "applied", "category": "applied", "label": null, "color": "#578BC7", "position": 1, "systemKey": "applied", "closedReason": null, "retiredAt": null },
+    { "id": "lane-referral", "category": "applied", "label": "Referral push", "color": "#578BC7", "position": 2, "systemKey": null, "closedReason": null, "retiredAt": null },
+    { "id": "screening", "category": "screening", "label": null, "color": "#319FA8", "position": 3, "systemKey": "screening", "closedReason": null, "retiredAt": null },
+    { "id": "interview", "category": "interview", "label": null, "color": "#BB9135", "position": 4, "systemKey": "interview", "closedReason": null, "retiredAt": null },
+    { "id": "offer", "category": "offer", "label": null, "color": "#449D70", "position": 5, "systemKey": "offer", "closedReason": null, "retiredAt": null },
+    { "id": "closed", "category": "closed", "label": null, "color": "#C36B5C", "position": 6, "systemKey": "closed", "closedReason": null, "retiredAt": null }
+  ]
+}

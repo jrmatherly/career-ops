@@ -28,3 +28,5 @@ interview-round.mjs
 salary-observe.mjs
 offer-terms.mjs
 followup-pin.mjs
+# Reactive Resume convergence, PR-09: the Reactive Resume application export importer.
+lib/import-rr-applications.mjs

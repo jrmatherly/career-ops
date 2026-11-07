@@ -18,6 +18,11 @@
  *   node import-tracker.mjs <export.csv>              # preview
  *   node import-tracker.mjs <export.csv> --confirm    # add the rows
  *   node import-tracker.mjs <export.csv> --day-first  # read 03/04/2026 as 3 April
+ *   node import-tracker.mjs --rr-zip <export.zip>     # a Reactive Resume account export
+ *
+ * A Reactive Resume CSV export is recognized by its headers. It and the
+ * account zip go through lib/import-rr-applications.mjs, which also writes
+ * each row's lane, tags, notes, interviews, contacts and other sidecars.
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'fs';
@@ -26,15 +31,18 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { parseCsv } from './linkedin-join.mjs';
-import { resolveColumns, parseTrackerRow, normalizeTextKey } from './tracker-parse.mjs';
+import { resolveColumns, parseTrackerRow } from './tracker-parse.mjs';
 import { loadCanonicalStates, resolveCanonicalState } from './tracker-utils.mjs';
 import { normalizeUrl } from './url-key.mjs';
 import { getCareerOpsRoot, resolveTrackerPath, resolveTrackerPathForWrite } from './path-resolver.mjs';
 import { reserveReportNumbers, releaseReportNumbers } from './reserve-report-num.mjs';
 import { tsvSafe, slugifyCompany, isPostingUrl } from './lib/tracker-addition.mjs';
-import { hasFlag, validateFlags } from './lib/cli-flags.mjs';
+import { hasFlag, flagValue, validateFlags } from './lib/cli-flags.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { localToday } from './lib/local-today.mjs';
+import {
+  detectRrExport, rrFromCsv, readRrZip, planRrImport, postingIndex, roleKey, writeRrSidecars, appendSavedToPipeline, importedNums,
+} from './lib/import-rr-applications.mjs';
 
 const CODE_ROOT = dirname(fileURLToPath(import.meta.url));
 const STATES_FILE = join(CODE_ROOT, 'templates/states.yml');
@@ -42,11 +50,15 @@ const RESERVE_CHUNK = 50;
 const PREVIEW_ROWS = 20;
 
 const usage = () => `Usage: node import-tracker.mjs <export.csv> [options]
+       node import-tracker.mjs --rr-zip <export.zip> [--confirm]
 
 Adds the applications in a CSV export from another tracker (Teal, Huntr,
 Simplify, a spreadsheet) to data/applications.md. Dry run by default.
 
   --confirm     Add the rows (default is a preview that writes nothing)
+  --rr-zip FILE Import a Reactive Resume "export everything" zip (applications,
+                timeline notes, interviews, contacts, follow-ups); a Reactive
+                Resume CSV export is recognized without a flag
   --day-first   Read slash dates as day/month/year (default: inferred from
                 the file, month/day/year when every date fits both)
   -h, --help    Show this help and exit
@@ -100,6 +112,8 @@ export const OUTCOMES = {
   tracked: 'already in the tracker',
   repeat: 'repeated in this file',
   'not-applied': 'not applied yet (add these to the pipeline to evaluate them)',
+  saved: 'saved in Reactive Resume (goes to the pipeline inbox)',
+  'never-submitted': 'never submitted (skipped)',
   'unknown-status': 'unknown stage (rename it in the file to a tracker state)',
   incomplete: 'missing company or role',
 };
@@ -187,8 +201,6 @@ export function resolveStage(raw, states) {
     ?? (Object.hasOwn(OTHER_TRACKER_STAGES, key) ? OTHER_TRACKER_STAGES[key] : null);
 }
 
-const roleKey = (company, role) => `${normalizeTextKey(company)}\u0000${normalizeTextKey(role)}`;
-
 /**
  * Plan an import without touching disk.
  * @param {string[][]} csvRows - parseCsv() output, header first.
@@ -209,18 +221,9 @@ export function planImport(csvRows, { states, trackerRows, today, dayFirst, sour
   const dates = body.map((r) => at(r, 'date'));
   const readDayFirst = dayFirst ?? inferDayFirst(dates);
 
-  // One posting is one key: the URL when both sides have one, otherwise the
-  // company and role. Two different URLs under one title are two postings.
-  const index = () => ({ byUrl: new Map(), byRole: new Map() });
-  const remember = (idx, urlKey, rk, value) => {
-    if (urlKey) idx.byUrl.set(urlKey, value);
-    idx.byRole.set(rk, [...(idx.byRole.get(rk) ?? []), { urlKey, value }]);
-  };
-  const lookup = (idx, urlKey, rk) => (urlKey ? idx.byUrl.get(urlKey) : undefined)
-    ?? (idx.byRole.get(rk) ?? []).find((c) => !(c.urlKey && urlKey && c.urlKey !== urlKey))?.value;
-  const tracked = index();
-  for (const t of trackerRows) remember(tracked, normalizeUrl(t.url), roleKey(t.company, t.role), t.num);
-  const seen = index();
+  const tracked = postingIndex();
+  for (const t of trackerRows) tracked.remember(normalizeUrl(t.url), roleKey(t.company, t.role), t.num);
+  const seen = postingIndex();
 
   const entries = body.map((r) => {
     const company = at(r, 'company');
@@ -235,11 +238,11 @@ export function planImport(csvRows, { states, trackerRows, today, dayFirst, sour
     if (!status) return { ...base, outcome: 'unknown-status' };
     const urlKey = normalizeUrl(url);
     const rk = roleKey(company, role);
-    const trackedNum = lookup(tracked, urlKey, rk);
+    const trackedNum = tracked.lookup(urlKey, rk);
     if (trackedNum != null) return { ...base, status, outcome: 'tracked', trackedNum };
-    const firstRow = lookup(seen, urlKey, rk);
+    const firstRow = seen.lookup(urlKey, rk);
     if (firstRow != null) return { ...base, status, outcome: 'repeat', firstRow };
-    remember(seen, urlKey, rk, r.row);
+    seen.remember(urlKey, rk, r.row);
     const date = readSourceDate(at(r, 'date'), readDayFirst);
     return { ...base, status, date: date ?? today, undated: !date, outcome: 'import' };
   });
@@ -349,6 +352,7 @@ async function writeImport(entries, { colmap }) {
       const nums = await reserveReportNumbers(chunk.length);
       reservations.push(nums);
       chunk.forEach((entry, j) => {
+        entry.num = nums[j];
         const file = join(additionsDir, `${nums[j]}-${slugifyCompany(entry.company)}.tsv`);
         writeFileSync(file, additionTsv(entry, nums[j], shape), { flag: 'wx' });
       });
@@ -378,11 +382,108 @@ async function writeImport(entries, { colmap }) {
   }
 }
 
+function sidecarSummary(s) {
+  const count = (list, word) => (list.length ? `${list.length} ${word}${list.length > 1 ? 's' : ''}` : '');
+  return [
+    s.meta.length ? `meta: ${[...new Set(s.meta.map((m) => m.key))].join(', ')}` : '',
+    count(s.notes, 'note'),
+    count(s.statusLog, 'status-log row'),
+    count(s.contacts, 'contact'),
+    count(s.interviews, 'interview'),
+    s.followUp ? 'follow-up pin' : '',
+    s.salary ? `salary ${s.salary.amount} ${s.salary.currency}` : '',
+    s.salaryUnparsed ? 'salary not recorded: no amount or no single currency' : '',
+    s.offer ? 'offer terms' : '',
+    s.jd ? 'JD capture' : '',
+  ].filter(Boolean).join('; ');
+}
+
+function printRrPreview(plan, { label, csv, confirm, urlColumn, trackerExists, blocked, imported }) {
+  const count = (o) => plan.entries.filter((e) => e.outcome === o);
+  console.log(confirm ? `Importing ${label} (Reactive Resume export)` : `Import preview for ${label} (Reactive Resume export)`);
+  console.log('');
+  const state = (e) => (e.app.status === 'closed' ? `${e.status} (closed, ${e.closedReason ?? 'no reason'})` : `${e.status} (${e.app.status})`);
+  for (const e of plan.entries) {
+    const detail = {
+      import: () => `to import: ${e.date}${e.undated ? ' (no readable Application Date: today)' : ''}  ${state(e)}`,
+      tracked: () => `already in the tracker as #${e.trackedNum}: ${state(e)}${e.trackedStatus && e.trackedStatus !== e.status ? `; the tracker says ${e.trackedStatus}, not changed (use set-status.mjs)` : ''}`,
+      repeat: () => `repeated in this file, same as row ${e.firstRow}`,
+      saved: () => (e.url ? 'saved: goes to the pipeline inbox' : 'saved, no posting URL: not added anywhere'),
+      'never-submitted': () => `never submitted (${e.app.unsentReason}): skipped`,
+      'unknown-status': () => `unknown stage "${e.app.status}"`,
+      incomplete: () => 'missing company or role',
+    }[e.outcome]();
+    const done = e.outcome === 'tracked' && imported.has(e.trackedNum);
+    const sidecars = !e.sidecars ? '' : done ? 'sidecars already imported' : sidecarSummary(e.sidecars);
+    console.log(`row ${e.row}: ${e.company || '?'} | ${e.role || '?'}  ${detail}${sidecars ? `  [${sidecars}]` : ''}`);
+  }
+  console.log('');
+  for (const [outcome, text] of Object.entries(OUTCOMES)) {
+    const rows = count(outcome);
+    if (rows.length) console.log(`${String(rows.length).padStart(4)} ${text}`);
+  }
+  if (csv) console.log("\nThe CSV's Timeline column is not read, and the CSV has no follow-up field. Import the account zip with --rr-zip to keep timeline notes, interviews and follow-ups.");
+  const links = count('import').filter((e) => e.url).length;
+  if (links && !urlColumn) {
+    console.log(`\n${links} row(s) carry a posting link, and the tracker has no URL column, so the links will not be kept. Run "node merge-tracker.mjs --backfill-urls" once to add the column, then import.`);
+  }
+  if (!trackerExists && count('import').length) console.log('\nNo tracker yet: --confirm creates data/applications.md.');
+  if (confirm || blocked) return;
+  const withSidecars = plan.entries.filter((e) => e.sidecars && !(e.outcome === 'tracked' && imported.has(e.trackedNum))).length;
+  console.log(`\nNothing written. Add --confirm to add ${count('import').length} tracker row(s), ${count('saved').filter((e) => e.url).length} saved posting(s) to the pipeline inbox, and the sidecars of ${withSidecars} row(s).`);
+}
+
+const BLOCKED_NO_URL = 'the tracker has no URL column, so --confirm would drop the posting links. Run "node merge-tracker.mjs --backfill-urls" once to add it, then import.';
+
+// Without a URL column, two postings for the same company and role differ
+// only by the link the TSV cannot carry, and merge's company-and-role tier
+// would fold the second into the first. Refuse instead of losing a row.
+function urlGate(toImport, tracker, confirm) {
+  const withUrl = toImport.some((e) => e.url);
+  const urlColumn = tracker.exists ? tracker.colmap?.url != null : withUrl;
+  return { withUrl, urlColumn, blocked: confirm && withUrl && !urlColumn };
+}
+
+async function runRr(plan, { label, csv, confirm, dataRoot, tracker, trackerPath, exportLabel, today, fail }) {
+  const toImport = plan.entries.filter((e) => e.outcome === 'import');
+  const { withUrl, urlColumn, blocked } = urlGate(toImport, tracker, confirm);
+  printRrPreview(plan, { label, csv, confirm: confirm && !blocked, urlColumn, trackerExists: tracker.exists, blocked, imported: importedNums(dataRoot, exportLabel) });
+  if (blocked) fail(BLOCKED_NO_URL);
+  if (!confirm) return 0;
+  if (!tracker.exists && toImport.length) {
+    createTracker(trackerPath, withUrl);
+    tracker = readTracker(trackerPath);
+  }
+  let status = 0;
+  if (toImport.length) {
+    console.log('');
+    status = await writeImport(toImport, { colmap: tracker.colmap });
+  }
+  try {
+    const queued = await appendSavedToPipeline(dataRoot, plan.entries);
+    if (queued) console.log(`\nPipeline inbox: ${queued} saved posting(s) added to data/pipeline.md.`);
+  } catch (err) {
+    console.error(`import-tracker: the saved postings were not added to data/pipeline.md: ${err.message}`);
+    status = 1;
+  }
+  const result = await writeRrSidecars(dataRoot, trackerPath, plan.entries, { exportLabel, today });
+  console.log(`\nSidecars: ${result.completed} row(s) written, ${result.skipped.filter((s) => s.num != null).length} already imported.`);
+  const lost = result.skipped.filter((x) => x.num == null);
+  for (const s of lost) console.error(`import-tracker: row ${s.row}: ${s.reason}; merge-tracker.mjs may have folded it into another row. Its sidecars were not written.`);
+  for (const f of result.failed) console.error(`import-tracker: row ${f.row} (#${f.num}): ${f.error}`);
+  if (result.failed.length) console.error('Run the same command again to complete those rows once the cause is fixed.');
+  if (lost.length || result.failed.length) status = 1;
+  return status;
+}
+
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
-  validateFlags(args, ['--confirm', '--day-first', '--help', '-h'], usage(), { requireOperand: true });
+  validateFlags(args, ['--confirm', '--day-first', '--rr-zip', '--help', '-h'], usage(), { valueFlags: ['--rr-zip'], requireOperand: true });
   const fail = (msg) => { console.error(`import-tracker: ${msg}`); process.exit(1); };
-  const named = args.find((a) => !a.startsWith('-'));
+  const rrZip = flagValue(args, '--rr-zip');
+  const operand = args.find((a, i) => !a.startsWith('-') && args[i - 1] !== '--rr-zip');
+  if (rrZip && operand) fail('give either a CSV file or --rr-zip, not both. See --help.');
+  const named = rrZip ?? operand;
   if (!named) fail('name the CSV file to import. See --help.');
   const dataRoot = getCareerOpsRoot();
   const file = isAbsolute(named) ? named : join(dataRoot, named);
@@ -393,27 +494,36 @@ if (isMainModule(import.meta.url)) {
   let tracker = readTracker(trackerPath);
   if (!tracker.exists) trackerPath = resolveTrackerPathForWrite(dataRoot);
 
+  const today = localToday();
   let plan;
+  let rr = null;
   try {
-    plan = planImport(parseCsv(readFileSync(file, 'utf-8')), {
-      states: loadCanonicalStates(STATES_FILE),
-      trackerRows: tracker.rows,
-      today: localToday(),
-      dayFirst: hasFlag(args, '--day-first') ? true : undefined,
-      source: basename(file),
-    });
+    const csvRows = rrZip ? null : parseCsv(readFileSync(file, 'utf-8'));
+    if (rrZip) {
+      const { exportDate, apps } = readRrZip(readFileSync(file), basename(file));
+      rr = { apps, csv: false, exportLabel: exportDate ? `${basename(file)} (exported ${exportDate})` : basename(file) };
+    } else if (detectRrExport(csvRows.find((r) => r.some((c) => c.trim())) ?? [])) {
+      rr = { apps: rrFromCsv(csvRows), csv: true, exportLabel: basename(file) };
+    } else {
+      plan = planImport(csvRows, {
+        states: loadCanonicalStates(STATES_FILE),
+        trackerRows: tracker.rows,
+        today,
+        dayFirst: hasFlag(args, '--day-first') ? true : undefined,
+        source: basename(file),
+      });
+    }
+    if (rr) rr.plan = planRrImport(rr.apps, { trackerRows: tracker.rows, today, exportLabel: rr.exportLabel });
   } catch (err) {
     fail(err.message);
   }
+  if (rr) {
+    process.exit(await runRr(rr.plan, { label: basename(file), csv: rr.csv, confirm, dataRoot, tracker, trackerPath, exportLabel: rr.exportLabel, today, fail }));
+  }
   const toImport = plan.entries.filter((e) => e.outcome === 'import');
-  const withUrl = toImport.some((e) => e.url);
-  const urlColumn = tracker.exists ? tracker.colmap?.url != null : withUrl;
-  // Without a URL column, two postings for the same company and role differ
-  // only by the link the TSV cannot carry, and merge's company-and-role tier
-  // would fold the second into the first. Refuse instead of losing a row.
-  const blocked = confirm && withUrl && !urlColumn;
+  const { withUrl, urlColumn, blocked } = urlGate(toImport, tracker, confirm);
   printPreview(plan, { source: basename(file), confirm: confirm && !blocked, urlColumn, trackerExists: tracker.exists, blocked });
-  if (blocked) fail('the tracker has no URL column, so --confirm would drop the posting links. Run "node merge-tracker.mjs --backfill-urls" once to add it, then import.');
+  if (blocked) fail(BLOCKED_NO_URL);
   if (!confirm || !toImport.length) process.exit(0);
 
   if (!tracker.exists) {

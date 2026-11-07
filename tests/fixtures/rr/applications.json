@@ -1,0 +1,520 @@
+[
+  {
+    "location": "Remote",
+    "salary": "$150k - $170k",
+    "laneId": "lane-referral",
+    "closedReason": null,
+    "source": "LinkedIn",
+    "tags": [
+      "remote",
+      "dbt"
+    ],
+    "sourceUrl": "https://jobs.example.com/larkspur/1",
+    "jobDescription": "Larkspur Analytics is hiring an Analytics Engineer to build its fictional metrics layer.",
+    "postingSource": null,
+    "notes": "Referred through a former teammate",
+    "followUpAt": "2026-07-20T00:00:00.000Z",
+    "followUpDateOnly": true,
+    "followUpNote": "Ask about the take-home",
+    "contacts": [
+      {
+        "name": "Rowan Vale",
+        "role": "Talent Partner",
+        "type": "Recruiter",
+        "email": "rowan@example.com",
+        "phone": ""
+      }
+    ],
+    "activity": [
+      {
+        "id": "s-applied-2026-07-01T09:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-07-01T09:00:00.000Z",
+        "laneId": "lane-referral",
+        "laneLabel": "Referral push"
+      },
+      {
+        "id": "n1",
+        "type": "note",
+        "at": "2026-07-02T14:30:00.000Z",
+        "text": "Sent the portfolio link"
+      },
+      {
+        "id": "i1",
+        "type": "interview",
+        "at": "2026-07-10T19:00:00.000Z",
+        "kind": "screening",
+        "durationMinutes": 30,
+        "location": "",
+        "notes": "Intro call",
+        "participants": [
+          {
+            "name": "Rowan Vale",
+            "role": "Talent Partner"
+          }
+        ],
+        "audience": "recruiter",
+        "timezone": "America/New_York"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-07-01T09:00:00.000Z",
+    "updatedAt": "2026-07-01T09:00:00.000Z",
+    "id": "a1",
+    "company": "Larkspur Analytics",
+    "role": "Analytics Engineer",
+    "status": "applied",
+    "appliedAt": "2026-07-01T09:00:00.000Z",
+    "submittedAt": "2026-07-01T09:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/quillfeather/2",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-07-14T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-07-14T10:00:00.000Z"
+      },
+      {
+        "id": "s-screening-2026-07-18T10:00:00.000Z",
+        "type": "stage",
+        "stage": "screening",
+        "at": "2026-07-18T10:00:00.000Z"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-07-14T10:00:00.000Z",
+    "updatedAt": "2026-07-14T10:00:00.000Z",
+    "id": "a2",
+    "company": "Quillfeather Health",
+    "role": "Data Analyst II",
+    "status": "screening",
+    "appliedAt": "2026-07-14T10:00:00.000Z",
+    "submittedAt": "2026-07-14T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/tidewater/3",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-01T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-01T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-08-20T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-08-20T10:00:00.000Z",
+        "closedReason": null
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-01T10:00:00.000Z",
+    "updatedAt": "2026-08-01T10:00:00.000Z",
+    "id": "a3",
+    "company": "Tidewater Freight",
+    "role": "BI Developer",
+    "status": "closed",
+    "appliedAt": "2026-08-01T10:00:00.000Z",
+    "submittedAt": "2026-08-01T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": "EUR 90000",
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/saltmarsh/4",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-02T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-02T10:00:00.000Z"
+      },
+      {
+        "id": "s-interview-2026-08-12T10:00:00.000Z",
+        "type": "stage",
+        "stage": "interview",
+        "at": "2026-08-12T10:00:00.000Z"
+      },
+      {
+        "id": "s-offer-2026-09-01T10:00:00.000Z",
+        "type": "stage",
+        "stage": "offer",
+        "at": "2026-09-01T10:00:00.000Z"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-02T10:00:00.000Z",
+    "updatedAt": "2026-08-02T10:00:00.000Z",
+    "id": "a4",
+    "company": "Saltmarsh Labs",
+    "role": "Analytics Engineer",
+    "status": "offer",
+    "appliedAt": "2026-08-02T10:00:00.000Z",
+    "submittedAt": "2026-08-02T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": "not-selected",
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/fennwick/5",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-03T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-03T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-08-15T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-08-15T10:00:00.000Z",
+        "closedReason": "not-selected"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-03T10:00:00.000Z",
+    "updatedAt": "2026-08-03T10:00:00.000Z",
+    "id": "a5",
+    "company": "Fennwick Insurance",
+    "role": "Data Analyst",
+    "status": "closed",
+    "appliedAt": "2026-08-03T10:00:00.000Z",
+    "submittedAt": "2026-08-03T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/cobaltline/6",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-saved-2026-08-04T10:00:00.000Z",
+        "type": "stage",
+        "stage": "saved",
+        "at": "2026-08-04T10:00:00.000Z"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-04T10:00:00.000Z",
+    "updatedAt": "2026-08-04T10:00:00.000Z",
+    "id": "a6",
+    "company": "Cobaltline Energy",
+    "role": "Senior Data Analyst",
+    "status": "saved",
+    "appliedAt": "2026-08-04T10:00:00.000Z",
+    "submittedAt": null
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/marrowfield/7",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-06T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-06T10:00:00.000Z",
+        "dateUnknown": true
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-06T10:00:00.000Z",
+    "updatedAt": "2026-08-06T10:00:00.000Z",
+    "id": "a7",
+    "company": "Marrowfield Foods",
+    "role": "Analytics Engineer",
+    "status": "applied",
+    "appliedAt": "2026-08-06T10:00:00.000Z",
+    "submittedAt": null
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/granite/8",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [],
+    "trashedAt": null,
+    "createdAt": "2026-08-07T10:00:00.000Z",
+    "updatedAt": "2026-08-07T10:00:00.000Z",
+    "id": "a8",
+    "company": "Granite Hollow Bank",
+    "role": "Ops Analyst",
+    "status": "saved",
+    "appliedAt": "2026-08-07T10:00:00.000Z",
+    "submittedAt": null
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": "withdrew",
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/pebblebrook/9",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-08T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-08T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-08-22T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-08-22T10:00:00.000Z",
+        "closedReason": "withdrew"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-08T10:00:00.000Z",
+    "updatedAt": "2026-08-08T10:00:00.000Z",
+    "id": "a9",
+    "company": "Pebblebrook Media",
+    "role": "Product Analyst",
+    "status": "closed",
+    "appliedAt": "2026-08-08T10:00:00.000Z",
+    "submittedAt": "2026-08-08T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": "£70,000",
+    "laneId": null,
+    "closedReason": "accepted",
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/harrowgate/10",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-09T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-09T10:00:00.000Z"
+      },
+      {
+        "id": "s-offer-2026-09-05T10:00:00.000Z",
+        "type": "stage",
+        "stage": "offer",
+        "at": "2026-09-05T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-09-10T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-09-10T10:00:00.000Z",
+        "closedReason": "accepted"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-09T10:00:00.000Z",
+    "updatedAt": "2026-08-09T10:00:00.000Z",
+    "id": "a10",
+    "company": "Harrowgate Systems",
+    "role": "Data Engineer",
+    "status": "closed",
+    "appliedAt": "2026-08-09T10:00:00.000Z",
+    "submittedAt": "2026-08-09T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": "accepted-other",
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/ironbark/11",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-10T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-10T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-09-11T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-09-11T10:00:00.000Z",
+        "closedReason": "accepted-other"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-10T10:00:00.000Z",
+    "updatedAt": "2026-08-10T10:00:00.000Z",
+    "id": "a11",
+    "company": "Ironbark Robotics",
+    "role": "ML Engineer",
+    "status": "closed",
+    "appliedAt": "2026-08-10T10:00:00.000Z",
+    "submittedAt": "2026-08-10T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": "no-response",
+    "source": null,
+    "tags": [],
+    "sourceUrl": "https://jobs.example.com/juniper/12",
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [
+      {
+        "id": "s-applied-2026-08-11T10:00:00.000Z",
+        "type": "stage",
+        "stage": "applied",
+        "at": "2026-08-11T10:00:00.000Z"
+      },
+      {
+        "id": "s-closed-2026-09-12T10:00:00.000Z",
+        "type": "stage",
+        "stage": "closed",
+        "at": "2026-09-12T10:00:00.000Z",
+        "closedReason": "no-response"
+      }
+    ],
+    "trashedAt": null,
+    "createdAt": "2026-08-11T10:00:00.000Z",
+    "updatedAt": "2026-08-11T10:00:00.000Z",
+    "id": "a12",
+    "company": "Juniper Row",
+    "role": "Analyst",
+    "status": "closed",
+    "appliedAt": "2026-08-11T10:00:00.000Z",
+    "submittedAt": "2026-08-11T10:00:00.000Z"
+  },
+  {
+    "location": null,
+    "salary": null,
+    "laneId": null,
+    "closedReason": null,
+    "source": null,
+    "tags": [],
+    "sourceUrl": null,
+    "jobDescription": null,
+    "postingSource": null,
+    "notes": null,
+    "followUpAt": null,
+    "followUpDateOnly": false,
+    "followUpNote": null,
+    "contacts": [],
+    "activity": [],
+    "trashedAt": null,
+    "createdAt": "2026-08-12T10:00:00.000Z",
+    "updatedAt": "2026-08-12T10:00:00.000Z",
+    "id": "a13",
+    "company": "",
+    "role": "Analyst",
+    "status": "applied",
+    "appliedAt": "2026-08-12T10:00:00.000Z",
+    "submittedAt": "2026-08-12T10:00:00.000Z"
+  }
+]

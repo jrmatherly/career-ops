@@ -1,0 +1,26 @@
+﻿"Company","Role","Stage","Lane","Lane Category","Lane Closed Reason","Stage Date","Application Date","Location","Salary","Source","URL","Job Description","Posting Source","Tags","Contacts","Notes","Closed Reason","Stage History","Timeline","Created At","Updated At"
+"Larkspur Analytics","Analytics Engineer","applied","Referral push","applied","","2026-07-01","2026-07-01","Remote","$150k - $170k","LinkedIn","https://jobs.example.com/larkspur/1","Larkspur Analytics is hiring an Analytics Engineer to build its fictional metrics layer.","","remote; dbt","Rowan Vale (Talent Partner, Recruiter)","Referred through a former teammate","","Applied (2026-07-01)","2026-07-01: Applied
+2026-07-02: Sent the portfolio link
+2026-07-10: Screening interview","2026-07-01T09:00:00.000Z","2026-07-01T09:00:00.000Z"
+"Quillfeather Health","Data Analyst II","screening","Screening","screening","","2026-07-18","2026-07-14","","","","https://jobs.example.com/quillfeather/2","","","","","'-follow up after the screen","","Applied (2026-07-14) → Screening (2026-07-18)","2026-07-14: Applied
+2026-07-18: Screening","2026-07-14T10:00:00.000Z","2026-07-14T10:00:00.000Z"
+"Tidewater Freight","BI Developer","closed","Closed","closed","","2026-08-20","2026-08-01","","","","https://jobs.example.com/tidewater/3","","","","","","","Applied (2026-08-01) → Closed (2026-08-20)","2026-08-01: Applied
+2026-08-20: Closed","2026-08-01T10:00:00.000Z","2026-08-01T10:00:00.000Z"
+"Saltmarsh Labs","Analytics Engineer","offer","Offer","offer","","2026-09-01","2026-08-02","","EUR 90000","","https://jobs.example.com/saltmarsh/4","","","","","","","Applied (2026-08-02) → Interview (2026-08-12) → Offer (2026-09-01)","2026-08-02: Applied
+2026-08-12: Interview
+2026-09-01: Offer","2026-08-02T10:00:00.000Z","2026-08-02T10:00:00.000Z"
+"Fennwick Insurance","Data Analyst","closed","Closed","closed","","2026-08-15","2026-08-03","","","","https://jobs.example.com/fennwick/5","","","","","","not-selected","Applied (2026-08-03) → Closed (2026-08-15)","2026-08-03: Applied
+2026-08-15: Closed","2026-08-03T10:00:00.000Z","2026-08-03T10:00:00.000Z"
+"Cobaltline Energy","Senior Data Analyst","saved","Saved","saved","","2026-08-04","","","","","https://jobs.example.com/cobaltline/6","","","","","","","Saved (2026-08-04)","2026-08-04: Saved","2026-08-04T10:00:00.000Z","2026-08-04T10:00:00.000Z"
+"Marrowfield Foods","Analytics Engineer","applied","Applied","applied","","","","","","","https://jobs.example.com/marrowfield/7","","","","","","","Applied (date not recorded)","2026-08-06: Applied","2026-08-06T10:00:00.000Z","2026-08-06T10:00:00.000Z"
+"Granite Hollow Bank","Ops Analyst","saved","Saved","saved","","","","","","","https://jobs.example.com/granite/8","","","","","","","","","2026-08-07T10:00:00.000Z","2026-08-07T10:00:00.000Z"
+"Pebblebrook Media","Product Analyst","closed","Closed","closed","","2026-08-22","2026-08-08","","","","https://jobs.example.com/pebblebrook/9","","","","","","withdrew","Applied (2026-08-08) → Closed (2026-08-22)","2026-08-08: Applied
+2026-08-22: Closed","2026-08-08T10:00:00.000Z","2026-08-08T10:00:00.000Z"
+"Harrowgate Systems","Data Engineer","closed","Closed","closed","","2026-09-10","2026-08-09","","£70,000","","https://jobs.example.com/harrowgate/10","","","","","","accepted","Applied (2026-08-09) → Offer (2026-09-05) → Closed (2026-09-10)","2026-08-09: Applied
+2026-09-05: Offer
+2026-09-10: Closed","2026-08-09T10:00:00.000Z","2026-08-09T10:00:00.000Z"
+"Ironbark Robotics","ML Engineer","closed","Closed","closed","","2026-09-11","2026-08-10","","","","https://jobs.example.com/ironbark/11","","","","","","accepted-other","Applied (2026-08-10) → Closed (2026-09-11)","2026-08-10: Applied
+2026-09-11: Closed","2026-08-10T10:00:00.000Z","2026-08-10T10:00:00.000Z"
+"Juniper Row","Analyst","closed","Closed","closed","","2026-09-12","2026-08-11","","","","https://jobs.example.com/juniper/12","","","","","","no-response","Applied (2026-08-11) → Closed (2026-09-12)","2026-08-11: Applied
+2026-09-12: Closed","2026-08-11T10:00:00.000Z","2026-08-11T10:00:00.000Z"
+"","Analyst","applied","Applied","applied","","","2026-08-12","","","","","","","","","","","","","2026-08-12T10:00:00.000Z","2026-08-12T10:00:00.000Z"
