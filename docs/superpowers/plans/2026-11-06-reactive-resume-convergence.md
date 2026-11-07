@@ -924,7 +924,7 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 - [ ] Lane 3. Create a feedback link, open it in Chrome, post a comment, read `/api/shares/<slug>/feedback`. Save `feedback.png`, `feedback.json`. Pass when the comment is returned.
 - [ ] Lane 4. Upload with `hideContacts: true`. Save `hidden.png`. Pass when no email, phone or LinkedIn text is on the page.
 - [ ] Lane 5. Upload a different CV to the same slug. Save `frozen.png`. Pass when the old feedback link still shows the old HTML.
-- [ ] Lane 6. Delete the share. Save `deleted.txt`. Pass when `/s/<slug>` is 404.
+- [ ] Lane 6. Delete the share. Save `deleted.txt`. Pass when `/s/<slug>` answers 401 with the same body as an unknown slug (the service answers 401, not 404, by design, per Step 1).
 - [ ] Lane 7. Forged feedback token (valid id, wrong HMAC) and a random token. Save `forged.txt`. Pass when both are 404 with identical bodies.
 - [ ] Lane 8. Slug enumeration. Request an unknown slug and a known slug with a wrong password. Save `enum.txt`. Pass when both are 401 with the same body and response times within 20 percent.
 - [ ] Lane 9. Six wrong passwords in ten minutes from one client. Save `limiter.txt`. Pass when the sixth is 429 and a different client key is still 401.
@@ -1272,7 +1272,7 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 - [ ] Metric. Image size and cold start to the ready line.
 - [ ] Probe. `docker images` and the container log timestamps. Absolute budget.
 - [ ] Baseline. Record the root development image size for scale.
-- [ ] Rule. Under 2.5 GB and ready in under 15 s.
+- [ ] Rule. Under the base image plus 2 GB (the same-digest interface above makes 2.5 GB unreachable: base 3.3 GB, measured image 4.83 GB) and ready in under 15 s.
 
 **Review gate.** None. PR-17 is not review-gated.
 
@@ -1364,6 +1364,7 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 - CronJob `career-ops-backup` on the house `volume-backup` pattern, nightly tar of `/data` to the rustfs bucket with the 7-day prune, mounting the same claim (it lands on the web pod's node).
 - Publish HelmRelease. Image `ghcr.io/jrmatherly/career-ops-publish:latest@sha256:...`, one replica, `Recreate`, a `local-path` claim `publish-data` with `forceRename` and `retain` for `publish.db`, env `BETTER_AUTH_URL=https://cv.${SECRET_DOMAIN}`, `PUBLISH_BIND=0.0.0.0`, `PUBLISH_TRUSTED_PROXIES` set to the pod CIDR, `PUBLISH_CLIENT_IP_HEADER=x-forwarded-for` (Envoy sets it from the Cloudflare connection, and the ClientTrafficPolicy already trusts the pod CIDR), secrets from sops. Route `cv.${SECRET_DOMAIN}` on `envoy-external` with no SecurityPolicy, because share pages are public and the service has its own Better Auth. NetworkPolicy admits only the `network` namespace. Its own nightly backup CronJob with the sqlite `VACUUM INTO` step the house pattern uses.
 - Migration, operator steps. Create the two Pocket ID clients. Run `claude setup-token` on the Mac and paste the token into `cluster.toml`. After the first deploy, `kubectl cp ~/career-ops-data` into the claim (or restore from a tar), set `CAREER_OPS_ROOT` on the Mac to a scratch root, and stop the launchd scan agent with `web/scripts/install-scan-schedule.sh --uninstall`.
+- Operations notes (coordinator, 2026-11-07). The `claude setup-token` value lasts one year: renewing it is re-running the command on the Mac, pasting the new value into `cluster.toml` and `just configure`; the `reloader` annotation restarts the pod. The CLI pin `@anthropic-ai/claude-code@2.1.319` in `deploy/Dockerfile` is bumped by a Renovate regex manager in `.renovaterc.json5` or by hand, never by `latest`. The `data` claim mounts with `fsGroup: 1000` so the uid 1000 process can write a fresh volume. No tracker seeding step: since #18 `path-resolver.mjs` defaults a fresh root to the `data/` tracker layout, so an empty `/data` boots.
 
 **Build.**
 

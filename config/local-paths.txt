@@ -12,7 +12,7 @@
 FORK.md
 THIRD_PARTY_NOTICES.md
 .hadolint.yaml
-# publish/ is claimed ahead of PR-12 of the Reactive Resume convergence plan, which creates it.
+# publish/ is claimed by the Reactive Resume convergence plan (PR-12 created it; PR-13 and PR-15 extend it).
 publish/
 # Reactive Resume convergence, PR-02: the resume model absorbed from cv.md.
 resume.mjs
