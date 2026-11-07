@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { rmSync } from './helpers.mjs';
 import { defaultResumeData, parseResume, readLegacyDates } from '../lib/resume/schema.mjs';
 import { CHECK_RULE_IDS, checkResume } from '../lib/resume/check.mjs';
-import { TEMPLATE_LAYOUTS } from '../lib/resume/template-layouts.mjs';
+import { layoutFor, TEMPLATE_LAYOUTS } from '../lib/resume/template-layouts.mjs';
 
 const CLI = fileURLToPath(new URL('../resume.mjs', import.meta.url));
 const SAMPLE = fileURLToPath(new URL('./fixtures/resume/sample.json', import.meta.url));
@@ -129,7 +129,7 @@ test('writes the pointer as a dotted path, with a message and fix from the catal
   }));
   const email = report.findings.find((f) => f.id === 'MISSING_EMAIL');
   assert.deepEqual(email, {
-    id: 'MISSING_EMAIL', category: 'contact', severity: 'error', key: 'MISSING_EMAIL:/basics/email', path: 'basics.email',
+    id: 'MISSING_EMAIL', category: 'contact', severity: 'error', key: 'MISSING_EMAIL:/basics/email', path: 'basics.email', pointer: '/basics/email',
     message: 'No email address. Most systems file candidates by email address.', fix: 'Add an email',
   });
   assert.equal(report.findings.find((f) => f.id === 'UNPARSEABLE_PERIOD').path, 'sections.experience.items.0.period');
@@ -242,7 +242,7 @@ test('structure rules flag content that is never placed on a page', () => {
     }];
   });
   assert.deepEqual(lint(data).findings.map(strip), [{
-    id: 'SECTION_MISSING_FROM_LAYOUT', severity: 'error', path: 'sections.education', key: 'SECTION_MISSING_FROM_LAYOUT:/sections/education', params: { section: 'education', name: 'education' },
+    id: 'SECTION_MISSING_FROM_LAYOUT', severity: 'error', path: 'sections.education', key: 'SECTION_MISSING_FROM_LAYOUT:/sections/education', params: { section: 'education', name: 'Education' },
   }]);
 });
 
@@ -300,6 +300,47 @@ test('layout rules know a full-width page prints no sidebar', () => {
   assert.ok(codes.includes('SECTION_MISSING_FROM_LAYOUT'));
 });
 
+test('the built-in experience section is named by the heading cv.md prints for it', () => {
+  const data = makeResume((resume) => {
+    resume.sections.experience.title = 'Where I worked';
+    resume.sections.experience.columns = 2;
+  });
+  const found = lint(data).findings.find((f) => f.id === 'MULTI_COLUMN_PROSE_SECTION');
+  assert.equal(found.params.name, data.careerOps.cvStyle.experienceHeading);
+  assert.match(found.message, new RegExp(`^The ${data.careerOps.cvStyle.experienceHeading} section is split`));
+});
+
+test('TWO_COLUMN_LAYOUT lists sidebar sections by id in sections and by title in names', () => {
+  const data = makeResume((resume) => {
+    resume.sections.skills.items = [skillItem()];
+    resume.customSections = [{
+      id: 'c0ffee12-aaaa', type: 'projects', title: 'Consulting', icon: '', columns: 1, hidden: false,
+      keepTogether: false, startOnNewPage: false, items: [{ id: 'p1', hidden: false, name: 'Audit', period: '', website: { url: '', label: '', inlineLink: false }, description: '<p>Ran it.</p>' }],
+    }];
+    resume.careerOps.template = 'azurill';
+    resume.metadata.layout.pages = [{ fullWidth: false, main: ['experience'], sidebar: ['skills', 'c0ffee12-aaaa'] }];
+  });
+  const found = lint(data).findings.find((f) => f.id === 'TWO_COLUMN_LAYOUT');
+  assert.deepEqual(found.params, { sections: 'skills,c0ffee12-aaaa', names: 'Skills, Consulting' });
+  assert.match(found.message, /so Skills, Consulting come last/);
+});
+
+test('templateKnown is true for a table row or an explicit layout, false for an unknown name', () => {
+  const data = makeResume((resume) => (resume.careerOps.template = 'my-own-template'));
+  assert.equal(checkResume(data, { now: NOW }).templateKnown, false);
+  assert.equal(checkResume(data, { now: NOW, layout: LAYOUTS.azurill }).templateKnown, true);
+  data.careerOps.template = 'modern';
+  assert.equal(checkResume(data, { now: NOW }).templateKnown, true);
+});
+
+test('every layout row keeps the invariants the layout rules rely on', () => {
+  for (const [name, row] of [...Object.entries(TEMPLATE_LAYOUTS), ['unknown', layoutFor('unknown')]]) {
+    assert.ok(row.columns === 1 || row.columns === 2, name);
+    assert.equal(row.atsSafe, row.columns === 1, `${name}: atsSafe means one column`);
+    assert.ok(row.columns === 1 || row.sidebar, `${name}: a second column is a sidebar`);
+  }
+});
+
 test('layout rules flag a two-column template printing a sidebar, naming its sections', () => {
   const data = makeResume((resume) => {
     resume.sections.skills.items = [skillItem()];
@@ -307,7 +348,7 @@ test('layout rules flag a two-column template printing a sidebar, naming its sec
     resume.metadata.layout.pages = [{ fullWidth: false, main: ['experience'], sidebar: ['skills'] }];
   });
   const found = lint(data).findings.find((f) => f.id === 'TWO_COLUMN_LAYOUT');
-  assert.deepEqual(found.params, { sections: 'skills', names: 'skills' });
+  assert.deepEqual(found.params, { sections: 'skills', names: 'Skills' });
   assert.equal(found.path, 'metadata.layout.pages');
 });
 
@@ -603,6 +644,27 @@ test('check names a template outside the layout table on stderr', () => withRoot
   assert.match(r.stderr, /template "my-own-template" is not in lib\/resume\/template-layouts\.mjs/);
   assert.equal(JSON.parse(r.stdout).templateKnown, false);
   assert.equal(run(root, 'check', '--in', SAMPLE).stderr, '');
+}));
+
+test('metadata.check.ignored by an entry-id key follows the entry when it moves, and only that entry', () => {
+  const second = experienceItem({ id: 'exp-2', period: 'a while back' });
+  const third = experienceItem({ id: 'exp-3', period: 'some day' });
+  const key = 'UNPARSEABLE_PERIOD:/sections/experience/items/#exp-2/period';
+  for (const items of [[experienceItem(), second, third], [third, second, experienceItem()]]) {
+    const report = lint(makeResume((data) => {
+      data.sections.experience.items = items;
+      data.metadata.check = { ignored: [key], hiddenTerms: [] };
+    }));
+    assert.deepEqual(report.ignored.map((f) => f.key), [key]);
+    assert.deepEqual(report.findings.filter((f) => f.id === 'UNPARSEABLE_PERIOD').map((f) => f.key), ['UNPARSEABLE_PERIOD:/sections/experience/items/#exp-3/period']);
+  }
+});
+
+test('export keeps human text on the absorb gate failure that check --json turns into JSON', () => withRoot((root) => {
+  writeFileSync(join(root, 'cv.md'), readFileSync(EXAMPLE, 'utf8').replace('## Professional Summary', 'Stray line.\n\n## Professional Summary'));
+  const r = run(root, 'export', 'payload', '--json');
+  assert.equal(r.status, 3);
+  assert.match(r.stdout, /^cv\.md does not absorb losslessly/);
 }));
 
 test('every rule id is produced by some fixture above', () => {
