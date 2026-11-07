@@ -235,7 +235,8 @@ function namesAsStoredOnWindows(path) {
 
 /**
  * Returns the canonical path to the tracker applications.md file for reading.
- * Priority: process.env.CAREER_OPS_TRACKER > root/data/applications.md > root/applications.md.
+ * Priority: process.env.CAREER_OPS_TRACKER > root/data/applications.md > root/applications.md,
+ * and root/data/applications.md (the write default) when neither file exists.
  *
  * @param {string} rootDir The career-ops data root directory
  * @returns {string} Canonical absolute path to the tracker file
@@ -256,11 +257,13 @@ export function resolveTrackerPath(rootDir) {
  */
 export function rawTrackerPath(rootDir) {
   const env = process.env.CAREER_OPS_TRACKER?.trim();
-  return env
-    ? env
-    : existsSync(join(rootDir, 'data/applications.md'))
-      ? join(rootDir, 'data/applications.md')
-      : join(rootDir, 'applications.md');
+  if (env) return env;
+  const inData = join(rootDir, 'data/applications.md');
+  if (existsSync(inData)) return inData;
+  const atRoot = join(rootDir, 'applications.md');
+  // A fresh root reads where it will write, so resolveWorkspaceRoot() never
+  // strips a data root whose own basename is `data` down to its parent.
+  return existsSync(atRoot) ? atRoot : resolveTrackerPathForWrite(rootDir);
 }
 
 /**

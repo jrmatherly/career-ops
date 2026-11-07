@@ -202,11 +202,10 @@ follow-ups.md
 
 # The tracker's derived SQLite index (tracker.mjs, #918). It sits beside the
 # tracker markdown, so on the standard layout it lands in data/ and is already
-# covered by the rules above — but resolveTrackerPath() falls back to
-# `<root>/applications.md` when data/applications.md is absent, and the index
-# follows it there. That is the legacy install layout, and it is also every
-# fresh clone: `node test-all.mjs` leaves a 36KB applications.db in the repo
-# root, which `git add .` then stages.
+# covered by the rules above — but resolveTrackerPath() returns
+# `<root>/applications.md` when that file exists and data/applications.md is
+# absent, and the index follows it there. That is the legacy install layout,
+# and `git add .` would stage the 36KB applications.db it leaves in the root.
 #
 # Its content is the whole tracker — company, role, score, status, notes — so it
 # carries the same PII as the file it indexes, under a name none of the rules

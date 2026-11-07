@@ -425,9 +425,8 @@ if (selector !== null) {
 
 const APPS_FILE = resolveTrackerPath(DATA_ROOT);
 if (!existsSync(APPS_FILE)) {
-  // The read path falls back to <root>/applications.md when nothing exists yet.
-  // A first evaluation writes data/applications.md (or CAREER_OPS_TRACKER).
-  // Naming the fallback points the first status change at a file that will never appear.
+  // A first evaluation writes data/applications.md (or CAREER_OPS_TRACKER), so
+  // the message names the write path.
   const writePath = resolveTrackerPathForWrite(DATA_ROOT);
   failWith(EXIT_NOT_FOUND, 'no-tracker', `No tracker found at ${writePath}. The tracker is created when you evaluate your first offer.`);
 }

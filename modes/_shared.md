@@ -47,7 +47,7 @@ An override in step 1 or 2 that resolves inside a plugin install copy is refused
 
 ### Tracker Path Resolution Order:
 * **Explicit override**: If `CAREER_OPS_TRACKER` is set as an environment variable, use it as the path to the tracker file (a relative path resolves against the current working directory, so pass an absolute one).
-* **Default**: Otherwise, use `{DATA_ROOT}/data/applications.md` if it exists; if not, use `{DATA_ROOT}/applications.md`.
+* **Default**: Otherwise, use `{DATA_ROOT}/data/applications.md` if it exists, then `{DATA_ROOT}/applications.md` if that exists, and otherwise `{DATA_ROOT}/data/applications.md`, the write location.
 * **Writing**: All new/boilerplate writes must target `{DATA_ROOT}/data/applications.md`.
 
 ---

@@ -26,7 +26,7 @@ The User Layer location (Data Root) is resolved dynamically using the following 
 
 **Tracker Path & Canonical Writes:**
 - **Explicit override:** `CAREER_OPS_TRACKER` environment variable overrides the applications tracker file path. A relative path resolves against the current working directory (`rawTrackerPath` in `path-resolver.mjs`), so pass an absolute one.
-- **Reading:** If no override is set, reading resolves to `{DATA_ROOT}/data/applications.md` if it exists; otherwise falls back to `{DATA_ROOT}/applications.md`.
+- **Reading:** If no override is set, reading resolves to `{DATA_ROOT}/data/applications.md` if it exists, then to `{DATA_ROOT}/applications.md` if that exists, and otherwise to `{DATA_ROOT}/data/applications.md`, the write location.
 - **Writing:** All write operations (first-run creation or merge operations) target the canonical location `{DATA_ROOT}/data/applications.md` (or the explicit `CAREER_OPS_TRACKER` override).
 - **In scripts:** A new script resolves the data root and the tracker path through `path-resolver.mjs`, not through `__dirname`, because the data root can be overridden and can live outside the repository. Call `getCareerOpsRoot()` for the root, then pass it to `resolveTrackerPath(root)` to read or `resolveTrackerPathForWrite(root)` to write; both take the root as an argument, with no default.
 
