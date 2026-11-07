@@ -32,8 +32,10 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/import/linkedin.mjs` from `packages/import/src/linkedin.ts` (PR-03)
 - `lib/resume/import/reactive-resume-json.mjs` from `packages/import/src/reactive-resume-json.tsx` (PR-03)
 - `lib/resume/import/detect.mjs` from `apps/web/src/features/resume/import/read-file.ts` lines 32-115 (`detectJsonImportKind` and the magic-byte sniffing), plus the `importResume` dispatcher, which is ours (PR-03)
+- `lib/resume/check.mjs` from `packages/resume/src/ats/{rules,catalog,section-aliases,walk,index}.ts`, with `carriesUnmergedFields` from `merge.ts` and the rule messages from `apps/web/src/features/resume/editor/check/issues.ts`; `mergeIntoPreviousEntry`, `atsVerdict` and the PDF heading lookup are not ported (PR-04)
+- `lib/resume/template-layouts.mjs` replaces `templateLayouts` from `packages/schema/src/templates.ts` with the career-ops templates (PR-04)
 
-The import files are hand-ported JavaScript (types removed, `generateId()` replaced by `crypto.randomUUID()`, `read-file.ts`'s i18n macros removed), not `stripTypeScriptTypes` output, so their line numbers do not match the clone's.
+The import files and `lib/resume/check.mjs` are hand-ported JavaScript (types removed, `generateId()` replaced by `crypto.randomUUID()`, `read-file.ts`'s i18n macros removed; `check.mjs` joins several clone files into one), not `stripTypeScriptTypes` output, so their line numbers do not match the clone's.
 
 ### Licence text
 
