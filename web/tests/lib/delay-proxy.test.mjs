@@ -88,15 +88,18 @@ test("an upstream that resets mid-body truncates the response instead of throwin
   });
 });
 
-test("an unreachable upstream answers 502 with the request path", async () => {
+test("an unreachable upstream answers 502 as plain text without echoing the request", async () => {
   const dead = await upstream(() => {});
   const port = dead.address().port;
   await new Promise((r) => dead.close(r));
   const proxy = await startDelayProxy(port, 50);
   try {
-    const { res, body } = await get(proxy.address().port, "/pipeline");
+    const { res, body } = await get(proxy.address().port, "/%3Cimg%20src=x%20onerror=alert(1)%3E");
     assert.equal(res.statusCode, 502);
-    assert.match(body, /\/pipeline/);
+    assert.equal(res.headers["content-type"], "text/plain; charset=utf-8");
+    assert.equal(res.headers["x-content-type-options"], "nosniff");
+    assert.match(body, /^delay proxy: upstream request failed: /);
+    assert.doesNotMatch(body, /onerror/);
   } finally {
     proxy.close();
   }

@@ -51,7 +51,9 @@ export function startDelayProxy(upstreamPort, delayMs) {
     });
     up.on("error", (err) => {
       if (res.headersSent) return res.destroy(err); // mid-body: truncate, the suite's own assertion fails
-      res.writeHead(502); res.end(`delay proxy: upstream ${req.url} failed: ${err.message}`);
+      // Plain text, never the request path: the body must not reflect caller input.
+      res.writeHead(502, { "content-type": "text/plain; charset=utf-8", "x-content-type-options": "nosniff" });
+      res.end(`delay proxy: upstream request failed: ${err.message}`);
     });
     req.pipe(up);
   });
