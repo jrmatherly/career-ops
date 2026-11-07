@@ -8,11 +8,12 @@ import { getProfilePath } from "@/lib/core/profile-path.mjs";
 
 export type RenderResult =
   | { ok: true; html: string; warnings: string[] }
-  | { ok: false; status: 400 | 500 | 503; error: string; issues?: string[] };
+  | { ok: false; status: 400; error: string; issues?: string[] }
+  | { ok: false; status: 500 | 503; error: string };
 
 type Tokens = Record<string, string>;
 type PayloadSchema = { validatePayload: (payload: unknown, format: string) => { errors: string[] } };
-type Templates = { resolveTemplate: (kind: string, name: string | undefined, opts: { format: string; profilePath: string }) => string };
+type Templates = { resolveTemplate: (kind: string, name: string | undefined, opts: { format: string; profilePath: string; strict: boolean }) => string };
 type ThemeStyle = {
   readStyleTokens: (profilePath: string) => Tokens;
   styleTokensFrom: (style: unknown) => Tokens;
@@ -23,12 +24,15 @@ async function coreModule<T>(name: string): Promise<T> {
   return import(/* webpackIgnore: true */ pathToFileURL(rootScript(name)).href) as Promise<T>;
 }
 
+// The CLI prints one JSON report; like the other core-script routes, parse
+// from its first brace in case a banner precedes it, and never lose a
+// template-slot warning silently.
 function stdoutWarnings(stdout: string): string[] {
   try {
-    const warnings = JSON.parse(stdout).warnings;
+    const warnings = JSON.parse(stdout.slice(stdout.indexOf("{"))).warnings;
     return Array.isArray(warnings) ? warnings.map(String) : [];
   } catch {
-    return [];
+    return ["build-cv-html report unreadable; warnings unknown"];
   }
 }
 
@@ -45,7 +49,9 @@ export async function renderCv(payload: unknown, template?: string, style?: unkn
   const profilePath = getProfilePath(careerOpsRoot());
   let templatePath: string;
   try {
-    templatePath = resolveTemplate("cv", template, { format: "html", profilePath });
+    // strict: a broken config/profile.yml is reported, not silently rendered as
+    // the standard template with no style, which is what the PDF pipeline does.
+    templatePath = resolveTemplate("cv", template, { format: "html", profilePath, strict: true });
   } catch (err) {
     return { ok: false, status: 400, error: `template ${template ?? "(default)"}: ${(err as Error).message}` };
   }

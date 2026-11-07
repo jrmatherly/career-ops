@@ -158,8 +158,8 @@ version: 1.0.0
   /* Leadership summary: slightly larger than body, no panel or border. */
   .summary-text {
     font-size: 10.8px;
-    line-height: 1.55;
-    color: #23272c;
+    line-height: var(--line-height, 1.55);
+    color: var(--text-color, #23272c);
   }
 
   /* === COMPETENCIES ===
@@ -214,7 +214,7 @@ version: 1.0.0
     float: left;
     font-size: 11px;
     font-weight: 700;
-    color: #1b1b1b;
+    color: var(--text-color, #1b1b1b);
   }
 
   .job-location {
@@ -231,7 +231,7 @@ version: 1.0.0
     width: 100%;
     font-style: italic;
     font-size: 10px;
-    line-height: 1.5;
+    line-height: var(--line-height, 1.5);
     color: #55606d;
     margin-top: 3px;
   }
@@ -274,7 +274,7 @@ version: 1.0.0
     gap: 10px;
   }
 
-  .edu-title { font-weight: 700; color: #1b1b1b; }
+  .edu-title { font-weight: 700; color: var(--text-color, #1b1b1b); }
 
   .edu-org { font-weight: 400; color: #23272c; }
 
@@ -402,7 +402,7 @@ version: 1.0.0
   html[lang="zh-CN"] .summary-text,
   html[lang="zh"] .summary-text,
   html[lang="zh-CN"] .job li,
-  html[lang="zh"] .job li { line-height: 1.7; }
+  html[lang="zh"] .job li { line-height: var(--line-height, 1.7); }
 </style>
 </head>
 <body>

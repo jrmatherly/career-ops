@@ -144,7 +144,8 @@ export function styleTokensFrom(style) {
   const out = {};
   if (!style || typeof style !== 'object' || Array.isArray(style)) return out;
   for (const [key, cssVar] of Object.entries(STYLE_VAR_MAP)) {
-    const v = style[key];
+    // A bare YAML number (line_height: 1.45) is as valid as the quoted form.
+    const v = Number.isFinite(style[key]) ? String(style[key]) : style[key];
     if (typeof v === 'string' && v.trim()) out[cssVar] = v.trim();
   }
   return out;

@@ -7,7 +7,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,4 +111,42 @@ test("POST rejects a non-object body and forwards validator issues with the lib'
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.ok(body.issues.some((issue) => issue.startsWith("experience:")), JSON.stringify(body));
+});
+
+test("a CLI warning reaches the response instead of being dropped", async () => {
+  const result = await renderCv({ ...payload, extras: ["not a section"] });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(result.warnings.some((w) => w.startsWith("extras:")), JSON.stringify(result.warnings));
+});
+
+test("a broken config/profile.yml is a 400 naming the file, not a silent default render", async () => {
+  const profile = join(dataRoot, "config", "profile.yml");
+  mkdirSync(dirname(profile), { recursive: true });
+  writeFileSync(profile, "cv:\n  template: [unclosed\n");
+  try {
+    const result = await renderCv(payload);
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error, /profile/i);
+  } finally {
+    rmSync(profile);
+  }
+});
+
+test("the profile style: block applies and the request's style wins over it", async () => {
+  const profile = join(dataRoot, "config", "profile.yml");
+  mkdirSync(dirname(profile), { recursive: true });
+  writeFileSync(profile, 'style:\n  text_color: "#111"\n  section_gap: "9px"\n');
+  try {
+    const fromProfile = await renderCv(payload);
+    assert.equal(fromProfile.ok, true, JSON.stringify(fromProfile));
+    assert.match(fromProfile.html, /--text-color: #111;/);
+    const overridden = await renderCv(payload, undefined, { text_color: "#222" });
+    assert.equal(overridden.ok, true, JSON.stringify(overridden));
+    assert.match(overridden.html, /--text-color: #222;/);
+    assert.match(overridden.html, /--section-gap: 9px;/);
+    assert.doesNotMatch(overridden.html, /--text-color: #111;/);
+  } finally {
+    rmSync(profile);
+  }
 });

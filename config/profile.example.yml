@@ -215,10 +215,10 @@ spend_tier: standard
 #                                         # "auto" lets projects split. Unset: the template's own default
 #   heading_font_family: "Georgia, serif" # your name and the section titles
 #   heading_font_size: "13px"             # section titles (your name keeps its own size)
-#   line_height:      "1.45"              # body line spacing
+#   line_height:      "1.45"              # line spacing of body text (bullets, summary, descriptions)
 #   section_gap:      "16px"              # space below each section
 #   item_gap:         "12px"              # space below each job and project
-#   text_color:       "#1f2937"           # body text
+#   text_color:       "#1f2937"           # colour of body text (bullets, summary, titles of entries)
 #   background_color: "#ffffff"           # page background
 #   sidebar_width:    "110px"             # section-title rail (compact template only)
 

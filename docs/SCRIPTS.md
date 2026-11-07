@@ -2214,4 +2214,4 @@ Renders a `build-cv-html.mjs` payload to HTML from the web app, for a live previ
 curl -X POST localhost:3000/api/cv-render -H 'content-type: application/json' -d @body.json
 ```
 
-Returns `200 { "html": "...", "warnings": [...] }`. An invalid payload or an unknown template is `400 { "error": "...", "issues": [...] }` with the validator's messages; a render that fails is `500`, and one that outruns the CLI timeout is `503`. With no `style` the HTML is byte for byte what `build-cv-html.mjs` writes.
+Returns `200 { "html": "...", "warnings": [...] }`. An invalid payload is `400 { "error": "invalid payload", "issues": [...] }` with the validator's messages; an unknown template or a body that is not a JSON object is `400 { "error": "..." }`; a render that fails is `500`, and one that outruns the CLI timeout is `503`. With no `style` and no `style:` block in `config/profile.yml`, the HTML is byte for byte what `build-cv-html.mjs` writes.

@@ -84,6 +84,13 @@ try {
   if (unmapped.length === 0) pass('styleTokensFrom carries each design token to its CSS variable');
   else fail(`styleTokensFrom dropped ${unmapped.map(([k]) => k).join(', ')}`);
 
+  const numeric = styleTokensFrom({ line_height: 1.45, heading_font_size: 13, text_color: true });
+  if (numeric['--line-height'] === '1.45' && numeric['--heading-font-size'] === '13' && !('--text-color' in numeric)) {
+    pass('styleTokensFrom accepts a bare YAML number and still ignores other non-strings');
+  } else {
+    fail(`styleTokensFrom numeric => ${JSON.stringify(numeric)}`);
+  }
+
   const dir = mkdtempSync(join(tmpdir(), 'theme-style-tokens-'));
   const input = join(dir, 'payload.json');
   writeFileSync(input, JSON.stringify(EXAMPLE_PAYLOAD));

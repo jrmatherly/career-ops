@@ -163,7 +163,7 @@ version: 1.0.0
     border-left: 2px solid var(--accent-color);
     padding: 7px 10px;
     text-align: justify;
-    color: #262b33;
+    color: var(--text-color, #262b33);
   }
 
   /* === COMPETENCIES === */
@@ -230,7 +230,7 @@ version: 1.0.0
   .job-context {
     font-style: italic;
     font-size: 9.5px;
-    line-height: 1.5;
+    line-height: var(--line-height, 1.5);
     color: #55606d;
     margin-top: 3px;
   }
@@ -288,7 +288,7 @@ version: 1.0.0
     gap: 10px;
   }
 
-  .edu-title { font-weight: 700; color: #0d0f13; }
+  .edu-title { font-weight: 700; color: var(--text-color, #0d0f13); }
 
   .edu-org { font-weight: 600; color: var(--accent-color); }
 
@@ -315,7 +315,7 @@ version: 1.0.0
     margin-bottom: 3px;
   }
 
-  .cert-title { font-weight: 700; color: #0d0f13; }
+  .cert-title { font-weight: 700; color: var(--text-color, #0d0f13); }
   .cert-org { flex: 1; color: #3a4048; }
   .cert-year { font-size: 9px; font-weight: 600; color: #6b7280; white-space: nowrap; }
 
@@ -429,7 +429,7 @@ version: 1.0.0
   html[lang="zh-CN"] .summary-text,
   html[lang="zh"] .summary-text,
   html[lang="zh-CN"] .job li,
-  html[lang="zh"] .job li { line-height: 1.7; }
+  html[lang="zh"] .job li { line-height: var(--line-height, 1.7); }
 </style>
 </head>
 <body>
