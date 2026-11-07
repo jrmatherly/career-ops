@@ -127,11 +127,15 @@ resolves against the data root.
 When something outside this machine's OS scheduler fires the runs (a Kubernetes
 CronJob that POSTs `/api/scheduler` every 15 minutes, say), set
 `CAREER_OPS_SCHEDULER=external` so the Scheduled scans page reports the schedule
-as installed instead of "Task not installed", and put a short note in
-`CAREER_OPS_SCHEDULER_DESCRIPTION` (shown as the task status). With it set the
-app never reads `crontab` or `launchctl`. Each accepted `POST /api/scheduler`
-touches the `.tick` marker beside `data/scheduled-jobs.json`, the same marker the
-cron line touches, so "Last OS check" stays right.
+as installed ("Task enabled") instead of "Task not installed". With it set the
+app never reads `crontab` or `launchctl`, and each accepted `POST /api/scheduler`
+touches the `.tick` marker beside `data/scheduled-jobs.json` once the runner has
+started, the marker the cron line touches, so "Last OS check" stays right. Without
+it a manual "Check due jobs now" click leaves "Last OS check" alone, so a broken
+cron line still shows. A short note in `CAREER_OPS_SCHEDULER_DESCRIPTION` comes
+back from `GET /api/scheduler` as `description` and `task.status`; the page does
+not render it yet. Any other value of `CAREER_OPS_SCHEDULER` is logged once and
+read as the OS schedule.
 
 ## Development
 

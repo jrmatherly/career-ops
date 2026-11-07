@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
-import { schedulerStatus, schedulerTickPath } from "@/lib/scheduler-status";
+import { schedulerSource, schedulerStatus, schedulerTickPath } from "@/lib/scheduler-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,11 +23,6 @@ export async function POST() {
   }
 
   try {
-    // The cron line touches the tick before the runner; this route is the external scheduler's and the manual
-    // trigger's entry point, so it touches it too.
-    const tick = schedulerTickPath();
-    fs.mkdirSync(path.dirname(tick), { recursive: true });
-    fs.writeFileSync(tick, "");
     const child = spawn(process.execPath, [script], {
       cwd: resolveCodeRoot(process.cwd(), process.env),
       detached: true,
@@ -47,8 +42,23 @@ export async function POST() {
       });
     });
     child.unref();
-    return NextResponse.json({ accepted: true }, { status: 202 });
   } catch {
     return NextResponse.json({ error: "Could not start the local scheduled-job runner." }, { status: 500 });
   }
+
+  // An external scheduler has no cron line to touch the tick, so this route does; a manual click in OS mode must not.
+  if (schedulerSource() === "external") {
+    const tick = schedulerTickPath();
+    try {
+      fs.mkdirSync(path.dirname(tick), { recursive: true });
+      fs.writeFileSync(tick, "");
+    } catch (error) {
+      console.error(`career-ops web: runner started but could not write ${tick}:`, error);
+      return NextResponse.json(
+        { accepted: true, warning: `Could not write the tick marker at ${tick}, so lastRun will not move.` },
+        { status: 202 },
+      );
+    }
+  }
+  return NextResponse.json({ accepted: true }, { status: 202 });
 }

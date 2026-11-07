@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import "../helpers/web-ts-alias-loader.mjs";
+import "../helpers/next-server-stub.mjs";
 import {
   normalizeHost,
   isLoopbackHost,
@@ -393,6 +395,11 @@ test("a cross-site navigation to an /api route is refused", () => {
   assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: "/api/healthz" }).ok, false);
 });
 
+test("a navigation with no pathname is refused (the /api exclusion fails closed)", () => {
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: undefined }).ok, false);
+  assert.equal(navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", pathname: null }).ok, false);
+});
+
 test("navigation does not bypass the Host filter", () => {
   const d = navigate({ secFetchSite: "cross-site", method: "GET", secFetchMode: "navigate", host: "192.168.1.50:3000" });
   assert.equal(d.ok, false);
@@ -404,10 +411,19 @@ test("same-origin and none still pass when method and secFetchMode are omitted",
   assert.equal(navigate({ secFetchSite: "none" }).ok, true);
 });
 
-test("proxy.ts hands the guard the method, Sec-Fetch-Mode, Sec-Fetch-Dest and path", () => {
-  const src = readFileSync(join(WEB_ROOT, "src", "proxy.ts"), "utf8");
-  assert.ok(src.includes("method: req.method"), "passes method");
-  assert.ok(src.includes('secFetchMode: req.headers.get("sec-fetch-mode")'), "passes Sec-Fetch-Mode");
-  assert.ok(src.includes('secFetchDest: req.headers.get("sec-fetch-dest")'), "passes Sec-Fetch-Dest");
-  assert.ok(src.includes("pathname: req.nextUrl.pathname"), "passes the path");
+test("proxy.ts hands the guard the method, Sec-Fetch-Mode, Sec-Fetch-Dest and path", async () => {
+  const { proxy } = await import("@/proxy.ts");
+  const request = (method, pathname) => ({
+    method,
+    headers: new Headers({
+      host: "localhost:3000",
+      "sec-fetch-site": "cross-site",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-dest": "document",
+    }),
+    nextUrl: new URL(`http://localhost:3000${pathname}`),
+  });
+  assert.equal(proxy(request("GET", "/pipeline")).status, 200);
+  assert.equal(proxy(request("GET", "/api/healthz")).status, 403);
+  assert.equal(proxy(request("POST", "/pipeline")).status, 403);
 });

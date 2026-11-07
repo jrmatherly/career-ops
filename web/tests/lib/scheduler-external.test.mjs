@@ -3,7 +3,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
@@ -13,6 +13,7 @@ import { externalScheduleStatus } from "../../src/lib/scheduled-os-schedule.mjs"
 const dataRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-data-"));
 const codeRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-code-"));
 const tick = join(dataRoot, "data", "scheduled-jobs.json.tick");
+const stubRunner = join(codeRoot, "web", "scripts", "scheduled-jobs-runner.mjs");
 const ENV = {
   CAREER_OPS_SCHEDULER: "external",
   CAREER_OPS_SCHEDULER_DESCRIPTION: "CronJob every 15 min",
@@ -26,7 +27,7 @@ const savedEnv = Object.fromEntries(Object.keys(ENV).map((k) => [k, process.env[
 before(() => {
   Object.assign(process.env, ENV);
   mkdirSync(join(codeRoot, "web", "scripts"), { recursive: true });
-  writeFileSync(join(codeRoot, "web", "scripts", "scheduled-jobs-runner.mjs"), "process.exit(0);\n");
+  writeFileSync(stubRunner, "process.exit(0);\n");
 });
 
 after(() => {
@@ -34,8 +35,10 @@ after(() => {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
   }
-  rmSync(dataRoot, { recursive: true, force: true });
-  rmSync(codeRoot, { recursive: true, force: true });
+  // The detached stub runner may still hold codeRoot as its cwd for a moment, which Windows refuses to delete.
+  const retry = { recursive: true, force: true, maxRetries: 20, retryDelay: 100 };
+  rmSync(dataRoot, retry);
+  rmSync(codeRoot, retry);
 });
 
 test("externalScheduleStatus reports an enabled task with no OS next run", () => {
@@ -70,6 +73,15 @@ test("schedulerStatus under an external scheduler reads the tick, not the OS", a
   assert.equal(status.task.lastRun, new Date(statSync(tick).mtimeMs).toISOString());
 });
 
+test("a blank description falls back to the generic label", async () => {
+  process.env.CAREER_OPS_SCHEDULER_DESCRIPTION = "   ";
+  const { schedulerStatus } = await import("@/lib/scheduler-status");
+  const status = await schedulerStatus();
+  assert.equal(status.description, null);
+  assert.equal(status.task.status, "External scheduler");
+  process.env.CAREER_OPS_SCHEDULER_DESCRIPTION = ENV.CAREER_OPS_SCHEDULER_DESCRIPTION;
+});
+
 test("POST /api/scheduler touches the tick so GET reports the run", async () => {
   rmSync(tick, { force: true });
   const { GET, POST } = await import("@/app/api/scheduler/route.ts");
@@ -79,4 +91,47 @@ test("POST /api/scheduler touches the tick so GET reports the run", async () => 
   assert.ok(Math.abs(Date.now() - mtimeMs) < 5_000, "tick is fresh");
   const body = await (await GET()).json();
   assert.equal(body.task.lastRun, new Date(mtimeMs).toISOString());
+});
+
+test("the tick follows CAREER_OPS_SCHEDULED_JOBS_PATH, as the cron line does", async () => {
+  const store = join(dataRoot, "elsewhere", "jobs.json");
+  process.env.CAREER_OPS_SCHEDULED_JOBS_PATH = store;
+  const { schedulerTickPath } = await import("@/lib/scheduler-status");
+  const { GET, POST } = await import("@/app/api/scheduler/route.ts");
+  assert.equal(schedulerTickPath(dataRoot), `${store}.tick`);
+  assert.equal((await POST()).status, 202);
+  const mtimeMs = statSync(`${store}.tick`).mtimeMs;
+  assert.equal((await (await GET()).json()).task.lastRun, new Date(mtimeMs).toISOString());
+  process.env.CAREER_OPS_SCHEDULED_JOBS_PATH = "";
+});
+
+test("a 404 (runner not installed) leaves no tick", async () => {
+  rmSync(tick, { force: true });
+  renameSync(stubRunner, `${stubRunner}.off`);
+  try {
+    const { POST } = await import("@/app/api/scheduler/route.ts");
+    assert.equal((await POST()).status, 404);
+    assert.equal(existsSync(tick), false);
+  } finally {
+    renameSync(`${stubRunner}.off`, stubRunner);
+  }
+});
+
+test("without the env the status is the OS schedule and a manual POST leaves lastRun alone", async () => {
+  delete process.env.CAREER_OPS_SCHEDULER;
+  rmSync(tick, { force: true });
+  try {
+    const { schedulerStatus } = await import("@/lib/scheduler-status");
+    const { POST } = await import("@/app/api/scheduler/route.ts");
+    const status = await schedulerStatus();
+    assert.equal(status.source, "os");
+    assert.equal(status.description, null);
+    assert.equal(status.installed, status.task.exists);
+    assert.equal((await POST()).status, 202);
+    assert.equal(existsSync(tick), false);
+    process.env.CAREER_OPS_SCHEDULER = "k8s";
+    assert.equal((await schedulerStatus()).source, "os", "an unknown value reads as the OS schedule");
+  } finally {
+    process.env.CAREER_OPS_SCHEDULER = ENV.CAREER_OPS_SCHEDULER;
+  }
 });

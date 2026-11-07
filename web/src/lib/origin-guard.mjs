@@ -122,7 +122,7 @@ function block(reason) {
 }
 
 /**
- * Decide whether an /api request may proceed.
+ * Decide whether a request to a page or an /api route may proceed.
  * @param {object} req
  * @param {string|null} req.secFetchSite  Sec-Fetch-Site header, if any
  * @param {string|null} req.origin        Origin header, if any
@@ -132,7 +132,7 @@ function block(reason) {
  * @param {string|null} [req.method]       HTTP method
  * @param {string|null} [req.secFetchMode] Sec-Fetch-Mode header, if any
  * @param {string|null} [req.secFetchDest] Sec-Fetch-Dest header, if any
- * @param {string|null} [req.pathname]     request path, to keep /api out of the navigation rule
+ * @param {string|null} req.pathname       request path; the navigation rule needs it and fails closed without it
  * @returns {{ok: true} | {ok: false, status: number, reason: string}}
  */
 export function checkRequest({
@@ -160,7 +160,8 @@ export function checkRequest({
   // Origin layer (F1), primary: the Fetch Metadata signal, when present.
   //   same-origin — the app's own fetch()          → allow
   //   none         — a direct navigation/bookmark   → allow (not attacker-forgeable)
-  //   same-site / cross-site — another origin        → block
+  //   same-site / cross-site — another origin        → block, except a GET or
+  //     HEAD document navigation to a page (below)
   if (secFetchSite) {
     if (secFetchSite === "same-origin" || secFetchSite === "none") return { ok: true };
     // A top-level page navigation carries no body or custom header, so it is not this layer's CSRF, and an
@@ -170,7 +171,8 @@ export function checkRequest({
       (method === "GET" || method === "HEAD") &&
       secFetchMode === "navigate" &&
       secFetchDest === "document" &&
-      !String(pathname ?? "").startsWith("/api/")
+      typeof pathname === "string" &&
+      !pathname.startsWith("/api/")
     ) {
       return { ok: true };
     }
