@@ -118,8 +118,17 @@ test('republishing without password or hideContacts keeps both; sending them cha
   const served = await (await get('/s/keep')).text();
   assert.ok(served.includes('ada@example.com'), 'contacts are back');
   const nothing = await api('PUT', '/api/shares/plain', { html: '<html><body><h1>No contacts</h1></body></html>', hideContacts: true });
-  assert.equal(nothing.body.hideContacts, false, 'hideContacts is reported true only when something was removed');
-  assert.equal((await api('GET', '/api/shares/plain/stats')).body.hideContacts, false);
+  assert.deepEqual([nothing.body.hideContacts, nothing.body.contactsRemoved], [true, false], 'intent is kept, and the caller learns nothing was removed');
+  assert.equal((await api('GET', '/api/shares/plain/stats')).body.hideContacts, true);
+  const later = await api('PUT', '/api/shares/plain', { html: fixture('later') });
+  assert.deepEqual([later.body.hideContacts, later.body.contactsRemoved], [true, true], 'a later render with contacts is still stripped');
+  assert.ok(!(await (await get('/s/plain')).text()).includes('ada@example.com'));
+  assert.equal(first.body.contactsRemoved, true);
+});
+
+test('hideContacts strips mixed-quote and unquoted mailto and tel hrefs', () => {
+  const html = `<a href="mailto:a'b@example.com">m1</a><a href='tel:+1"5'>t1</a><a href=mailto:c@example.com>m2</a><a href="https://example.com">keep</a>`;
+  assert.equal(hideContacts(html), '<a href="https://example.com">keep</a>');
 });
 
 test('view counting: two clients x10 is 2, owner 0, crawler 0, 50 parallel distinct keys add 50', async (t) => {

@@ -15,5 +15,5 @@ export function feedbackPage(snapshotHtml, token) {
 export function hideContacts(html) {
   return html
     .replace(/<div class="contact-row">[\s\S]*?<\/div>/g, '')
-    .replace(/<a\b[^>]*href=(["'])(?:mailto|tel):[^"']*\1[^>]*>[\s\S]*?<\/a>/gi, '');
+    .replace(/<a\b[^>]*href=(?:"(?:mailto|tel):[^"]*"|'(?:mailto|tel):[^']*'|(?:mailto|tel):[^\s>]*)[^>]*>[\s\S]*?<\/a>/gi, '');
 }

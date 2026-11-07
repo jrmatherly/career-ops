@@ -160,11 +160,11 @@ export function createServer(config) {
       const current = db.getShare(m[1]);
       const hiding = hide ?? !!current?.hide_contacts;
       const html = hiding ? hideContacts(raw) : raw;
-      const hidden = hiding && html !== raw;
       const pwHash = password === undefined ? current?.pw_hash ?? null : password ? await hashPassword(password) : null;
       const sha = sha256(html).toString('hex');
-      db.publish(m[1], sha, html, pwHash, hidden);
-      return json(res, 200, { slug: m[1], sha, url: `/s/${m[1]}`, hasPassword: !!pwHash, hideContacts: hidden });
+      db.publish(m[1], sha, html, pwHash, hiding);
+      // contactsRemoved tells the caller whether the stripper recognised this template's contact markup.
+      return json(res, 200, { slug: m[1], sha, url: `/s/${m[1]}`, hasPassword: !!pwHash, hideContacts: hiding, contactsRemoved: html !== raw });
     }) },
     { method: 'GET', pattern: route(`/api/shares/${SLUG}/stats`), handler: withShare((req, res, s) => json(res, 200, {
       slug: s.slug, views: s.views, hasPassword: !!s.pw_hash, hideContacts: !!s.hide_contacts, sha: s.html_sha, updated: s.updated,
