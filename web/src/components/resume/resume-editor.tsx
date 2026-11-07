@@ -4,14 +4,14 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { CvPreview } from "@/components/cv-studio/cv-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DesignPanel } from "@/components/resume/design-panel";
+import { GatePanel, type Report } from "@/components/resume/gate-panel";
 import { Field, SectionForm, type FieldKind, type ResumeDraft } from "@/components/resume/section-form";
+import { SELECT, TemplatePicker, type TemplateOption } from "@/components/resume/template-picker";
 import { BUILT_IN_SECTIONS, SECTION_TYPES, addCustomSection, editorReducer, firstTitleProblem, setField } from "@/lib/resume-form.mjs";
 
 // The reducer is plain JS in resume-form.mjs so its save-state rules have unit tests; these types describe it.
 const reducer = editorReducer as (state: State, action: Action) => State;
-
-type Entry = { id: string; section?: string; name?: string; company?: string; position?: string; period?: string };
-type Report = { orphans?: Entry[]; newEntries?: Entry[]; unparsed?: { line: number; text: string }[] };
 
 type Status =
   | { kind: "loading" }
@@ -47,9 +47,7 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
 // A route that throws answers with an HTML error page, not JSON.
 const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
-const entryText = (e: Entry) => (e.section ? `${e.section}: ${e.name ?? ""}` : [e.company, e.position, e.period].filter(Boolean).join(", "));
-
-export function ResumeEditor() {
+export function ResumeEditor({ templates }: { templates: TemplateOption[] }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
   const [html, setHtml] = useState("");
   // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
@@ -57,6 +55,9 @@ export function ResumeEditor() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [customType, setCustomType] = useState("projects");
   const edited = useRef(false);
+  const editDelay = useRef(300);
+  // Bumped after a pairing or an adoption so the editor reloads cv.md.
+  const [generation, setGeneration] = useState(0);
   const requestNo = useRef(0);
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export function ResumeEditor() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [generation]);
 
   const { data, status } = state;
   const editable = data && status.kind !== "loading" && status.kind !== "readonly" && status.kind !== "error";
@@ -99,7 +100,7 @@ export function ResumeEditor() {
       } catch (err) {
         if (n === requestNo.current) setPreviewError((err as Error).message);
       }
-    }, edited.current ? 300 : 0);
+    }, edited.current ? editDelay.current : 0);
     return () => clearTimeout(timer);
   }, [data, editable]);
 
@@ -111,9 +112,10 @@ export function ResumeEditor() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const edit = (next: ResumeDraft) => {
+  const edit = (next: ResumeDraft, delay = 300) => {
     performance.mark("resume-edit");
     edited.current = true;
+    editDelay.current = delay;
     dispatch({ type: "edit", data: next });
   };
 
@@ -148,7 +150,7 @@ export function ResumeEditor() {
           {status.message}
         </p>
       )}
-      {status.kind === "readonly" && <ReadOnlyReport report={state.report} absorbed={state.data !== null} />}
+      {status.kind === "readonly" && <GatePanel key={generation} report={state.report} absorbed={state.data !== null} onResolved={() => setGeneration((g) => g + 1)} />}
 
       {editable && data && (
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -167,6 +169,14 @@ export function ResumeEditor() {
                 </p>
               )}
             </div>
+
+            <section aria-labelledby="design-heading" className="space-y-3">
+              <h2 id="design-heading" className="font-display text-lg tracking-tight text-foreground">
+                Design
+              </h2>
+              <TemplatePicker templates={templates} value={data.careerOps?.template ?? "default"} onChange={(v) => edit(setField(data, ["careerOps", "template"], v), 0)} />
+              <DesignPanel style={data.careerOps?.style ?? {}} onChange={(v) => edit(setField(data, ["careerOps", "style"], v))} />
+            </section>
 
             <section aria-labelledby="basics-heading" className="space-y-3">
               <h2 id="basics-heading" className="font-display text-lg tracking-tight text-foreground">
@@ -198,7 +208,7 @@ export function ResumeEditor() {
                 <label htmlFor="custom-type" className="mb-1 block text-xs font-medium text-muted">
                   Custom section type
                 </label>
-                <select id="custom-type" value={customType} onChange={(e) => setCustomType(e.target.value)} className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]">
+                <select id="custom-type" value={customType} onChange={(e) => setCustomType(e.target.value)} className={SELECT}>
                   {Object.entries(SECTION_TYPES).map(([type, t]) => (
                     <option key={type} value={type}>
                       {t.label}
@@ -233,50 +243,5 @@ export function ResumeEditor() {
         </div>
       )}
     </div>
-  );
-}
-
-function ReadOnlyReport({ report, absorbed }: { report: Report | null; absorbed: boolean }) {
-  const list = (title: string, entries: Entry[] | undefined) =>
-    entries?.length ? (
-      <div>
-        <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
-          {entries.map((e) => (
-            <li key={e.id} className="break-words">
-              {entryText(e)} <code className="text-faint">{e.id}</code>
-            </li>
-          ))}
-        </ul>
-      </div>
-    ) : null;
-  return (
-    <Card className="mt-6 space-y-4">
-      <p role="status" className="text-sm text-foreground">
-        <code>cv.md</code> does not read back into the editor without loss, so the editor is read-only.{" "}
-        {absorbed ? (
-          <>
-            If an entry was renamed or redated (it shows in both lists below), pair it with <code>node resume.mjs pair &lt;orphanId&gt; &lt;newId&gt;</code>.{" "}
-          </>
-        ) : (
-          <>Fix the lines listed below and reload. </>
-        )}
-        <code>node resume.mjs adopt</code> shows how cv.md differs from the file regenerated from it.
-      </p>
-      {list("Entries only in data/resume.json", report?.orphans)}
-      {list("Entries only in cv.md", report?.newEntries)}
-      {report?.unparsed?.length ? (
-        <div>
-          <h3 className="text-sm font-medium text-foreground">Lines that could not be read</h3>
-          <ul className="mt-1 space-y-1 text-sm text-muted">
-            {report.unparsed.map((u) => (
-              <li key={u.line} className="break-words">
-                Line {u.line}: <code>{u.text}</code>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </Card>
   );
 }
