@@ -5,6 +5,11 @@ services:
     build: .
     image: ghcr.io/jrmatherly/career-ops-publish:latest
     env_file: .env
+    # Over .env: .env.example's loopback bind and relative database path break the container.
+    environment:
+      - PUBLISH_BIND=0.0.0.0
+      - PUBLISH_PORT=8080
+      - PUBLISH_DB=/data/publish.db
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

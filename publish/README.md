@@ -84,7 +84,7 @@ docker compose -f publish/compose.yml up --build
 
 The runtime contract:
 
-- **Environment.** The variables in [Environment](#environment). The image sets `PUBLISH_BIND=0.0.0.0`, `PUBLISH_PORT=8080` and `PUBLISH_DB=/data/publish.db`; the compose file reads the rest from `publish/.env`. Register `https://<host>/api/auth/callback/pocket-id` as the Pocket ID redirect URI, where `https://<host>` is `PUBLISH_BASE_URL`.
+- **Environment.** The variables in [Environment](#environment). The image and the compose file both set `PUBLISH_BIND=0.0.0.0`, `PUBLISH_PORT=8080` and `PUBLISH_DB=/data/publish.db`. Compose's values win over the copies in `publish/.env`. Left to `.env.example`'s loopback bind and relative database path, the container would be unreachable and unable to open its database. Compose reads the rest from `publish/.env`. Another runtime that passes the `.env` file must leave those three unset or keep these values. Register `https://<host>/api/auth/callback/pocket-id` as the Pocket ID redirect URI, where `https://<host>` is `PUBLISH_BASE_URL`.
 - **Port.** 8080 inside the container. `publish/compose.yml` publishes it on `127.0.0.1:8080` only; the tunnel or the cluster Service is the only public path in.
 - **Volume.** `/data`, owned by uid 1000, holds `publish.db` and its WAL files: shares, comments, views, accounts and keys. It is the only state, so back it up, and run one replica (see below).
 
