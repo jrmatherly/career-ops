@@ -4,7 +4,7 @@ Subagent research report, 2026-11-06. Model output: claims carry file:line evide
 
 # career-ops feature inventory (resume building, web UI, tracking)
 
-Scope: read-only, repo at /Users/jason/dev/career-ops (main at 42f2c07b). Nothing was created or edited. "V" means I read the cited lines. "G" means I confirmed a negative with grep. "N" means not verified beyond a header or doc comment. I did not run any script or test.
+Scope: read-only, repo at ~/dev/career-ops (main at 42f2c07b). Nothing was created or edited. "V" means I read the cited lines. "G" means I confirmed a negative with grep. "N" means not verified beyond a header or doc comment. I did not run any script or test.
 
 ## 1. Resume/CV building and rendering
 

@@ -2,7 +2,7 @@
 
 Subagent research report, 2026-11-06. Model output: claims carry file:line evidence or are labelled inference; verify against the code before relying on one.
 
-Review of the plan at `/Users/jason/dev/career-ops-rr-plan/docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`. I checked every claim below against the files cited. Findings are ordered by severity.
+Review of the plan at `~/dev/career-ops-rr-plan/docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md`. I checked every claim below against the files cited. Findings are ordered by severity.
 
 **Blocking**
 

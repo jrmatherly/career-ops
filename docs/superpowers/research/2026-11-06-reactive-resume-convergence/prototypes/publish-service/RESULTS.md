@@ -1,6 +1,6 @@
 # Option B prototype results (throwaway)
 
-Node v24.22.2, stdlib only. Nothing written under /Users/jason/dev/career-ops (`git status --short` empty before and after).
+Node v24.22.2, stdlib only. Nothing written under ~/dev/career-ops (`git status --short` empty before and after).
 
 ## Render (step 1)
 - `build-cv-html.mjs` takes positionals, not flags: `node build-cv-html.mjs <input.json> <output.html> [template.html]`. With CAREER_OPS_ROOT=proto/root it printed `"valid": true`, `"warnings": []`, 21.9 KB. Wall time 113 ms (default template).

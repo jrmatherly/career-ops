@@ -2,7 +2,7 @@
 
 Subagent research report, 2026-11-06. Model output: claims carry file:line evidence or are labelled inference; verify against the code before relying on one.
 
-All claims below were read from files in /Users/jason/dev/home-cluster. Nothing was run against the cluster, nothing under `private/` was read except `private/reactive-resume-setup.md`, and `cluster.toml` was not opened (I used the sample and the fixtures). "Inferred" marks anything not read directly.
+All claims below were read from files in ~/dev/home-cluster. Nothing was run against the cluster, nothing under `private/` was read except `private/reactive-resume-setup.md`, and `cluster.toml` was not opened (I used the sample and the fixtures). "Inferred" marks anything not read directly.
 
 ## 1. Repo shape
 
@@ -171,7 +171,7 @@ All claims below were read from files in /Users/jason/dev/home-cluster. Nothing 
 
 ## Minimal file set for a new app, modelled on reactive-resume
 
-Examples use a namespace and app both named `career-ops` (the name is a placeholder). Template paths are relative to `/Users/jason/dev/home-cluster/`, and each has a rendered twin at the same path with `template/config/` removed and `.j2` dropped.
+Examples use a namespace and app both named `career-ops` (the name is a placeholder). Template paths are relative to `~/dev/home-cluster/`, and each has a rendered twin at the same path with `template/config/` removed and `.j2` dropped.
 
 **Web Deployment** (`career-ops/career-ops`)
 - `template/config/kubernetes/apps/career-ops/kustomization.yaml.j2`

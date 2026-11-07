@@ -201,24 +201,24 @@ Build it first in the scratch dir, outside the repo. Promoting it means a new `p
 - `node --version`. It must be 22 or newer for `node:sqlite`.
 - Scratch files:
   - `/private/tmp/claude-501/-Users-jason-dev-career-ops/9d4e3414-0fa5-470a-ad4f-a6db69a9b9c4/scratchpad/arch/proto/server.mjs`, the `node:http` server: `PUT /api/shares/:slug`, `GET/POST /s/:slug`, `GET/POST /f/:token`, `GET /api/shares/:slug/stats`.
-  - `/private/tmp/claude-501/-Users-jason-dev-career-ops/9d4e3414-0fa5-470a-ad4f-a6db69a9b9c4/scratchpad/arch/proto/share.mjs`, the CLI: `publish | stats | pull`. It imports `inlineLocalFonts` from `/Users/jason/dev/career-ops/generate-pdf.mjs` and resolves the root through `getCareerOpsRoot()` from `/Users/jason/dev/career-ops/path-resolver.mjs`, as AGENTS.md requires of new scripts.
+  - `/private/tmp/claude-501/-Users-jason-dev-career-ops/9d4e3414-0fa5-470a-ad4f-a6db69a9b9c4/scratchpad/arch/proto/share.mjs`, the CLI: `publish | stats | pull`. It imports `inlineLocalFonts` from `~/dev/career-ops/generate-pdf.mjs` and resolves the root through `getCareerOpsRoot()` from `~/dev/career-ops/path-resolver.mjs`, as AGENTS.md requires of new scripts.
   - `/private/tmp/claude-501/-Users-jason-dev-career-ops/9d4e3414-0fa5-470a-ad4f-a6db69a9b9c4/scratchpad/arch/proto/selfcheck.mjs`, assert-based checks for points 2 to 5.
 - Run:
   - `CAREER_OPS_ROOT=<tmp root> node share.mjs publish --html <tmp root>/output/cv-x.html --slug x --password hunter22 --hide-contacts`
   - `node server.mjs`
   - `node selfcheck.mjs`
-- The local store it writes is `<tmp root>/data/shares.json` plus `<tmp root>/data/share-feedback/x.md`. It writes nothing under `/Users/jason/dev/career-ops`.
+- The local store it writes is `<tmp root>/data/shares.json` plus `<tmp root>/data/share-feedback/x.md`. It writes nothing under `~/dev/career-ops`.
 - If no `output/*.html` exists locally, make one with `node build-cv-html.mjs` on `examples/` payload data. That is unverified: check `node build-cv-html.mjs --help` for the payload flag first.
 
 ## Where things live
 
-- `/Users/jason/dev/career-ops/web/src/proxy.ts` and `/Users/jason/dev/career-ops/web/src/lib/origin-guard.mjs` hold today's only access control.
-- `/Users/jason/dev/career-ops/web/src/lib/career-ops.ts` binds the data root (`careerOpsRoot`, 37-61).
-- `/Users/jason/dev/career-ops/web/src/lib/core-cli.ts` and `/Users/jason/dev/career-ops/web/src/app/api/run/route.ts` are where spawned children inherit the env.
-- `/Users/jason/dev/career-ops/web/src/lib/core/run-registry.ts` and `/Users/jason/dev/career-ops/web/src/lib/apply/session.ts` hold the process-global state.
-- `/Users/jason/dev/career-ops/web/src/lib/pdf-render.mjs` keeps the published HTML in `output/` (`keepTailoredHtml`).
-- `/Users/jason/dev/career-ops/generate-pdf.mjs:2330` is `inlineLocalFonts`.
-- `/Users/jason/dev/career-ops/update-system.mjs:334-348` is `USER_PATHS`, which covers `data/` and `.career-ops-web/`.
+- `~/dev/career-ops/web/src/proxy.ts` and `~/dev/career-ops/web/src/lib/origin-guard.mjs` hold today's only access control.
+- `~/dev/career-ops/web/src/lib/career-ops.ts` binds the data root (`careerOpsRoot`, 37-61).
+- `~/dev/career-ops/web/src/lib/core-cli.ts` and `~/dev/career-ops/web/src/app/api/run/route.ts` are where spawned children inherit the env.
+- `~/dev/career-ops/web/src/lib/core/run-registry.ts` and `~/dev/career-ops/web/src/lib/apply/session.ts` hold the process-global state.
+- `~/dev/career-ops/web/src/lib/pdf-render.mjs` keeps the published HTML in `output/` (`keepTailoredHtml`).
+- `~/dev/career-ops/generate-pdf.mjs:2330` is `inlineLocalFonts`.
+- `~/dev/career-ops/update-system.mjs:334-348` is `USER_PATHS`, which covers `data/` and `.career-ops-web/`.
 - RR:
   - `apps/server/src/http/app.ts:176-204`, the routes
   - `apps/server/src/static/resume-page.ts`, the page and password form
@@ -234,4 +234,4 @@ Build it first in the scratch dir, outside the repo. Promoting it means a new `p
 - RR's public page and RR's feedback page use different renderers: server HTML on one, a PDF canvas on the other. For career-ops, one HTML artifact can serve both.
 - RR's feedback snapshot keeps contact details (`feedback/service.ts:193`) while the public page can hide them. Decide this per link, not per resume.
 
-Not checked: whether Studio edits reach `output/*.html`; the photo path behaviour; the exact `build-cv-html.mjs` CLI flags. Commit counts come from this checkout's merged history (upstream plus fork), not from upstream alone. Nothing was run in the RR clone, and nothing was written in /Users/jason/dev/career-ops.
+Not checked: whether Studio edits reach `output/*.html`; the photo path behaviour; the exact `build-cv-html.mjs` CLI flags. Commit counts come from this checkout's merged history (upstream plus fork), not from upstream alone. Nothing was run in the RR clone, and nothing was written in ~/dev/career-ops.

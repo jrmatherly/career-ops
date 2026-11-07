@@ -4,7 +4,7 @@ Subagent research report, 2026-11-06. Model output: claims carry file:line evide
 
 # web/ survey for kanban, resume editor, Check panel, share pages
 
-All paths under /Users/jason/dev/career-ops/web unless noted. "Inferred" marks my reasoning, not a read fact.
+All paths under ~/dev/career-ops/web unless noted. "Inferred" marks my reasoning, not a read fact.
 
 ## 1. Stack and conventions
 

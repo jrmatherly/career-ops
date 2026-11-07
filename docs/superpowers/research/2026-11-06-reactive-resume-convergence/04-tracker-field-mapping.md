@@ -2,7 +2,7 @@
 
 Subagent research report, 2026-11-06. Model output: claims carry file:line evidence or are labelled inference; verify against the code before relying on one.
 
-NOTE: the Write tool refused the report file (policy: subagents return findings as text), so /private/tmp/.../scratchpad/tracker/report.md was NOT written. The full report is below. Read-only: nothing written in either repo. `RR/` = the RR clone `.../scratchpad/rr/repo`, `CO/` = /Users/jason/dev/career-ops. "Inferred" marks anything not read directly.
+NOTE: the Write tool refused the report file (policy: subagents return findings as text), so /private/tmp/.../scratchpad/tracker/report.md was NOT written. The full report is below. Read-only: nothing written in either repo. `RR/` = the RR clone `.../scratchpad/rr/repo`, `CO/` = ~/dev/career-ops. "Inferred" marks anything not read directly.
 
 # RR v6 applications vs career-ops tracker: field-level mapping
 

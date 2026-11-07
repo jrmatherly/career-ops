@@ -6,7 +6,7 @@ Subagent research report, 2026-11-06. Model output: claims carry file:line evide
 
 - Clone: `/private/tmp/claude-501/-Users-jason-dev-career-ops/9d4e3414-0fa5-470a-ad4f-a6db69a9b9c4/scratchpad/rr/repo`
 - HEAD SHA: `d065a9f76538afda5da5de9374da2ed51f96c1e4` (commit dated 2026-11-07 00:17 +0100)
-- Nothing was run from inside the clone. All of it is read-only. I wrote nothing in `/Users/jason/dev/career-ops`.
+- Nothing was run from inside the clone. All of it is read-only. I wrote nothing in `~/dev/career-ops`.
 - "V" means verified from source or `gh` output. "I" means inferred. Paths are relative to the clone root.
 - Line numbers: I recorded them only for the career-ops-relevant files where I grepped (e.g. the `templateSchema` at `packages/schema/src/templates.ts:3`). Elsewhere the citation is file-level.
 - I did not read every file. The sections on the career coach, offers and the application workspace come from the schema, the DB and the docs. I did not trace their service code.
