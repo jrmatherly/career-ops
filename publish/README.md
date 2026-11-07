@@ -75,7 +75,7 @@ One view per client key per share per hour. Requests carrying a `share:manage` k
 
 ## Image
 
-`publish/Dockerfile` builds the service on `node:24-alpine`, pinned by digest, with `npm ci --omit=dev`; the `auth` CLI is a runtime dependency because the container runs `auth migrate` before `start.mjs`, offline, on every start. It runs as uid 1000 under `tini`. CI publishes it as `ghcr.io/jrmatherly/career-ops-publish` (`latest` on `main`, `sha-<short>` on every build), from `.github/workflows/docker-image.yml`.
+`publish/Dockerfile` builds the service on `node:24-alpine`, pinned by digest, with `npm ci --omit=dev`; the `auth` CLI is a runtime dependency because the container runs `auth migrate` before `start.mjs` (which also migrates in-process before it listens), offline, on every start. It runs as uid 1000 under `tini`. CI publishes it as `ghcr.io/jrmatherly/career-ops-publish` (`latest` on `main`, `sha-<short>` on every pushed build), from `.github/workflows/docker-image.yml`.
 
 ```bash
 cp publish/.env.example publish/.env   # then fill it in
@@ -89,6 +89,8 @@ The runtime contract:
 - **Volume.** `/data`, owned by uid 1000, holds `publish.db` and its WAL files: shares, comments, views, accounts and keys. It is the only state, so back it up, and run one replica (see below).
 
 Inside the container the service binds every interface, so the loopback argument below moves to the container boundary: publish the port on loopback, or let only the proxy reach the pod.
+
+Through a published port, the service sees the compose network's gateway (for example `192.168.148.1`) as the peer of every request from the host, a host-run `cloudflared` included. All visitors then share one view-counter and password-limiter key: nobody can spoof an address, but five wrong passwords from anyone lock password entry on every share, for everyone, for ten minutes. Never list the gateway in `PUBLISH_TRUSTED_PROXIES`, which would let any host process set the client address. Run the proxy beside the service instead (a `cloudflared` sidecar in the pod, peer `127.0.0.1`) and trust only that.
 
 ## Why loopback, and why the proxy must be the only peer
 
