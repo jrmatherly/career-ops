@@ -32,6 +32,7 @@ function withRoot(fn) {
 const run = (root, ...args) => spawnSync(process.execPath, [CLI, ...args], {
   env: ownRootEnv({ CAREER_OPS_ROOT: root }),
 });
+const escapeXml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const documentXml = (buffer) => strFromU8(unzipSync(new Uint8Array(buffer))['word/document.xml']);
 const withoutCareerOps = ({ careerOps, ...rest }) => rest;
 const withoutIds = (value) => JSON.parse(JSON.stringify(value, (key, v) => (key === 'id' ? undefined : v)));
@@ -42,13 +43,20 @@ test('resume-export: payloadToDocx writes the name, every company and the headin
   const { payload } = resumeToPayload(data);
   const xml = documentXml(await payloadToDocx(payload));
   assert.ok(xml.includes(data.basics.name), 'name present');
-  for (const entry of payload.experience) assert.ok(xml.includes(entry.company.replace(/&/g, '&amp;')), `company ${entry.company}`);
+  for (const entry of payload.experience) assert.ok(xml.includes(escapeXml(entry.company)), `company ${entry.company}`);
   const HEADINGS = { summary: 'Summary', experience: 'Experience', education: 'Education', projects: 'Projects', skills: 'Skills', interests: 'Interests', awards: 'Awards', certifications: 'Certifications' };
   const keys = Object.keys(payload).filter((k) => HEADINGS[k]);
   assert.ok(keys.length >= 6, 'sample fills most sections');
   const positions = keys.map((k) => xml.indexOf(`<w:t xml:space="preserve">${HEADINGS[k]}</w:t>`));
   assert.ok(positions.every((p) => p >= 0), `every heading present: ${positions}`);
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'headings in payload order');
+  const shows = (value) => xml.includes(escapeXml(value));
+  assert.ok(shows(payload.candidate.email), 'contact line');
+  assert.ok(shows(payload.experience[0].bullets[0]), 'experience bullet');
+  assert.ok(shows(payload.education[0].title), 'education title');
+  for (const skill of payload.skills) assert.ok(shows(skill.items[0]), `skill ${skill.items[0]}`);
+  const bullets = payload.experience.reduce((n, e) => n + (e.bullets?.length ?? 0), 0);
+  assert.equal(xml.split('<w:numPr>').length - 1, bullets, 'one Word bullet per experience bullet');
 });
 
 test('resume-export: payloadToDocx refuses a payload section it has no layout for', async () => {
@@ -73,8 +81,14 @@ test('resume-export: CLI export rr-json reimports to the same data, without care
 }));
 
 test('resume-export: rr-json with --hide exits 1', () => withRoot((root) => {
-  assert.equal(run(root, 'export', 'rr-json', '--in', SAMPLE, '--hide', 'experience').status, 1);
-  assert.equal(run(root, 'export', 'rr-json', '--in', SAMPLE, '--hide-item', 'x').status, 1);
+  for (const flag of [['--hide', 'experience'], ['--hide-item', 'x']]) {
+    const r = run(root, 'export', 'rr-json', '--in', SAMPLE, ...flag);
+    assert.equal(r.status, 1);
+    assert.match(String(r.stderr), /does not take --hide/);
+  }
+  const unknown = run(root, 'export', 'constructor', '--in', SAMPLE);
+  assert.equal(unknown.status, 1);
+  assert.match(String(unknown.stderr), /export takes cv-md, payload, docx, rr-json, json-resume/);
 }));
 
 test('resume-export: json-resume parses with the importer and round-trips the fixture', () => {
@@ -99,7 +113,7 @@ test('resume-export: json-resume of the RR sample parses with the importer and l
   data.customSections.push({ ...structuredClone(data.customSections[0]), id: 'cover', type: 'cover-letter', title: 'Cover note', items: [{ id: 'c1', hidden: false, recipient: '', content: '<p>Hi</p>' }] });
   const { document, unmapped } = resumeToJsonResume(data);
   assert.doesNotThrow(() => parseJSONResume(document));
-  assert.deepEqual(unmapped, ['Cover note']);
+  assert.deepEqual(unmapped, ['Northwind Games (the title and description above its roles)', 'Cover note', `basics.customFields (${data.basics.customFields.length})`]);
   const custom = data.customSections[0];
   assert.ok(document.work.some((w) => w.name === custom.items[0].company), 'custom experience merged into work');
 });
@@ -121,14 +135,14 @@ test('resume-export: --hide experience and --hide-item leave entries out of DOCX
   const xml = documentXml(readFileSync(docx));
   const work = (JSON.parse(readFileSync(json, 'utf8')).work ?? []).map((w) => w.name);
   for (const name of names) {
-    assert.ok(!xml.includes(name), `${name} not in DOCX`);
+    assert.ok(!xml.includes(escapeXml(name)), `${name} not in DOCX`);
     assert.ok(!work.includes(name), `${name} not in work`);
   }
 
   const [first] = data.sections.experience.items;
   assert.equal(run(root, 'export', 'docx', '--in', SAMPLE, '--hide-item', first.id, '--out', docx).status, 0);
   assert.equal(run(root, 'export', 'json-resume', '--in', SAMPLE, '--hide-item', first.id, '--out', json).status, 0);
-  assert.ok(!documentXml(readFileSync(docx)).includes(first.company));
+  assert.ok(!documentXml(readFileSync(docx)).includes(escapeXml(first.company)));
   const kept = JSON.parse(readFileSync(json, 'utf8')).work.map((w) => w.name);
   assert.ok(!kept.includes(first.company));
   assert.ok(kept.includes(names[1]), 'other entries stay');
@@ -175,21 +189,26 @@ test('resume-export: CLI json-resume names a custom section it cannot carry on s
   writeFileSync(input, JSON.stringify(data));
   const r = run(root, 'export', 'json-resume', '--in', input, '--out', join(root, 'out.json'));
   assert.equal(r.status, 0, String(r.stderr));
-  assert.match(String(r.stderr), /not in the JSON Resume: Cover note/);
+  assert.match(String(r.stderr), /^resume: not in the JSON Resume: .*Cover note/m);
 }));
 
 test('resume-export: docx refuses a terminal stdout and writes nothing', async () => {
   const { isTTY } = process.stdout;
   const errors = [];
   const { error } = console;
+  const { write } = process.stdout;
+  let written = 0;
   process.stdout.isTTY = true;
   console.error = (...a) => errors.push(a.join(' '));
+  process.stdout.write = (...a) => (written++, write.apply(process.stdout, a));
   try {
     assert.equal(await main(['export', 'docx', '--in', SAMPLE]), 1);
   } finally {
     process.stdout.isTTY = isTTY;
     console.error = error;
+    process.stdout.write = write;
   }
+  assert.equal(written, 0, 'nothing written to stdout');
   assert.match(errors.join('\n'), /docx is binary; add --out/);
 });
 
@@ -200,4 +219,20 @@ test('resume-export: json-resume keeps summary and award bullets as lines in the
   const { document } = resumeToJsonResume(data);
   assert.equal(document.basics.summary, 'Lead\n- Cut cloud spend 30%');
   assert.equal(document.awards[0].summary, 'Award lead\n- Award bullet');
+});
+
+test('resume-export: json-resume keeps publication and reference bullets, a long location, and a profile without a username', () => {
+  const data = sampleData();
+  data.sections.publications.items[0].description = '<p>A</p><ul><li><p>B</p></li></ul>';
+  data.sections.references.items[0].description = '<p>A</p><ul><li><p>B</p></li></ul>';
+  data.basics.location = 'Bldg 4, Seattle, WA, US';
+  const { document } = resumeToJsonResume(data);
+  assert.equal(document.publications[0].summary, 'A\n- B');
+  assert.equal(document.references[0].reference, 'A\n- B');
+  assert.deepEqual(document.basics.location, { city: 'Bldg 4, Seattle, WA, US' });
+  assert.equal(importResume(Buffer.from(JSON.stringify(document)), 'json-resume').data.basics.location, 'Bldg 4, Seattle, WA, US');
+
+  const once = importResume(Buffer.from(JSON.stringify({ basics: { name: 'A', profiles: [{ network: 'GitHub', url: 'https://github.com/a' }] } })), 'json-resume').data;
+  const again = importResume(Buffer.from(JSON.stringify(resumeToJsonResume(once).document)), 'json-resume').data;
+  assert.equal(again.sections.profiles.items[0].username, '', 'the network name is not exported as a handle');
 });
