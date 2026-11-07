@@ -891,6 +891,27 @@ export function appendLedgerRows(path, text) {
 }
 
 /**
+ * Append backfilled transitions (source `backfill`) to the status-log.tsv
+ * beside `trackerPath`. appendLedgerRows alone is unlocked, so this holds the
+ * tracker lock that set-status.mjs takes before it appends to the same ledger.
+ *
+ * @param {string} trackerPath - The applications tracker.
+ * @param {{num:number, date:string, from?:string|null, to:string, note?:string}[]} rows
+ * @returns {Promise<number>} Rows written.
+ */
+export async function appendBackfillRows(trackerPath, rows) {
+  const tracker = canonicalizeTrackerPath(trackerPath);
+  const lock = await acquireTrackerLock(trackerLockDirFor(tracker), { tracker });
+  try {
+    const text = rows.map(({ num, date, from, to, note }) => `${num}\t${date}\t${from ?? '-'}\t${to}\tbackfill\t${String(note ?? '').replace(/[\t\r\n]+/g, ' ')}\n`).join('');
+    appendLedgerRows(join(dirname(tracker), 'status-log.tsv'), text);
+  } finally {
+    lock.release();
+  }
+  return rows.length;
+}
+
+/**
  * Load the canonical tracker states from `templates/states.yml`.
  *
  * states.yml is the single source of truth for the canonical states and
