@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rmSync } from './helpers.mjs';
 import { listTree } from '../lib/walk-tree.mjs';
@@ -28,7 +28,7 @@ function withRoot(fn) {
 const run = (root, ...args) => spawnSync(process.execPath, [CLI, ...args], {
   encoding: 'utf8', env: { ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '' },
 });
-const files = (root) => listTree(root).map((p) => p.slice(root.length + 1)).sort();
+const files = (root) => listTree(root).map((p) => p.slice(root.length + 1).replaceAll(sep, '/')).sort();
 
 for (const [format, name] of Object.entries(FIXTURES)) {
   test(`${name} is detected as ${format} and imports to a valid resume that round-trips through cv.md`, () => {
