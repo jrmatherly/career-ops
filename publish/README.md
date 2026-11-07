@@ -73,6 +73,23 @@ One view per client key per share per hour. Requests carrying a `share:manage` k
 | `POCKET_ID_DISCOVERY_URL` | required | Pocket ID's `/.well-known/openid-configuration`. |
 | `PUBLISH_ALLOWED_EMAILS` | required | Comma-separated emails allowed to sign in. Anyone else is refused at sign-in. |
 
+## Image
+
+`publish/Dockerfile` builds the service on `node:24-alpine`, pinned by digest, with `npm ci --omit=dev`; the `auth` CLI is a runtime dependency because the container runs `auth migrate` before `start.mjs`, offline, on every start. It runs as uid 1000 under `tini`. CI publishes it as `ghcr.io/jrmatherly/career-ops-publish` (`latest` on `main`, `sha-<short>` on every build), from `.github/workflows/docker-image.yml`.
+
+```bash
+cp publish/.env.example publish/.env   # then fill it in
+docker compose -f publish/compose.yml up --build
+```
+
+The runtime contract:
+
+- **Environment.** The variables in [Environment](#environment). The image sets `PUBLISH_BIND=0.0.0.0`, `PUBLISH_PORT=8080` and `PUBLISH_DB=/data/publish.db`; the compose file reads the rest from `publish/.env`. Register `https://<host>/api/auth/callback/pocket-id` as the Pocket ID redirect URI, where `https://<host>` is `PUBLISH_BASE_URL`.
+- **Port.** 8080 inside the container. `publish/compose.yml` publishes it on `127.0.0.1:8080` only; the tunnel or the cluster Service is the only public path in.
+- **Volume.** `/data`, owned by uid 1000, holds `publish.db` and its WAL files: shares, comments, views, accounts and keys. It is the only state, so back it up, and run one replica (see below).
+
+Inside the container the service binds every interface, so the loopback argument below moves to the container boundary: publish the port on loopback, or let only the proxy reach the pod.
+
 ## Why loopback, and why the proxy must be the only peer
 
 The view counter and the password limiter are keyed by the client address. The service reads that address from the socket peer, except when the peer is listed in `PUBLISH_TRUSTED_PROXIES`, in which case it reads `PUBLISH_CLIENT_IP_HEADER` instead. `X-Forwarded-For` is never read, so a visitor who reaches the service directly cannot mint views or dodge the limiter by rotating headers.

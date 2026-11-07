@@ -1,0 +1,15 @@
+# Runs the publish image on this machine. Copy .env.example to .env first.
+# Loopback only: the tunnel or the cluster Service is the only public path in.
+services:
+  publish:
+    build: .
+    image: ghcr.io/jrmatherly/career-ops-publish:latest
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - publish-data:/data
+    restart: unless-stopped
+
+volumes:
+  publish-data:

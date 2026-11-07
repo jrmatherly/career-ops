@@ -1,6 +1,6 @@
 name: "🐳 Docker images"
 
-# Fork-only: publishes the three images this repo builds to GitHub Container
+# Fork-only: publishes the four images this repo builds to GitHub Container
 # Registry, so `docker compose pull`, the test workflow and the home cluster
 # fetch them instead of rebuilding. Upstream builds career-ops:local and the
 # cv-visual image ad hoc; it ships no registry workflow.
@@ -8,9 +8,10 @@ name: "🐳 Docker images"
 #   ghcr.io/<owner>/career-ops            root Dockerfile (dev container, linux/amd64 + arm64)
 #   ghcr.io/<owner>/career-ops-cv-visual  tests/cv-visual (CI rendering image, linux/amd64)
 #   ghcr.io/<owner>/career-ops-server     deploy/Dockerfile (hosted web + CLI, linux/amd64)
+#   ghcr.io/<owner>/career-ops-publish    publish/Dockerfile (share-page service, linux/amd64)
 #
 # Every push to main builds, with no path filter: the server image copies the
-# whole checkout, so any commit changes it. The other two rebuild from the
+# whole checkout, so any commit changes it. The other three rebuild from the
 # layer cache when their inputs did not change.
 # On a pull request that touches image inputs the images build without pushing.
 #
@@ -63,6 +64,10 @@ jobs:
           - name: "career-ops-server"
             context: .
             file: deploy/Dockerfile
+            platforms: linux/amd64
+          - name: "career-ops-publish"
+            context: publish
+            file: publish/Dockerfile
             platforms: linux/amd64
     steps:
       - name: "⬇️ Checkout"
