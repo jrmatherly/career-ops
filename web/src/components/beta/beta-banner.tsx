@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bug, X, ShieldCheck, ThumbsUp, Search, Loader2 } from "lucide-react";
-import { collect, fingerprint, issueBody, issueUrl, type Diag } from "@/lib/report/report";
+import { REPO, collect, fingerprint, issueBody, issueUrl, type Diag } from "@/lib/report/report";
 import { searchIssues } from "@/lib/beta/issue-search.mjs";
 import { Modal } from "@/components/ui/modal";
 import "@/lib/report/logbuf"; // install the client error ring-buffer (side-effect)
@@ -14,7 +14,6 @@ type SimilarIssue = { number: number; title: string; url: string };
 // ours. The search itself lives in lib/beta/issue-search.mjs, which returns
 // null when it could NOT run rather than folding that into an empty array —
 // see that file for the two days of silent false negatives that cost us.
-const REPO = "career-ops-hq/career-ops";
 const findSimilar = (q: string) => searchIssues(q, REPO, fetch);
 
 // Beta/RC differentiator: a small version+channel pill (only on a pre-release
