@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT } from './helpers.mjs';
-import { writeFakeCli } from './helpers/fake-cli.mjs';
+import { envWithPathFirst, writeFakeCli } from './helpers/fake-cli.mjs';
 
 const BACKLOG = '- [ ] https://example.test/backlog | Backlog Co | Old Role';
 const NEW_ONE = '- [ ] https://example.test/new-1 | Acme | Backend Engineer';
@@ -28,11 +28,12 @@ function withRoot(fn) {
     mkdirSync(join(root, 'data'));
     mkdirSync(join(root, 'bin'));
     writeFileSync(join(root, 'data', 'pipeline.md'), PIPELINE);
-    const ranker = writeFakeCli(join(root, 'bin'), 'fixture-ranker', FAKE_RANKER);
+    writeFakeCli(join(root, 'bin'), 'fixture-ranker', FAKE_RANKER);
     const run = (...args) => {
       const r = spawnSync(process.execPath, [join(ROOT, 'rank-pipeline.mjs'), ...args], {
         cwd: root,
-        env: { ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_RANK_CLI: ranker },
+        // A bare name on PATH, so Windows launches the .cmd shim the helper writes.
+        env: envWithPathFirst(join(root, 'bin'), { CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_RANK_CLI: 'fixture-ranker' }),
         encoding: 'utf8',
         timeout: 30_000,
       });
