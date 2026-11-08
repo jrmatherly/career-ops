@@ -201,6 +201,7 @@ function checkBillingSource() {
     };
   }
 
+  const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
   const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
   if (baseUrl) {
     const url = URL.parse(baseUrl);
@@ -213,17 +214,25 @@ function checkBillingSource() {
     }
     const { host } = url;
     if (host !== 'api.anthropic.com') {
-      if (String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim()) {
+      const oauth = String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim();
+      if (oauth && which) {
         return {
           warn: true,
-          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set; Claude Code sends the OAuth token and ignores ANTHROPIC_AUTH_TOKEN, so the gateway gets a credential it cannot honour.`,
-          fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.'],
+          label: `Billing source. Requests route through a gateway at ${host}, and ${which} outranks CLAUDE_CODE_OAUTH_TOKEN, so the OAuth token is unused here.`,
+          fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN, so a missing gateway credential never falls back to your subscription.'],
         };
       }
-      if (!key && !authToken) {
+      if (oauth) {
         return {
           warn: true,
-          label: `Billing source. Requests route through a gateway at ${host}, but no credential is set, so the gateway will refuse requests.`,
+          label: `Billing source. Requests route through a gateway at ${host}, and no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends your subscription OAuth token (CLAUDE_CODE_OAUTH_TOKEN) to the gateway.`,
+          fix: ["Set ANTHROPIC_AUTH_TOKEN to the gateway's client key and unset CLAUDE_CODE_OAUTH_TOKEN."],
+        };
+      }
+      if (!which) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, but no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends any keychain login to the gateway, which refuses it if it checks a client key.`,
           fix: ["Set ANTHROPIC_AUTH_TOKEN to the gateway's client key."],
         };
       }
@@ -231,7 +240,6 @@ function checkBillingSource() {
     }
   }
 
-  const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
   if (!which) {
     return { pass: true, label: 'Billing source: no API key in the environment (a Claude subscription will be used if you are logged in)' };
   }

@@ -79,8 +79,9 @@ for (const v of ['CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY']) {
 const GATEWAY = 'http://proxy.example:8317';
 const GATEWAY_LINE = /route through a gateway at proxy\.example:8317/;
 const GATEWAY_PASS = /^✓ Billing source\. Requests route through a gateway at proxy\.example:8317, and the gateway's credential/m;
-const GATEWAY_NO_CREDENTIAL = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, but no credential is set/m;
-const GATEWAY_WITH_OAUTH = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set; Claude Code sends the OAuth token and ignores ANTHROPIC_AUTH_TOKEN, so the gateway gets a credential it cannot honour\./m;
+const GATEWAY_NO_CREDENTIAL = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, but no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends any keychain login to the gateway/m;
+const GATEWAY_OAUTH_ONLY = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, and no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends your subscription OAuth token \(CLAUDE_CODE_OAUTH_TOKEN\) to the gateway\.\n {2}→ Set ANTHROPIC_AUTH_TOKEN to the gateway's client key and unset CLAUDE_CODE_OAUTH_TOKEN\.$/m;
+const outranksOAuth = (v) => new RegExp(`^⚠ Billing source\\. Requests route through a gateway at proxy\\.example:8317, and ${v} outranks CLAUDE_CODE_OAUTH_TOKEN, so the OAuth token is unused here\\.\\n {2}→ Unset CLAUDE_CODE_OAUTH_TOKEN, so a missing gateway credential never falls back to your subscription\\.$`, 'm');
 const NOT_HTTP_URL = /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m;
 
 // [name, env, must match, must not match]
@@ -95,11 +96,17 @@ const BILLING_CASES = [
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: '  ' }, GATEWAY_NO_CREDENTIAL, GATEWAY_PASS],
   ['a whitespace-only API key beside a gateway counts as no credential',
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_API_KEY: '  ' }, GATEWAY_NO_CREDENTIAL, GATEWAY_PASS],
-  // Claude Code 2.1.317 answers on the subscription when ANTHROPIC_API_KEY is only whitespace.
+  // Claude Code 2.1.319 treats a whitespace-only ANTHROPIC_API_KEY as unset.
   ['a whitespace-only API key with no gateway counts as no API key',
     { ANTHROPIC_API_KEY: '  ' }, /a Claude subscription will be used/, /ANTHROPIC_API_KEY is set/],
-  ['a gateway base URL beside CLAUDE_CODE_OAUTH_TOKEN warns about the pair',
-    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'x' }, GATEWAY_WITH_OAUTH, GATEWAY_PASS],
+  ['a gateway with only CLAUDE_CODE_OAUTH_TOKEN warns that the OAuth token goes to the gateway',
+    { ANTHROPIC_BASE_URL: GATEWAY, CLAUDE_CODE_OAUTH_TOKEN: 'x' }, GATEWAY_OAUTH_ONLY, GATEWAY_NO_CREDENTIAL],
+  ['a gateway token beside CLAUDE_CODE_OAUTH_TOKEN warns that the token outranks it',
+    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'x' }, outranksOAuth('ANTHROPIC_AUTH_TOKEN'), GATEWAY_PASS],
+  ['an API key beside CLAUDE_CODE_OAUTH_TOKEN warns that the key outranks it',
+    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_API_KEY: 'sk-ant-test', CLAUDE_CODE_OAUTH_TOKEN: 'x' }, outranksOAuth('ANTHROPIC_API_KEY'), GATEWAY_PASS],
+  ['a whitespace-only CLAUDE_CODE_OAUTH_TOKEN beside a gateway token passes with the gateway',
+    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x', CLAUDE_CODE_OAUTH_TOKEN: '  ' }, GATEWAY_PASS, /CLAUDE_CODE_OAUTH_TOKEN/],
   ['api.anthropic.com as base URL keeps the key warning',
     { ANTHROPIC_BASE_URL: 'https://api.anthropic.com', ANTHROPIC_API_KEY: 'sk-ant-test' }, /^⚠ ANTHROPIC_API_KEY is set/m, GATEWAY_LINE],
   ['an unparseable base URL warns and does not throw',
