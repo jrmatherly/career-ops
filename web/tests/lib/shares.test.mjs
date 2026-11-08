@@ -177,6 +177,7 @@ test("a refused key is a 503, rate limiting a 429 and a service error a 502, non
     const r = await post({ slug: "alpha" });
     assert.equal(r.status, status, stderr);
     assert.match(r.body.error, message);
+    if (status === 503 && /PUBLISH_API_KEY/.test(message)) assert.match(r.body.error, /environment/, stderr);
     assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api|\/home/);
   }
 });
@@ -189,6 +190,7 @@ test("a service that does not answer is a 502 whose message names no URL or path
   standIn(1, "publish: PUBLISH_URL is not set (environment or /home/u/root/.env)\n");
   const unset = await post({});
   assert.equal(unset.status, 503);
+  assert.match(unset.body.error, /environment/);
   assert.doesNotMatch(unset.body.error, /\/home/);
 });
 
