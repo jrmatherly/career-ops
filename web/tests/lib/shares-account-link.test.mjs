@@ -19,13 +19,23 @@ test("Manage publish keys renders only with a URL, as a new-tab link with rel no
   assert.match(anchor[1], /rel="noopener"/);
 });
 
-test("a new pull clears the last toast before fetching, and a failed pull's toast stays until dismissed", () => {
+test("a new pull clears the last toast before fetching", () => {
   const pull = src("components/shares/shares-view.tsx").match(/async function pull\([^)]*\) \{([\s\S]*?)\n {2}\}\n/);
   assert.ok(pull, "pull() is found");
-  const body = pull[1];
-  const clear = body.indexOf("setToast(null)");
-  assert.ok(clear !== -1 && clear < body.indexOf("await fetch("), "setToast(null) runs before the fetch");
-  const failed = [...body.matchAll(/setToast\(\{ text: ["`]Pull failed:[\s\S]*?\}\);/g)].map((m) => m[0]);
-  assert.equal(failed.length, 2, "both Pull failed toasts are found");
-  for (const call of failed) assert.doesNotMatch(call, /transient/);
+  const clear = pull[1].indexOf("setToast(null)");
+  assert.ok(clear !== -1 && clear < pull[1].indexOf("await fetch("), "setToast(null) runs before the fetch");
+});
+
+test("a 200 body without ok, missing and pulled gets its own toast before missing is read", () => {
+  const pull = src("components/shares/shares-view.tsx").match(/async function pull\([^)]*\) \{([\s\S]*?)\n {2}\}\n/)[1];
+  const guard = pull.search(/if \(body\.ok !== true \|\| !Array\.isArray\(body\.missing\) \|\| typeof body\.pulled !== "number"\) \{\s*setToast\("Pull failed: the app sent a response this page cannot read"\)/);
+  assert.ok(guard !== -1, "the shape guard sets its own toast");
+  assert.ok(guard < pull.indexOf("data.missing"), "the guard runs before missing is read");
+});
+
+test("every toast, the missing-shares note with its delete command included, stays until Dismiss clears it", () => {
+  const view = src("components/shares/shares-view.tsx");
+  assert.match(view, /setToast\(`Not on the publish service any more:[^\n]*delete --slug/, "the missing-shares note is a toast");
+  assert.doesNotMatch(view, /set(?:Timeout|Interval)\([^;]*setToast|transient/, "no toast closes on a timer");
+  assert.match(view, /<button[^>]*onClick=\{\(\) => setToast\(null\)\}[^>]*aria-label="Dismiss"/, "Dismiss clears the toast");
 });

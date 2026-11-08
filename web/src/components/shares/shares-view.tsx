@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ExternalLink, Loader2, RefreshCw, X } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
 import { Badge } from "@/components/ui/badge";
@@ -17,15 +17,8 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
   const router = useRouter();
   // Which pull is in flight: one slug, or every share from Pull all.
   const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
-  // An object, so a repeat of the same message is a new toast (and restarts a transient one's timer).
-  // A toast stays until dismissed unless marked transient: error advice runs to a few hundred characters, too long to read in 6 s.
-  const [toast, setToast] = useState<{ text: string; transient?: true } | null>(null);
-
-  useEffect(() => {
-    if (!toast?.transient) return;
-    const t = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(t);
-  }, [toast]);
+  // A toast stays until dismissed: its advice runs to a few hundred characters, too long to read before a timer closes it.
+  const [toast, setToast] = useState<string | null>(null);
 
   async function pull(slug?: string) {
     if (pulling) return;
@@ -33,22 +26,29 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
     setToast(null);
     try {
       const res = await fetch("/api/shares/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slug ? { slug } : {}) });
-      const data = (await res.json().catch(() => null)) as PullResponse | null;
-      if (!res.ok || !data || !("ok" in data)) {
-        setToast({ text: `Pull failed: ${data && "error" in data ? data.error : `HTTP ${res.status}`}` });
+      const raw: unknown = await res.json().catch(() => null);
+      const body = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
+      if (!res.ok) {
+        setToast(`Pull failed: ${typeof body.error === "string" ? body.error : `HTTP ${res.status}`}`);
         return;
       }
+      if (body.ok !== true || !Array.isArray(body.missing) || typeof body.pulled !== "number") {
+        setToast("Pull failed: the app sent a response this page cannot read");
+        router.refresh();
+        return;
+      }
+      const data = body as Extract<PullResponse, { ok: true }>;
       // The CLI skips a share the service no longer has and still exits 0; say so, or the row just stays stale.
       // When nothing answered at all, the likelier cause is the URL, not deleted shares: never advise deleting then.
       if (data.missing.length && data.pulled === 0) {
-        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the environment (the career-ops HelmRelease env on a cluster install) or the data root's .env before deleting anything.` });
+        setToast(`The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the environment (the career-ops HelmRelease env on a cluster install) or the data root's .env before deleting anything.`);
       } else if (data.missing.length) {
-        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}`, transient: true });
+        setToast(`Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}`);
       }
       router.refresh();
     } catch (err) {
       console.error(err);
-      setToast({ text: "Pull failed: could not reach the app" });
+      setToast("Pull failed: could not reach the app");
     } finally {
       setPulling(null);
     }
@@ -87,7 +87,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
 
       {!error && shares.length === 0 && (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">No shares yet. Publishing stays in the CLI, so the service key never enters the app:</p>
+          <p className="text-sm text-muted">No shares yet. Publishing stays in the CLI, and the web app never uses the service key:</p>
           <code className="mt-3 inline-block rounded-md bg-surface-hover px-3 py-1.5 font-mono text-xs text-foreground">{PUBLISH_CMD}</code>
         </div>
       )}
@@ -120,7 +120,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
       {toast && (
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
           <div role="status" className="flex max-w-2xl items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
-            <p className="min-w-0 break-words">{toast.text}</p>
+            <p className="min-w-0 break-words">{toast}</p>
             <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-muted hover:text-foreground">
               <X className="size-3.5" />
             </button>
