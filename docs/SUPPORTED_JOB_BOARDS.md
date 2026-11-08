@@ -153,9 +153,8 @@ modules.
 
 ## Evaluated, not supported
 
-These boards were evaluated alongside `providers/careerviet.mjs` and found NOT
-eligible for the zero-auth/no-browser provider contract. Recorded here so a
-future evaluation doesn't repeat the same investigation from scratch.
+These boards were evaluated and found NOT eligible for the zero-auth/no-browser
+provider contract. Recorded here so a future evaluation doesn't repeat the same investigation from scratch.
 
 | Board | Reason | Evaluated |
 | --- | --- | --- |
