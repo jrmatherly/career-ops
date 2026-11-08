@@ -7,13 +7,19 @@ import {
   withScheduledStore,
 } from "./scheduled-jobs-store.mjs";
 import { nextScheduledRun } from "./scheduled-cadence.mjs";
-import { assertScheduledJobBody, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
+import { assertScheduledJobBody, scheduledEvaluate, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
 export type ScheduleUnit = "minutes" | "hours" | "days";
 export type FiltersFrom = "custom" | "file";
+export type EvaluateSettings = {
+  mode: "off" | "review" | "auto";
+  enabledAt: string;
+  rankThreshold: number;
+  maxPerRun: number;
+};
 
 export type ScheduledJob = {
   id: string;
@@ -21,6 +27,7 @@ export type ScheduledJob = {
   status: JobStatus;
   engine: ScanEngine;
   filtersFrom?: FiltersFrom;
+  evaluate?: EvaluateSettings;
   filters: ExploreFilters;
   timezone: string;
   startAt: string;
@@ -44,11 +51,13 @@ export type JobRun = {
   message?: string;
   rolesFound?: number;
   engine?: ScanEngine;
+  ranked?: number;
+  evalMessage?: string;
 };
 
 type QueueItem = { id: string; jobId: string; queuedAt: string };
 type Store = { jobs: ScheduledJob[]; runs: JobRun[]; queue: QueueItem[] };
-type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "filters" | "timezone" | "startAt" | "every" | "unit">;
+type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "evaluate" | "filters" | "timezone" | "startAt" | "every" | "unit">;
 
 export class ScheduledJobValidationError extends Error {
   constructor(message: string) {
@@ -108,12 +117,18 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
     .trim()
     .slice(0, 80) || "UTC");
   const startAt = cleanStartAt(input.startAt, base?.startAt || new Date().toISOString());
+  let evaluate: EvaluateSettings | undefined;
+  try {
+    evaluate = scheduledEvaluate(input.evaluate, base?.evaluate, timezone) as EvaluateSettings | undefined;
+  } catch (error) {
+    throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Invalid evaluate settings.");
+  }
   const filters = parseExplorePatch(
     (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>,
     base?.filters || DEFAULT_FILTERS,
   );
 
-  return { name, engine, filtersFrom, unit, every, timezone, startAt, filters };
+  return { name, engine, filtersFrom, ...(evaluate ? { evaluate } : {}), unit, every, timezone, startAt, filters };
 }
 
 export function listScheduledJobs(): Pick<Store, "jobs" | "runs"> {

@@ -26,11 +26,13 @@ import {
   MAX_ATTEMPTS,
   MAX_RUNS,
   nextFutureRun,
+  rankPass,
   recordCompletion,
+  recordStepCounts,
   runnerResourcePath,
   SCAN_TIMEOUT_MS,
 } from "../../scripts/scheduled-jobs-runner.mjs";
-import { assertScheduledJobBody, scheduledFiltersFrom } from "../../src/lib/scheduled-job-input.mjs";
+import { assertScheduledJobBody, scheduledEvaluate, scheduledFiltersFrom } from "../../src/lib/scheduled-job-input.mjs";
 import { scanFailureMessage, stderrCause } from "../../src/lib/scheduled-scan-error.mjs";
 
 const WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -1097,4 +1099,212 @@ test("parseScheduledJobInput keeps a file-mode job's source and lists on an edit
   assert.equal(edited.filters.sinceDays, 14);
   assert.equal(parseScheduledJobInput({ name: "New" }).filtersFrom, "custom");
   assert.throws(() => parseScheduledJobInput({ name: "Bad", filtersFrom: "portals" }), { message: "Invalid filters source." });
+});
+
+const RANK_JOB = "11111111-1111-4111-8111-111111111111";
+const RANK_RUN = "22222222-2222-4222-8222-222222222222";
+const RANK_EARLIER_RUN = "33333333-3333-4333-8333-333333333333";
+const SCANNED = ["https://boards.test/acme/1", "https://boards.test/acme/2"];
+const BACKLOG_ROW = "- [ ] https://boards.test/old/9 | Old Co | Backlog Role";
+const HAND_ROW = "- [ ] https://by-hand.test/role | Hand Co | Added By Hand";
+
+// A data root after a review job's scan: two new rows, an older backlog row and a row added by hand during the scan.
+async function withRankRoot(evaluate, fn) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-rank-pass-"));
+  const storePath = path.join(root, "data", "scheduled-jobs.json");
+  const now = "2026-11-08T15:00:00.000Z";
+  fs.mkdirSync(path.join(root, "data"));
+  fs.writeFileSync(path.join(root, "data", "pipeline.md"), ["## Pending", BACKLOG_ROW, ...SCANNED.map((url, i) => `- [ ] ${url} | Acme | Engineer ${i}`), HAND_ROW, ""].join("\n"));
+  fs.writeFileSync(path.join(root, "data", "scan-history.tsv"), [
+    "url\tfirst_seen\tportal\ttitle\tcompany\tstatus",
+    "https://boards.test/old/9\t2026-10-01\tboards\tBacklog Role\tOld Co\tadded",
+    ...SCANNED.map((url, i) => `${url}\t2026-11-08\tboards\tEngineer ${i}\tAcme\tadded`),
+    "",
+  ].join("\n"));
+  const job = { id: RANK_JOB, name: "Review", status: "active", engine: "full", filters: {}, timezone: "UTC", startAt: now, every: 1, unit: "days", createdAt: now, updatedAt: now, ...(evaluate ? { evaluate } : {}) };
+  fs.writeFileSync(storePath, JSON.stringify({
+    jobs: [job],
+    runs: [
+      { id: RANK_RUN, jobId: RANK_JOB, at: now, state: "success", attempt: 1, rolesFound: 2 },
+      { id: RANK_EARLIER_RUN, jobId: RANK_JOB, at: "2026-11-07T15:00:00.000Z", state: "success", attempt: 1, rolesFound: 0 },
+    ],
+    queue: [],
+  }));
+  try {
+    return await fn({ root, storePath, pipeline: path.join(root, "data", "pipeline.md") });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// Stands in for rank-pipeline.mjs: ranks each listed URL that is still unranked.
+function fakeRanker(calls, status = 0) {
+  return (node, args, options) => {
+    const urls = fs.readFileSync(args[args.indexOf("--urls-file") + 1], "utf8").split("\n").filter(Boolean);
+    calls.push({ node, args, cwd: options.cwd, env: options.env, urls });
+    if (status !== 0) return { status, stdout: "", stderr: "  batch 1: CLI call failed (fake exited with code 1)\nError: every call to fake failed\n" };
+    const file = path.join(options.env.CAREER_OPS_ROOT, "data", "pipeline.md");
+    const lines = fs.readFileSync(file, "utf8").split("\n").map((line) =>
+      urls.some((url) => line.startsWith(`- [ ] ${url} `)) && !line.includes("| rank: ") ? `${line} | rank: 4.0/5 — fake` : line);
+    fs.writeFileSync(file, lines.join("\n"));
+    return { status: 0, stdout: "Ranked", stderr: "" };
+  };
+}
+
+async function quietly(fn) {
+  const write = process.stderr.write;
+  const lines = [];
+  process.stderr.write = (chunk) => { lines.push(String(chunk)); return true; };
+  try {
+    return { value: await fn(), stderr: lines.join("") };
+  } finally {
+    process.stderr.write = write;
+  }
+}
+
+const runRecord = (storePath) => readScheduledStore(storePath).runs.find((run) => run.id === RANK_RUN);
+const REVIEW = { mode: "review", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5 };
+
+test("rankPass runs only for mode review or auto", async () => {
+  for (const [evaluate, spawns] of [[undefined, 0], [{ ...REVIEW, mode: "off" }, 0], [REVIEW, 1], [{ ...REVIEW, mode: "auto" }, 1]]) {
+    await withRankRoot(evaluate, async ({ root, storePath, pipeline }) => {
+      const calls = [];
+      await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+      assert.equal(calls.length, spawns, `mode ${evaluate?.mode ?? "absent"}`);
+      if (!spawns) {
+        assert.doesNotMatch(fs.readFileSync(pipeline, "utf8"), /rank:/);
+        assert.equal(runRecord(storePath).ranked, undefined);
+        return;
+      }
+      const [call] = calls;
+      assert.deepEqual(call.urls, SCANNED, "only the rows the scan added are sent");
+      assert.deepEqual(call.args.slice(0, 2), ["rank-pipeline.mjs", "--urls-file"]);
+      assert.deepEqual(call.args.slice(3), ["--limit", "2"]);
+      assert.match(call.args[2], new RegExp(`data[\\\\/]tmp[\\\\/]rank-${RANK_JOB}-[0-9a-f-]{36}\\.txt$`));
+      assert.equal(call.node, process.execPath);
+      assert.equal(call.env.CAREER_OPS_ROOT, root);
+      assert.equal(call.cwd, path.resolve(WEB_ROOT, ".."));
+      assert.deepEqual(fs.readdirSync(path.join(root, "data", "tmp")), [], "the URL list is removed");
+      const text = fs.readFileSync(pipeline, "utf8");
+      assert.ok(text.includes(`${BACKLOG_ROW}\n`), "the backlog row is untouched");
+      assert.ok(text.includes(`${HAND_ROW}\n`), "the hand-added row is untouched");
+      assert.equal(runRecord(storePath).ranked, 2);
+      assert.equal(runRecord(storePath).state, "success");
+    });
+  }
+});
+
+test("rankPass skips the spawn with no candidates", async () => {
+  await withRankRoot({ ...REVIEW, enabledAt: "2026-11-09" }, async ({ root, storePath, pipeline }) => {
+    const before = fs.readFileSync(pipeline, "utf8");
+    const calls = [];
+    const { stderr } = await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls.length, 0, "an enabledAt after every scanned row leaves nothing to rank");
+    assert.equal(fs.readFileSync(pipeline, "utf8"), before);
+    assert.equal(runRecord(storePath).ranked, 0);
+    assert.match(stderr, /rank: job 11111111-1111-4111-8111-111111111111 since 2026-11-09: 0 ranked, 0 sent\n/);
+  });
+});
+
+test("rank exit 1 records evalMessage and leaves the scan success", async () => {
+  await withRankRoot(REVIEW, async ({ root, storePath, pipeline }) => {
+    const calls = [];
+    const { stderr } = await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls, 1) }));
+    assert.equal(calls.length, 1);
+    const run = runRecord(storePath);
+    assert.equal(run.state, "success");
+    assert.equal(run.ranked, 0);
+    assert.equal(run.evalMessage, "Error: every call to fake failed");
+    assert.doesNotMatch(fs.readFileSync(pipeline, "utf8"), /rank:/);
+    assert.match(stderr, /0 ranked, 2 sent; Error: every call to fake failed/);
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(runRecord(storePath).ranked, 2, "the next tick retries the rows");
+    assert.equal(runRecord(storePath).evalMessage, undefined, "a pass that succeeds clears the message");
+  });
+});
+
+test("rankPass twice over the same files ranks once", async () => {
+  // The first pass stands in for the tick after a runner that died between the scan and the rank.
+  await withRankRoot(REVIEW, async ({ root, storePath, pipeline }) => {
+    const calls = [];
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    const once = fs.readFileSync(pipeline, "utf8");
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls.length, 1, "the second pass spawns nothing");
+    assert.equal(fs.readFileSync(pipeline, "utf8"), once);
+    assert.equal((once.match(/\| rank: /g) || []).length, 2);
+    assert.equal(runRecord(storePath).ranked, 2);
+  });
+});
+
+test("rankPass waits for a scan that is still running", async () => {
+  await withRankRoot(REVIEW, async ({ root, storePath }) => {
+    await withScheduledStore(storePath, (store) => { store.runs[0].state = "running"; });
+    const calls = [];
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls.length, 0);
+    assert.equal(runRecord(storePath).ranked, undefined, "counts land on the run once it has finished");
+  });
+});
+
+test("a list longer than one pass keeps the run due until every row is sent", async () => {
+  await withRankRoot(REVIEW, async ({ root, storePath, pipeline }) => {
+    const extra = Array.from({ length: 55 }, (_, i) => `https://boards.test/bulk/${i}`);
+    fs.appendFileSync(pipeline, extra.map((url) => `- [ ] ${url} | Bulk | Role\n`).join(""));
+    fs.appendFileSync(path.join(root, "data", "scan-history.tsv"), extra.map((url) => `${url}\t2026-11-08\tboards\tRole\tBulk\tadded\n`).join(""));
+    const calls = [];
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls[0].urls.length, 50);
+    assert.equal(runRecord(storePath).ranked, 50);
+    assert.equal(runRecord(storePath).evalMessage, "7 rows wait for the next rank pass.");
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls[1].urls.length, 7);
+    assert.equal(runRecord(storePath).ranked, 57);
+    assert.equal(runRecord(storePath).evalMessage, undefined);
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.equal(calls.length, 2, "a finished pass is not repeated");
+  });
+});
+
+test("recordStepCounts leaves the store alone for a run MAX_RUNS has trimmed", async () => {
+  await withRankRoot(REVIEW, async ({ storePath }) => {
+    const before = fs.readFileSync(storePath, "utf8");
+    const { stderr } = await quietly(() => recordStepCounts(storePath, "44444444-4444-4444-8444-444444444444", { ranked: 3 }));
+    assert.match(stderr, /run 44444444-4444-4444-8444-444444444444 is no longer in the store/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(storePath, "utf8")), JSON.parse(before));
+  });
+});
+
+test("enabledAt is rewritten on every off-to-on transition", () => {
+  const day = Date.parse("2026-11-08T03:00:00.000Z");
+  const later = Date.parse("2026-11-20T12:00:00.000Z");
+  const created = scheduledEvaluate({ mode: "review" }, undefined, "America/New_York", day);
+  assert.deepEqual(created, { mode: "review", enabledAt: "2026-11-07", rankThreshold: 3.5, maxPerRun: 5 }, "a new job takes today in its timezone");
+  assert.equal(scheduledEvaluate(undefined, created, "UTC", later), created, "an edit that omits evaluate keeps it");
+  assert.equal(scheduledEvaluate({ mode: "auto" }, created, "UTC", later).enabledAt, "2026-11-07", "review to auto is not a transition from off");
+  const off = scheduledEvaluate({ mode: "off" }, created, "UTC", later);
+  assert.equal(off.enabledAt, "2026-11-07");
+  assert.equal(scheduledEvaluate({ mode: "review" }, off, "UTC", later).enabledAt, "2026-11-20", "off to review rewrites it");
+  assert.equal(scheduledEvaluate({ mode: "auto" }, off, "UTC", later).enabledAt, "2026-11-20", "off to auto rewrites it");
+  const clamped = scheduledEvaluate({ mode: "auto", rankThreshold: 9, maxPerRun: 0 }, undefined, "UTC", later);
+  assert.equal(clamped.rankThreshold, 5);
+  assert.equal(clamped.maxPerRun, 1);
+  assert.equal(scheduledEvaluate({ mode: "auto", rankThreshold: 3.46 }, undefined, "UTC", later).rankThreshold, 3.5);
+  assert.equal(scheduledEvaluate({ mode: "auto", maxPerRun: 40 }, undefined, "UTC", later).maxPerRun, 20);
+  for (const value of [null, "review", ["review"], { mode: "on" }, { mode: "auto", rankThreshold: "x" }, { mode: "auto", rankThreshold: true }, { mode: "auto", maxPerRun: null }]) {
+    assert.throws(() => scheduledEvaluate(value, undefined, "UTC", later), /^Error: Invalid /);
+  }
+});
+
+test("parseScheduledJobInput sets evaluate and keeps it on an edit that omits it", async () => {
+  await import("../helpers/web-ts-alias-loader.mjs");
+  const { parseScheduledJobInput, ScheduledJobValidationError } = await import("../../src/lib/scheduled-jobs.ts");
+  const { DEFAULT_FILTERS } = await import("../../src/lib/explore.ts");
+  assert.equal("evaluate" in parseScheduledJobInput({ name: "No evaluate" }), false, "a job created without it has none");
+  const created = parseScheduledJobInput({ name: "Review", timezone: "UTC", evaluate: { mode: "review" } });
+  assert.equal(created.evaluate.mode, "review");
+  assert.match(created.evaluate.enabledAt, /^\d{4}-\d{2}-\d{2}$/);
+  const base = { id: RANK_JOB, name: "Review", engine: "full", every: 1, unit: "hours", timezone: "UTC", startAt: "2026-11-08T00:00:00.000Z", filters: DEFAULT_FILTERS, evaluate: { ...REVIEW } };
+  assert.deepEqual(parseScheduledJobInput({ name: "Renamed" }, base).evaluate, REVIEW);
+  assert.throws(() => parseScheduledJobInput({ name: "Bad", evaluate: { mode: "yes" } }), (error) => error instanceof ScheduledJobValidationError && error.message === "Invalid evaluate settings.");
 });

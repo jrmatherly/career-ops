@@ -78,7 +78,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run reposts` | `detect-reposts.mjs` | Flag re-listed (ghost) postings from scan history |
 | `npm run filter-audit` | `filter-audit.mjs` | Show which `title_filter.positive` keywords never match, add nothing, or bring mostly low-scored offers, replayed over scan history (read-only) |
 | `node coverage-check.mjs <url> --company <name> --title <title>` | `coverage-check.mjs` | Explain why the scanners missed a posting you found by hand, and propose the `portals.yml` change that would have caught it (read-only, zero-network) |
-| `node rank-pipeline.mjs` | `rank-pipeline.mjs` | Opt-in LLM relevance re-ranker — annotates pending pipeline rows with a score + reason (off by default) |
+| `node rank-pipeline.mjs` | `rank-pipeline.mjs` | Opt-in LLM relevance re-ranker — annotates pending pipeline rows with a score + reason (off by default); `--urls-file <path>` limits it to the listed rows |
 | `npm run gemini:eval` | `gemini-eval.mjs` | Evaluate a JD with Google Gemini (free-tier alternative). `--file <path>` reads the JD from a file, `--model <name>` picks the Gemini model, `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`, `--no-compress` skips token-budget compression, `--context-only` prints the resolved context budget and exits without calling Gemini; `--help` prints the usage |
 | `npm run ollama:eval` | `ollama-eval.mjs` | Evaluate a JD with a local Ollama model. `--file <path>` reads the JD from a file, `--model <name>` picks the model, `--url <url>` the Ollama base URL, `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`; `--help` prints the usage |
 | `npm run openai:eval` | `openai-eval.mjs` | Evaluate a JD via any OpenAI-compatible endpoint. `--file <path>` reads the JD from a file, `--url <base>` the OpenAI-compatible base URL, `--model <id>` the model (else `OPENAI_MODEL`), `--key <key>` the API key (else `OPENAI_API_KEY`), `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`, `--no-compress` skips token-budget compression; `--help` prints the usage |
@@ -1746,7 +1746,15 @@ node rank-pipeline.mjs                  # rank up to 20 pending entries
 node rank-pipeline.mjs --limit 10
 node rank-pipeline.mjs --cli codex      # override auto-detection
 node rank-pipeline.mjs --dry-run        # print annotations, write nothing
+node rank-pipeline.mjs --urls-file new.txt --limit 5   # rank only the listed rows
 ```
+
+`--urls-file <path>` ranks only the pending rows whose URL is listed in the
+file, one per line, matched by the normalized URL key, so a tracking parameter
+or a trailing slash does not matter. Other pending rows stay as they are. A
+missing or unreadable file prints the usage text and exits 1. The scheduled
+scan runner (`web/scripts/scheduled-jobs-runner.mjs`) uses it after each tick
+to rank the rows the scans of a job in review or auto mode added.
 
 Writes go through `pipeline-lock.mjs`, the same lock `scan.mjs` and
 `scan-ats-full.mjs` use, and the file is re-read inside the lock — so a
