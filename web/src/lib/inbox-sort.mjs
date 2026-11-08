@@ -43,3 +43,22 @@ export function latestAddedDates(jobs, hidden, max = 5) {
   for (const job of jobs) if (job.addedAt && !hid.has(job.url)) dates.add(job.addedAt);
   return [...dates].sort().reverse().slice(0, max);
 }
+
+/**
+ * The empty-state copy when the `?added=` date leaves no pending, unhidden
+ * row, else null. A date on which a scan added roles means they were all
+ * skipped or tracked since; any other date means the scan added nothing.
+ *
+ * @param {string | null} added
+ * @param {{ url: string, addedAt?: string }[]} jobs - pending inbox rows
+ * @param {string[]} hidden
+ * @param {string[]} scanDates - the dates a scan added roles (readScanAddedDates)
+ * @returns {{ title: string, hint: string } | null}
+ */
+export function addedEmptyState(added, jobs, hidden, scanDates) {
+  if (added == null || latestAddedDates(jobs, hidden, Infinity).includes(added)) return null;
+  const title = scanDates.includes(added)
+    ? `Every role added on ${added} has been skipped or tracked`
+    : `No roles were added on ${added}`;
+  return { title, hint: "Pick another scan date, or clear the filter." };
+}

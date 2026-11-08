@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addedParam, compareInboxJobs, latestAddedDates } from "../../src/lib/inbox-sort.mjs";
+import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "../../src/lib/inbox-sort.mjs";
 
 const row = (name, rank, age) => ({ job: { url: name, ...(rank != null && { rank }) }, age });
 const order = (rows) => [...rows].sort(compareInboxJobs).map((r) => r.job.url);
@@ -49,4 +50,34 @@ test("latestAddedDates lists distinct scan dates newest first, skipping hidden r
 test("latestAddedDates keeps the five newest dates by default", () => {
   const jobs = ["01", "02", "03", "04", "05", "06"].map((d) => ({ url: d, addedAt: `2026-11-${d}` }));
   assert.deepEqual(latestAddedDates(jobs, []), ["2026-11-06", "2026-11-05", "2026-11-04", "2026-11-03", "2026-11-02"]);
+});
+
+test("addedEmptyState says nothing while a pending row carries the date", () => {
+  const jobs = [{ url: "a", addedAt: "2026-11-06" }];
+  assert.equal(addedEmptyState(null, jobs, [], ["2026-11-06"]), null);
+  assert.equal(addedEmptyState("2026-11-06", jobs, [], ["2026-11-06"]), null);
+});
+
+test("addedEmptyState: a date the scan history lacks added no roles", () => {
+  assert.deepEqual(addedEmptyState("2026-11-03", [{ url: "a", addedAt: "2026-11-06" }], [], ["2026-11-06"]), {
+    title: "No roles were added on 2026-11-03",
+    hint: "Pick another scan date, or clear the filter.",
+  });
+});
+
+test("addedEmptyState: a scanned date with no pending row was skipped or tracked", () => {
+  const title = addedEmptyState("2026-11-05", [], [], ["2026-11-05", "2026-11-06"])?.title;
+  assert.equal(title, "Every role added on 2026-11-05 has been skipped or tracked");
+});
+
+test("the Inbox empty state renders addedEmptyState's copy", () => {
+  const src = readFileSync(new URL("../../src/components/inbox/inbox-triage.tsx", import.meta.url), "utf8");
+  assert.match(src, /addedEmptyState\(added, enrichedJobs, hidden, scanDates\)/);
+  assert.match(src, /\{addedCopy\?\.title \?\? "No matches"\}/);
+  assert.match(src, /\{addedCopy\?\.hint \?\? "Loosen the filters to see more of your inbox\."\}/);
+});
+
+test("addedEmptyState counts a hidden row as skipped", () => {
+  const title = addedEmptyState("2026-11-05", [{ url: "a", addedAt: "2026-11-05" }], ["a"], ["2026-11-05"])?.title;
+  assert.equal(title, "Every role added on 2026-11-05 has been skipped or tracked");
 });

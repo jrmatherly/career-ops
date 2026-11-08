@@ -11,7 +11,7 @@ import { ATS_SOURCES } from "@/lib/explore";
 import { daysSince, seniorityFromTitle, sourceFromUrl, SENIORITY_ORDER, type Seniority } from "@/lib/inbox";
 import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
-import { addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
+import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips } from "./facet-chips";
 import { TriageRow, type RowScore } from "./triage-row";
 import { ShortlistTray, type ShortItem } from "./shortlist-tray";
@@ -30,7 +30,7 @@ type UndoNotice = { label: string; fn: () => Promise<void>; busy?: boolean; erro
 // Default is a small capped batch (never the full wall); free facets + Save/Skip narrow
 // it; only "Score shortlist" spends tokens. 🔴 The shell is agnostic to what makes a
 // role relevant — order goes through a single documented plug point.
-export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
+export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates: string[] }) {
   const router = useRouter();
   const { jobs, startJob } = useJobs();
   const { sections, setSections } = useEvaluationOptions();
@@ -156,12 +156,10 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
     return SENIORITY_ORDER.filter((s) => set.has(s));
   }, [enriched, hidden]);
 
-  const latestAdded = useMemo(() => latestAddedDates(enriched.map((e) => e.job), hidden), [enriched, hidden]);
+  const enrichedJobs = useMemo(() => enriched.map((e) => e.job), [enriched]);
+  const latestAdded = useMemo(() => latestAddedDates(enrichedJobs, hidden), [enrichedJobs, hidden]);
   const availAdded = added && !latestAdded.includes(added) ? [added, ...latestAdded] : latestAdded;
-  const addedEmpty = useMemo(
-    () => added != null && !latestAddedDates(enriched.map((e) => e.job), hidden, Infinity).includes(added),
-    [enriched, hidden, added],
-  );
+  const addedCopy = useMemo(() => addedEmptyState(added, enrichedJobs, hidden, scanDates), [enrichedJobs, hidden, added, scanDates]);
 
   const filtered = useMemo(
     () =>
@@ -475,8 +473,8 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
         </ul>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-10 text-center">
-          <p className="font-display text-lg">{addedEmpty ? `No roles were added on ${added}` : "No matches"}</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{addedEmpty ? "Pick another scan date, or clear the filter." : "Loosen the filters to see more of your inbox."}</p>
+          <p className="font-display text-lg">{addedCopy?.title ?? "No matches"}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{addedCopy?.hint ?? "Loosen the filters to see more of your inbox."}</p>
         </div>
       )}
 

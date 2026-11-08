@@ -41,7 +41,8 @@ const RANK_CELL = /^rank:/i;
 /** Parse data/pipeline.md — `- [ ] URL | Company | Role [| Location [| Compensation]] [| label: …]*`.
  *  The http(s) or `local:` cell is the URL, so `#NNN | URL | …` and a bare
  *  checkbox URL both survive. Company and role are the first two cells after that URL and
- *  are never labels: a `word:` there is text. Labels (`posted:`/`trust:`/`yrs:`/`note:`/`rank:`)
+ *  are never labels, except a full `rank: N/5 — reason` value: any other
+ *  `word:` there is text. Labels (`posted:`/`trust:`/`yrs:`/`note:`/`rank:`)
  *  start at the third cell after the URL, so they do not occupy location or
  *  compensation. Missing company and role stay empty. A row with neither an
  *  http(s) nor a `local:` cell is skipped. Further trailing columns are ignored.
@@ -66,7 +67,7 @@ export function parseInbox(md) {
       // A full rank value is the exception: rank-pipeline.mjs appends it to a
       // short row too, and no real title reads `rank: 4.2/5 — …`.
       const early = i < urlIndex + 3;
-      // seg[4] (the colon after `rank`) is a prefilter: the regex on every company and role cell measured 4% slower.
+      // seg[4] (the colon after `rank`) is a prefilter, so a company or role cell costs one character check, not a regex.
       let lm = early && !(seg[4] === ":" && RANK_CELL.test(seg)) ? null : seg.match(LABELED_SEGMENT);
       if (lm && early && !RANK_VALUE.test(lm[2].trim())) lm = null;
       if (lm) labels.set(lm[1].toLowerCase(), lm[2].trim());
