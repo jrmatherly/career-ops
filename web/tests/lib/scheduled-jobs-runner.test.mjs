@@ -322,8 +322,53 @@ test("a portals.yml that does not parse is named in the failure", () => {
       spawnFn: () => { throw new Error("scanner must not run"); },
     });
     assert.equal(result.state, "failed");
-    assert.ok(result.message.startsWith(`${path.join(temp, "portals.yml")}: `), result.message);
+    assert.equal(result.message, `${path.join(temp, "portals.yml")}: bad indentation of a mapping entry (3:2)`);
   });
+});
+
+test("an empty or scalar portals.yml is named in the failure before the scanner starts", () => {
+  for (const [yml, reason] of [["", "expected a document, but the input is empty"], ["just text\n", "must contain a mapping"]]) {
+    withPortals("career-ops-scheduled-empty-yaml-", yml, (temp) => {
+      let spawned = false;
+      const result = executeJob(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filters: { positive: ["engineer"] } }, {
+        spawnFn: () => { spawned = true; throw new Error("scanner must not run"); },
+      });
+      assert.equal(spawned, false);
+      assert.equal(result.attempt, 1);
+      assert.equal(result.message, `${path.join(temp, "portals.yml")}: ${reason}`);
+    });
+  }
+});
+
+test("a scalar title list is no title limit to the scanner, so both modes refuse it", () => {
+  withPortals("career-ops-scheduled-scalar-", "title_filter:\n  positive: engineer\n", (temp) => {
+    for (const [filtersFrom, message] of [
+      ["file", "Scheduled scans require title keywords in portals.yml title_filter.positive when a job uses the file's filters"],
+      ["custom", "Scheduled scans require title keywords in the job or portals.yml title_filter.positive."],
+    ]) {
+      let spawned = false;
+      const result = executeJob(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filtersFrom, filters: {} }, {
+        spawnFn: () => { spawned = true; throw new Error("scanner must not run"); },
+      });
+      assert.equal(spawned, false, filtersFrom);
+      assert.equal(result.attempt, 1);
+      assert.equal(result.message, message);
+    }
+  });
+});
+
+test("the title guard refuses exactly the lists the scanner reads as no title limit", async () => {
+  const { buildTitleFilter } = await import("../../../title-keywords.mjs");
+  for (const positive of [[], [" "], [null], [1], "engineer", ["engineer"], ["*"]]) {
+    const unlimited = buildTitleFilter({ positive })("zzz unmatched title");
+    withPortals("career-ops-scheduled-drift-", yaml.dump({ title_filter: { positive } }), (temp) => {
+      let spawned = false;
+      executeJob(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "portals", filtersFrom: "file", filters: {} }, {
+        spawnFn: () => { spawned = true; return { status: 0, stdout: "", stderr: "" }; },
+      });
+      assert.equal(spawned, !unlimited, JSON.stringify(positive));
+    });
+  }
 });
 
 test("the title guard checks the list the full engine reads", () => {
@@ -346,6 +391,11 @@ test("the title guard checks the list the full engine reads", () => {
   assert.equal(custom.result.attempt, 1);
   assert.equal(custom.result.message, "Scheduled scans require title keywords in the job or portals.yml title_filter_full.positive.");
   assert.equal(run(fullEmpty, { engine: "full", filters: { positive: ["designer"] } }).spawned, true);
+  const fullNull = "title_filter:\n  positive: [engineer]\ntitle_filter_full: null\n";
+  assert.equal(run(fullNull, { engine: "full", filtersFrom: "file" }).spawned, true, "a null title_filter_full falls back to title_filter");
+  const noEngine = run(fullEmpty, { engine: undefined, filtersFrom: "file" });
+  assert.equal(noEngine.spawned, false, "a job with no engine runs the full engine");
+  assert.match(noEngine.result.message, /title_filter_full\.positive/);
 });
 
 test("custom job with empty lists inherits all six from the file", () => {
@@ -397,7 +447,7 @@ test("a legacy job with empty lists writes empty location lists when the file ha
 test("custom job with a non-empty negative list replaces the file's", () => {
   withPortals("career-ops-scheduled-replace-", `${FULL_PORTALS}title_filter_full:\n  positive: [architect]\n  negative: [junior]\n`, (temp) => {
     let overlay;
-    executeJob(temp, { id: "44444444-4444-4444-8444-444444444444", engine: "full", filters: { negative: ["sales"], allow: ["EU"] } }, {
+    executeJob(temp, { id: "44444444-4444-4444-8444-444444444444", engine: "full", filters: { negative: ["sales", "sales", 7], allow: ["EU"] } }, {
       spawnFn: (_node, _args, options) => {
         overlay = yaml.load(fs.readFileSync(options.env.CAREER_OPS_PORTALS, "utf8"));
         return { status: 0, stdout: JSON.stringify({ postingsKept: 0 }), stderr: "" };
@@ -957,4 +1007,28 @@ test("a scheduled-job filters source is validated and defaults to the base job's
   assert.equal(scheduledFiltersFrom(undefined, "file"), "file", "an edit that omits it keeps the base job's");
   assert.equal(scheduledFiltersFrom(undefined, undefined), "custom", "a new or legacy job is custom");
   assert.equal(scheduledFiltersFrom("custom", "file"), "custom");
+});
+
+test("parseScheduledJobInput keeps a file-mode job's source and lists on an edit that omits them", async () => {
+  await import("../helpers/web-ts-alias-loader.mjs");
+  const { parseScheduledJobInput } = await import("../../src/lib/scheduled-jobs.ts");
+  const { DEFAULT_FILTERS } = await import("../../src/lib/explore.ts");
+  const base = {
+    id: "66666666-6666-4666-8666-666666666666",
+    name: "File job",
+    engine: "full",
+    filtersFrom: "file",
+    every: 1,
+    unit: "hours",
+    timezone: "UTC",
+    startAt: "2026-11-08T00:00:00.000Z",
+    filters: { ...DEFAULT_FILTERS, positive: ["engineer"], allow: ["Remote"] },
+  };
+  const edited = parseScheduledJobInput({ name: "File job", filters: { sinceDays: 14 }, every: 2, unit: "hours" }, base);
+  assert.equal(edited.filtersFrom, "file");
+  assert.deepEqual(edited.filters.positive, ["engineer"]);
+  assert.deepEqual(edited.filters.allow, ["Remote"]);
+  assert.equal(edited.filters.sinceDays, 14);
+  assert.equal(parseScheduledJobInput({ name: "New" }).filtersFrom, "custom");
+  assert.throws(() => parseScheduledJobInput({ name: "Bad", filtersFrom: "portals" }), { message: "Invalid filters source." });
 });

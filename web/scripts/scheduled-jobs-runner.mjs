@@ -18,6 +18,7 @@ import { getCareerOpsRoot } from "../../path-resolver.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { scanFailureMessage } from "../src/lib/scheduled-scan-error.mjs";
 import { cleanChips } from "../src/lib/clean-chips.mjs";
+import { foldTitle } from "../../title-keywords.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -158,11 +159,14 @@ const FILTER_LISTS = [
   ["alwaysAllow", "location_filter", "always_allow"],
 ];
 
+// The scanner's rule (normalizeKeywords in title-keywords.mjs): a non-array or all-blank list is no title limit.
+const hasTitleKeywords = (list) => Array.isArray(list) && list.some((k) => typeof k === "string" && foldTitle(k).trim());
+
 // Names the title list the scanner reads when it is empty, else null.
 // scan-ats-full.mjs reads title_filter_full in place of title_filter whenever it is set.
 function emptyTitleKey(config, engine) {
   const section = engine !== "portals" && config.title_filter_full != null ? "title_filter_full" : "title_filter";
-  return cleanChips(config[section]?.positive).length ? null : `${section}.positive`;
+  return hasTitleKeywords(config[section]?.positive) ? null : `${section}.positive`;
 }
 
 function readPortals(file) {
@@ -173,7 +177,7 @@ function readPortals(file) {
   } catch (error) {
     throw new Error(`${file}: ${error.message}`);
   }
-  if (!base || typeof base !== "object") throw new Error("portals.yml must contain a mapping");
+  if (!base || typeof base !== "object") throw new Error(`${file}: must contain a mapping`);
   return base;
 }
 
