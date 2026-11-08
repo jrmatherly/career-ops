@@ -21,7 +21,7 @@ Both can ride the combined R1+A2+A3 PR, which edits claude-invocation.mjs and th
 ## Leftovers to decide, each with its check
 - Local branch `f1-merge-main` refused `git branch -d`, so it holds commits not on main: `git log --oneline main..f1-merge-main` says what; delete with `-D` only if they are the F1 merge-prep already landed via PR 35.
 - Local branch `claude/scan-build-coordinator-f35d72` at 6983ec4f and session worktree `distracted-ptolemy-303da4` (detached at 6983ec4f, clean): belong to archived sessions; `git log main..claude/scan-build-coordinator-f35d72` then delete if empty.
-- SessionStart warned `core.hooksPath` is the absolute `/Users/jason/dev/career-ops/.githooks`, so the fork's pre-commit guard is "not active" by the hook's check; `git config core.hooksPath` and the SessionStart hook in `.claude/hooks/` show whether the relative form is what it wants.
+- SessionStart warned `core.hooksPath` is the absolute `<repo>/.githooks`, so the fork's pre-commit guard is "not active" by the hook's check; `git config core.hooksPath` and the SessionStart hook in `.claude/hooks/` show whether the relative form is what it wants.
 
 ## Traps that held today (evidence this session)
 - The auto-mode classifier refuses a compound destructive git line (`worktree remove --force` chained with `branch -D` and `push --delete`); plain `git worktree remove` without `--force` on clean unlocked worktrees, `git branch -d`, and `git push origin --delete` each passed on their own.

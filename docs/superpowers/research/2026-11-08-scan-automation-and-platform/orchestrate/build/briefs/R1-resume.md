@@ -1,5 +1,5 @@
 R1 RESUME TO CODE-READY. Fresh owner. You finish PR-R1 from a stopped owner's WIP and bring it to code-ready, then babysit CI to green. The spec is <store>/build/briefs/R1.md (read it in full; it binds, including its 25 standing orders, plus orders 26-28 in <store>/preferences.md). This file is the delta.
-<store> = /Users/jason/dev/career-ops/.claude/worktrees/busy-shannon-d44979/docs/superpowers/research/2026-11-08-scan-automation-and-platform/orchestrate
+<store> = <repo>/docs/superpowers/research/2026-11-08-scan-automation-and-platform/orchestrate
 
 WHAT CHANGED SINCE R1.md WAS WRITTEN
 - Base: origin/main is now cedf9543 (carries F1 PR 35, R2 PR 40 and A1 PR 39). R1.md's premises were measured at 6fb1403b; re-measure every one at cedf9543 before relying on it (rank-pipeline.mjs line numbers, the runner's withResourceLock shape, scheduled-jobs.ts JobRun, scan-history columns). R2 landed web/src/lib/pipeline-table.mjs and career-ops.ts changes you may import read-only.
