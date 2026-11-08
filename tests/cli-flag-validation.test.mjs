@@ -513,6 +513,25 @@ test('rank-pipeline.mjs --help exits 0 and prints usage', () => {
     const r = runRankPipeline(root, '--help');
     assert.equal(r.status, 0, describeSpawn(r, `rank-pipeline.mjs --help exited ${r.status}, want 0`));
     assert.match(r.all, /node rank-pipeline\.mjs \[--limit N\]/, 'rank-pipeline.mjs --help printed no usage block');
+    assert.match(r.all, /--urls-file <path>/, 'rank-pipeline.mjs --help does not list --urls-file');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('rank-pipeline.mjs --urls-file without a value exits 1 and ranks nothing', () => {
+  const root = mkdtempSync(join(tmpdir(), 'career-ops-rank-pipeline-'));
+  try {
+    mkdirSync(join(root, 'data'));
+    const pipeline = join(root, 'data', 'pipeline.md');
+    const before = '## Pending\n- [ ] https://x.test/1 | Acme | Backend Engineer\n';
+    writeFileSync(pipeline, before);
+    for (const args of [['--urls-file'], ['--urls-file', '--dry-run'], ['--urls-file=']]) {
+      const r = runRankPipeline(root, ...args);
+      assert.equal(r.status, 1, describeSpawn(r, `rank-pipeline.mjs ${args.join(' ')} exited ${r.status}, want 1`));
+      assert.match(r.all, /--urls-file requires a value|--urls-file: cannot read/, `rank-pipeline.mjs ${args.join(' ')} did not name --urls-file`);
+      assert.equal(readFileSync(pipeline, 'utf-8'), before, `rank-pipeline.mjs ${args.join(' ')} changed data/pipeline.md`);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

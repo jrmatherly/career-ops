@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import * as yaml from "js-yaml";
 import {
   isSafeScheduledId,
+  readScheduledStore,
   withResourceLock,
   withScheduledStore,
 } from "../src/lib/scheduled-jobs-store.mjs";
@@ -16,10 +17,12 @@ import { isMainModule } from "../../lib/is-main-module.mjs";
 import { scheduledRunnerResourcePath, scheduledStorePath } from "../src/lib/scheduled-runner-path.mjs";
 import { getCareerOpsRoot } from "../../path-resolver.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
-import { scanFailureMessage } from "../src/lib/scheduled-scan-error.mjs";
+import { scanFailureMessage, stderrCause } from "../src/lib/scheduled-scan-error.mjs";
 import { cleanChips } from "../src/lib/clean-chips.mjs";
 import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
+import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
+import { candidateSince, candidatesFor, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -199,13 +202,28 @@ function jobPortals(job, base) {
   return base;
 }
 
-function writeJobPortals(root, jobId, config) {
+function writeJobTemp(root, jobId, prefix, ext, text) {
   if (!isSafeScheduledId(jobId)) throw new Error("Invalid scheduled job identifier.");
   const tempDir = path.join(root, "data", "tmp");
   fs.mkdirSync(tempDir, { recursive: true });
-  const tempPath = path.join(tempDir, `scheduled-${jobId}-${randomUUID()}.yml`);
-  fs.writeFileSync(tempPath, yaml.dump(config, { lineWidth: 120, noRefs: true }), "utf8");
+  const tempPath = path.join(tempDir, `${prefix}-${jobId}-${randomUUID()}.${ext}`);
+  fs.writeFileSync(tempPath, text, "utf8");
   return tempPath;
+}
+
+function writeJobPortals(root, jobId, config) {
+  return writeJobTemp(root, jobId, "scheduled", "yml", yaml.dump(config, { lineWidth: 120, noRefs: true }));
+}
+
+// The env every core script the runner starts gets; the scanner adds CAREER_OPS_PORTALS.
+function coreEnv(root) {
+  return {
+    ...process.env,
+    CAREER_OPS_ROOT: root,
+    // The scripts run with cwd = the checkout; a relative CAREER_OPS_PROFILE
+    // is resolved here, the way the web resolves it, so both read one file.
+    ...(process.env.CAREER_OPS_PROFILE?.trim() ? { CAREER_OPS_PROFILE: getProfilePath(root) } : {}),
+  };
 }
 
 /*
@@ -249,14 +267,7 @@ export function executeJob(root, job, options = {}) {
         [command.script, ...command.args],
         {
           cwd: CODE_ROOT,
-          env: {
-            ...process.env,
-            CAREER_OPS_ROOT: root,
-            CAREER_OPS_PORTALS: tempPortals || basePortals,
-            // The scanner runs with cwd = the checkout; a relative CAREER_OPS_PROFILE
-            // is resolved here, the way the web resolves it, so both read one file.
-            ...(process.env.CAREER_OPS_PROFILE?.trim() ? { CAREER_OPS_PROFILE: getProfilePath(root) } : {}),
-          },
+          env: { ...coreEnv(root), CAREER_OPS_PORTALS: tempPortals || basePortals },
           encoding: "utf8",
           timeout: SCAN_TIMEOUT_MS,
           maxBuffer: MAX_OUTPUT_BYTES,
@@ -328,6 +339,153 @@ export async function recordCompletion(storePath, claim, result, inMemoryStore =
   else await withScheduledStore(storePath, apply);
 }
 
+/** Merge `counts` into run `runId`; a key set to undefined is removed. A run MAX_RUNS has trimmed is left alone. */
+export async function recordStepCounts(storePath, runId, counts) {
+  await withScheduledStore(storePath, (store) => {
+    const run = store.runs.find((item) => item.id === runId);
+    if (!run) {
+      process.stderr.write(`rank: run ${runId} is no longer in the store; counts not recorded\n`);
+      return;
+    }
+    for (const [key, value] of Object.entries(counts)) {
+      if (value === undefined) delete run[key];
+      else run[key] = value;
+    }
+  });
+}
+
+function readText(file) {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return "";
+    throw error;
+  }
+}
+
+const RANK_DETAIL_MAX = 290;
+// rank-pipeline.mjs's indented per-batch failure lines: the CLI's own cause in parentheses, or the batch's problem.
+const RANK_BATCH_FAILED = /^\s+batch \d+: (?:CLI call failed \((.*)\), entries left un-annotated|(.*?) — entries left un-annotated)$/;
+
+/*
+ * Why a rank pass failed, for evalMessage. Without a batch line, the cause is
+ * among rank-pipeline.mjs's column-0 lines, which state it first and a hint
+ * after (its usage errors, its "No supported agent CLI found"), so they go to
+ * stderrCause reversed: its last-line fallback then takes the first.
+ */
+export function rankFailureMessage(result, { timeoutMs = SCAN_TIMEOUT_MS, cli = process.env.CAREER_OPS_RANK_CLI } = {}) {
+  const error = result?.error;
+  const lines = String(result?.stderr || "").split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.trim());
+  const topLevel = lines.filter((line) => !/^\s/.test(line) && !/^Node\.js v\d/.test(line));
+  let detail;
+  if (error?.code === "ETIMEDOUT") detail = `ranker timed out after ${Math.round(timeoutMs / 60_000)} minutes.`;
+  else if (error) detail = String(error.message || error).split(/\r?\n/)[0];
+  else {
+    const batch = lines.map((line) => line.match(RANK_BATCH_FAILED)).findLast(Boolean);
+    detail = (batch && (batch[1] ?? batch[2]))
+      || stderrCause(topLevel.toReversed().join("\n"))
+      || (result?.signal ? `ranker stopped by ${result.signal}.` : `ranker exited ${result?.status ?? "unknown"}.`);
+  }
+  const bin = cli?.trim();
+  if (bin && path.basename(bin) !== bin) detail = detail.replaceAll(bin, path.basename(bin));
+  if (detail.length > RANK_DETAIL_MAX) {
+    const cut = detail.slice(0, RANK_DETAIL_MAX);
+    // Back up to a word boundary only when one is near the end, so one long token (a URL, a path) is not dropped whole.
+    const space = cut.search(/\s+\S*$/);
+    detail = `${space > RANK_DETAIL_MAX / 2 ? cut.slice(0, space) : cut}…`;
+  }
+  return `Rank: ${detail}`;
+}
+
+const RANK_LOCK = { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 60_000 };
+// Five ranker batches of ten at its default 180 s each stay inside SCAN_TIMEOUT_MS; the rest wait for the next tick.
+const RANK_MAX_PER_PASS = 50;
+const evaluatingJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate && job.evaluate.mode !== "off");
+
+const RANK_WAITING = " rows wait for the next rank pass.";
+
+// A job's newest run needs a pass once it has finished, until one records its
+// counts. A failed pass is not retried each tick, so a broken CLI is not paid
+// for every 15 minutes; the job's next run sends those rows again.
+function runToRank(store, job) {
+  const lastRun = store.runs.find((run) => run.jobId === job.id);
+  if (!lastRun || lastRun.state === "queued" || lastRun.state === "running") return null;
+  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) ? lastRun : null;
+}
+
+/*
+ * Rank the rows each review or auto job's scans added. It reads only durable
+ * state (pipeline.md, scan-history.tsv, the store), so a tick after a crash or
+ * a failed scan ranks what the earlier run left, and a row already ranked is
+ * never sent again. It records counts on a run but never changes its `state`.
+ */
+export async function rankPass(root, storePath, { spawnFn = spawnSync } = {}) {
+  const due = (store) => evaluatingJobs(store).filter((job) => runToRank(store, job));
+  if (!due(readScheduledStore(storePath)).length) return;
+  // Its own lock keeps a slow pass from running twice when the next tick's scan ends first.
+  await withResourceLock(`${runnerResourcePath(storePath)}.rank`, async () => {
+    const store = readScheduledStore(storePath);
+    const pipelinePath = path.join(root, "data", "pipeline.md");
+    const historyPath = path.join(root, "data", "scan-history.tsv");
+    if (!fs.existsSync(historyPath) && pendingRows(readText(pipelinePath)).length) {
+      process.stderr.write(`rank: ${historyPath} is missing, so no pending row counts as a scan's; nothing is ranked\n`);
+    }
+    const scanHistoryRows = scanHistoryDataLines(readText(historyPath))
+      .filter((line) => line.trim())
+      .map(parseScanHistoryLine);
+    for (const job of due(store)) {
+      try {
+        await rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, spawnFn }, job);
+      } catch (error) {
+        process.stderr.write(`rank: job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}\n`);
+      }
+    }
+  }, RANK_LOCK);
+}
+
+async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, spawnFn }, job) {
+  const lastRun = runToRank(store, job);
+  const since = candidateSince({ job, runs: store.runs, excludeRunId: lastRun.id });
+  const candidates = candidatesFor({ pendingRows: pendingRows(readText(pipelinePath)), scanHistoryRows, since });
+  const waiting = candidates.filter((candidate) => !candidate.ranked);
+  const unranked = waiting.slice(0, RANK_MAX_PER_PASS);
+  const rankedBefore = candidates.length - waiting.length;
+  let ranked = rankedBefore;
+  // The waiting message keeps the run due, so the next tick sends the rest.
+  let evalMessage = waiting.length > unranked.length ? `${waiting.length - unranked.length}${RANK_WAITING}` : undefined;
+  if (unranked.length) {
+    const urlsFile = writeJobTemp(root, job.id, "rank", "txt", `${unranked.map((c) => c.url).join("\n")}\n`);
+    let rankerOutput = "";
+    try {
+      const result = spawnFn(
+        process.execPath,
+        ["rank-pipeline.mjs", "--urls-file", urlsFile, "--limit", String(unranked.length)],
+        { cwd: CODE_ROOT, env: coreEnv(root), encoding: "utf8", timeout: SCAN_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
+      );
+      rankerOutput = `${result.stdout || ""}${result.stderr || ""}`;
+      if (result.status !== 0) evalMessage = rankFailureMessage(result);
+    } catch (error) {
+      evalMessage = rankFailureMessage({ error });
+    } finally {
+      fs.rmSync(urlsFile, { force: true });
+    }
+    // The scan history has not changed, so the candidates are the same rows; only whether they are ranked can have changed.
+    const rows = pendingRows(readText(pipelinePath));
+    const urls = new Set(candidates.map((candidate) => candidate.url));
+    ranked = rows.filter((row) => row.ranked && urls.has(row.url)).length;
+    // rank-pipeline.mjs exits 0 unless every call failed. The run is not made due again, as for a failed pass.
+    const sent = new Set(unranked.map((candidate) => candidate.url));
+    const missed = unranked.length - rows.filter((row) => row.ranked && sent.has(row.url)).length;
+    if (!evalMessage && missed > 0) {
+      evalMessage = `Rank: ${missed} of ${unranked.length} sent rows came back unranked; the ranker's output is in the runner's stderr log.`;
+      // Both streams: rank-pipeline explains skipped batches and unmatched rows on stdout, failed calls on stderr.
+      for (const line of rankerOutput.split(/\r?\n/)) if (line.trim()) process.stderr.write(`rank: job ${job.id} | ${line}\n`);
+    }
+  }
+  process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
+  if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage) await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage });
+}
+
 async function takeDueJob(storePath) {
   return withScheduledStore(storePath, (store) => {
     enqueueDueJobs(store);
@@ -340,13 +498,13 @@ function requestedJobId(args) {
   return index >= 0 ? args[index + 1] || null : null;
 }
 
-async function main() {
-  const root = getCareerOpsRoot();
+/** One runner tick. `root` and `spawnFn` are seams for tests; the CLI passes neither. */
+export async function main(args = process.argv.slice(2), { root = getCareerOpsRoot(), spawnFn = spawnSync } = {}) {
   const storePath = scheduledStorePath(root);
   const runnerResource = runnerResourcePath(storePath);
-  const manualJobId = requestedJobId(process.argv.slice(2));
+  const manualJobId = requestedJobId(args);
 
-  return withResourceLock(
+  const tick = withResourceLock(
     runnerResource,
     async () => {
       let claim;
@@ -365,13 +523,22 @@ async function main() {
 
       if (!claim) return { status: "idle" };
 
-      const result = executeJob(root, claim.job);
+      const result = executeJob(root, claim.job, { spawnFn });
       await recordCompletion(storePath, claim, result);
       if (result.state === "failed") throw new Error(result.message);
       return { status: "success", jobId: claim.job.id, ...result };
     },
     { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 60_000 },
   );
+  try {
+    return await tick;
+  } finally {
+    // In a finally, so a failed scan or a busy runner lock still ranks the other jobs' rows.
+    // The manual route returns when its scan finishes; the next tick ranks what it found.
+    if (!manualJobId) {
+      await rankPass(root, storePath, { spawnFn }).catch((error) => process.stderr.write(`rank pass failed: ${error instanceof Error ? error.message : String(error)}\n`));
+    }
+  }
 }
 
 if (isMainModule(import.meta.url)) {

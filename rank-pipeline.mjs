@@ -26,6 +26,7 @@
  *   node rank-pipeline.mjs --cli codex         # override CLI auto-detection
  *   node rank-pipeline.mjs --model <name>      # passed through when the CLI takes one
  *   node rank-pipeline.mjs --dry-run           # print what would be written
+ *   node rank-pipeline.mjs --urls-file <path>  # rank only the pending rows listed in the file
  *   node rank-pipeline.mjs --self-test         # in-memory suite; spawns no subprocess
  */
 
@@ -40,6 +41,7 @@ import { withPipelineLock } from './pipeline-lock.mjs';
 import { replaceUserFile } from './tracker-utils.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
+import { normalizeUrl } from './url-key.mjs';
 import { readRememberedCli } from './lib/agent-cli.mjs';
 import { resolveCliLaunch } from './lib/agent-launch.mjs';
 
@@ -107,9 +109,10 @@ export const CLI_CANDIDATES = [
 const USAGE = `
   rank-pipeline.mjs — opt-in LLM relevance re-ranker (annotates, never filters)
 
-  node rank-pipeline.mjs [--limit N] [--cli <name>] [--model <name>] [--dry-run]
+  node rank-pipeline.mjs [--limit N] [--urls-file <path>] [--cli <name>] [--model <name>] [--dry-run]
 
     --limit N     max entries to rank this run (default ${DEFAULT_LIMIT}, ceiling ${LIMIT_CEILING})
+    --urls-file <path>  rank only pending rows whose URL is listed in the file, one per line
     --cli <name>  force a CLI instead of $CAREER_OPS_CLI or auto-detection
     --model <n>   passed through to the CLI when it accepts one
     --dry-run     print the annotations, write nothing
@@ -119,6 +122,7 @@ const USAGE = `
 `;
 const KNOWN_FLAGS = [
   '--limit',
+  '--urls-file',
   '--cli',
   '--model',
   '--dry-run',
@@ -126,7 +130,7 @@ const KNOWN_FLAGS = [
   '--help',
   '-h',
 ];
-const VALUE_FLAGS = ['--limit', '--cli', '--model'];
+const VALUE_FLAGS = ['--limit', '--urls-file', '--cli', '--model'];
 /**
  * Clamp to [0,5] at one decimal, and sanitize the reason so a model-generated
  * string can never break the row's pipe-delimited grammar or forge a new row.
@@ -166,6 +170,12 @@ export function parsePendingEntries(text) {
     });
   });
   return out;
+}
+
+/** The pending rows whose URL is in `urls`, in file order. URLs match by normalized key; a URL with no key matches nothing. */
+export function filterPendingByUrls(pending, urls) {
+  const wanted = new Set(urls.map(normalizeUrl).filter(Boolean));
+  return pending.filter(e => wanted.has(normalizeUrl(e.url)));
 }
 
 /**
@@ -372,6 +382,17 @@ async function main(args) {
     console.error('--limit must be a positive integer.');
     return 1;
   }
+  const urlsFile = flagValue(args, '--urls-file');
+  let urls = null;
+  if (urlsFile !== undefined) {
+    try {
+      urls = readFileSync(urlsFile, 'utf-8').split(/\r?\n/);
+    } catch (err) {
+      console.error(`--urls-file: cannot read ${urlsFile} (${err.code ?? err.message}).`);
+      console.error(USAGE);
+      return 1;
+    }
+  }
   const model = flagValue(args, '--model');
   const forced = flagValue(args, '--cli') ?? process.env.CAREER_OPS_RANK_CLI;
 
@@ -397,7 +418,8 @@ async function main(args) {
   }
 
   const original = readFileSync(PIPELINE_PATH, 'utf-8');
-  const pending = parsePendingEntries(original);
+  const eligible = parsePendingEntries(original);
+  const pending = urls ? filterPendingByUrls(eligible, urls) : eligible;
   if (!pending.length) {
     console.log('No unranked pending entries. Nothing to do.');
     return 0;
@@ -576,6 +598,14 @@ function selfTest() {
   check('detect respects priority order', detectCli(CLI_CANDIDATES, () => true).bin === 'claude');
 
   check('prompt marks postings untrusted', /untrusted data/.test(buildPrompt(pending, '')));
+
+  const listed = filterPendingByUrls(parsePendingEntries(fixture), ['https://x.test/2', 'HTTPS://X.TEST/1/?utm_source=a', '', 'not a url', 'https://x.test/4']);
+  check('the URL filter keeps only listed rows, in file order', listed.map(e => e.url).join(' ') === 'https://x.test/1 https://x.test/2');
+  check('the URL filter joins two spellings of one URL', listed.some(e => e.url === 'https://x.test/1'));
+  check('an already-ranked listed row stays out', !listed.some(e => e.url.endsWith('/4')));
+  check('an empty URL list matches nothing', filterPendingByUrls(pending, []).length === 0);
+  check('a row whose URL has no key matches nothing',
+    filterPendingByUrls([{ url: '' }, { url: '   ' }], ['', '   ']).length === 0);
 
   // pipeline.md does not enforce line uniqueness. Two identical pending rows are
   // two entries scored separately; matching by row text alone would hand both the

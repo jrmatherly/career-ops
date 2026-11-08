@@ -4,7 +4,7 @@ R2	build	merged	claude/r2-inbox-rank	40	fc31cb2161fb1a837d4a503ec497310a2582988e
 A1	build	merged	claude/a1-evaluate-text	39	cedf9543	briefs/A1-r4-verify.md
 P1	build	merged	claude/p1-doctor-gateway	37	66f0cb7a2d8bfa6c61ee35cfcc813c225dd454c8	briefs/P1-fix4.md
 K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad93311c	briefs/K1-fix4.md
-R1	build	stopped-mid-build-wip	claude/r1-rank-pass			orchestrate/build/briefs/R1.md
 A2	build	building-combined	claude/r1-rank-pass			orchestrate/build/briefs/R1.md
 A3	build	building-combined	claude/r1-rank-pass			orchestrate/build/briefs/R1.md
 P2	operator	pending				
+R1	build	merge-ready	claude/r1-rank-pass	42	coordinator-head	briefs/R1-r2-verify.md
