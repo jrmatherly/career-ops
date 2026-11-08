@@ -204,15 +204,15 @@ export function diffAgainstBaseline(current, baseline, { fraction = DEFAULT_DRIF
 }
 
 /**
- * Audit each enabled tracked company through the scanner's own provider layer.
+ * Audit each enabled tracked company and job board through the scanner's own provider layer.
  *
  * `local-parser` is skipped for the same reason verify-portals skips it: an
  * audit must stay network-only and never execute a command configured in a
  * portals file it did not write.
  *
- * @param {Array<object>} companies - tracked_companies entries.
+ * @param {Array<object>} companies - tracked_companies and job_boards entries.
  * @param {{providers?: Map, httpCtx?: object, smallThreshold?: number, concurrency?: number}} [deps]
- * @returns {Promise<Array<object>>} One row per enabled company.
+ * @returns {Promise<Array<object>>} One row per enabled entry.
  */
 export async function auditCompanies(companies, {
   providers = null,
@@ -362,11 +362,11 @@ export function findUnclaimedEntries(entries, providers) {
   return { silent, handoff, unknownProvider };
 }
 
-/** Read tracked_companies out of a portals file. Throws on a missing file. */
+/** Read tracked_companies, then job_boards, out of a portals file. Throws on a missing file. */
 export function loadCompanies(filePath = DEFAULT_PORTALS_PATH) {
   if (!existsSync(filePath)) throw new Error(`portals file not found: ${filePath}`);
   const cfg = loadYaml(readFileSync(filePath, 'utf-8')) || {};
-  return Array.isArray(cfg.tracked_companies) ? cfg.tracked_companies : [];
+  return ['tracked_companies', 'job_boards'].flatMap((key) => (Array.isArray(cfg[key]) ? cfg[key] : []));
 }
 
 // This is lexical advice, not semantic validation: synonyms and another
@@ -458,7 +458,7 @@ async function main() {
     const needle = only.toLowerCase();
     companies = companies.filter((c) => String(c?.name || '').toLowerCase().includes(needle));
     if (companies.length === 0) {
-      console.error(`Error: no tracked company matches "${only}" in ${filePath}`);
+      console.error(`Error: no tracked company or job board matches "${only}" in ${filePath}`);
       process.exit(1);
     }
   }

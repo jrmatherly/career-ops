@@ -229,6 +229,32 @@ Re-read against rule 6 after a contributor checked the live `robots.txt` in [#57
 
 ---
 
+## Loxo (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program, with no proposal issue; not listed, recorded in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. `GET https://app.loxo.co/{agency}` serves server-rendered job cards (`app.loxo.co/loxo`: HTTP 200, 7 cards) and `robots.txt` is `Allow: /` under `User-agent: *`. Detail pages carry no JSON-LD and no posting date, `/{agency}.rss` answers 404, and pagination on a large board was not observed. Tenants are recruiting agencies, which rule 2 accepts with the agency as the company (decision D4), but the date gap and the unconfirmed pagination kept it out of this round.
+
+## Harri (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `POST https://gateway.harri.com/core/api/v1/harri_search/search_jobs` needs no auth (the site bundle marks it `noAuth`) and reported 57,089 hits, 10 per page. `start=10000` answers HTTP 400 `CLOUDSEARCH_MAX_WINDOW_SIZE_EXCEEDED`, and no filter body that partitions the index was found, so rule 3 (the complete inventory) is unconfirmed. The sample mixed many UK listings with US ones. `harri.com/robots.txt` disallows only unrelated paths; `gateway.harri.com/robots.txt` answers 403.
+
+## Jobgether (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed and needs a [source proposal](https://github.com/career-ops-hq/career-ops/issues/new?template=source-proposal.yml). `GET https://jobgether.com/astroapi/ai/jobs.json?limit=25&page=N` is a documented public API with no key, rate-limited at 60 requests a minute, and `robots.txt` allows that path by name. Any `page` past 10 comes back as page 10, so one query reaches 250 rows (rule 3); each `url` is a jobgether.com page, not the employer's (rule 2); and the board may republish other sources (rule 5).
+
+## idealist.org (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `https://www.idealist.org/sitemap-jobs-en-1.xml` listed 2,252 `/en/nonprofit-job/{id}-{slug}` URLs, newest `lastmod` that day, and `robots.txt` blocks only a third-party-login path for `User-agent: *`. The sitemap route costs one detail fetch per posting per scan, and a JSON-LD parse of the detail page was not confirmed. The search page reads an Algolia index through a public search key; under decision D2 such a key counts as zero-auth when discovered at runtime, so that route stays open for a later round.
+
+## Dribbble Jobs (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `https://dribbble.com/jobs.rss` answered `application/rss+xml` with 46 items and `robots.txt` disallows only `/jobs/*/apply_now`. Some items were posted in 2022 to 2024, the HTML listing returns no jobs past page 1 without client-side code, and the board is design-only, so the yield did not justify a provider.
+
+## USAJOBS front-end search (not used)
+
+Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Decision D3: core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API.
+
+---
+
 ## Backfill waiver (2026-11-08)
 
 These board providers merged without an entry in this log: most before the log existed on 2026-08-07, the rest after it without one. Each line names the provider and the author date of the commit that added its file (`git log --diff-filter=A --format=%as -- providers/{id}.mjs`). A line here records the gap; it is not a verification. A full entry for a provider replaces its line. `tests/providers/indexing-log-coverage.test.mjs` fails when a board provider has neither.
