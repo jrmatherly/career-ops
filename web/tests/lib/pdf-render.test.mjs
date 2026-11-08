@@ -13,6 +13,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync, rmSyn
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  renderFailureMessage,
   pdfRunOutcome,
   writeCvHtml,
   spawnGeneratePdf,
@@ -277,8 +278,10 @@ test("renderAndMarkPdf: generate-pdf.mjs fails -> render-failed, mark-pdf-ready 
     // When rendering
     const result = await renderAndMarkPdf({ spawnFn, execPath: "node", coreRoot: "/root", pdfPaths, format: "letter", reportNum: "3" });
 
-    // Then it reports render-failed with the render's stderr, never calls mark-pdf-ready, and still cleans scratch
-    assert.deepEqual(result, { kind: "render-failed", error: "Refusing to write the PDF outside the project directory" });
+    // Then it reports render-failed with the kept path then the renderer's reason, never calls mark-pdf-ready, and still cleans scratch
+    assert.equal(result.kind, "render-failed");
+    assert.match(result.error, /^Rejected CV kept at .*\. Refusing to write the PDF outside the project directory$/);
+    assert.equal(result.kept.html, join(dir, "cv-web-3-rejected.html"));
     assert.equal(calls.length, 1);
     assert.deepEqual(readdirSync(dir).filter((f) => f.startsWith("cv-web-3.")), []);
     assert.deepEqual(readdirSync(join(dir, "output")), [], "a failed render keeps no HTML");
@@ -537,6 +540,65 @@ test("writeCvHtml: a shorter re-render leaves no trailing bytes", () => {
     const onDisk = readFileSync(paths.html, "utf8");
     assert.equal(onDisk, short);
     assert.ok(!onDisk.includes("XXXX"), "trailing bytes from the earlier write survived");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("renderAndMarkPdf: fact gate fails after a voice warning -> the error leads with the fact-check claims and the rejected HTML plus renderer stderr are kept", async () => {
+  // Given generate-pdf.mjs printed a voice advisory, then the fact-gate failure (the
+  // cluster run on reports 059 and 034: the UI showed only "PDF generation failed: Fa")
+  const dir = makeScratchDir();
+  const pdfPaths = makePdfPaths(dir, "59");
+  writeFileSync(pdfPaths.html, "<html>12 years</html>");
+  const stderr = [
+    "⚠️  Voice check warning for cv-web-59.html: an em dash. The build continues. PDF generation normalizes long dashes for ATS. LaTeX and CV Studio leave the dash in the text.",
+    '❌ PDF generation failed: Fact check failed for cv-web-59.html: "12 years" is not in cv.md; "$4M budget" is not in cv.md. Add the claim to cv.md or remove it from the CV.',
+  ].join("\n");
+  const { spawnFn } = makeRouterSpawn({
+    "generate-pdf.mjs": { exitCode: 1, stderr },
+    "mark-pdf-ready.mjs": { exitCode: 0 },
+  });
+  try {
+    const result = await renderAndMarkPdf({ spawnFn, execPath: "node", coreRoot: "/root", pdfPaths, format: "letter", reportNum: "59" });
+
+    assert.equal(result.kind, "render-failed");
+    // The route caps the message at 1000 characters; the path and the claims must survive the cap, not the advisory.
+    assert.match(result.error.slice(0, 1000), /^Rejected CV kept at .*\. PDF generation failed: Fact check failed for cv-web-59\.html: "12 years" is not in cv\.md; "\$4M budget"/);
+    assert.doesNotMatch(result.error, /Voice check warning/);
+    assert.equal(readFileSync(result.kept.html, "utf8"), "<html>12 years</html>", "the rejected HTML survives the scratch sweep");
+    assert.equal(readFileSync(result.kept.stderr, "utf8"), stderr, "the full renderer stderr is the run record");
+    assert.match(result.error, new RegExp(result.kept.html.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "the message names the kept HTML");
+    assert.deepEqual(readdirSync(dir).filter((f) => f.startsWith("cv-web-59.")), [], "the scratch copy is still swept");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("renderFailureMessage: ❌ lines win; otherwise the first line; empty stderr gets the fallback", () => {
+  assert.equal(renderFailureMessage("⚠️  advisory\n❌ one\n❌ two"), "one two");
+  assert.equal(renderFailureMessage("⚠️  advisory\n❌ PDF browser failed: Executable doesn't exist at /x\nRun npx playwright install"), "PDF browser failed: Executable doesn't exist at /x Run npx playwright install");
+  assert.equal(renderFailureMessage("TypeError: boom\n    at render (x.mjs:1:1)\n    at main (x.mjs:9:1)"), "TypeError: boom");
+  assert.equal(renderFailureMessage("file:///x/generate-pdf.mjs:3\nimport nope from 'nope';\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'nope'\nNode.js v24.22.2"), "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'nope'");
+  assert.equal(renderFailureMessage(""), "PDF rendering failed.");
+  assert.equal(renderFailureMessage("  \n "), "PDF rendering failed.");
+});
+
+test("renderAndMarkPdf: the rejected HTML cannot be kept -> the error carries no path, the stderr record is still written", async () => {
+  // Given the scratch HTML is gone before the render fails
+  const dir = makeScratchDir();
+  const pdfPaths = makePdfPaths(dir, "8");
+  const { spawnFn } = makeRouterSpawn({
+    "generate-pdf.mjs": { exitCode: 1, stderr: "❌ PDF generation failed: Fact check failed for cv-web-8.html: \"9 teams\" is not in cv.md." },
+    "mark-pdf-ready.mjs": { exitCode: 0 },
+  });
+  try {
+    const result = await renderAndMarkPdf({ spawnFn, execPath: "node", coreRoot: "/root", pdfPaths, format: "letter", reportNum: "8" });
+
+    assert.equal(result.kind, "render-failed");
+    assert.equal(result.kept.html, null);
+    assert.equal(result.kept.stderr, join(dir, "cv-web-8-rejected.stderr.txt"));
+    assert.match(result.error, /^The rejected CV could not be kept \(see the server log\)\. PDF generation failed: Fact check failed for cv-web-8\.html/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

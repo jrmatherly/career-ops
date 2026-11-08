@@ -25,7 +25,10 @@ fails when a diverged path has no row in the table.
 
 ## Run the fork as your plugin
 
-Daily use goes through the Claude Code plugin, never through this checkout.
+On a Mac, daily use goes through the Claude Code plugin with the
+`~/career-ops-data` data root, never through this checkout. The fork's
+production path is the server image documented in `deploy/README.md`, a pod
+with `CAREER_OPS_ROOT=/data` (the full path is `docs/DEPLOYMENT.md`).
 In Claude Code, run the fork route that
 [`docs/CLAUDE_PLUGIN.md`](docs/CLAUDE_PLUGIN.md) documents:
 
@@ -36,8 +39,9 @@ In Claude Code, run the fork route that
 
 The plugin installs from the fork's `main` and updates only when `version` in
 `.claude-plugin/plugin.json` changes, so a branch checked out here never reaches
-daily use and user data cannot land in the checkout. The data root stays
-`~/career-ops-data`, the plugin default, so `CAREER_OPS_ROOT` needs no change.
+daily use and user data cannot land in the checkout. On a Mac the data root
+is `~/career-ops-data`, the plugin default, so `CAREER_OPS_ROOT` needs no change
+there.
 
 ## Where to contribute
 

@@ -39,7 +39,7 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
       // The CLI skips a share the service no longer has and still exits 0; say so, or the row just stays stale.
       // When nothing answered at all, the likelier cause is the URL, not deleted shares: never advise deleting then.
       if (data.missing.length && data.pulled === 0) {
-        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the data root's .env before deleting anything.` });
+        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the environment or the data root's .env before deleting anything.` });
       } else if (data.missing.length) {
         setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}` });
       }

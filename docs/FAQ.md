@@ -105,11 +105,11 @@ Usually a DNS filter. Sandboxed agent environments, and some corporate or home D
 
 ## Can I run career-ops in Docker / self-hosted?
 
-Yes: there's a `Dockerfile` and `docker-compose.yml` in the repo root. Note that career-ops is local-first and human-in-the-loop, so Docker packages the environment: it does not turn career-ops into a service that runs on its own or applies to jobs for you.
+Yes: there's a `Dockerfile` and `docker-compose.yml` in the repo root. Note that career-ops is local-first and human-in-the-loop, so Docker packages the environment: it does not turn career-ops into a service that runs on its own or applies to jobs for you. This fork also ships a hosted web image and runs it as a pod, see [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Does career-ops sync across devices?
 
-No. Everything is files in your checkout, and there is no cloud component. People who want this put the directory in a synced folder.
+No. Everything is files in your checkout, and there is no cloud component. People who want this put the directory in a synced folder. On this fork the hosted pod in [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) is one data root on one volume, not a sync.
 
 ## How do I get an issue assigned to me?
 

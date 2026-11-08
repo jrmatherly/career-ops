@@ -144,6 +144,10 @@ export function markTrackerReady({ spawnFn, execPath, coreRoot, reportNum }) {
 
 /**
  * Glob-clean every scratch file for this run rather than the one known filename.
+ * The trailing dot in the `cv-web-{N}.` prefix is load-bearing: the
+ * `cv-web-{N}-rejected.*` files keepRejectedRender writes to the same
+ * directory must survive this sweep, and `cv-web-4.` must not match
+ * `cv-web-42.html`.
  * The agent is not told these paths, and on Claude Code holds no write tool — but
  * the BACKEND writes here and generate-pdf.mjs may leave its own intermediates, so
  * matching the run's prefix stays the right sweep. Logs rather than silently
@@ -186,9 +190,59 @@ export function keepTailoredHtml(pdfPaths, warnings) {
 }
 
 /**
+ * The user-facing reason a render failed. generate-pdf.mjs prints advisories
+ * (a voice warning, a page-budget note) before the failure it exits on, and the
+ * route caps the message, so the advisory alone filled the cap and the fact
+ * gate's claims never reached the UI ("PDF generation failed: Fa"). The fatal
+ * text is everything from the first line generate-pdf.mjs marks with ❌, since
+ * that error can span lines (Playwright's missing-browser message does). With
+ * no marker, the first line naming an error, else the first line: an uncaught
+ * throw ends with a bare "Node.js v24" line, not the cause.
+ * @param {string} stderr
+ * @returns {string}
+ */
+export function renderFailureMessage(stderr) {
+  const lines = stderr.split("\n").map((l) => l.trim()).filter(Boolean);
+  const marked = lines.findIndex((l) => l.startsWith("❌"));
+  const picked = marked >= 0
+    ? lines.slice(marked).map((l) => l.replace(/^❌\s*/, ""))
+    : [lines.find((l) => /error|failed/i.test(l)) ?? lines[0]];
+  return picked.filter(Boolean).join(" ") || "PDF rendering failed.";
+}
+
+/**
+ * Keep the rejected HTML and the renderer's full stderr beside the scratch
+ * file, named outside the `cv-web-{N}.` sweep prefix, so the user can read
+ * what the fact gate flagged after the run. Each path is null when that file
+ * could not be written, so the caller names only what is really on disk.
+ * @param {{html: string}} pdfPaths
+ * @param {string} reportNum
+ * @param {string} stderr
+ * @returns {{html: string | null, stderr: string | null}}
+ */
+export function keepRejectedRender(pdfPaths, reportNum, stderr) {
+  const base = path.join(path.dirname(pdfPaths.html), `cv-web-${reportNum}-rejected`);
+  const kept = { html: null, stderr: null };
+  try {
+    fs.copyFileSync(pdfPaths.html, `${base}.html`);
+    kept.html = `${base}.html`;
+  } catch (err) {
+    console.error(`pdf render: could not keep the rejected HTML for report #${reportNum}: ${err.message}`);
+  }
+  try {
+    fs.writeFileSync(`${base}.stderr.txt`, stderr, "utf8");
+    kept.stderr = `${base}.stderr.txt`;
+  } catch (err) {
+    console.error(`pdf render: could not keep the renderer output for report #${reportNum}: ${err.message}`);
+  }
+  return kept;
+}
+
+/**
  * @typedef {Object} RenderFailedResult
  * @property {"render-failed"} kind
  * @property {string} error
+ * @property {{html: string | null, stderr: string | null}} kept - The rejected HTML and the renderer's stderr; a path is null when that file could not be written.
  */
 /**
  * @typedef {Object} RenderedResult
@@ -201,7 +255,8 @@ export function keepTailoredHtml(pdfPaths, warnings) {
  * Render the tailored HTML to a PDF, then mark the tracker's PDF column
  * ready — only after the render is CONFIRMED successful, never
  * optimistically. Always cleans up scratch files, whether the render
- * succeeds or fails.
+ * succeeds or fails; a failed render first keeps the rejected HTML and the
+ * renderer's stderr as `cv-web-{N}-rejected.*` beside it.
  *
  * Call after writeCvHtml for the same pdfPaths — this reads the HTML that
  * function wrote. `format` is passed in rather than read back off disk, so the two
@@ -214,10 +269,16 @@ export async function renderAndMarkPdf({ spawnFn, execPath, coreRoot, pdfPaths, 
 
   const render = await spawnGeneratePdf({ spawnFn, execPath, coreRoot, html: pdfPaths.html, finalPdf: pdfPaths.finalPdf, format, reportNum });
   if (render.ok) keepTailoredHtml(pdfPaths, warnings);
+  const kept = render.ok ? null : keepRejectedRender(pdfPaths, reportNum, render.stderr);
   cleanupPdfScratch(path.dirname(pdfPaths.html), `cv-web-${reportNum}.`);
 
   if (!render.ok) {
-    return { kind: "render-failed", error: render.stderr || "PDF rendering failed." };
+    // Path first: the fact gate's claim list can run past the route's cap, and
+    // the path is what lets the user read the rest.
+    const where = kept.html
+      ? `Rejected CV kept at ${kept.html}${kept.stderr ? " (full renderer output beside it as .stderr.txt)" : ""}. `
+      : "The rejected CV could not be kept (see the server log). ";
+    return { kind: "render-failed", error: where + renderFailureMessage(render.stderr), kept };
   }
 
   // A render that exits 0 can still have written advisories to stderr, and two
