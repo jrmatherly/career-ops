@@ -7,4 +7,4 @@ K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad
 A2	build	building-combined	claude/r1-rank-pass			orchestrate/build/briefs/R1.md
 A3	build	building-combined	claude/r1-rank-pass			orchestrate/build/briefs/R1.md
 P2	operator	pending				
-R1	build	merge-ready	claude/r1-rank-pass	42	coordinator-head	briefs/R1-r2-verify.md
+R1	build	merged	claude/r1-rank-pass	42	5505a546	briefs/R1-r2-verify.md
