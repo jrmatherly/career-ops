@@ -55,9 +55,9 @@ export async function POST(req: Request) {
   if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|fetch failed|non-JSON body|answered 5\d\d/.test(err)) {
     return Response.json({ error: "the publish service did not answer; is it running?" }, { status: 502 });
   }
-  if (/answered 40[13]/.test(err)) return Response.json({ error: "the publish service refused PUBLISH_API_KEY; check the data root's .env" }, { status: 503 });
+  if (/answered 40[13]/.test(err)) return Response.json({ error: "the publish service refused PUBLISH_API_KEY; check the environment or the data root's .env" }, { status: 503 });
   if (/answered 429/.test(err)) return Response.json({ error: "the publish service is rate limiting pulls; try again shortly" }, { status: 429 });
-  if (/is not set/.test(err)) return Response.json({ error: "PUBLISH_URL or PUBLISH_API_KEY is not set in the data root's .env" }, { status: 503 });
+  if (/is not set/.test(err)) return Response.json({ error: "PUBLISH_URL or PUBLISH_API_KEY is not set in the environment or the data root's .env" }, { status: 503 });
   if (/lock timeout/.test(err)) return Response.json({ error: "another pull or publish is writing data/shares.json; try again shortly" }, { status: 503 });
   if (/is not valid JSON/.test(err)) return Response.json({ error: "data/shares.json is not valid JSON; fix it or republish from the CLI" }, { status: 500 });
   if (/no local record/.test(err)) return Response.json({ error: "that share is not in data/shares.json" }, { status: 404 });
