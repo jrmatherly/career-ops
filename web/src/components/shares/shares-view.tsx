@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { PullResponse, Share } from "@/lib/shares";
 
 const PUBLISH_CMD = "node publish/share.mjs publish --slug <name> --from-resume";
@@ -13,7 +13,7 @@ const PUBLISH_CMD = "node publish/share.mjs publish --slug <name> --from-resume"
 // UTC to the minute (pull writes toISOString(), always Z): the same text on the server and the client, so hydration never mismatches.
 const pulledLabel = (at: string) => (Number.isNaN(Date.parse(at)) ? at : `${at.slice(0, 16).replace("T", " ")} UTC`);
 
-export function SharesView({ shares, error }: { shares: Share[]; error: string | null }) {
+export function SharesView({ shares, error, accountUrl }: { shares: Share[]; error: string | null; accountUrl: string | null }) {
   const router = useRouter();
   // Which pull is in flight: one slug, or every share from Pull all.
   const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
@@ -61,12 +61,20 @@ export function SharesView({ shares, error }: { shares: Share[]; error: string |
             <span className="tabular-nums">{shares.length}</span> published · views and comments refresh on Pull
           </p>
         </div>
-        {shares.length > 0 && (
-          <Button variant="outline" size="sm" onClick={() => void pull()} disabled={pulling !== null}>
-            {pulling && "all" in pulling ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-            Pull all
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {accountUrl && (
+            <a href={accountUrl} target="_blank" rel="noopener" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <ExternalLink className="size-3.5" />
+              Manage publish keys
+            </a>
+          )}
+          {shares.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => void pull()} disabled={pulling !== null}>
+              {pulling && "all" in pulling ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              Pull all
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (

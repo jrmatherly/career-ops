@@ -112,8 +112,8 @@ Sign-in is limited to `PUBLISH_ALLOWED_EMAILS`: Better Auth's `validateUserInfo`
 The key flow:
 
 1. Register an OIDC client in Pocket ID with the redirect URI `$PUBLISH_BASE_URL/api/auth/callback/pocket-id`, and put its id, secret and discovery URL in the service's environment.
-2. Open `$PUBLISH_BASE_URL/account`, sign in with Pocket ID, and create a key. It is shown once.
-3. Put it in the data root's `.env` as `PUBLISH_API_KEY`, next to `PUBLISH_URL`. The share CLI sends it on every request.
+2. Open `$PUBLISH_BASE_URL/account` (the dashboard's Shares page links to it as "Manage publish keys" when `PUBLISH_URL` is an `https` URL), sign in with Pocket ID, and create a key. It is shown once. The page carries the dashboard's colour tokens inline, light and dark, with no script and no external URL, so the CSP stays as it is.
+3. Put it where the share CLI reads it. On a cluster install, `PUBLISH_API_KEY` is pod env rendered from `cluster.toml`, so add the line the page prints, `publish_api_key = "cops_..."`, to the `[career_ops]` block; the environment wins over `.env`, so a key put in `.env` there is ignored. On a local install, put it in the data root's `.env` as `PUBLISH_API_KEY`, next to `PUBLISH_URL`. The share CLI sends it on every request.
 4. Revoke it on the same page when a machine is retired. Revoking takes effect on the next request. Removing an email from `PUBLISH_ALLOWED_EMAILS` and restarting the service stops that user's sign-ins, open sessions and keys; the keys stay in the database, refused, until revoked.
 
 If Pocket ID is down when the service starts, shares and keys keep working and sign-in answers 503; the next sign-in after Pocket ID is back re-reads its discovery document.

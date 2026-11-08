@@ -9,6 +9,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { request } from 'node:http';
 import { readConfig, createServer, clientKey } from '../server.mjs';
 import { hideContacts } from '../pages.mjs';
+import { accountPage, signInPage } from '../pages/account.mjs';
 import { AUTH_ENV, ownerKey } from './helpers.mjs';
 
 // The owner's key for the server under test, set by boot(); top-level tests run one at a time.
@@ -336,4 +337,42 @@ test('hideContacts strips the contact row build-cv-html renders from a payload t
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+});
+
+const accountPages = () => [
+  signInPage('Sign-in was refused.'),
+  accountPage({ email: 'ada@example.com', keys: [{ id: 'k1', name: 'laptop', start: 'cops_ab', createdAt: '2026-11-08T00:00:00Z' }], created: 'cops_test' }),
+];
+
+test('account page has no script tag and no external URL', () => {
+  for (const html of accountPages()) {
+    assert.doesNotMatch(html, /<script/i);
+    assert.doesNotMatch(html, /https?:|\/\/[a-z]|url\(|@import/i);
+  }
+});
+
+test('account page carries the dashboard token values', () => {
+  const css = readFileSync(fileURLToPath(new URL('../../web/src/app/globals.css', import.meta.url)), 'utf8');
+  const block = (text, open) => {
+    const start = text.indexOf(open);
+    assert.notEqual(start, -1, `${open} block`);
+    return text.slice(start + open.length, text.indexOf('}', start));
+  };
+  const value = (body, name) => body.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1].trim();
+  const html = accountPages()[1];
+  const pageLight = block(html, ':root{');
+  const pageDark = block(html, '@media (prefers-color-scheme: dark){:root{');
+  const theme = block(css, '@theme {');
+  for (const name of ['--color-brand', '--color-brand-foreground']) assert.equal(value(pageLight, name), value(theme, name), name);
+  for (const name of ['--bg', '--surface', '--border', '--fg', '--muted', '--brand-text']) {
+    assert.equal(value(pageLight, name), value(block(css, ':root {'), name), `light ${name}`);
+    assert.equal(value(pageDark, name), value(block(css, '.dark {'), name), `dark ${name}`);
+  }
+});
+
+test('the new key is printed as the cluster.toml line and named for the local .env', () => {
+  const html = accountPages()[1];
+  assert.match(html, /<pre>publish_api_key = "cops_test"<\/pre>/);
+  assert.match(html, /\[career_ops\]<\/code> block of <code>cluster\.toml/);
+  assert.match(html, /<code>\.env<\/code> as <code>PUBLISH_API_KEY/);
 });

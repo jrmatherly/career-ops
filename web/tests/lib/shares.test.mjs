@@ -162,6 +162,9 @@ test("a share the service no longer has comes back as missing on a successful pu
   assert.deepEqual((await post({})).body, { ok: true, missing: [], pulled: 0 }, "other stderr on exit 0 is logged, not reported");
 });
 
+// A cluster install takes the key from cluster.toml as pod env, which wins over .env, so both places are named.
+const KEY_DESTINATIONS = /publish_api_key = "cops_\.\.\." in the \[career_ops\] block of cluster\.toml.*data root's \.env/;
+
 test("a refused key is a 503, rate limiting a 429 and a service error a 502, none naming a URL", async () => {
   const cases = [
     ["publish: GET /api/shares/alpha/stats answered 401 (api key required)\n", 503, /PUBLISH_API_KEY/],
@@ -178,6 +181,7 @@ test("a refused key is a 503, rate limiting a 429 and a service error a 502, non
     assert.equal(r.status, status, stderr);
     assert.match(r.body.error, message);
     assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api|\/home/);
+    if (status === 503 && /40[13]/.test(stderr)) assert.match(r.body.error, KEY_DESTINATIONS);
   }
 });
 
@@ -190,6 +194,7 @@ test("a service that does not answer is a 502 whose message names no URL or path
   const unset = await post({});
   assert.equal(unset.status, 503);
   assert.doesNotMatch(unset.body.error, /\/home/);
+  assert.match(unset.body.error, KEY_DESTINATIONS);
 });
 
 test("any other non-zero exit is a 500 with a generic message; a missing record is a 404", async () => {

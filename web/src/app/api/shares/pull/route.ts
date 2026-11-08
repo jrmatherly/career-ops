@@ -7,6 +7,9 @@ import { SLUG_RE, type PullResponse } from "@/lib/shares";
 export const runtime = "nodejs"; // delegates to the share CLI via child_process
 export const dynamic = "force-dynamic";
 
+// On the cluster the key is pod env from cluster.toml, and share.mjs reads env before .env, so a key put in .env there is ignored.
+const KEY_DESTINATIONS = `On a cluster install, set publish_api_key = "cops_..." in the [career_ops] block of cluster.toml; on a local install, set PUBLISH_URL and PUBLISH_API_KEY in the data root's .env.`;
+
 // Runs `node publish/share.mjs pull [--slug s]`: the CLI reads PUBLISH_URL and
 // the key from its environment or the data root's .env, refreshes
 // data/shares.json and rewrites the feedback file of every share it pulled.
@@ -55,9 +58,9 @@ export async function POST(req: Request) {
   if (/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET|fetch failed|non-JSON body|answered 5\d\d/.test(err)) {
     return Response.json({ error: "the publish service did not answer; is it running?" }, { status: 502 });
   }
-  if (/answered 40[13]/.test(err)) return Response.json({ error: "the publish service refused PUBLISH_API_KEY; check the data root's .env" }, { status: 503 });
+  if (/answered 40[13]/.test(err)) return Response.json({ error: `the publish service refused PUBLISH_API_KEY. Mint a new key on the publish account page. ${KEY_DESTINATIONS}` }, { status: 503 });
   if (/answered 429/.test(err)) return Response.json({ error: "the publish service is rate limiting pulls; try again shortly" }, { status: 429 });
-  if (/is not set/.test(err)) return Response.json({ error: "PUBLISH_URL or PUBLISH_API_KEY is not set in the data root's .env" }, { status: 503 });
+  if (/is not set/.test(err)) return Response.json({ error: `PUBLISH_URL or PUBLISH_API_KEY is not set. ${KEY_DESTINATIONS}` }, { status: 503 });
   if (/lock timeout/.test(err)) return Response.json({ error: "another pull or publish is writing data/shares.json; try again shortly" }, { status: 503 });
   if (/is not valid JSON/.test(err)) return Response.json({ error: "data/shares.json is not valid JSON; fix it or republish from the CLI" }, { status: 500 });
   if (/no local record/.test(err)) return Response.json({ error: "that share is not in data/shares.json" }, { status: 404 });
