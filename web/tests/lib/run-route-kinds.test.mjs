@@ -176,7 +176,7 @@ test("an evaluate input that is not a bare posting URL is refused before any CLI
   fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
   for (const kind of ["evaluate", "evaluate-text"]) {
-    for (const input of [" https://jobs.example.test/1", "https://jobs.example.test/1 ", "https://jobs.example.test/1\n", "https://jobs.example.test/1\r", "https://jobs.example.test/\t1", "https://jobs.example.test/a b", "https://jobs.example.test/1\u2028", "local: jds/acme.md", " local:x", "local:x\n", "local:x\ty", "local:", "https://", "http://", "jobs.example.test/1", "ftp://jobs.example.test/1"]) {
+    for (const input of [" https://jobs.example.test/1", "https://jobs.example.test/1 ", "https://jobs.example.test/1\n", "https://jobs.example.test/1\r", "https://jobs.example.test/\t1", "https://jobs.example.test/a b", "https://jobs.example.test/1\u2028", "local: jds/acme.md", " local:x", "local:x\n", "local:x\ty", ...["\u2028", "\u2029", "\u0085", "\u00a0", "\v", "\f"].map((space) => `local:a${space}b`), "local:", "https://", "http://", "jobs.example.test/1", "ftp://jobs.example.test/1"]) {
       assert.match(await refusal(await run({ kind, input, jdText: kind === "evaluate-text" ? "Role." : undefined })), /^The posting URL must be a bare http\(s\) URL/, `${kind} input=${JSON.stringify(input)}`);
     }
   }

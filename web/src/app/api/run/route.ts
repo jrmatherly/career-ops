@@ -42,11 +42,12 @@ const JD_TEXT_MAX_CHARS = 16 * 1024;
 const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
 // The input each evaluate kind takes. The inbox also queues local:jds/ rows for
 // evaluate, so that kind keeps them, and scan mode names those files with the
-// company unslugged, so a local: path may hold an interior space.
+// company unslugged, so a local: path may hold an interior space. \s misses
+// U+0085 (NEL), a line break, so the local: branch names it.
 const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
   evaluate: {
-    pattern: /^(?:https?:\/\/\S+|local:\S(?:[^\t\r\n]*\S)?)$/i,
-    shape: "a bare http(s) URL with no whitespace in it, or a local: path with no padding, tab or line break",
+    pattern: /^(?:https?:\/\/\S+|local:[^\s\u0085](?:(?:[^\s\u0085]| )*[^\s\u0085])?)$/i,
+    shape: "a bare http(s) URL with no whitespace in it, or a local: path with no whitespace but interior spaces",
   },
   "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL with no whitespace in it" },
 };

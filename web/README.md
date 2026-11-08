@@ -79,7 +79,8 @@ tool and no write tool, runs on Claude only, and is denied Read on secrets and
 the PII files. Its report header reads `unconfirmed (auto mode, no web
 research)`.
 
-The route answers 400, before it starts any CLI, for:
+The route answers 400, before it starts any CLI, for these request-shape
+errors among others:
 
 - a kind it does not know.
 - a field sent to a kind that does not own it, an explicit `null` included:
@@ -89,13 +90,15 @@ The route answers 400, before it starts any CLI, for:
   whitespace-only.
 - an `evaluate` or `evaluate-text` input that is not a bare `http(s)://` URL
   with no whitespace in it. `evaluate` also takes a `local:` inbox row, which
-  may hold an interior space but no padding, tab or line break.
+  may hold an interior space but no other whitespace.
 - a `cliId` with leading or trailing whitespace.
 - a built prompt that contains a NUL byte, which argv cannot carry.
 - for `evaluate-text`: a `cliId` other than `claude`; a `jdText` that is
   missing, blank or over 16,384 characters; a data root the server cannot
   resolve; and a data root with characters outside letters, digits, `.`, `_`,
   `-` and `/`.
+- an `evaluate-text` request whose `claude` resolves to another CLI because
+  Claude is not available.
 
 ## Safety
 
