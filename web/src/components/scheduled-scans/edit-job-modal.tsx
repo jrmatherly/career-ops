@@ -153,11 +153,9 @@ export function EditJobModal({
           <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
 
           {/* ─── Reuse FilterBuilder from Explore ─── */}
-          {filtersFrom === "custom" && (
-            <div className="rounded-xl border border-border bg-surface/30 p-4">
-              <FilterBuilder filters={filters} onChange={setFilters} />
-            </div>
-          )}
+          <div className="rounded-xl border border-border bg-surface/30 p-4">
+            <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} />
+          </div>
 
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">

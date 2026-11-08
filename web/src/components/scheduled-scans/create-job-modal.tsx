@@ -138,11 +138,9 @@ export function CreateJobModal({
           <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
 
           {/* ─── Reuse FilterBuilder from Explore ─── */}
-          {filtersFrom === "custom" && (
-            <div className="rounded-xl border border-border bg-surface/30 p-4">
-              <FilterBuilder filters={filters} onChange={setFilters} />
-            </div>
-          )}
+          <div className="rounded-xl border border-border bg-surface/30 p-4">
+            <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} />
+          </div>
 
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
@@ -178,7 +176,7 @@ export function FiltersFromToggle({ value, onChange }: { value: FiltersFrom; onC
       />
       <span>
         <span className="font-medium">Use portals.yml filters</span>
-        <span className="block text-[11px] text-faint">Each run reads the title and location lists from portals.yml, so later edits to that file apply. Posted within, sources and scan depth keep their saved values.</span>
+        <span className="block text-[11px] text-faint">Each run reads the title and location lists from portals.yml, so later edits to that file apply. Posted within, sources and scan depth still come from this job.</span>
       </span>
     </label>
   );

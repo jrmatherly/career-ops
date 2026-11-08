@@ -78,9 +78,12 @@ export function ScheduleJobAction({ filters }: { filters: ExploreFilters }) {
             <option value="hours">hours</option>
             <option value="days">days</option>
           </select>
-          <label className="inline-flex items-center gap-2 self-center text-xs text-muted">
-            <input type="checkbox" checked={fromFile} onChange={(event) => setFromFile(event.target.checked)} className="size-4 accent-brand" />
-            Use portals.yml filters
+          <label className="inline-flex items-start gap-2 self-center text-xs text-muted">
+            <input type="checkbox" checked={fromFile} onChange={(event) => setFromFile(event.target.checked)} className="mt-0.5 size-4 accent-brand" />
+            <span>
+              Use portals.yml filters
+              <span className="block text-[11px] text-faint">Each run reads the title and location lists from portals.yml, so the lists set here are not saved.</span>
+            </span>
           </label>
           <Button
             type="button"

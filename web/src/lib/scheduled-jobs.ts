@@ -7,7 +7,7 @@ import {
   withScheduledStore,
 } from "./scheduled-jobs-store.mjs";
 import { nextScheduledRun } from "./scheduled-cadence.mjs";
-import { assertScheduledJobBody } from "./scheduled-job-input.mjs";
+import { assertScheduledJobBody, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
@@ -91,8 +91,10 @@ function validateTimezone(value: string): string {
 
 export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFields {
   let input: Record<string, unknown>;
+  let filtersFrom: FiltersFrom;
   try {
     input = assertScheduledJobBody(raw) as Record<string, unknown>;
+    filtersFrom = scheduledFiltersFrom(input.filtersFrom, base?.filtersFrom) as FiltersFrom;
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Scheduled job body must be an object.");
   }
@@ -100,8 +102,6 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   const name = String(input.name ?? fallbackName).trim().slice(0, 80) || fallbackName;
   if (input.engine !== undefined && input.engine !== "portals" && input.engine !== "full") throw new ScheduledJobValidationError("Invalid scan engine.");
   const engine: ScanEngine = input.engine === "portals" || input.engine === "full" ? input.engine : base?.engine || "full";
-  if (input.filtersFrom !== undefined && input.filtersFrom !== "file" && input.filtersFrom !== "custom") throw new ScheduledJobValidationError("Invalid filters source.");
-  const filtersFrom = (input.filtersFrom ?? base?.filtersFrom ?? "custom") as FiltersFrom;
   const unit = cleanUnit(input.unit, base?.unit || "hours");
   const every = cleanEvery(input.every, unit, base?.every || 1);
   const timezone = validateTimezone(String(input.timezone ?? base?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC")

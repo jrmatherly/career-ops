@@ -4,3 +4,9 @@ export function assertScheduledJobBody(value) {
   }
   return value;
 }
+
+export function scheduledFiltersFrom(value, base) {
+  if (value === undefined) return base ?? "custom";
+  if (value === "file" || value === "custom") return value;
+  throw new Error("Invalid filters source.");
+}

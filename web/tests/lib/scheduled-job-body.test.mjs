@@ -41,3 +41,12 @@ test("a file job body carries filtersFrom and drops the six lists", () => {
 test("filtersFrom defaults to custom", () => {
   assert.equal(scheduledJobBody({ name: "Scan", filters, every: 1, unit: "days" }).filtersFrom, "custom");
 });
+
+test("an edit body without the six lists keeps the base job's lists", async () => {
+  const { parseExplorePatch, DEFAULT_FILTERS } = await import("../../src/lib/explore.ts");
+  const stored = { ...DEFAULT_FILTERS, ...filters };
+  const body = scheduledJobBody({ name: "Scan", filtersFrom: "file", filters: { ...filters, positive: ["typed then toggled"], allow: ["EU"], sinceDays: 14 }, every: 3, unit: "hours" });
+  const saved = parseExplorePatch(body.filters, stored);
+  for (const key of ["positive", "negative", "allow", "block", "blockHard", "alwaysAllow"]) assert.deepEqual(saved[key], stored[key], key);
+  assert.equal(saved.sinceDays, 14, "the rest of the body still applies");
+});
