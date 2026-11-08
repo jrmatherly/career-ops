@@ -134,17 +134,13 @@ export function readScanDates(): Map<string, string> {
   return new Map(readScanIndex()?.byUrl);
 }
 
-/** The dates on which a scan added roles to the Inbox; [] with no scan history. */
-export function readScanAddedDates(): string[] {
-  return [...(readScanIndex()?.addedDates ?? [])];
-}
-
-// One parse of scan-history.tsv serves both readers, so a page that needs both reads the file once.
+// One parse of scan-history.tsv serves readScanDates and pipelineSummary, so the page reads the file once.
 function readScanIndex() {
   const file = path.join(careerOpsRoot(), "data", "scan-history.tsv");
   // Missing file: null. Other read errors throw.
-  return cachedFileValue(file, "scan-dates", (tsv) => {
+  return cachedFileValue(file, "scan-index", (tsv) => {
     const byUrl = new Map<string, string>();
+    const addedByUrl = new Map<string, string>();
     const added = new Set<string>();
     const lines = splitLines(tsv);
     for (let i = 0; i < lines.length; i++) {
@@ -158,9 +154,12 @@ function readScanIndex() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(firstSeen)) continue;
       if (!byUrl.has(url)) byUrl.set(url, firstSeen);
       // Status is the sixth column; blank reads as `added` (scan.mjs). A filtered row (skipped_title and the like) added nothing.
-      if ((cols[4]?.trim() || "added") === "added") added.add(firstSeen);
+      if ((cols[4]?.trim() || "added") !== "added") continue;
+      added.add(firstSeen);
+      // Latest wins: a recheck re-adds a processed URL (scan.mjs recheck_after_days), and the pending line is from that add.
+      if ((addedByUrl.get(url) ?? "") < firstSeen) addedByUrl.set(url, firstSeen);
     }
-    return { byUrl, addedDates: [...added] };
+    return { byUrl, addedByUrl, addedDates: [...added] };
   });
 }
 
@@ -415,16 +414,21 @@ export type PipelineSummary = {
 
 export function pipelineSummary(): PipelineSummary {
   const root = careerOpsRoot();
-  const scanDates = readScanDates();
+  const scan = readScanIndex();
   const applications = readApplications();
   return {
     root,
     rootExists: fs.existsSync(root),
     // join the freshness date (first_seen) onto each raw posting — the inbox's
     // triage view orders/faceted-filters on it entirely client-side.
-    inbox: readInbox(applications).map((j) => ({ ...j, postedAt: j.postedAt ?? scanDates.get(j.url), addedAt: scanDates.get(j.url) })),
+    inbox: readInbox(applications).map((j) => ({
+      ...j,
+      postedAt: j.postedAt ?? scan?.byUrl.get(j.url),
+      // the latest added row, so a URL filtered or added on one date and added again later carries the later date
+      addedAt: scan?.addedByUrl.get(j.url),
+    })),
     applications,
-    scanDates: readScanAddedDates(),
+    scanDates: [...(scan?.addedDates ?? [])],
   };
 }
 

@@ -43,3 +43,31 @@ test("scanDates keeps dates with an added row, drops filtered-only dates, and re
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("addedAt is the URL's latest added date, not an earlier filtered or added row's", { skip: skipTs }, () => {
+  const root = mkdtempSync(join(tmpdir(), "co-scan-added-at-"));
+  const prevRoot = process.env.CAREER_OPS_ROOT;
+  try {
+    mkdirSync(join(root, "data"), { recursive: true });
+    writeFileSync(join(root, "data/scan-history.tsv"), [
+      "url\tfirst_seen\tportal\ttitle\tcompany\tstatus",
+      "https://x.test/re\t2026-11-01\tgreenhouse\tEngineer\tAcme\tskipped_title",
+      "https://x.test/re\t2026-11-06\tgreenhouse\tEngineer\tAcme\tadded",
+      "https://x.test/again\t2026-09-01\tgreenhouse\tEngineer\tAcme\tadded",
+      "https://x.test/again\t2026-11-07\tgreenhouse\tEngineer\tAcme\tadded",
+      "",
+    ].join("\n"));
+    writeFileSync(join(root, "data/pipeline.md"), "## Pending\n\n- [ ] https://x.test/re | Acme | Engineer\n- [ ] https://x.test/again | Acme | Engineer\n");
+    process.env.CAREER_OPS_ROOT = root;
+    const inbox = mods.pipelineSummary().inbox;
+    const job = inbox.find((j) => j.url === "https://x.test/re");
+    assert.ok(job, "the pending row is in the Inbox");
+    assert.equal(job.addedAt, "2026-11-06");
+    assert.equal(job.postedAt, "2026-11-01", "postedAt still falls back to the first row of any status");
+    assert.equal(inbox.find((j) => j.url === "https://x.test/again")?.addedAt, "2026-11-07", "a recheck re-add dates the row to the re-add");
+  } finally {
+    if (prevRoot === undefined) delete process.env.CAREER_OPS_ROOT;
+    else process.env.CAREER_OPS_ROOT = prevRoot;
+    rmSync(root, { recursive: true, force: true });
+  }
+});

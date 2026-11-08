@@ -52,7 +52,7 @@ export function latestAddedDates(jobs, hidden, max = 5) {
  * @param {string | null} added
  * @param {{ url: string, addedAt?: string }[]} jobs - pending inbox rows
  * @param {string[]} hidden
- * @param {string[]} scanDates - the dates a scan added roles (readScanAddedDates)
+ * @param {string[]} scanDates - the dates a scan added roles (pipelineSummary().scanDates)
  * @returns {{ title: string, hint: string } | null}
  */
 export function addedEmptyState(added, jobs, hidden, scanDates) {
