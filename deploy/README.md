@@ -37,7 +37,9 @@ The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 | `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). An empty volume is fine since jrmatherly/career-ops#18: before it, a mount point named `data` with no `data/applications.md` made the tracker fallback `/data/applications.md`, the workspace resolver treated `/data` as a `data/` subdirectory and returned `/`, and the PDF server died on `mkdir /output`. |
 | `CAREER_OPS_WEB_ALLOWED_HOSTS` | `<public host> career-ops-web` | A hostname makes `web/src/lib/bind-host.mjs` bind `0.0.0.0`, which a container needs. The request guard admits only these hosts and loopback. |
 | `CAREER_OPS_CLI` | `claude` | Preset in the image. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this or `ANTHROPIC_API_KEY`. Pass it as a secret, never in the image. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this, `ANTHROPIC_API_KEY`, or the proxy pair below. Pass it as a secret, never in the image. |
+| `ANTHROPIC_BASE_URL` | the gateway URL, such as `http://proxy.example:8317` | The proxy pair, with `ANTHROPIC_AUTH_TOKEN`. Routes every `claude` request through the gateway. Set it with the token, and never with `CLAUDE_CODE_OAUTH_TOKEN`. `node doctor.mjs` then reports the gateway host as the billing source. |
+| `ANTHROPIC_AUTH_TOKEN` | the gateway's client key | The proxy pair, with `ANTHROPIC_BASE_URL`. Pass it as a secret, never in the image. |
 | `/home/app` | writable | The CLI writes `~/.claude`. |
 | `/tmp` | emptyDir | The PDF server socket and Playwright scratch. |
 | `/dev/shm` | emptyDir, `medium: Memory` | Chromium. |

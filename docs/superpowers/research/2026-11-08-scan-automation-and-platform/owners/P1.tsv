@@ -1,0 +1,9 @@
+ts	phase	decision	why	evidence	result
+2026-11-08T15:05:31Z	start	branch claude/p1-doctor-gateway from origin/main d2fea890	brief P1, plan section PR-P1	git checkout -b claude/p1-doctor-gateway origin/main	done
+2026-11-08T15:05:31Z	build	gateway branch sits after the cloud switches and before the key and token branch	plan Build box; live lane 5 wants the cloud warning to win	doctor.mjs checkBillingSource	done
+2026-11-08T15:05:31Z	build	unparseable warn names the variable, not its value	a base URL can carry userinfo credentials, and no key may be printed (standing order 5)	label "ANTHROPIC_BASE_URL is set but unparseable"	done
+2026-11-08T15:05:31Z	build	gateway label uses URL.host, so the port shows and userinfo never does	the You see box expects proxy.example:8317	you-see-gateway.txt line 6	done
+2026-11-08T15:05:31Z	test	three plan cases plus a cloud-first case, table-driven	plan Verify unit box; /simplify finding	node test-all.mjs --quick --only doctor-billing-source: 14 passed, 0 failed; trunk doctor.mjs: 12 passed, 2 failed	done
+2026-11-08T15:05:31Z	simplify	applied URL.canParse and the case table; skipped exporting checkBillingSource for in-process tests and a gatewayHost helper	doctor.mjs runs at import and has no exports; one reader of the variable today	four /simplify lanes	done
+2026-11-08T15:05:31Z	docs	deviations rows extend the existing doctor.mjs and RUNNING_ON_A_BUDGET.md rows instead of a new sub-heading	plan Global constraints: a path already in a row extends that row; PR-F1 creates the sub-heading	.claude/skills/upstream-review/SKILL.md	done
+2026-11-08T15:05:31Z	you-see	real CLI on scratch root /tmp/P1-owner/root seeded from examples/ and templates/	brief acceptance	/tmp/P1-owner/you-see-gateway.txt, you-see-malformed.txt, you-see-key.txt, you-see-json.txt	done

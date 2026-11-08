@@ -59,6 +59,10 @@ Inside Claude Code, `/status` reports the active login and shows an API-key row 
 
 `ANTHROPIC_AUTH_TOKEN` and the cloud-provider switches (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`) take precedence too, so check those if a stray key is not the culprit.
 
+### Through a gateway
+
+When `ANTHROPIC_BASE_URL` points at a host other than `api.anthropic.com`, Claude Code sends every request to that gateway (CLIProxyAPI, for example). The key or token in your environment then authenticates to the gateway, and the gateway's own upstream credential decides what is billed. `node doctor.mjs` reports the gateway host instead of the per-token warning. A cloud-provider switch still wins over a gateway.
+
 ### A settings.json helper can bring the key back
 
 Even with the environment clean, `~/.claude/settings.json` can set `apiKeyHelper` — a script Claude Code runs to produce an API key on every request. When it is set, that key wins over your subscription login, so the steps above alone will not fix billing.

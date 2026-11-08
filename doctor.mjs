@@ -201,6 +201,23 @@ function checkBillingSource() {
     };
   }
 
+  const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
+  if (baseUrl) {
+    const host = URL.canParse(baseUrl) ? new URL(baseUrl).host : '';
+    if (!host) {
+      return {
+        warn: true,
+        label: 'ANTHROPIC_BASE_URL is set but unparseable, so Claude Code cannot reach a gateway with it.',
+        fix: ['Set it to a full URL such as http://proxy.example:8317, or unset it.'],
+      };
+    }
+    // A gateway such as CLIProxyAPI holds its own upstream credential, so the
+    // key or token in this environment authenticates to the gateway, not to Anthropic.
+    if (host !== 'api.anthropic.com') {
+      return { pass: true, label: `Billing source. Requests route through a gateway at ${host}, and the gateway's credential decides billing` };
+    }
+  }
+
   const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
   if (!which) {
     return { pass: true, label: 'Billing source: no API key in the environment (a Claude subscription will be used if you are logged in)' };
