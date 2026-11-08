@@ -40,7 +40,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run liveness` | `check-liveness.mjs` | Test if job URLs are still active |
 | `node check-liveness.mjs --tracker [--status=Evaluated,Applied]` | `check-liveness.mjs` | Check the postings of open tracker rows (`Evaluated` and `Applied` by default). Each row's posting is its URL cell or its report's `**URL:**`. Rows with neither are listed by number |
 | `node check-liveness.mjs --tracker --discard-expired [--apply]` | `check-liveness.mjs` | Check the postings of Evaluated and Applied tracker rows, then move Evaluated rows whose posting is `expired` to Discarded with the note `posting closed YYYY-MM-DD`. Without `--apply` it is a dry run. Uncertain verdicts and Applied rows stay as they are |
-| `npm run extract` | `browser-extract.mjs` | Headless read-only page extractor (opt-in `scan.extractor: cli`) — compact JSON for scan/JD; a posting whose ATS is in `JD_TEXT_API_ATS` (`liveness-api.mjs`) is first read without a browser, falling back to the page when that read is inconclusive, and an empty jd extraction exits 1 with `code: empty_text` |
+| `npm run extract` | `browser-extract.mjs` | Headless read-only page extractor (opt-in `scan.extractor: cli`) — compact JSON for scan/JD; a posting whose ATS is in `JD_TEXT_API_ATS` (`liveness-api.mjs`) is first read without a browser, falling back to the page when that read is inconclusive, and an empty jd extraction exits 1 with `code: empty_text`. Needs an agent run that holds `Bash`; the web dashboard's `evaluate` run does not, so the setting does nothing there |
 | `node fetch-jd.mjs <url>` | `fetch-jd.mjs` | JD text on stdout, read without a browser (including canonical and short-link Workable postings with description, requirements and benefits), for a posting whose ATS is in `JD_TEXT_API_ATS` (`liveness-api.mjs`) — exit 1 with empty stdout for any other ATS and for an inconclusive read, so a caller falls back to its browser/WebFetch path |
 | `npm run scan` | `scan.mjs` | Zero-token portal scanner |
 | `npm run scan:full` | `scan-ats-full.mjs` | Reverse ATS discovery scanner |
@@ -48,10 +48,11 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run scan:interamt` | `scan-interamt.mjs` | Interamt.de scanner via Playwright (the board has no HTTP API). `--dry-run` writes nothing |
 | `npm run scan:dayforce` | `scan-dayforce.mjs` | Dayforce (Ceridian) scanner via Playwright. `--dry-run` writes nothing; `--tenant NAME` scans one board |
 | `npm run scan:seek` | `scan-seek.mjs` | SEEK NZ keyword scanner over `seek_searches` in portals.yml. `--dry-run` writes nothing |
-| `node web/scripts/scheduled-jobs-runner.mjs` | `web/scripts/scheduled-jobs-runner.mjs` | Run one due local scheduled scan (normally invoked by the OS scheduler: Task Scheduler, launchd or cron) |
+| `node web/scripts/scheduled-jobs-runner.mjs` | `web/scripts/scheduled-jobs-runner.mjs` | Run one due local scheduled scan (normally invoked by the OS scheduler: Task Scheduler, launchd or cron). The job's own filters replace `title_filter.negative` and the `location_filter` lists in a temporary copy of `portals.yml`; only `title_filter.positive` falls back to `portals.yml` |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/install-scan-schedule.ps1` | `web/scripts/install-scan-schedule.ps1` | Install the 15-minute Windows scheduled-jobs queue worker for the logged-in current user |
 | `sh web/scripts/install-scan-schedule.sh` | `web/scripts/install-scan-schedule.sh` | Install the 15-minute scheduled-jobs queue worker on macOS (launchd) or Linux (cron) for the current user |
-| `sh web/scripts/uninstall-scan-schedule.sh` | `web/scripts/uninstall-scan-schedule.sh` | Remove the macOS launchd agent or Linux cron line for the scheduled-jobs queue worker |
+| `powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/uninstall-scan-schedule.ps1` | `web/scripts/uninstall-scan-schedule.ps1` | Remove the Windows scheduled task the installer created |
+| `sh web/scripts/uninstall-scan-schedule.sh` | `web/scripts/uninstall-scan-schedule.sh` | Remove the macOS launchd agent or Linux cron line for the scheduled-jobs queue worker. It removes only what the installer wrote (`io.career-ops.scheduled-scan`), never a hand-made recipe agent |
 | `npm run company:funded` | `company-funded.mjs` | Review-first discovery of recently funded companies |
 | `npm run validate:portals` | `validate-portals.mjs` | Validate portals.yml shape before scanning |
 | `npm run tracker` | `tracker.mjs` | SQLite derived index over applications.md — sync/query/history/export |
@@ -59,7 +60,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run ics-interview -- invite.ics` | `ics-interview.mjs` | Read an interview invite's `.ics` (first VEVENT: start/end/length, time zone, link, organizer) and print a row to paste into `data/active-interviews.md` (read-only) |
 | `npm run panelist-roles -- invite.txt` | `panelist-roles.mjs` | Classify the panelists named in an interview invite (pasted text or `.ics`) by title into recruiter / hiring manager / privacy-compliance / technical / peer / executive, with a one-line prep focus per role (offline, read-only) |
 | `npm run invite-match` | `invite-match.mjs` | Fuzzy-match a pasted interview-invite email against `data/applications.md`; invites also get a draft-only clarification email (`--no-clarification-draft` to omit) |
-| `npm run application:init` | `application-artifacts.mjs` | Initialize one versioned application-scoped JD/CV/PDF artifact bundle |
+| `npm run application:init` | `application-artifacts.mjs` | Initialize one versioned application-scoped JD/CV/PDF artifact bundle. `--report N --company NAME --role ROLE` name the bundle (all required), `--version N` the tailored-CV version (default 1), `--root DIR` the output root (default `output`), `--init` creates the directories instead of only printing the paths; `--help` prints the usage |
 | `npm run paste-reply` | `paste-reply.mjs` | Manual/no-Gmail input into the `reply-watch.mjs` classification pipeline |
 | `npm run closing-soon` | `closing-soon.mjs` | List tracker rows whose Notes (or matching `jds/` capture) carry a closing date within N days, plus separate `overdue` and `unparsed` groups (read-only) |
 | `npm run close-stale` | `close-stale.mjs` | Close long-silent `Applied` rows in bulk (dry run by default; `--confirm` writes through the locked tracker path, tags the note and logs each transition) |
@@ -68,7 +69,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run freshness` | `check-table-freshness.mjs` | Staleness validator for jurisdiction data tables (`as_of` / `next_effective` watchdog) |
 | `npm run jd-archive` | `check-jd-archive.mjs` | Validate every `reports/*.md` has an archived JD (embedded section, numbered `jds/` capture, or a capture its tracker row links) — `missing-jd-archive` with no tracker to join, `jd-archive-review-due` for a live row |
 | `npm run openai:tailor` | `openai-tailor.mjs` | Tailor a CV via any OpenAI-compatible endpoint (headless companion to `openai-eval.mjs`) |
-| `npm run or` | `openrouter-runner.mjs` | Run scan/evaluate/pipeline/apply on OpenRouter free models — no Claude CLI required |
+| `npm run or` | `openrouter-runner.mjs` | Run scan/evaluate/pipeline/apply on OpenRouter free models — no Claude CLI required. `pipeline --one` evaluates a single pending entry (test mode) |
 | `npm run reconcile` | `reconcile-pipeline.mjs` | Remove batch-evaluated offers from pipeline.md "Pendientes" |
 | `npm run cover-letter` | `generate-cover-letter.mjs` | Render a cover-letter JSON payload to PDF |
 | `npm run verify:portals` | `verify-portals.mjs` | Probe ATS endpoints to confirm portals.yml slugs resolve (network) |
@@ -78,17 +79,17 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run filter-audit` | `filter-audit.mjs` | Show which `title_filter.positive` keywords never match, add nothing, or bring mostly low-scored offers, replayed over scan history (read-only) |
 | `node coverage-check.mjs <url> --company <name> --title <title>` | `coverage-check.mjs` | Explain why the scanners missed a posting you found by hand, and propose the `portals.yml` change that would have caught it (read-only, zero-network) |
 | `node rank-pipeline.mjs` | `rank-pipeline.mjs` | Opt-in LLM relevance re-ranker — annotates pending pipeline rows with a score + reason (off by default) |
-| `npm run gemini:eval` | `gemini-eval.mjs` | Evaluate a JD with Google Gemini (free-tier alternative) |
-| `npm run ollama:eval` | `ollama-eval.mjs` | Evaluate a JD with a local Ollama model |
-| `npm run openai:eval` | `openai-eval.mjs` | Evaluate a JD via any OpenAI-compatible endpoint |
-| `npm run eval:golden` | `eval-golden.mjs` | Compare a candidate model's score block to the frozen golden set (`--replay` is offline) |
-| `npm run star` | `match-star.mjs` | Match a behavioural question to your best STAR story (zero-LLM) |
+| `npm run gemini:eval` | `gemini-eval.mjs` | Evaluate a JD with Google Gemini (free-tier alternative). `--file <path>` reads the JD from a file, `--model <name>` picks the Gemini model, `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`, `--no-compress` skips token-budget compression, `--context-only` prints the resolved context budget and exits without calling Gemini; `--help` prints the usage |
+| `npm run ollama:eval` | `ollama-eval.mjs` | Evaluate a JD with a local Ollama model. `--file <path>` reads the JD from a file, `--model <name>` picks the model, `--url <url>` the Ollama base URL, `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`; `--help` prints the usage |
+| `npm run openai:eval` | `openai-eval.mjs` | Evaluate a JD via any OpenAI-compatible endpoint. `--file <path>` reads the JD from a file, `--url <base>` the OpenAI-compatible base URL, `--model <id>` the model (else `OPENAI_MODEL`), `--key <key>` the API key (else `OPENAI_API_KEY`), `--posting-url <url>` records the posting URL in the report header, `--no-save` skips writing to `reports/`, `--no-compress` skips token-budget compression; `--help` prints the usage |
+| `npm run eval:golden` | `eval-golden.mjs` | Compare a candidate model's score block to the frozen golden set (`--replay` is offline and the default; `--live` calls the model through `openai-eval.mjs`, `--model <id>` names the candidate, `--golden <dir>` and `--fixtures <dir>` move the golden set and the replay fixtures; `--help` prints the usage) |
+| `npm run star` | `match-star.mjs` | Match a behavioural question to your best STAR story (zero-LLM). `--jd <file>` also scores the stories against a JD, `--top <n>` prints the n best matches, `--list` lists the bank's stories with their tags; `--help` prints the usage |
 | `npm run archive` | `archive-posting.mjs` | Save a live job posting as PDF before it disappears |
 | `npm run prepare:application` | `prepare-application.mjs` | Print an ATS prefill summary (read-only, never POSTs) |
 | `npm run build:dashboard` | `build-dashboard.mjs` | Build the Go TUI dashboard binary cross-platform |
 | `npm run manifesto` | `manifesto.mjs` | Print the manifesto couplet and open the signing page in a browser |
 | `node upgrade-tests.mjs --pr-gate` | `upgrade-tests.mjs` | Upgrade an install seeded from the newest old release to this commit and prove user data survived (CI gate; `--canary` proves the gate can fail) |
-| `node linkedin-join.mjs` | `linkedin-join.mjs` | Warm-intro finder — join a LinkedIn `Connections.csv` export against tracker + `portals.yml` companies to answer "do I know anyone here?" (offline, zero-token, read-only; see [LINKEDIN_JOIN.md](LINKEDIN_JOIN.md)) |
+| `node linkedin-join.mjs` | `linkedin-join.mjs` | Warm-intro finder — join a LinkedIn `Connections.csv` export against tracker + `portals.yml` companies to answer "do I know anyone here?" (offline, zero-token, read-only; see [LINKEDIN_JOIN.md](LINKEDIN_JOIN.md)). `--company <name>` answers for one company, `--summary` groups human-readable output by company, `--tsv` prints `contacts.tsv`-shaped rows, `--tracker-only` and `--portals-only` restrict the company set, `--include-weak` keeps weak name matches, `--since <YYYY>` keeps connections made in or after that year, `--csv <path>` overrides the export location, `--self-test` runs the inline checks; `--help` prints the usage |
 | `npm run digest` | `weekly-digest.mjs` | Weekly roll-up of interview-prep sessions (see [weekly-digest](#weekly-digest)) |
 | `npm run rejection-latency` | `rejection-latency.mjs` | Flag companies silent past the courtesy threshold after an interview (see [rejection-latency](#rejection-latency)) |
 | `npm run role-clarity` | `role-clarity.mjs` | Six-point role-clarity check on a JD file (see [role-clarity](#role-clarity)) |
@@ -355,7 +356,10 @@ npm run pdf -- input.html output.pdf --allow-reorder    # a deliberately reorder
 npm run pdf -- input.html output.pdf --max-pages=1 --strict-pages   # page budget (default 2, or cv.max_pages); --strict-pages fails on overflow
 npm run pdf -- input.html output.pdf --report=042 --kind=cv --country=DE   # link to report #42 in data/pdf-index.tsv; document kind; employer country for an `auto` page format
 npm run pdf -- --batch=<manifest.json>                  # render every manifest entry through one Chromium
+node generate-pdf.mjs --pdf-server                      # long-lived renderer; CAREER_OPS_PDF_SHARED=1 makes other renders use it
 ```
+
+`web/server.mjs` starts `generate-pdf.mjs --pdf-server` once, and the dashboard's render children run with `CAREER_OPS_PDF_SHARED=1` (`web/src/lib/pdf-render.mjs`), so they share one Chromium instead of launching their own.
 
 `--format` outranks `config/profile.yml`, which outranks the A4 default. Over the page budget the render warns with trimming guidance; `--strict-pages` (or `cv.strict_pages`) makes it fail.
 
@@ -1890,7 +1894,7 @@ These have no `npm run` binding — modes and agents call them with
 | `node agent-inbox.mjs list [--all]` | List pending (or all) queued items by stable number — gaps mean already resolved |
 | `node agent-inbox.mjs resolve <n> [--expect "..."] [--result "..."]` | Tick item `n` and stamp a one-line result; `--expect` aborts unless the item contains that substring |
 | `node generate-latex.mjs <input.tex> [output.pdf] [--compile-only] [--source <path>] [--skip-fact-check] [--help]` | Fact-check, validate and compile a generated `.tex` CV via tectonic or pdflatex. The CV fact gate runs first whenever the data root has a `cv.md`, and a blocked document is not compiled; `--source` adds an evidence file (repeatable; `latex-tex` passes the user's own `.tex`). `--compile-only` skips career-ops template validation so a user-owned `.tex` compiles as-is (`latex-tex` mode) |
-| `node install-latex-engine.mjs [--check] [--force] [--json] [--help]` | Opt-in local LaTeX engine: downloads a pinned tectonic release for this platform, verifies its SHA-256 before extracting, and places it in the repo root (gitignored) where `generate-latex.mjs` looks first. Downloads are bounded by a timeout and a size cap. No-op when tectonic is already available (a pdflatex-only host still gets tectonic, which the CJK template needs); `--check` never downloads |
+| `node install-latex-engine.mjs [--check] [--force] [--json] [--help]` | Opt-in local LaTeX engine: downloads a pinned tectonic release for this platform, verifies its SHA-256 before extracting, and places it in the repo root (gitignored) where `generate-latex.mjs` looks first. Downloads are bounded by a timeout and a size cap. No-op when tectonic is already available (a pdflatex-only host still gets tectonic, which the CJK template needs); `--check` never downloads. In a container with a read-only image root this path is not writable; use `cv.output_format: html` |
 | `node classify-tier.mjs "<job-title>"` (or `--test`) | Classify a job title into intern / entry / mid / senior |
 | `node ats-payload.mjs <payload.json> [--summary]` | ATS payload transform: folds `competencies[]` into `skills[]` (one safe, idempotent transform) and reports three judgement calls it deliberately does not apply. Payload on stdout, findings on stderr |
 | `node plugins.mjs list\|run <id> [hook]` | CLI host for non-provider plugin hooks (see [PLUGINS.md](PLUGINS.md)) |
@@ -1907,17 +1911,18 @@ These have no `npm run` binding — modes and agents call them with
 | `node jd-skill-gap.mjs <jd-file> [--summary]` | Classify JD skills against `cv.md` as existing, supported by the resume, or gap. Never edits `cv.md` |
 | `node precheck-duplicate.mjs --company "Acme" --title "Role" [--req ID] [--url URL] [--json]` | List tracker rows that could be the same opening. Advisory, never writes |
 | `node negotiation-roi.mjs [--summary] [--wage <n>] [--frequency <unit>\|--occurrences <n>]` | Salary-negotiation talking points anchored in a story-bank figure that `cv.md` also states |
-| `node sponsor-check.mjs --company <name>\|--tracker\|--pipeline\|--file <path> [--summary]` | Check employers against the UK register of licensed sponsors. `not-found` means unconfirmed. `--help` lists the cache options |
+| `node sponsor-check.mjs --company <name>\|--tracker\|--pipeline\|--file <path> [--summary]` | Check employers against the UK register of licensed sponsors. `not-found` means unconfirmed. Cache options: `--register <path>` uses a local register CSV, `--max-age-days <n>` re-downloads an older cache (default 7), `--refresh` re-downloads now, `--offline` never fetches, `--cache-status` reports the cache's age and source; `--self-test` runs the inline checks, `--help` lists them all |
+| `node story-provenance-check.mjs [--summary] [--story-bank <path>] [--cv <path>]` | Classify the numeric claims in `interview-prep/story-bank.md` against `cv.md` into four provenance buckets, zero-LLM, report only. `--summary` prints a table instead of JSON, `--story-bank <path>` and `--cv <path>` override the two files, `--self-test` runs the built-in checks, `--help` prints the usage |
 | `node discard-analytics.mjs [--log <path>] [--reason <pattern>] [--top N] [--since YYYY-MM-DD]` | Summarize the pre-screen discard log for filter tuning |
 | `node hired-share.mjs --report N [--anonymity handle\|role\|count] [--story "..."] [--open]` | Draft a Hired Wall story and a prefilled GitHub issue the user submits. `--status` and `--mark` track the answer |
 | `node evaluation-cache.mjs --identity FILE --liveness FILE [--reports DIR] [--invalidate]` | Print reusable public job facts from local reports when identity and liveness are fresh |
 | `node intake.mjs [--summary]` | Deterministic half of the `intake` mode: scans `documents/` and extracts text. `--text`, `--diff` and `--commit` work per file |
 | `node remember-cli.mjs <cli>` | Record the agent CLI as `CAREER_OPS_CLI` in the data root's `.env` (onboarding Step 6) |
 | `node apply-scope.mjs <root\|check-path\|launch-options>` | Print the directories the `apply` mode may read, test a path against them, or print the Playwright launch options |
-| `node learn.mjs check <candidates.json> [--summary]` | Gate for the `retro` mode's proposed rules. `apply <pending.json> --accept 1,3 --reply "..."` writes the accepted ones |
+| `node learn.mjs check <candidates.json> [--summary]` | Gate for the `retro` mode's proposed rules. `apply <pending.json> --accept 1,3 --reply "..."` writes the accepted ones; `--reject 2` records the rejected ids, `--reply-file <reply.txt>` holds the reply so no shell quoting touches it, `--self-test` runs the pure-function checks, `--help` prints the usage |
 | `node discover-ats.mjs --in companies.yml [--write] [--summary]` | Resolve company names to scannable ATS boards. Preview by default; `--write` appends to `portals.yml` |
 | `node discover-new-companies.mjs [--since N] [--min-rows N] [--out <file>]` | List scan-history companies not yet in `portals.yml` or the blacklist, as a `discover-ats.mjs` input file |
-| `node clean-markers.mjs audit\|clean [--ascii] <file...>` | Report or strip invisible marker characters from generated text |
+| `node clean-markers.mjs audit\|clean [--ascii] <file...>` | Report or strip invisible marker characters from generated text. `--keep-script-joiners` leaves the script joiners in place; `--help` prints the usage |
 | `node cv-templates.mjs <list\|resolve\|lint> <cv\|cover> [name]` | List, resolve or lint the CV and cover-letter templates |
 | `node extract-latex-content.mjs <source.tex> [--out manifest.json]` | `latex-tex` mode: extract the editable content of a user's `.tex` CV |
 | `node patch-latex-content.mjs <source.tex> <patches.json> <output.tex>` | `latex-tex` mode: apply content patches to a user's `.tex` CV |
@@ -1926,10 +1931,10 @@ These have no `npm run` binding — modes and agents call them with
 | `node linkedin-import.mjs [--file alert.eml] [--dry-run] [--json]` | Add the jobs in a pasted LinkedIn job alert to the pipeline (stdin by default) |
 | `node listing-fingerprint.mjs [--validate] '<JSON>'` | Compute or validate a listing-fingerprint record. Writes nothing |
 | `node persist-evaluation-report.mjs < payload.json` | Write an evaluation report and its headed tracker-addition TSV from one JSON payload. Reserves no number and does not merge |
-| `node session-activity.mjs <claim\|check\|release\|gc> [key]` | Claim, check or release a session activity key |
+| `node session-activity.mjs <claim\|check\|release\|gc> [key]` | Claim, check or release a session activity key. `claim` takes `--label <text>` and `--ttl-ms <N>`; `release` needs the `--token <token>` the claim returned |
 | `node sync-batch-input.mjs [--dry-run] [--pipeline <path>] [--input <path>] [--state <path>]` | Copy `data/pipeline.md` Pending entries into `batch/batch-input.tsv` |
 | `node validate-profile.mjs [--profile <path>] [--json]` | Structural check of `config/profile.yml` (misspelled or misplaced keys) |
-| `node hired-wall-build.mjs --rebuild\|--add ...` | Maintainer: append to `HIRED.md` and regenerate the Hired Wall's derived files |
+| `node hired-wall-build.mjs --rebuild\|--add ...` | Maintainer: append to `HIRED.md` and regenerate the Hired Wall's derived files. `--rebuild` takes `--fetch-avatars` or `--avatar-fixture <png>`; `--add` takes `--level handle\|role\|count`, `--handle`, `--role`, `--geo`, `--weeks`, `--story` and `--link <url>` |
 | `node i18n-drift.mjs [--lang tr ...] [--json\|--summary]` | Developer check: structural coverage of translated modes. Drift exits 0 |
 | `node seed-fixture.mjs <targetDir> [--state name]` | Developer helper: seed an upgrade-test fixture into an install (used by `upgrade-tests.mjs`) |
 | `node validate-system-paths-coverage.mjs` | Developer check: every tracked file is claimed by SYSTEM_PATHS, USER_PATHS or `config/local-paths.txt` |
@@ -2262,3 +2267,12 @@ curl -X POST localhost:3000/api/cv-render -H 'content-type: application/json' -d
 ```
 
 Returns `200 { "html": "...", "warnings": [...] }`. An invalid payload is `400 { "error": "invalid payload", "issues": [...] }` with the validator's messages; an unknown template or a body that is not a JSON object is `400 { "error": "..." }`; a render that fails is `500`, and one that outruns the CLI timeout is `503`. With no `style` and no `style:` block in `config/profile.yml`, the HTML is byte for byte what `build-cv-html.mjs` writes.
+
+---
+
+## Fork entry points
+
+| Command | What it does |
+|---|---|
+| `node web/server.mjs start` | The production web entry (upstream's `npm --prefix web start`). The fork's server image runs it under `tini`; see `deploy/README.md` |
+| `node publish/share.mjs` | Fork-only. The share CLI that publishes a CV to the publish service and pulls comments back; see `publish/README.md` |

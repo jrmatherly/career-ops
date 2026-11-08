@@ -15,5 +15,8 @@ services:
     volumes:
       - "${CAREER_OPS_SMOKE_ROOT:?set CAREER_OPS_SMOKE_ROOT to a scratch data root outside the checkout}:/data"
     shm_size: 1g
+    read_only: true
     tmpfs:
       - /tmp
+      - /home/app
+      - /app/web/.next/cache
