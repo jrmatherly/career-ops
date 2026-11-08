@@ -1,0 +1,30 @@
+{
+  "trunk": {
+    "sizes": [
+      525,
+      525,
+      525
+    ],
+    "csp": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "mintedPrefixCops": true,
+    "clusterLine": false,
+    "listed": true,
+    "revokeStatus": 303,
+    "keysAfterRevoke": 0
+  },
+  "head": {
+    "sizes": [
+      1649,
+      1649,
+      1649
+    ],
+    "csp": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+    "mintedPrefixCops": true,
+    "clusterLine": true,
+    "listed": true,
+    "revokeStatus": 303,
+    "keysAfterRevoke": 0
+  },
+  "cspIdentical": true,
+  "deltaBytes": 1124
+}

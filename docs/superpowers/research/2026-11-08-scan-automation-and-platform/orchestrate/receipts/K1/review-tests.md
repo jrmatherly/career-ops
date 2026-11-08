@@ -1,0 +1,3 @@
+toolkit pr-test-analyzer, head 1e0b92ab, mutation-tested; 16 of 17 non-trivial mutants die on the files that have tests
+Survivors: T1 [7] the Shares-page link has no test of any kind (rel noopener dropped, link never rendered, page.tsx passing null all survive); house pattern is a source-regex test like web/tests/lib/decision-card-cta.test.mjs:7-19. T2 [3] viewport meta unpinned (one assert in the no-script test). T3 [3] esc() on the cluster.toml line unpinned. parseEnv newline fix survives only because Node 24 lacks the 22.13 bug.
+Killed: every token drift (page or globals.css), script tag, url() in style, dark block removed, cluster.toml key renamed, env/.env order, http accepted, trailing slash, canParse dropped, both destination messages, [career_ops] renamed.

@@ -1,0 +1,11 @@
+comment-analyzer, A1 round 3, head a1e4df6b vs main 6983ec4f (sonnet, coordinator-written from the agent's returned text; findings 1 and 2 re-measured by the coordinator at the head). No tests run.
+
+DEFECTS
+1. MEDIUM, conf high, CONFIRMED by the coordinator. PR body "What changed" bullet 2 and the SKILL.md claudeCliArgs row (around :268-271) say seven Read(//...) denies / seven Read denies in the // absolute form; claude-invocation.mjs:191-197 emits five // rules (//proc/**, //var/run/secrets/**, three //<root>/... files) and two home-relative rules (~/.claude/**, ~/.claude.json); claude-invocation.test.mjs:304-310 pins the same list. True wording: seven Read denies, five in the // absolute form and two home-relative.
+2. LOW, conf high, CONFIRMED. SKILL.md route.ts row: "...a built prompt with a NUL byte (argv cannot carry one). accepts `{ kind: "evaluate-text", ... }`..." is a spliced fragment with no subject. True wording: end the clause at the NUL sentence, then "It also accepts { kind: "evaluate-text", input, cliId: "claude", jdText }: 400 when ...".
+LOW NOTES
+3. conf medium: web/README.md:83-90 "The route answers 400, before it starts any CLI, for:" lists four items and omits the NUL-byte 400 that reaches every kind (SKILL.md and the PR body list it).
+4. conf medium: README never tells an operator the data-root character limit (route.ts:118-122 answers 400 when the realpath has characters outside letters, digits, . _ - /); PR body and SKILL.md do.
+5. conf medium: TOOL_SCOPES JSDoc in claude-invocation.mjs omits evaluate-text, which now takes localReadOnly; incomplete, not false.
+6. conf low: route.ts:390-396 "a plain evaluate has no such phase" where killMsForKind covers both evaluate kinds; untouched by the PR.
+CHECKED TRUE: route.ts comments at :35-36, :38-41, :43-44, :54, :56, :71-72, :80-81, :102, :109, :269-270, :289 (JD_TEXT_CAP 12,000 matches browser-extract.mjs; report-persist.mjs:275-278 behaviour; unknown-kind fall-through; NUL 500 at :313-323); run-prompts.mjs ENVELOPE_MARKER_RE; worker-capabilities.mjs comments; the // prefix comment; README :74-90 and the Safety table row; AGENTS.md:546; PR body Blast Radius names every refusal reaching other kinds; the 28-probe arithmetic.

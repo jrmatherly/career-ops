@@ -1,0 +1,19 @@
+F1 FIX-FORWARD, round 3. Fresh owner. One round, every item, then a new code-ready head.
+GOAL  Close the round-2 verification findings on PR 35 (branch claude/f1-file-filters, head d97707dc) and bring it to merge-ready.
+SCOPE  Only PR 35's files. Local branch: git fetch origin claude/f1-file-filters && git checkout -b f1-fix3 FETCH_HEAD; push with git push origin HEAD:claude/f1-file-filters, fast-forward only. You are the only writer; the landing owner has finished.
+CONTEXT  <store> = /Users/jason/dev/career-ops/.claude/worktrees/busy-shannon-d44979/docs/superpowers/research/2026-11-08-scan-automation-and-platform/orchestrate. Read <store>/preferences.md (25 orders, binding), <store>/briefs/F1.md, <store>/briefs/F1-fix2.md, then <store>/receipts/F1-r2/ (verifier.md, review-errors.md, review-comments.md, live.md, review-code.md). Round 2 passed the live lane and the code review; the verdict at d97707dc is verifier-failed on the items below. Same shape as the round-1 regression: a config the guard accepts that the scanner reads as no title limit.
+CODE
+1. (review-errors 1, CRITICAL, confirmed) web/scripts/scheduled-jobs-runner.mjs:180 readPortals lets a top-level sequence through ("must contain a mapping" checks typeof only). In custom mode with a job positive, jobPortals sets title_filter on the array, the guard passes, and yaml.dump writes only the elements, so the scanner reads no title limit. Refuse an array with the same "must contain a mapping" message. Test in both modes, the custom one with a job positive, asserting attempt 1, spawned false.
+2. (review-errors 2) runner:190 carries the job positive into title_filter_full only when the block is truthy; use != null so a title_filter_full of false, 0 or "" takes the job's list, matching the guard and the scanner's ??. Test: title_filter_full: false plus a job positive, engine full, spawned true, and the overlay's title_filter_full.positive is the job's list.
+3. (review-errors 3) runner:189 spreads base[section] even when it is a scalar or an array; spread only a plain object. Test: a scalar title_filter overlay carries no numeric keys.
+TESTS
+4. (verifier mutant d2) title_filter.positive [] plus title_filter_full: null, engine full: spawned false at attempt 1 with a message naming title_filter.positive. It must fail if emptyTitleKey treats a null title_filter_full as no limit.
+DOCS
+5. (review-comments) docs/WEB_UI.md:59: say a bare `title_filter_full:` with no keys counts as unset and falls back to title_filter, a block without positive is refused, and a list counts as empty unless it is an array with at least one non-blank string.
+6. PR body: tie every count to the new head and name the suite.
+Parked, not yours: a bare word: or stem: positive that matches nothing; the silent temp-file cleanup catch at runner:284; the non-retryable error retried at runner:199; the round-1 parked list in F1-fix2.md.
+VERIFY  npm install at the root, npm ci in web/. node scripts/check-syntax.mjs; node test-all.mjs --quick; cd web && npm run typecheck && npm test; the runner and body suites by name; node test-all.mjs --quick --only fork-deviations-covered after the head commit. Prove items 1, 2 and 4 with mutants judged by the suite's exit code (order 23). /simplify and /code-review before each commit, /no-comments before review.
+TIMEBOX  Ninety minutes to merge-ready.
+FORBIDDEN  No gh pr merge, no retarget, rebase or force-push, no edits outside PR 35's files, no user-layer files in a checkout, no reading the operator's data root.
+REPORT  Code-ready with the head SHA, per-item file:line, gate outputs and mutant results; then babysit CI (gh pr checks 35 --watch) and report merge-ready with CI state and the PR URL https://github.com/jrmatherly/career-ops/pull/35. Keep outputs in your scratchpad subfolder owner-F1-r4.
+STANDING  <store>/preferences.md, binding. Invoke /jstack:j-mode first (order 9).

@@ -1,0 +1,10 @@
+id	track	state	branch	pr	sha	brief
+F1	build	merge-ready	claude/f1-file-filters	35	50488b974eebe2b2b7d3bd0375e92f819018cf2b	briefs/F1-fix4.md
+R2	build	fix-round-3	claude/r2-inbox-rank	40	8669fdd473b5a10eae54155c48a443cfd41afc77	briefs/R2-fix3.md
+A1	build	fix-round-4-queued	claude/a1-evaluate-text	39	a1e4df6b4347ec0768c13c5f039a157910e411de	briefs/A1-fix4.md
+P1	build	merged	claude/p1-doctor-gateway	37	66f0cb7a2d8bfa6c61ee35cfcc813c225dd454c8	briefs/P1-fix4.md
+K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad93311c	briefs/K1-fix4.md
+R1	build	pending				
+A2	build	pending				
+A3	build	pending				
+P2	operator	pending				

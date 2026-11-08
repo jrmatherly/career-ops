@@ -1,0 +1,4 @@
+toolkit pr-test-analyzer (R2), head a64d71af, mutation-tested; 23/23 pass
+Caught: sort ascending, unranked first, three tiebreak variants, rankReason dropped, rank parsed from a row with no segment (the deepEqual "parses as before" test), ?added= ignored (parse only).
+Survived: T1 [8] "5/5" treated as unranked survives: no test asserts 5/5 or 5.0/5 parses, and the writer emits 5.0/5 for every top row; add a boundary test (also 0/5). T2 [5] the early-cell rank guard (pipeline-table.mjs:69) can be deleted with no failure; one row with a company literally "rank: pending". T3 equivalent mutant: the .trim() at :88 is dead code.
+Unit tests cannot reach: the facet filter line in inbox-triage.tsx:166 (deleting it survives; live lane 4 is load-bearing), the ?added= chip for a date no row carries, the TS pass-through, the rank label and aria-label (lanes 3 and 10). Nice to have: latestAddedDates default max=5 untested.

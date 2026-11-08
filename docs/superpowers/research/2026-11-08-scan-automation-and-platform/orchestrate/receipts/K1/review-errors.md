@@ -1,0 +1,8 @@
+toolkit silent-failure-hunter, head 1e0b92ab, ISSUES (33 inputs probed)
+E1 HIGH publish-account-url.mjs:20-26 the .env read catches every error as "no .env": a mode-000 or directory .env hides the link with no log, while share.mjs aborts the pull on the same fault, so the operator sees two unrelated symptoms. Catch only ENOENT; log the code otherwise (web/src/lib/shares.ts:68-73 already does this split).
+E2 HIGH a set PUBLISH_URL that is http or unparsable (or a .env line with no = or a BOM) yields null silently; one console.error line explains the missing control.
+E3 MEDIUM odd parsable values produce a dead href: leading or trailing whitespace, a query string (/account lands in the query), an unterminated quote in .env that swallows the next line (the key's line ends up in the rendered href; React escapes it, not XSS, but the module promises the key never surfaces), NUL, userinfo. Build the href from the parsed URL with search and hash cleared, or return null and log.
+E4 MEDIUM route.ts:11,61,63 the unset message names only publish_api_key on a cluster though PUBLISH_URL may be the missing one (same as comment-review C6); KEY_DESTINATIONS' local-install clause is noise after a refused key; the /is not set/ regex is latent.
+E5 MEDIUM shares-view.tsx:25 the 6-second toast cannot show a 230-character message; keep an error toast until dismissed or render the last pull error inline.
+E6 LOW (pre-existing) account.mjs:19 new Date(k.createdAt).toISOString() throws on an invalid createdAt and 500s the whole page; a one-line guard.
+Done well: every interpolation escaped; key only in a no-store POST body; stderr stays in the server log.

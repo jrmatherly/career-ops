@@ -1,0 +1,2 @@
+lane live-6, head 38e86d5c, PASS
+Relative CAREER_OPS_PORTALS=portals-alt.yml: the runner run by hand with the same env printed exactly `portals: /tmp/swarm-f1/worker-6/root/portals-alt.yml (file)` (/tmp/swarm-f1/worker-6/runner.err); no overlay; dashboard run success. Screenshot /tmp/swarm-f1/worker-6/f1-env-portals.png. Note, not F1: a PATCH setting limitPerAts 1 came back 50 (clamp or defect, not investigated).

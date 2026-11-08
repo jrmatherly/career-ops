@@ -1,0 +1,3 @@
+{"type":"status","label":"Agent ready"}
+{"type":"text","text":"Stopped: the posting names a dealbreaker.\n<<evaluation-gate>>\n{\"status\":\"needs_confirmation\",\"reason\":\"dealbreaker\",\"message\":\"The role requires on-site work in a location the profile rules out. Confirm to continue.\"}\n<</evaluation-gate>>\nVERDICT: N/A/5 — dealbreaker\n"}
+{"type":"gated","reason":"dealbreaker","message":"The role requires on-site work in a location the profile rules out. Confirm to continue.","confirmationRequired":true,"tokens":2,"costUsd":null}

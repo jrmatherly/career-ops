@@ -1,0 +1,2 @@
+lane cli-matrix (plan lanes 1,2,3,4,5,6,8), head 189da72e, all PASS
+Lane 1 key warning identical at trunk and head; 2 and 3 gateway line "Requests route through a gateway at proxy.example.test, and the gateway's credential decides billing"; 4 api.anthropic.com host stays on the key path, no gateway line; 5 Bedrock warning wins; 6 JSON keys unchanged, warnings an array of strings; 8 unparseable URL warns and exits 0. Wording matches the plan and RUNNING_ON_A_BUDGET 2b. Receipts /tmp/swarm-p1/worker-1/lane*.txt.
