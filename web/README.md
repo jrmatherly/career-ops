@@ -71,6 +71,32 @@ and `keywords`. Omitting it preserves the full evaluation; `[]` requests the
 required assessment without optional sections. Invalid selections return 400
 before starting an AI run.
 
+The `evaluate-text` kind evaluates posting text the caller already has, for
+unattended runs. Its body is `{kind: "evaluate-text", input, cliId: "claude",
+jdText}`: `input` is the posting URL, used only to name the posting, and
+`jdText` is the posting text, at most 16,384 characters. The worker gets no web
+tool and no write tool, runs on Claude only, and is denied Read on secrets and
+the PII files. Its report header reads `unconfirmed (auto mode, no web
+research)`.
+
+The route answers 400, before it starts any CLI, for:
+
+- a kind it does not know.
+- a field sent to a kind that does not own it, an explicit `null` included:
+  `jdText` outside `evaluate-text`, `brief` outside `cover`, and
+  `evaluationSections` outside `evaluate` and `evaluate-text`.
+- an `input` or a `cliId` that is not a string, or is blank or
+  whitespace-only.
+- an `evaluate` or `evaluate-text` input that is not a bare `http(s)://` URL
+  with no whitespace in it. `evaluate` also takes a `local:` inbox row, which
+  may hold an interior space but no padding, tab or line break.
+- a `cliId` with leading or trailing whitespace.
+- a built prompt that contains a NUL byte, which argv cannot carry.
+- for `evaluate-text`: a `cliId` other than `claude`; a `jdText` that is
+  missing, blank or over 16,384 characters; a data root the server cannot
+  resolve; and a data root with characters outside letters, digits, `.`, `_`,
+  `-` and `/`.
+
 ## Safety
 
 - **Local-first:** the local web app runs entirely on your machine — no cloud,
@@ -107,6 +133,7 @@ Which tools each run kind holds on Claude Code (`TOOL_SCOPES` in
 | `pdf` | Read, Glob, Grep | none |
 | `research` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
 | `evaluate` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
+| `evaluate-text` | Read, Glob, Grep | none |
 | `cover` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
 | `fix-portal` | Read, WebFetch, WebSearch, Write, Edit, Bash, Glob, Grep | fetch and writes |
 
