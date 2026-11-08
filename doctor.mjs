@@ -203,17 +203,30 @@ function checkBillingSource() {
 
   const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
   if (baseUrl) {
-    const host = URL.canParse(baseUrl) ? new URL(baseUrl).host : '';
-    if (!host) {
+    const url = URL.parse(baseUrl);
+    if (!url?.host || !['http:', 'https:'].includes(url.protocol)) {
       return {
         warn: true,
-        label: 'ANTHROPIC_BASE_URL is set but unparseable, so Claude Code cannot reach a gateway with it.',
+        label: 'ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.',
         fix: ['Set it to a full URL such as http://proxy.example:8317, or unset it.'],
       };
     }
-    // A gateway such as CLIProxyAPI holds its own upstream credential, so the
-    // key or token in this environment authenticates to the gateway, not to Anthropic.
+    const { host } = url;
     if (host !== 'api.anthropic.com') {
+      if (String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim()) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set, a pair deploy/README.md rules out.`,
+          fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.'],
+        };
+      }
+      if (!key && !authToken) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, but no credential is set, so the gateway will refuse requests.`,
+          fix: ["Set ANTHROPIC_AUTH_TOKEN to the gateway's client key."],
+        };
+      }
       return { pass: true, label: `Billing source. Requests route through a gateway at ${host}, and the gateway's credential decides billing` };
     }
   }
@@ -1962,6 +1975,7 @@ function onboardingState(root) {
   const resumeSidecar = checkResumeSidecar(root);
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
+  const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
     ...(pluginInstall && !pluginInstall.pass ? [`${pluginInstall.label}\n→ ${pluginInstall.fix}`] : []),
@@ -1972,6 +1986,7 @@ function onboardingState(root) {
     ...(resumeSidecar?.warn ? [`${resumeSidecar.label}\n→ ${resumeSidecar.fix.join('\n  ')}`] : []),
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
+    ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];
 
