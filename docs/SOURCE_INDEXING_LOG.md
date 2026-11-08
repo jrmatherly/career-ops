@@ -226,3 +226,47 @@ Re-read against rule 6 after a contributor checked the live `robots.txt` in [#57
 **Rule 6 (the source's own `robots.txt`).** Checked on 2026-10-23 and again on 2026-11-05: one GET of `https://jobspresso.co/robots.txt`, HTTP 200. Under `User-agent: *` it disallows `/*?` and sets `Crawl-delay: 3`; its only `Allow` lines are `/*.css` and `/*.js`. No group names career-ops. `/*?` covered the URL the provider originally fetched, `/?feed=job_feed`, the same shape as Lagou in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. Unlike Lagou, a usable request without a query string exists: WordPress serves the same feed at `https://jobspresso.co/feed/job_feed/`, which is the URL the feed's own `<atom:link rel="self">` names. On 2026-11-05 it answered HTTP 200 `application/rss+xml` with no redirect, and returned the same 10 items as the query-string URL. `/*?` does not cover it, so the provider now reads that path, once per scan.
 
 **Rules 1 to 5.** Not re-verified here.
+
+---
+
+## Backfill waiver (2026-11-08)
+
+These board providers merged without an entry in this log: most before the log existed on 2026-08-07, the rest after it without one. Each line names the provider and the author date of the commit that added its file (`git log --diff-filter=A --format=%as -- providers/{id}.mjs`). A line here records the gap; it is not a verification. A full entry for a provider replaces its line. `tests/providers/indexing-log-coverage.test.mjs` fails when a board provider has neither.
+
+- `providers/4dayweek.mjs`, merged 2026-06-29
+- `providers/agentic-jobs.mjs`, merged 2026-07-20
+- `providers/arbeitnow.mjs`, merged 2026-06-29
+- `providers/arbeitsagentur.mjs`, merged 2026-06-18
+- `providers/bulldogjob.mjs`, merged 2026-10-30
+- `providers/careerviet.mjs`, merged 2026-08-27
+- `providers/consider.mjs`, merged 2026-08-08
+- `providers/flowxtra.mjs`, merged 2026-07-27
+- `providers/generalist-world.mjs`, merged 2026-09-11
+- `providers/germantechjobs.mjs`, merged 2026-11-03
+- `providers/getonbrd.mjs`, merged 2026-07-03
+- `providers/getro.mjs`, merged 2026-08-08
+- `providers/gupy.mjs`, merged 2026-10-03
+- `providers/hackernews.mjs`, merged 2026-06-29
+- `providers/higheredjobs.mjs`, merged 2026-07-01
+- `providers/himalayas.mjs`, merged 2026-06-29
+- `providers/itviec.mjs`, merged 2026-08-26
+- `providers/jobbankca.mjs`, merged 2026-08-21
+- `providers/jobicy.mjs`, merged 2026-06-29
+- `providers/landingjobs.mjs`, merged 2026-06-29
+- `providers/larajobs.mjs`, merged 2026-07-08
+- `providers/manfred.mjs`, merged 2026-08-04
+- `providers/mycareersfuture.mjs`, merged 2026-08-21
+- `providers/nodesk.mjs`, merged 2026-06-30
+- `providers/occ.mjs`, merged 2026-09-29
+- `providers/platsbanken.mjs`, merged 2026-10-12
+- `providers/pythonorg.mjs`, merged 2026-09-14
+- `providers/remoteok.mjs`, merged 2026-06-17
+- `providers/remotive.mjs`, merged 2026-06-17
+- `providers/senjob.mjs`, merged 2026-08-17
+- `providers/thehub.mjs`, merged 2026-06-29
+- `providers/themuse.mjs`, merged 2026-06-29
+- `providers/vdab.mjs`, merged 2026-07-27
+- `providers/weworkremotely.mjs`, merged 2026-06-27
+- `providers/workingnomads.mjs`, merged 2026-06-17
+- `providers/wp-job-manager.mjs`, merged 2026-10-26
+- `providers/yourator.mjs`, merged 2026-08-19
