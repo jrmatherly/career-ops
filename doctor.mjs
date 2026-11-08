@@ -177,8 +177,8 @@ function checkNodeVersion() {
 // fallo: tener una clave puesta es una eleccion legitima, lo que no es legitimo
 // es que el usuario no sepa que la esta usando en vez del plan que ya paga.
 function checkBillingSource() {
-  const key = process.env.ANTHROPIC_API_KEY;
-  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const key = String(process.env.ANTHROPIC_API_KEY ?? '').trim();
+  const authToken = String(process.env.ANTHROPIC_AUTH_TOKEN ?? '').trim();
   // Enabled means SET TO A TRUTHY VALUE, not merely present. These switches are
   // documented as `=1`, so `CLAUDE_CODE_USE_BEDROCK=0` is how someone turns one
   // off — and mere presence would then report "requests bill to your cloud
@@ -202,6 +202,44 @@ function checkBillingSource() {
   }
 
   const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
+  const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
+  if (baseUrl) {
+    const url = URL.parse(baseUrl);
+    if (!url?.host || !['http:', 'https:'].includes(url.protocol)) {
+      return {
+        warn: true,
+        label: 'ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.',
+        fix: ['Set it to a full URL such as http://proxy.example:8317, or unset it.'],
+      };
+    }
+    const { host } = url;
+    if (host !== 'api.anthropic.com') {
+      const oauth = String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim();
+      if (oauth && which) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, and ${which} outranks CLAUDE_CODE_OAUTH_TOKEN, so the OAuth token is unused here.`,
+          fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN, so a missing gateway credential never falls back to your subscription.'],
+        };
+      }
+      if (oauth) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, and no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends your subscription OAuth token (CLAUDE_CODE_OAUTH_TOKEN) to the gateway.`,
+          fix: ["Set ANTHROPIC_AUTH_TOKEN to the gateway's client key and unset CLAUDE_CODE_OAUTH_TOKEN."],
+        };
+      }
+      if (!which) {
+        return {
+          warn: true,
+          label: `Billing source. Requests route through a gateway at ${host}, but no ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY is set, so Claude Code sends any keychain login to the gateway, which refuses it if it checks a client key.`,
+          fix: ["Set ANTHROPIC_AUTH_TOKEN to the gateway's client key."],
+        };
+      }
+      return { pass: true, label: `Billing source. Requests route through a gateway at ${host}, and the gateway's credential decides billing` };
+    }
+  }
+
   if (!which) {
     return { pass: true, label: 'Billing source: no API key in the environment (a Claude subscription will be used if you are logged in)' };
   }
@@ -1945,6 +1983,7 @@ function onboardingState(root) {
   const resumeSidecar = checkResumeSidecar(root);
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
+  const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
     ...(pluginInstall && !pluginInstall.pass ? [`${pluginInstall.label}\n→ ${pluginInstall.fix}`] : []),
@@ -1955,6 +1994,7 @@ function onboardingState(root) {
     ...(resumeSidecar?.warn ? [`${resumeSidecar.label}\n→ ${resumeSidecar.fix.join('\n  ')}`] : []),
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
+    ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];
 
