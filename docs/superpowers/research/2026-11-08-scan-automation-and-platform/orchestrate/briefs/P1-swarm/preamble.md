@@ -1,0 +1,11 @@
+P1 VERIFICATION LANE, shared preamble
+
+You verify PR-P1 of jrmatherly/career-ops, https://github.com/jrmatherly/career-ops/pull/37, branch claude/p1-doctor-gateway, at the exact head 189da72eee227fa979fca9685e023a0d481cb2dd (trunk base d2fea890). You did not write this code and you distrust the PR body. Your product is evidence.
+
+Worktree: `git fetch origin claude/p1-doctor-gateway` then `git checkout 189da72eee227fa979fca9685e023a0d481cb2dd`; confirm `git rev-parse HEAD`. A trunk comparison uses `git worktree add /tmp/swarm-p1/trunk d2fea890`. A fresh worktree has no node_modules: run `npm install --no-audit --no-fund` at the root (no lockfile there, so not npm ci) and `npm ci` in web/ if your lane needs the dashboard. Run one plain shell command at a time.
+Spec: <store>/briefs/P1-swarm/plan-section.md (the plan's PR-P1 section), the plan's Global constraints, AGENTS.md, .claude/rules/dev-workflow.md.
+Scratch data root only: `export CAREER_OPS_ROOT=/tmp/swarm-p1/worker-<n>/root` seeded from examples/cv-example.md, config/profile.example.yml, modes/_profile.template.md, templates/portals.example.yml and an applications.md header. Never the operator's data, never a real key: every token or key value in a lane is a placeholder string like `x` or `test-token`. Never print, log or commit a real credential.
+Evidence: save each command's full output to /tmp/swarm-p1/worker-<n>/<lane-slug>.txt. Where the plan names a .png, a text capture of the terminal output under the same slug is the receipt (the run skill's surface is the CLI); a dashboard lane saves a real screenshot (take it without filePath and copy the file out).
+Each plan lane has a fixed pass rule; judge against it exactly.
+Forbidden: editing files in the PR worktree outside your scratch paths, pushing, commenting on the PR, auto-approve flags, doctor --init-templates in the checkout, reading the operator's data root. Stop any server you start by pid or port, never by pattern. Timebox 30 minutes; on expiry return BLOCKED with what you saw.
+REPORT (plain text): lane ids covered; HEAD SHA verified; per plan lane PASS, ISSUES or BLOCKED with the exact command, the output line that decides it, and the receipt path; for ISSUES every defect you can prove with file:line.

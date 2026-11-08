@@ -1,0 +1,2 @@
+lane live-5, head 38e86d5c, PASS
+Custom job with empty negative list; overlay captured during the run carries intern under title_filter.negative (copy at /tmp/swarm-f1/worker-5/scheduled-d0e22e4a-...yml); run success, 8 roles, overlay removed after. Screenshot /tmp/swarm-f1/worker-5/f1-negative-inherit.jpg (pane tool makes JPEG). Notes: Turbopack refuses a symlinked web/node_modules, npm ci needed; POST /api/scheduled-jobs needs Host matching Origin; the runner's stderr "portals:" line is not forwarded by the web run route, so no lane can see it from the dashboard.

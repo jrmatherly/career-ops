@@ -1,0 +1,2 @@
+lane gates, head 38e86d5c, PASS
+check-syntax 2191 ok; test-all --quick run 1: 21209 passed 1 failed (batch-dealbreaker-skip, load flake, passes alone), run 2: 21210 passed 0 failed; fork-deviations-covered 503 paths ok; web typecheck clean; web npm test 2559 tests 0 fail; runner suite 43/43, body suite 3/3. Against trunk's runner the suite fails 6 tests including the four the plan names. Logs /tmp/g-quick.log, /tmp/g-quick2.log.

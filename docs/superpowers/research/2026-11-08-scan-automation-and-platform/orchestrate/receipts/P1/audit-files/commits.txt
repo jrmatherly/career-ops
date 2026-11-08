@@ -1,0 +1,8 @@
+189da72e feat(doctor): report a gateway base URL as the billing source
+
+.claude/skills/upstream-review/SKILL.md
+deploy/README.md
+docs/RUNNING_ON_A_BUDGET.md
+docs/superpowers/research/2026-11-08-scan-automation-and-platform/owners/P1.tsv
+doctor.mjs
+tests/doctor-billing-source.test.mjs

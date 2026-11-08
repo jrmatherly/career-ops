@@ -1,0 +1,9 @@
+--- no jdText
+{"error":"evaluate-text needs jdText, the posting text, as a non-empty string."}
+HTTP 400
+--- cliId codex
+{"error":"evaluate-text runs on Claude only: cliId must be \"claude\"."}
+HTTP 400
+--- 20 kB jdText
+{"error":"jdText is over the 16384-character limit."}
+HTTP 400

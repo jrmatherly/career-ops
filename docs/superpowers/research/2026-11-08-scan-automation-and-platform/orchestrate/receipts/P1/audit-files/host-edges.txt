@@ -1,0 +1,5 @@
+"http://user:test-token@proxy.example:8317/v1" "proxy.example:8317"
+"proxy.example:8317" ""
+"not a url" unparseable
+"https://API.Anthropic.com/" "api.anthropic.com"
+"https://api.anthropic.com:443" "api.anthropic.com"

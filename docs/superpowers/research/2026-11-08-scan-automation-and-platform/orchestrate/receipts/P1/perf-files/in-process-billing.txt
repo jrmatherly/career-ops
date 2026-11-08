@@ -1,0 +1,6 @@
+no-gateway round 1 trunk ns/call 2081 head ns/call 2221
+no-gateway round 2 trunk ns/call 2123 head ns/call 3522
+no-gateway round 3 trunk ns/call 6915 head ns/call 3678
+gateway round 1 trunk ns/call 1858 head ns/call 2811
+gateway round 2 trunk ns/call 1879 head ns/call 2793
+gateway round 3 trunk ns/call 1893 head ns/call 2896

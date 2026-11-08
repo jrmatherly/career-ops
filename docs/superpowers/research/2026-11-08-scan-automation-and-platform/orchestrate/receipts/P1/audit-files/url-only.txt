@@ -1,0 +1,1 @@
+6:✓ Billing source. Requests route through a gateway at proxy.example:8317, and the gateway's credential decides billing

@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Content-Length: 2191
+Cache-Control: private, no-store
+X-Content-Type-Options: nosniff
+Content-Type: text/html; charset=utf-8
+Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+Referrer-Policy: same-origin
+X-Robots-Tag: noindex
+Date: Sun, 08 Nov 2026 15:29:39 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

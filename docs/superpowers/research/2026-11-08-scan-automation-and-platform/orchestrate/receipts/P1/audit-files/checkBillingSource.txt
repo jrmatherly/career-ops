@@ -1,0 +1,58 @@
+     1	function checkBillingSource() {
+     2	  const key = process.env.ANTHROPIC_API_KEY;
+     3	  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+     4	  // Enabled means SET TO A TRUTHY VALUE, not merely present. These switches are
+     5	  // documented as `=1`, so `CLAUDE_CODE_USE_BEDROCK=0` is how someone turns one
+     6	  // off — and mere presence would then report "requests bill to your cloud
+     7	  // account" at exactly the user who just said they don't. A billing check that
+     8	  // misreads an explicit opt-out causes the confusion it exists to remove.
+     9	  // Matches the repo's own env-flag convention (=== '1' in merge-tracker.mjs
+    10	  // and update-system.mjs), while also accepting `true` since these are
+    11	  // third-party switches users copy from assorted docs.
+    12	  const cloud = ['CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY']
+    13	    .filter((v) => /^(1|true|yes|on)$/i.test(String(process.env[v] ?? '').trim()));
+    14	
+    15	  if (cloud.length) {
+    16	    return {
+    17	      warn: true,
+    18	      label: `${cloud[0]} is set, so requests bill to your cloud account, not to a Claude subscription.`,
+    19	      fix: [
+    20	        'Intentional? Nothing to do.',
+    21	        `Not intentional: unset ${cloud[0]} and restart your terminal.`,
+    22	      ],
+    23	    };
+    24	  }
+    25	
+    26	  const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
+    27	  if (baseUrl) {
+    28	    const host = URL.canParse(baseUrl) ? new URL(baseUrl).host : '';
+    29	    if (!host) {
+    30	      return {
+    31	        warn: true,
+    32	        label: 'ANTHROPIC_BASE_URL is set but unparseable, so Claude Code cannot reach a gateway with it.',
+    33	        fix: ['Set it to a full URL such as http://proxy.example:8317, or unset it.'],
+    34	      };
+    35	    }
+    36	    // A gateway such as CLIProxyAPI holds its own upstream credential, so the
+    37	    // key or token in this environment authenticates to the gateway, not to Anthropic.
+    38	    if (host !== 'api.anthropic.com') {
+    39	      return { pass: true, label: `Billing source. Requests route through a gateway at ${host}, and the gateway's credential decides billing` };
+    40	    }
+    41	  }
+    42	
+    43	  const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
+    44	  if (!which) {
+    45	    return { pass: true, label: 'Billing source: no API key in the environment (a Claude subscription will be used if you are logged in)' };
+    46	  }
+    47	
+    48	  return {
+    49	    warn: true,
+    50	    label: `${which} is set, so it takes precedence over any Claude subscription: this session bills per token even if you pay for Pro or Max.`,
+    51	    fix: [
+    52	      'Intentional (you meant to use API credits)? Nothing to do.',
+    53	      `Not intentional: remove the export of ${which} from ~/.zshrc, ~/.bashrc, ~/.profile or a project .env, restart your terminal, and run /login.`,
+    54	      'Batch runs are the exception: `claude -p` workers do not use the interactive login, so they need `claude setup-token` exported as CLAUDE_CODE_OAUTH_TOKEN.',
+    55	      'Details: docs/RUNNING_ON_A_BUDGET.md section 2b.',
+    56	    ],
+    57	  };
+    58	}

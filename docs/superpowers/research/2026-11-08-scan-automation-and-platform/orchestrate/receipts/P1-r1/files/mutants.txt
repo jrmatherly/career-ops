@@ -1,0 +1,20 @@
+M4 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ a gateway base URL alone warns that no credential is set and names the host: expected /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, but no credential is set/m and not /a Claude subscription will be used/
+M5 exit 1 Results: 19 passed, 2 failed, 0 warnings
+    ❌ a gateway base URL with a token passes with the gateway, not per-token billing: expected /^✓ Billing source\. Requests route through a gateway at proxy\.example:8317, and the gateway's credential/m and not /bills per token/
+    ❌ a gateway base URL with an API key passes with the gateway: expected /^✓ Billing source\. Requests route through a gateway at proxy\.example:8317, and the gateway's credential/m and not /bills per token/
+M7 exit 1 Results: 17 passed, 4 failed, 0 warnings
+    ❌ an unparseable base URL warns and does not throw: expected /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m and not /route through a gateway at proxy\.example:8317/
+    ❌ a file: base URL warns as not an http(s) URL: expected /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m and not /route through a gateway at proxy\.example:8317/
+    ❌ an ftp: base URL warns instead of passing as a gateway: expected /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m and not /route through a gateway/
+    ❌ --json billing warn: keys unchanged=true, warning listed=false
+M8 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ a whitespace-only base URL falls through to the key warning: expected /^⚠ ANTHROPIC_API_KEY is set/m and not /ANTHROPIC_BASE_URL is set/
+X1 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ --json billing warn: keys unchanged=true, warning listed=false
+X2 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ a gateway base URL beside CLAUDE_CODE_OAUTH_TOKEN warns about the pair: expected /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set/m and not /^✓ Billing source\. Requests route through a gateway at proxy\.example:8317, and the gateway's credential/m
+X3 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ an ftp: base URL warns instead of passing as a gateway: expected /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m and not /route through a gateway/
+X4 exit 1 Results: 20 passed, 1 failed, 0 warnings
+    ❌ a gateway base URL alone warns that no credential is set and names the host: expected /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, but no credential is set/m and not /a Claude subscription will be used/

@@ -1,0 +1,2 @@
+toolkit code-reviewer, head 189da72e, no issues at confidence 80
+Confirmed: branch order, canParse guard, host drops userinfo, CLEAN blanks ANTHROPIC_BASE_URL, no duplicate billing check elsewhere, rows and README per spec. Low-confidence notes: .host keeps a port and a trailing dot (api.anthropic.com:8443 or api.anthropic.com. read as a gateway), same as audit note A; the unparseable warn names the variable not the value (safer; plan wording loose).
