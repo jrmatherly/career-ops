@@ -150,11 +150,19 @@ export function grantsWriteCapability(scope) {
  * Assembled here, not in the route, so a guard can assert on the command line
  * that actually ships instead of on source text that can be rewritten around it.
  *
- * @param {{kind: string, prompt: string}} args
+ * evaluate-text runs unattended on untrusted posting text, so it also denies
+ * Read on what a hostile posting would aim at: the process environment, the
+ * service-account token, the CLI's own home and credentials, the data root's
+ * .env and the two third-party PII files.
+ *
+ * @param {{kind: string, prompt: string, dataRoot?: string}} args
  * @returns {string[]}
  */
-export function claudeCliArgs({ kind, prompt }) {
+export function claudeCliArgs({ kind, prompt, dataRoot }) {
   const scope = toolScopeFor(kind);
+  const disallowed = kind === "evaluate-text"
+    ? [scope.disallowed, ...evaluateTextReadDenies(dataRoot)].join(",")
+    : scope.disallowed;
   return [
     "-p", prompt,
     "--output-format", "stream-json",
@@ -168,7 +176,25 @@ export function claudeCliArgs({ kind, prompt }) {
     // it is locked too. A writing kind keeps its MCP servers.
     ...(capabilitiesFor(kind).writes ? [] : ["--strict-mcp-config"]),
     "--allowedTools", scope.allowed,
-    "--disallowedTools", scope.disallowed,
+    "--disallowedTools", disallowed,
+  ];
+}
+
+// `//` is Claude Code's absolute-path prefix; a single slash anchors at the
+// settings source, so `Read(/proc/**)` would not cover /proc.
+function evaluateTextReadDenies(dataRoot) {
+  if (!dataRoot?.startsWith("/")) {
+    throw new Error("claudeCliArgs: evaluate-text needs an absolute dataRoot for its Read denies");
+  }
+  const root = `/${dataRoot.replace(/\/+$/, "")}`;
+  return [
+    "Read(//proc/**)",
+    "Read(//var/run/secrets/**)",
+    "Read(~/.claude/**)",
+    "Read(~/.claude.json)",
+    `Read(${root}/.env)`,
+    `Read(${root}/data/contacts.tsv)`,
+    `Read(${root}/data/Connections.csv)`,
   ];
 }
 
