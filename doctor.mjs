@@ -177,8 +177,8 @@ function checkNodeVersion() {
 // fallo: tener una clave puesta es una eleccion legitima, lo que no es legitimo
 // es que el usuario no sepa que la esta usando en vez del plan que ya paga.
 function checkBillingSource() {
-  const key = process.env.ANTHROPIC_API_KEY;
-  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const key = String(process.env.ANTHROPIC_API_KEY ?? '').trim();
+  const authToken = String(process.env.ANTHROPIC_AUTH_TOKEN ?? '').trim();
   // Enabled means SET TO A TRUTHY VALUE, not merely present. These switches are
   // documented as `=1`, so `CLAUDE_CODE_USE_BEDROCK=0` is how someone turns one
   // off — and mere presence would then report "requests bill to your cloud
@@ -216,7 +216,7 @@ function checkBillingSource() {
       if (String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim()) {
         return {
           warn: true,
-          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set, a pair deploy/README.md rules out.`,
+          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set; authenticate to the gateway with ANTHROPIC_AUTH_TOKEN alone.`,
           fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.'],
         };
       }

@@ -91,6 +91,8 @@ const BASE_URL_CASES = [
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_API_KEY: 'sk-ant-test' }, GATEWAY_PASS, /bills per token/],
   ['a gateway base URL alone warns that no credential is set and names the host',
     { ANTHROPIC_BASE_URL: GATEWAY }, GATEWAY_NO_CREDENTIAL, /a Claude subscription will be used/],
+  ['a whitespace-only auth token beside a gateway counts as no credential',
+    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: '  ' }, GATEWAY_NO_CREDENTIAL, GATEWAY_PASS],
   ['a gateway base URL beside CLAUDE_CODE_OAUTH_TOKEN warns about the pair',
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'x' }, GATEWAY_WITH_OAUTH, GATEWAY_PASS],
   ['api.anthropic.com as base URL keeps the key warning',
