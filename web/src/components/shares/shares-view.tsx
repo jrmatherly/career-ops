@@ -30,6 +30,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
   async function pull(slug?: string) {
     if (pulling) return;
     setPulling(slug ? { slug } : { all: true });
+    setToast(null);
     try {
       const res = await fetch("/api/shares/pull", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(slug ? { slug } : {}) });
       const data = (await res.json().catch(() => null)) as PullResponse | null;
