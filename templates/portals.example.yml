@@ -157,7 +157,7 @@
 # Filter scanned jobs by location. Applied AFTER title filter, BEFORE dedup.
 # If this entire block is absent, all locations pass (current default behavior).
 #
-# Semantics (case-insensitive substring, in this order):
+# Semantics (case-insensitive whole-word match, in this order):
 #   - Empty location string on a job → pass (don't penalize missing data)
 #   - Any `block_hard` keyword present → reject (always_allow cannot override it)
 #   - Any `always_allow` keyword present → pass (takes precedence over `block`)
@@ -294,6 +294,7 @@
 # First health observation is a lower bound, not the date config was added.
 # No configuration is removed automatically; review filters/names before pruning.
 # portal_prune_quiet_days: 30
+# portal_health_threshold: 3   # consecutive failed scans before a board counts as failing (stats.mjs default)
 # Failure suggestions use portal_health_threshold (default 3).
 
 # -- Posting-age filter (optional) --
@@ -736,8 +737,10 @@ title_filter:
     # excluded and the shorter negative bought nothing for them.
     - "Customer Care Agent"
     - "Kundenbetreuung"
+  # Read only by an agent running modes/scan.md by hand. scan.mjs and
+  # scan-ats-full.mjs ignore it. Use skip_tiers or positive keywords to
+  # filter by seniority.
   seniority_boost:
-    # These prefixes add relevance but are not required
     - "Senior"
     - "Staff"
     - "Principal"

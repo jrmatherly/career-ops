@@ -33,7 +33,7 @@ Then start a new session. The first start takes a few seconds longer while the p
 | Node packages | `${CLAUDE_PLUGIN_DATA}/node_modules`: `~/.claude/plugins/data/career-ops-career-ops/` for a `/plugin` install, `~/.claude/plugins/data/career-ops-synced/` for a Customize install | Yes |
 | Your CV, profile, tracker, reports | `~/career-ops-data` | Yes, Claude Code never touches it |
 
-Claude Code replaces the code folder on every plugin update, so career-ops never keeps your files there. `path-resolver.mjs` detects a plugin install and uses `~/career-ops-data` when nothing else names a data folder.
+Claude Code replaces the code folder on every plugin update, so career-ops never keeps your files there. `path-resolver.mjs` resolves the data root in this order: `CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR`, then a `.career-ops-data` marker file, then `~/career-ops-data` for a plugin install, then the code folder itself. The marker is read from the code folder, which a plugin update replaces, so plugin users set `CAREER_OPS_ROOT` instead. The plugin folders are found under `CLAUDE_CODE_PLUGIN_CACHE_DIR` and `CLAUDE_CONFIG_DIR` when those are set, else under `~/.claude`.
 
 To use another folder, set `CAREER_OPS_ROOT` (or `CAREER_OPS_DATA_DIR`) to an absolute path in `~/.claude/settings.json`. A folder inside a plugin install copy (`~/.claude/plugins/cache/`, `marketplaces/` or `synced/`) is refused: career-ops scripts stop with an error that names the variable, and `node doctor.mjs` reports it.
 

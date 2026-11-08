@@ -1,5 +1,14 @@
 # Conditional workplace geography
 
+The location filter runs its tiers in a fixed order: `workplace_policy` first,
+then `block_hard`, `always_allow`, `block` and `allow`, then a rescue for a
+posting whose location is a worldwide label, and last `remote_title_fallback`.
+With a non-empty `allow` list, a posting whose location is only "Remote" fails
+unless `Remote` is in `allow` or the title itself says remote.
+`always_allow: ["United States"]` expands to every US state name and code. The
+full comment on each tier is in `templates/portals.example.yml` under
+`location_filter`.
+
 An `allow: [Remote]` location filter matches the work arrangement, not the
 countries a remote employee may work from. Likewise, allowing a whole country
 admits office roles in every city there. To combine a specific office/hybrid
