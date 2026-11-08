@@ -1218,8 +1218,14 @@ test("rank exit 1 records evalMessage and leaves the scan success", async () => 
     assert.doesNotMatch(fs.readFileSync(pipeline, "utf8"), /rank:/);
     assert.match(stderr, /0 ranked, 2 sent; Error: every call to fake failed/);
     await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
-    assert.equal(runRecord(storePath).ranked, 2, "the next tick retries the rows");
-    assert.equal(runRecord(storePath).evalMessage, undefined, "a pass that succeeds clears the message");
+    assert.equal(calls.length, 1, "a failed pass is not retried on the next tick");
+    const nextRun = "66666666-6666-4666-8666-666666666666";
+    await withScheduledStore(storePath, (store) => { store.runs.unshift({ id: nextRun, jobId: RANK_JOB, at: "2026-11-09T15:00:00.000Z", state: "success", attempt: 1, rolesFound: 0 }); });
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.deepEqual(calls[1].urls, SCANNED, "the job's next run sends the rows again");
+    const next = readScheduledStore(storePath).runs.find((run) => run.id === nextRun);
+    assert.equal(next.ranked, 2);
+    assert.equal(next.evalMessage, undefined);
   });
 });
 
@@ -1263,6 +1269,24 @@ test("a list longer than one pass keeps the run due until every row is sent", as
     assert.equal(runRecord(storePath).evalMessage, undefined);
     await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
     assert.equal(calls.length, 2, "a finished pass is not repeated");
+  });
+});
+
+test("one job's failing pass does not stop the next job's", async () => {
+  await withRankRoot(REVIEW, async ({ root, storePath }) => {
+    const second = "77777777-7777-4777-8777-777777777777";
+    await withScheduledStore(storePath, (store) => {
+      store.jobs.unshift({ ...store.jobs[0], id: "88888888-8888-4888-8888-888888888888", timezone: "Mars/Base" });
+      store.runs.unshift(
+        { id: second, jobId: "88888888-8888-4888-8888-888888888888", at: "2026-11-08T15:00:00.000Z", state: "success", attempt: 1, rolesFound: 0 },
+        { id: "99999999-9999-4999-8999-999999999999", jobId: "88888888-8888-4888-8888-888888888888", at: "2026-11-07T15:00:00.000Z", state: "success", attempt: 1, rolesFound: 0 },
+      );
+    });
+    const calls = [];
+    const { stderr } = await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
+    assert.match(stderr, /rank: job 88888888-8888-4888-8888-888888888888 failed: /);
+    assert.equal(calls.length, 1);
+    assert.equal(runRecord(storePath).ranked, 2);
   });
 });
 

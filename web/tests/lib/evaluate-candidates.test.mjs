@@ -83,3 +83,19 @@ test("a ranked candidate carries its rank and reason, and done rows are not pend
     { url: "https://a.test/4", ranked: true },
   ], "any rank label is ranked, as rank-pipeline.mjs reads it, so the pass never resends that row");
 });
+
+test("pendingRows reads pending and ranked rows the way rank-pipeline.mjs does", async () => {
+  const { parsePendingEntries } = await import("../../../rank-pipeline.mjs");
+  const text = [
+    "## Pending",
+    "- [ ] https://a.test/1 | A | Role",
+    "- [ ] https://a.test/2 | B | Role | rank: 3.0/5 — ok",
+    "- [x] https://a.test/3 | C | Role",
+    "-  [ ] https://a.test/4 | D | Role",
+    "- [ ]  https://a.test/5 |E|Role\r",
+  ].join("\n");
+  assert.deepEqual(
+    pendingRows(text).filter((row) => !row.ranked).map((row) => row.url),
+    parsePendingEntries(text).map((entry) => entry.url),
+  );
+});

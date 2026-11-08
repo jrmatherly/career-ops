@@ -374,11 +374,15 @@ const RANK_LOCK = { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 
 const RANK_MAX_PER_PASS = 50;
 const evaluatingJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate && job.evaluate.mode !== "off");
 
-// A job's newest run needs a pass once it has finished, until one records its counts without an error.
+const RANK_WAITING = " rows wait for the next rank pass.";
+
+// A job's newest run needs a pass once it has finished, until one records its
+// counts. A failed pass is not retried each tick, so a broken CLI is not paid
+// for every 15 minutes; the job's next run sends those rows again.
 function runToRank(store, job) {
   const lastRun = store.runs.find((run) => run.jobId === job.id);
   if (!lastRun || lastRun.state === "queued" || lastRun.state === "running") return null;
-  return lastRun.ranked !== undefined && lastRun.evalMessage === undefined ? null : lastRun;
+  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) ? lastRun : null;
 }
 
 export async function rankPass(root, storePath, { spawnFn = spawnSync } = {}) {
@@ -392,36 +396,44 @@ export async function rankPass(root, storePath, { spawnFn = spawnSync } = {}) {
       .filter((line) => line.trim())
       .map(parseScanHistoryLine);
     for (const job of due(store)) {
-      const lastRun = runToRank(store, job);
-      const since = candidateSince({ job, runs: store.runs, excludeRunId: lastRun.id });
-      const candidates = candidatesFor({ pendingRows: pendingRows(readText(pipelinePath)), scanHistoryRows, since });
-      const waiting = candidates.filter((candidate) => !candidate.ranked);
-      const unranked = waiting.slice(0, RANK_MAX_PER_PASS);
-      let ranked = candidates.length - waiting.length;
-      // A message keeps the run due, so the next tick sends the rest.
-      let evalMessage = waiting.length > unranked.length ? `${waiting.length - unranked.length} rows wait for the next rank pass.` : undefined;
-      if (unranked.length) {
-        const urlsFile = writeJobTemp(root, job.id, "rank", "txt", `${unranked.map((c) => c.url).join("\n")}\n`);
-        try {
-          const result = spawnFn(
-            process.execPath,
-            ["rank-pipeline.mjs", "--urls-file", urlsFile, "--limit", String(unranked.length)],
-            { cwd: CODE_ROOT, env: coreEnv(root), encoding: "utf8", timeout: SCAN_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
-          );
-          if (result.status !== 0) evalMessage = scanFailureMessage(result, { timeoutMs: SCAN_TIMEOUT_MS });
-        } catch (error) {
-          evalMessage = scanFailureMessage({ error });
-        } finally {
-          fs.rmSync(urlsFile, { force: true });
-        }
-        // The scan history has not changed, so the candidates are the same rows; only whether they are ranked can have changed.
-        const urls = new Set(candidates.map((candidate) => candidate.url));
-        ranked = pendingRows(readText(pipelinePath)).filter((row) => row.ranked && urls.has(row.url)).length;
+      try {
+        await rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, spawnFn }, job);
+      } catch (error) {
+        process.stderr.write(`rank: job ${job.id} failed: ${error instanceof Error ? error.message : String(error)}\n`);
       }
-      process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
-      if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage) await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage });
     }
   }, RANK_LOCK);
+}
+
+async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, spawnFn }, job) {
+  const lastRun = runToRank(store, job);
+  const since = candidateSince({ job, runs: store.runs, excludeRunId: lastRun.id });
+  const candidates = candidatesFor({ pendingRows: pendingRows(readText(pipelinePath)), scanHistoryRows, since });
+  const waiting = candidates.filter((candidate) => !candidate.ranked);
+  const unranked = waiting.slice(0, RANK_MAX_PER_PASS);
+  let ranked = candidates.length - waiting.length;
+  // The waiting message keeps the run due, so the next tick sends the rest.
+  let evalMessage = waiting.length > unranked.length ? `${waiting.length - unranked.length}${RANK_WAITING}` : undefined;
+  if (unranked.length) {
+    const urlsFile = writeJobTemp(root, job.id, "rank", "txt", `${unranked.map((c) => c.url).join("\n")}\n`);
+    try {
+      const result = spawnFn(
+        process.execPath,
+        ["rank-pipeline.mjs", "--urls-file", urlsFile, "--limit", String(unranked.length)],
+        { cwd: CODE_ROOT, env: coreEnv(root), encoding: "utf8", timeout: SCAN_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
+      );
+      if (result.status !== 0) evalMessage = scanFailureMessage(result, { timeoutMs: SCAN_TIMEOUT_MS });
+    } catch (error) {
+      evalMessage = scanFailureMessage({ error });
+    } finally {
+      fs.rmSync(urlsFile, { force: true });
+    }
+    // The scan history has not changed, so the candidates are the same rows; only whether they are ranked can have changed.
+    const urls = new Set(candidates.map((candidate) => candidate.url));
+    ranked = pendingRows(readText(pipelinePath)).filter((row) => row.ranked && urls.has(row.url)).length;
+  }
+  process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
+  if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage) await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage });
 }
 
 async function takeDueJob(storePath) {
