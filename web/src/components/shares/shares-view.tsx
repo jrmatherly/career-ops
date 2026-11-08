@@ -17,7 +17,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
   const router = useRouter();
   // Which pull is in flight: one slug, or every share from Pull all.
   const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
-  // A toast stays until dismissed: its advice runs to a few hundred characters, too long to read before a timer closes it.
+  // A toast stays until dismissed: some run to a few hundred characters, too long to read before a timer closes it.
   const [toast, setToast] = useState<string | null>(null);
 
   async function pull(slug?: string) {
@@ -120,7 +120,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
       {toast && (
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
           <div role="status" className="flex max-w-2xl items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
-            <p className="min-w-0 break-words">{toast}</p>
+            <p className="max-h-[50vh] min-w-0 overflow-y-auto break-words">{toast}</p>
             <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-muted hover:text-foreground">
               <X className="size-3.5" />
             </button>

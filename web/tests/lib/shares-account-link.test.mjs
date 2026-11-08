@@ -26,10 +26,10 @@ test("a new pull clears the last toast before fetching", () => {
   assert.ok(clear !== -1 && clear < pull[1].indexOf("await fetch("), "setToast(null) runs before the fetch");
 });
 
-test("a 200 body without ok, missing and pulled gets its own toast before missing is read", () => {
+test("a 200 body without ok, missing and pulled gets its own toast and a refresh before missing is read", () => {
   const pull = src("components/shares/shares-view.tsx").match(/async function pull\([^)]*\) \{([\s\S]*?)\n {2}\}\n/)[1];
-  const guard = pull.search(/if \(body\.ok !== true \|\| !Array\.isArray\(body\.missing\) \|\| typeof body\.pulled !== "number"\) \{\s*setToast\("Pull failed: the app sent a response this page cannot read"\)/);
-  assert.ok(guard !== -1, "the shape guard sets its own toast");
+  const guard = pull.search(/if \(body\.ok !== true \|\| !Array\.isArray\(body\.missing\) \|\| typeof body\.pulled !== "number"\) \{\s*setToast\("Pull failed: the app sent a response this page cannot read"\);\s*router\.refresh\(\);\s*return;/);
+  assert.ok(guard !== -1, "the shape guard sets its own toast, refreshes the rows and returns");
   assert.ok(guard < pull.indexOf("data.missing"), "the guard runs before missing is read");
 });
 

@@ -14,7 +14,7 @@ const KEY_ON_CLUSTER = `on a cluster install, set publish_api_key = "cops_..." i
 // Runs `node publish/share.mjs pull [--slug s]`: the CLI reads PUBLISH_URL and
 // the key from its environment or the data root's .env, refreshes
 // data/shares.json and rewrites the feedback file of every share it pulled.
-// The web never reads the key itself and never talks to the service.
+// The web never uses, returns or logs the key, and never talks to the service.
 export async function POST(req: Request) {
   // A body-less POST pulls everything; a body that is not an object is a client bug, not "everything".
   const body = req.headers.get("content-length") === "0" || !req.body ? {} : await readJsonObject<{ slug?: unknown }>(req);
