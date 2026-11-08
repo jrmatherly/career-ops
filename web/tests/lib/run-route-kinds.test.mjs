@@ -161,36 +161,52 @@ test("a malformed input is refused before the CLI is resolved", async (t) => {
   assert.equal(await refusal(await run({ kind: "pdf", input: "  ", jdText: undefined })), "input must be a non-empty string.");
   assert.match(await refusal(await run({ input: "https://jobs.example.test/1\n", jdText: "Role." })), /bare http\(s\) URL/);
   assert.match(await refusal(await run({ kind: "evaluate", input: "jobs.example.test/1" })), /bare http\(s\) URL/);
-  assert.equal(await refusal(await run({ cliId: 1, jdText: "Role." })), "cliId must be a non-empty string.");
+  assert.equal(await refusal(await run({ cliId: 1, jdText: "Role." })), "cliId must be a non-empty string with no padding.");
+});
+
+test("a bad posting URL is named before a bad cliId", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of ["evaluate", "evaluate-text"]) {
+    assert.match(await refusal(await run({ kind, input: "jobs.example.test/1", cliId: 1, jdText: kind === "evaluate-text" ? "Role." : undefined })), /^The posting URL must be a bare http\(s\) URL/, kind);
+  }
 });
 
 test("an evaluate input that is not a bare posting URL is refused before any CLI starts", async (t) => {
   fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
   for (const kind of ["evaluate", "evaluate-text"]) {
-    for (const input of [" https://jobs.example.test/1", "https://jobs.example.test/1 ", "https://jobs.example.test/1\n", "https://jobs.example.test/1\r", "https://jobs.example.test/\t1", "https://jobs.example.test/a b", "https://jobs.example.test/1\u2028", "local: jds/acme.md", "jobs.example.test/1", "ftp://jobs.example.test/1"]) {
+    for (const input of [" https://jobs.example.test/1", "https://jobs.example.test/1 ", "https://jobs.example.test/1\n", "https://jobs.example.test/1\r", "https://jobs.example.test/\t1", "https://jobs.example.test/a b", "https://jobs.example.test/1\u2028", "local: jds/acme.md", " local:x", "local:x\n", "local:x\ty", "local:", "https://", "http://", "jobs.example.test/1", "ftp://jobs.example.test/1"]) {
       assert.match(await refusal(await run({ kind, input, jdText: kind === "evaluate-text" ? "Role." : undefined })), /^The posting URL must be a bare http\(s\) URL/, `${kind} input=${JSON.stringify(input)}`);
     }
   }
-  assert.match(await refusal(await run({ input: "local:jds/acme.md", jdText: "Role." })), /^The posting URL must be a bare http\(s\) URL,/);
+  assert.equal(await refusal(await run({ input: "local:jds/acme.md", jdText: "Role." })), "The posting URL must be a bare http(s) URL with no whitespace in it.");
 });
 
 test("evaluate keeps the local: inbox rows and a bare URL", async (t) => {
   fixtureRoot(t);
   let spawns = 0;
   globalThis.__onSpawn = () => { spawns += 1; };
-  for (const input of ["local:jds/acme.md", "HTTPS://jobs.example.test/1"]) {
+  for (const input of ["local:jds/acme.md", "local:jds/Acme Corp-x.md", "HTTPS://jobs.example.test/1"]) {
     await events(await run({ kind: "evaluate", input, jdText: undefined }));
   }
-  assert.equal(spawns, 2);
+  assert.equal(spawns, 3);
+});
+
+test("evaluate-text takes an uppercase scheme", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
+  let spawned = false;
+  globalThis.__onSpawn = () => { spawned = true; };
+  await events(await run({ input: "HTTPS://jobs.example.test/1", jdText: "Role." }));
+  assert.ok(spawned, "the evaluate-text run reached the CLI");
 });
 
 test("a cliId that is not a non-empty string is refused before the CLI is resolved", async (t) => {
   fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
   for (const kind of ["evaluate", "pdf"]) {
-    for (const cliId of [undefined, null, "", "  ", 1, {}, true]) {
-      assert.equal(await refusal(await run({ kind, input: kind === "pdf" ? "7" : "https://jobs.example.test/1", cliId, jdText: undefined })), "cliId must be a non-empty string.", `${kind} cliId=${JSON.stringify(cliId)}`);
+    for (const cliId of [undefined, null, "", "  ", " claude ", "claude\n", 1, {}, true]) {
+      assert.equal(await refusal(await run({ kind, input: kind === "pdf" ? "7" : "https://jobs.example.test/1", cliId, jdText: undefined })), "cliId must be a non-empty string with no padding.", `${kind} cliId=${JSON.stringify(cliId)}`);
     }
   }
 });

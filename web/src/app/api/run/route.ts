@@ -41,10 +41,14 @@ const JD_TEXT_MAX_CHARS = 16 * 1024;
 // the CLI rules, so a refused CLI is named first on any platform.
 const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
 // The input each evaluate kind takes. The inbox also queues local:jds/ rows for
-// evaluate, so that kind keeps them.
+// evaluate, so that kind keeps them, and scan mode names those files with the
+// company unslugged, so a local: path may hold an interior space.
 const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
-  evaluate: { pattern: /^(?:https?:\/\/|local:)\S+$/i, shape: "a bare http(s) URL or a local: path" },
-  "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL" },
+  evaluate: {
+    pattern: /^(?:https?:\/\/\S+|local:\S(?:[^\t\r\n]*\S)?)$/i,
+    shape: "a bare http(s) URL with no whitespace in it, or a local: path with no padding, tab or line break",
+  },
+  "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL with no whitespace in it" },
 };
 
 export async function POST(req: Request) {
@@ -72,10 +76,11 @@ export async function POST(req: Request) {
   // the tracker row of a padded or schemeless input with no URL.
   const posting = POSTING_INPUT[kind];
   if (posting && !posting.pattern.test(input)) {
-    return Response.json({ error: `The posting URL must be ${posting.shape}, with no whitespace in it.` }, { status: 400 });
+    return Response.json({ error: `The posting URL must be ${posting.shape}.` }, { status: 400 });
   }
-  if (typeof requestedCliId !== "string" || !requestedCliId.trim()) {
-    return Response.json({ error: "cliId must be a non-empty string." }, { status: 400 });
+  // A padded id would miss the registry and reach the substitution fallback.
+  if (typeof requestedCliId !== "string" || !requestedCliId || requestedCliId !== requestedCliId.trim()) {
+    return Response.json({ error: "cliId must be a non-empty string with no padding." }, { status: 400 });
   }
   // evaluate-text is the unattended kind: its Read denies are Claude flags, so
   // no other CLI may run it, and the posting text replaces the fetch.
@@ -387,10 +392,11 @@ export async function POST(req: Request) {
       // generate-pdf.mjs mid-render. 600s agent / ~200s render is ample —
       // a Chromium PDF render normally takes low tens of seconds even with a
       // cold Playwright launch.
-      // pdf keeps 600s because its render+mark phase runs AFTER this timer; a
-      // plain evaluate has no such phase, so it can use almost the whole 800s
-      // budget. 285s was cutting real evaluations off mid-run — reading the mode
-      // and profile, fetching the posting, ~25 Bash calls and a few web searches
+      // pdf keeps 600s because its render+mark phase runs AFTER this timer; the
+      // evaluate kinds keep 740s for report-persist, and the other kinds, with no
+      // such phase, use almost the whole 800s budget. 285s was cutting real
+      // evaluations off mid-run — reading the mode and profile, fetching the
+      // posting, ~25 Bash calls and a few web searches
       // routinely run past it — and the SIGTERM then surfaced as "didn't save a
       // report" (see the close handler), blaming the CLI for a limit we imposed
       // (#3124). 780s leaves ~20s under maxDuration for a graceful shutdown.

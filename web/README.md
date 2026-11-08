@@ -82,13 +82,20 @@ research)`.
 The route answers 400, before it starts any CLI, for:
 
 - a kind it does not know.
-- a field sent to a kind that does not own it: `jdText` outside
-  `evaluate-text`, `brief` outside `cover`, and `evaluationSections` outside
-  `evaluate` and `evaluate-text`.
-- an `input` or a `cliId` that is not a non-empty string.
+- a field sent to a kind that does not own it, an explicit `null` included:
+  `jdText` outside `evaluate-text`, `brief` outside `cover`, and
+  `evaluationSections` outside `evaluate` and `evaluate-text`.
+- an `input` or a `cliId` that is not a string, or is blank or
+  whitespace-only.
 - an `evaluate` or `evaluate-text` input that is not a bare `http(s)://` URL
-  with no whitespace anywhere in it. `evaluate` also takes a `local:` inbox
-  row.
+  with no whitespace in it. `evaluate` also takes a `local:` inbox row, which
+  may hold an interior space but no padding, tab or line break.
+- a `cliId` with leading or trailing whitespace.
+- a built prompt that contains a NUL byte, which argv cannot carry.
+- for `evaluate-text`: a `cliId` other than `claude`; a `jdText` that is
+  missing, blank or over 16,384 characters; a data root the server cannot
+  resolve; and a data root with characters outside letters, digits, `.`, `_`,
+  `-` and `/`.
 
 ## Safety
 

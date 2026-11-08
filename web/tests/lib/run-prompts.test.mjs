@@ -220,6 +220,7 @@ test("buildPrompt: evaluate-text never asks for a fetch and labels the report as
     assert.match(prompt, /The posting text is below; do not fetch anything\./);
     assert.match(prompt, /"Verification: unconfirmed \(auto mode, no web research\)"/);
     assert.ok(!/batch mode/.test(prompt));
+    assert.match(prompt, /If the text below is not this job's description \(a login or consent wall, a page shell, an error or expired notice, a bot challenge, a different job\), stop before Block A and emit the evaluation-gate status with reason `needs_confirmation`, saying the job text is unavailable; do not emit a report envelope\./, `the text variant stops on a non-JD (focused=${Boolean(evaluationInstructions)})`);
   }
 });
 
@@ -245,6 +246,7 @@ test("buildPrompt: evaluate keeps its fetch instruction", () => {
 
   assert.match(prompt, /Use WebFetch to read the posting/);
   assert.ok(!prompt.includes("<<posting-text>>"));
+  assert.ok(!prompt.includes("If the text below is not this job's description"), "the URL path keeps its own fetch-failure stop");
 });
 
 test("buildPrompt: postedAt does not change the evaluate prompt", () => {

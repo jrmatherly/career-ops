@@ -90,10 +90,12 @@ export function scopeFrom(allowed) {
 /**
  * One scope per capability record, so Claude honours BOTH axes the policy states.
  *
- * `persisting` is the writing record (fix-portal runs verify-portals.mjs). pdf
- * and evaluate emit their artifact inline and the backend persists it, so they
- * take a read-only scope. evaluate still fetches the posting. A posting is
- * untrusted input, and Write or Bash on that run could be aimed at cv.md.
+ * `persisting` is the writing record (fix-portal runs verify-portals.mjs). pdf,
+ * evaluate and evaluate-text emit their artifact inline and the backend persists
+ * it, so they take a read-only scope: pdf and evaluate-text take localReadOnly,
+ * and evaluate and research take networkReadOnly. evaluate still fetches the
+ * posting. A posting is untrusted input, and Write or Bash on that run could be
+ * aimed at cv.md.
  *
  * The split between the two read-only scopes is the network axis. It used to be
  * absent: a single `readOnly` scope granted WebFetch/WebSearch to every
