@@ -100,7 +100,13 @@ function read(rel: string): string | null {
   }
 }
 
-export type InboxJob = { url: string; company: string; role: string; location?: string; compensation?: string; done: boolean; postedAt?: string };
+export type InboxJob = {
+  url: string; company: string; role: string; location?: string; compensation?: string; done: boolean; postedAt?: string;
+  /** From the row's `rank: N/5 — reason` label (rank-pipeline.mjs): a cheap prior, not an evaluation score. */
+  rank?: number; rankReason?: string;
+  /** The scan-history first_seen date, set by pipelineSummary; the Inbox groups a scan date's rows by it. */
+  addedAt?: string;
+};
 
 /** Parse data/pipeline.md. The row grammar and its labeled-segment handling
  *  live in pipeline-table.mjs — see there for the column rules (#1015, #1017). */
@@ -124,10 +130,18 @@ export function readInbox(applications: Pick<Application, "url">[] = readApplica
  * a malformed row is skipped, never thrown (missing ≠ corrupt).
  */
 export function readScanDates(): Map<string, string> {
+  // Copy so a caller that mutates the Map cannot poison the cache.
+  return new Map(readScanIndex()?.byUrl);
+}
+
+// One parse of scan-history.tsv serves readScanDates and pipelineSummary, so the page reads the file once.
+function readScanIndex() {
   const file = path.join(careerOpsRoot(), "data", "scan-history.tsv");
-  // Missing file: null, so an empty map. Other read errors throw.
-  const dates = cachedFileValue(file, "scan-dates", (tsv) => {
-    const parsed = new Map<string, string>();
+  // Missing file: null. Other read errors throw.
+  return cachedFileValue(file, "scan-index", (tsv) => {
+    const byUrl = new Map<string, string>();
+    const addedByUrl = new Map<string, string>();
+    const added = new Set<string>();
     const lines = splitLines(tsv);
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -135,13 +149,18 @@ export function readScanDates(): Map<string, string> {
       const tab = line.indexOf("\t");
       if (tab < 1) continue;
       const url = line.slice(0, tab);
-      const firstSeen = line.slice(tab + 1).split("\t")[0]?.trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(firstSeen) && !parsed.has(url)) parsed.set(url, firstSeen);
+      const cols = line.slice(tab + 1).split("\t");
+      const firstSeen = cols[0]?.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(firstSeen)) continue;
+      if (!byUrl.has(url)) byUrl.set(url, firstSeen);
+      // Status is the sixth column; blank reads as `added` (scan.mjs). A filtered row (skipped_title and the like) added nothing.
+      if ((cols[4]?.trim() || "added") !== "added") continue;
+      added.add(firstSeen);
+      // Latest wins: a recheck re-adds a processed URL (scan.mjs recheck_after_days), and the pending line is from that add.
+      if ((addedByUrl.get(url) ?? "") < firstSeen) addedByUrl.set(url, firstSeen);
     }
-    return parsed;
+    return { byUrl, addedByUrl, addedDates: [...added] };
   });
-  // Copy so a caller that mutates the Map cannot poison the cache.
-  return dates ? new Map(dates) : new Map();
 }
 
 /** Raw scan-history lines, reused until the file's mtime or size changes.
@@ -389,19 +408,27 @@ export type PipelineSummary = {
   rootExists: boolean;
   inbox: InboxJob[];
   applications: Application[];
+  /** The dates on which a scan added roles: the Inbox tells a date whose roles were all skipped or tracked from one that added none. */
+  scanDates: string[];
 };
 
 export function pipelineSummary(): PipelineSummary {
   const root = careerOpsRoot();
-  const scanDates = readScanDates();
+  const scan = readScanIndex();
   const applications = readApplications();
   return {
     root,
     rootExists: fs.existsSync(root),
     // join the freshness date (first_seen) onto each raw posting — the inbox's
     // triage view orders/faceted-filters on it entirely client-side.
-    inbox: readInbox(applications).map((j) => ({ ...j, postedAt: j.postedAt ?? scanDates.get(j.url) })),
+    inbox: readInbox(applications).map((j) => ({
+      ...j,
+      postedAt: j.postedAt ?? scan?.byUrl.get(j.url),
+      // the latest added row, so a URL filtered or added on one date and added again later carries the later date
+      addedAt: scan?.addedByUrl.get(j.url),
+    })),
     applications,
+    scanDates: [...(scan?.addedDates ?? [])],
   };
 }
 
