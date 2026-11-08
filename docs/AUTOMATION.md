@@ -80,7 +80,8 @@ macOS also runs cron, but launchd below survives sleep better.
 #### macOS — launchd
 
 Save as `~/Library/LaunchAgents/io.career-ops.scan.plist`, then
-`launchctl load ~/Library/LaunchAgents/io.career-ops.scan.plist`:
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.career-ops.scan.plist`.
+Unload it with `launchctl bootout gui/$(id -u)/io.career-ops.scan`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -146,6 +147,10 @@ sh web/scripts/install-scan-schedule.sh    # installs a LaunchAgent
 sh web/scripts/uninstall-scan-schedule.sh  # removes it
 ```
 
+The uninstall removes only the agent the installer wrote,
+`io.career-ops.scheduled-scan`. Unload a recipe agent from section A or C by
+hand with `launchctl bootout gui/$(id -u)/<label>`.
+
 The agent needs a logged-in GUI session.
 
 #### Windows — Task Scheduler
@@ -156,6 +161,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/uninstall-sc
 ```
 
 The task runs in the current user's interactive session, so you must be logged in.
+
+When a CronJob or another external scheduler fires the tick, set
+`CAREER_OPS_SCHEDULER=external`. The details are in `docs/DEPLOYMENT.md`.
 
 #### Last OS check
 
@@ -282,7 +290,8 @@ reviewing it first, headless or not.
 ### macOS — launchd
 
 Save as `~/Library/LaunchAgents/io.career-ops.followup.plist`, then
-`launchctl load ~/Library/LaunchAgents/io.career-ops.followup.plist`:
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.career-ops.followup.plist`.
+Unload it with `launchctl bootout gui/$(id -u)/io.career-ops.followup`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>

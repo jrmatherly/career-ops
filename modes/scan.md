@@ -229,7 +229,7 @@ Levels are additive — they are executed in order, and results are merged and d
 6a. **Filter by Title** using `title_filter` from `portals.yml`:
    - At least 1 keyword from `positive` must appear in the title (case-insensitive).
    - 0 keywords from `negative` must appear.
-   - `seniority_boost` keywords give priority but are not mandatory.
+   - `seniority_boost` keywords give priority but are not mandatory (this manual pass is their only reader, since `scan.mjs` and `scan-ats-full.mjs` ignore them).
 
 6b. **Filter by Location (Optional)** using `location_filter` from `portals.yml`:
    - If the `location_filter` block is absent, all locations pass (default behavior).

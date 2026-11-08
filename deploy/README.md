@@ -20,15 +20,20 @@ it for `linux/amd64` on every push to `main`, with provenance and an SBOM.
   reaps them. A pod stop ends the container as
   soon as `web/server.mjs` dies, so `next` and any run in flight get no
   graceful shutdown today.
-- No Go toolchain, no TeX. The dashboard TUI and the LaTeX CV path are not
+- No Go toolchain, no TeX, no `gh`. The dashboard TUI and the LaTeX CV path are not
   in this image. Neither is the apply flow: it wants a headed Google Chrome,
   or failing that the Chromium revision of the web's own `playwright-core`,
   and the image has no Chrome, no display and not that revision.
-- No `.claude/settings.json` or hooks: they are user-layer entries that
-  `.dockerignore` excludes, so `claude -p` runs in the pod with no session
-  hooks.
+- No `.claude/settings.json` or hooks: `.dockerignore` excludes them. A
+  dashboard `claude -p` run has the data root as cwd, so nothing under
+  `/app/.claude/` or `/app/CLAUDE.md` is loaded by it either way. The modes
+  and templates reach the worker by path.
 
 The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
+
+A merge to `main`, or a digest bump from the cluster manifests' Renovate, replaces the pod. Anything
+running at that moment (an evaluate, a PDF render, a scan) is lost. A claimed
+scan whose claim is older than 30 seconds is requeued and rerun on the next tick.
 
 ## Runtime contract
 
@@ -40,16 +45,23 @@ The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this, `ANTHROPIC_API_KEY`, or the proxy pair below. Pass it as a secret, never in the image. |
 | `ANTHROPIC_BASE_URL` | the gateway URL, such as `http://proxy.example:8317` | The proxy pair: this URL plus `ANTHROPIC_AUTH_TOKEN` (or `ANTHROPIC_API_KEY`). Routes every `claude` request through the gateway. `node doctor.mjs` reports the gateway host as the billing source, and warns when the URL is set without a token or key, or alongside `CLAUDE_CODE_OAUTH_TOKEN`, which the gateway token outranks. |
 | `ANTHROPIC_AUTH_TOKEN` | the gateway's client key | The proxy pair's credential, with `ANTHROPIC_BASE_URL`. Pass it as a secret, never in the image. |
+| `CAREER_OPS_SCHEDULER` | `external` | The Scheduled scans page reports the external tick instead of shelling out to `crontab -l` and saying "Task not installed". |
+| `CAREER_OPS_SCHEDULER_DESCRIPTION` | free text | Shown on the Scheduled scans page when the scheduler is external. |
+| `PUBLISH_URL` | the publish service | Environment, or `{root}/.env`, environment wins. |
+| `PUBLISH_API_KEY` | from the publish service | Environment, or `{root}/.env`, environment wins. |
+| Root filesystem | read-only | Writable paths: `/data`, `/home/app`, `/tmp`, `/dev/shm`, `/app/web/.next/cache`. |
 | `/home/app` | writable | The CLI writes `~/.claude`. |
 | `/tmp` | emptyDir | The PDF server socket and Playwright scratch. |
 | `/dev/shm` | emptyDir, `medium: Memory` | Chromium. |
 | Replicas | 1, `strategy: Recreate` | `lib/dir-lock.mjs` judges lock staleness by pid, so two pods would see each other's locks as stale. |
 | Port | 3000 | |
 
-Scans run inside this pod. A CronJob that POSTs `/api/scheduler` with
-`Host: career-ops-web` triggers the existing runner. Kubelet probes send
-`Host: <pod-ip>`, which the guard refuses, so set a `Host: career-ops-web`
-header on the probe.
+Scans run inside this pod. A CronJob that POSTs `/api/scheduler` triggers the
+existing runner. The request guard admits `Host: localhost` and any name in
+`CAREER_OPS_WEB_ALLOWED_HOSTS`, and refuses the `Host: <pod-ip>` kubelet probes
+send by default, so set one of those on the CronJob and on the probe.
+`GET /api/healthz` is the probe endpoint. The full cluster path is
+`docs/DEPLOYMENT.md`.
 
 ## Build and smoke test
 

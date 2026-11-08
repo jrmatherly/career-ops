@@ -156,3 +156,16 @@ node coverage-check.mjs <url> --company "<Company>" --title "<Title>" [--locatio
 
 Which provider covers which board — and what each one needs in `portals.yml` — is
 in [Supported job boards](SUPPORTED_JOB_BOARDS.md).
+
+## 5. Prune what has gone quiet
+
+```bash
+node stats.mjs --prune --summary
+```
+
+Lists the enabled boards that have returned nothing for `portal_prune_quiet_days`
+(default 30) and the boards failing `portal_health_threshold` scans in a row
+(default 3). Both keys live in `portals.yml`. It recommends, never edits.
+
+- `data/portal-health.tsv` is appended by `scan.mjs` on each run, one timestamp, company and status row per board. `stats.mjs --prune` derives each board's failure streak from it.
+- `data/dead-boards.tsv` is written by `scan-ats-full.mjs`, one row per board with its 404 miss count and last check.
