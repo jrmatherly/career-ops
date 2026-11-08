@@ -381,6 +381,27 @@ test("a scalar title_filter in the file leaves no stray keys in the overlay", ()
   });
 });
 
+test("a title section written as a sequence leaves no index keys in the overlay", () => {
+  withPortals("career-ops-scheduled-sequence-section-", "title_filter:\n  - engineer\ntitle_filter_full:\n  - architect\n", (temp) => {
+    const { result, overlay } = runWithOverlay(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filters: { positive: ["designer"] } });
+    assert.equal(result.state, "success");
+    assert.deepEqual(overlay.title_filter, { positive: ["designer"], negative: [] });
+    assert.deepEqual(overlay.title_filter_full, { positive: ["designer"] });
+  });
+});
+
+test("file mode refuses a falsy title_filter_full, which the full engine reads as no title limit", () => {
+  withPortals("career-ops-scheduled-file-full-false-", "title_filter:\n  positive: [engineer]\ntitle_filter_full: false\n", (temp) => {
+    let spawned = false;
+    const result = executeJob(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filtersFrom: "file", filters: {} }, {
+      spawnFn: () => { spawned = true; throw new Error("scanner must not run"); },
+    });
+    assert.equal(spawned, false);
+    assert.equal(result.attempt, 1);
+    assert.equal(result.message, "Scheduled scans require title keywords in portals.yml title_filter_full.positive when a job uses the file's filters");
+  });
+});
+
 test("a scalar title list is no title limit to the scanner, so both modes refuse it", () => {
   withPortals("career-ops-scheduled-scalar-", "title_filter:\n  positive: engineer\n", (temp) => {
     for (const [filtersFrom, message] of [
