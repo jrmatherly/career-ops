@@ -141,3 +141,42 @@ test("a CRLF bare URL row still parses", () => {
   assert.ok(!jobs[0].url.includes("\r"));
   assert.equal(jobs[0].company, "");
 });
+
+test("parseInbox returns rank and reason", () => {
+  const jobs = parseInbox(`- [ ] ${URL} | Acme | Engineer | Remote | rank: 4.2/5 — Strong match on platform work / infra`);
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].location, "Remote");
+  assert.equal(jobs[0].rank, 4.2);
+  assert.equal(jobs[0].rankReason, "Strong match on platform work / infra");
+});
+
+test("a row without rank parses as before", () => {
+  const jobs = parseInbox(`- [ ] ${URL} | Acme | Engineer | posted: 2026-11-01`);
+  assert.deepEqual(jobs[0], {
+    done: false,
+    url: URL,
+    company: "Acme",
+    role: "Engineer",
+    location: undefined,
+    compensation: undefined,
+    postedAt: "2026-11-01",
+  });
+});
+
+test("a rank on a short row stays a rank, not the role or company", () => {
+  const jobs = parseInbox([
+    `- [ ] ${URL} | Acme | rank: 4.0/5 — x`,
+    `- [ ] ${URL}/2 | rank: 2.5/5 — y`,
+  ].join("\n"));
+  assert.deepEqual(jobs.map((j) => [j.company, j.role, j.rank, j.rankReason]), [["Acme", "", 4, "x"], ["", "", 2.5, "y"]]);
+});
+
+test("a rank label with no reason, a bad number or above 5 sets no rank", () => {
+  const jobs = parseInbox([
+    `- [ ] ${URL} | Acme | Engineer | rank: 4.2/5`,
+    `- [ ] ${URL}/2 | Acme | Engineer | rank: high/5 — vibes`,
+    `- [ ] ${URL}/3 | Acme | Engineer | rank: 9/5 — hand edit`,
+  ].join("\n"));
+  assert.equal(jobs.length, 3);
+  for (const job of jobs) assert.ok(!("rank" in job) && !("rankReason" in job));
+});

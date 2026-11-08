@@ -100,7 +100,13 @@ function read(rel: string): string | null {
   }
 }
 
-export type InboxJob = { url: string; company: string; role: string; location?: string; compensation?: string; done: boolean; postedAt?: string };
+export type InboxJob = {
+  url: string; company: string; role: string; location?: string; compensation?: string; done: boolean; postedAt?: string;
+  /** From the row's `rank: N/5 — reason` label (rank-pipeline.mjs): a cheap prior, not an evaluation score. */
+  rank?: number; rankReason?: string;
+  /** The scan-history first_seen date, set by pipelineSummary; the Inbox groups a scan run's rows by it. */
+  addedAt?: string;
+};
 
 /** Parse data/pipeline.md. The row grammar and its labeled-segment handling
  *  live in pipeline-table.mjs — see there for the column rules (#1015, #1017). */
@@ -400,7 +406,7 @@ export function pipelineSummary(): PipelineSummary {
     rootExists: fs.existsSync(root),
     // join the freshness date (first_seen) onto each raw posting — the inbox's
     // triage view orders/faceted-filters on it entirely client-side.
-    inbox: readInbox(applications).map((j) => ({ ...j, postedAt: j.postedAt ?? scanDates.get(j.url) })),
+    inbox: readInbox(applications).map((j) => ({ ...j, postedAt: j.postedAt ?? scanDates.get(j.url), addedAt: scanDates.get(j.url) })),
     applications,
   };
 }

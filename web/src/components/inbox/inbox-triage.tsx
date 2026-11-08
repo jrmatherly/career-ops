@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Undo2 } from "lucide-react";
 import { evaluationGateForJob } from "@/lib/job-gate.mjs";
 import { useJobs } from "@/components/jobs/job-store";
@@ -11,6 +11,7 @@ import { ATS_SOURCES } from "@/lib/explore";
 import { daysSince, seniorityFromTitle, sourceFromUrl, SENIORITY_ORDER, type Seniority } from "@/lib/inbox";
 import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
+import { addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips } from "./facet-chips";
 import { TriageRow, type RowScore } from "./triage-row";
 import { ShortlistTray, type ShortItem } from "./shortlist-tray";
@@ -28,7 +29,7 @@ type UndoNotice = { label: string; fn: () => Promise<void>; busy?: boolean; erro
 // The inbox as a TRIAGE surface: Abundance → Triage → Shortlist → Opt-in Score.
 // Default is a small fresh batch (never the full wall); free facets + Save/Skip narrow
 // it; only "Score shortlist" spends tokens. 🔴 The shell is agnostic to what makes a
-// role relevant — order is freshness with a single documented plug point.
+// role relevant — order goes through a single documented plug point.
 export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
   const router = useRouter();
   const { jobs, startJob } = useJobs();
@@ -45,6 +46,10 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
   const [locQ, setLocQ] = useState("");
   const [kw, setKw] = useState("");
   const [showAll, setShowAll] = useState(false);
+  // ?added=YYYY-MM-DD opens a scan run's rows. The chip never writes the URL back:
+  // Next treats history.replaceState as a navigation, which can abort in-flight runs.
+  const params = useSearchParams();
+  const [added, setAdded] = useState<string | null>(() => addedParam(params.get("added")));
 
   // persisted triage state + ephemeral selection/undo
   const [shortlist, setShortlist] = useState<ShortItem[]>([]);
@@ -151,10 +156,14 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
     return SENIORITY_ORDER.filter((s) => set.has(s));
   }, [enriched, hidden]);
 
+  const latestAdded = useMemo(() => latestAddedDates(enriched.map((e) => e.job), hidden), [enriched, hidden]);
+  const availAdded = added && !latestAdded.includes(added) ? [added, ...latestAdded] : latestAdded;
+
   const filtered = useMemo(
     () =>
       enriched.filter((e) => {
         if (hidden.includes(e.job.url)) return false;
+        if (added && e.job.addedAt !== added) return false;
         if (within != null && (e.age == null || e.age > within)) return false;
         if (sources.size && (!e.source || !sources.has(e.source))) return false;
         if (seniorities.size && (!e.seniority || !seniorities.has(e.seniority))) return false;
@@ -162,15 +171,14 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
         if (kw.trim() && !`${e.job.company} ${e.job.role}`.toLowerCase().includes(kw.trim().toLowerCase())) return false;
         return true;
       }),
-    [enriched, hidden, within, sources, seniorities, locQ, kw],
+    [enriched, hidden, added, within, sources, seniorities, locQ, kw],
   );
 
-  // 🔴 SINGLE ORDER PLUG POINT — freshness only (newest first_seen first; unknown last).
-  // A smarter ranker replaces ONLY this comparator; facets/triage/shortlist/score never
-  // touch relevance. This is the whole firewall in one line.
-  const ordered = useMemo(() => [...filtered].sort((a, b) => (a.age ?? Infinity) - (b.age ?? Infinity)), [filtered]);
+  // 🔴 SINGLE ORDER PLUG POINT — compareInboxJobs (ranked rows first, then freshness).
+  // Facets/triage/shortlist/score never touch relevance. This is the whole firewall in one line.
+  const ordered = useMemo(() => [...filtered].sort(compareInboxJobs), [filtered]);
 
-  const anyFacet = within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
+  const anyFacet = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
   const capped = !showAll && !anyFacet;
   const visible = capped ? ordered.slice(0, BATCH) : ordered;
   const hiddenCount = hidden.length;
@@ -392,13 +400,31 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
         resultCount={filtered.length}
         totalCount={enriched.length - hiddenCount}
         anyActive={anyFacet}
-        onClear={() => { setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); }}
+        onClear={() => { setAdded(null); setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); }}
       />
+      {availAdded.length > 0 && (
+        <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Added by scan date">
+          {availAdded.map((date) => (
+            <button
+              key={date}
+              type="button"
+              onClick={() => setAdded(added === date ? null : date)}
+              aria-pressed={added === date}
+              className={cn(
+                "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors max-sm:min-h-[44px]",
+                added === date ? "border-brand/40 bg-brand-soft text-brand-text" : "border-border text-muted hover:text-foreground",
+              )}
+            >
+              Added {date}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* batch header: fresh slice by default, or the full filtered set */}
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground">
-          {capped ? "Fresh — worth a look" : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
+          {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
         </p>
         {hiddenCount > 0 && (
           <button type="button" onClick={() => void restoreHidden()} disabled={restoring} aria-busy={restoring} className="text-xs text-faint transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-[44px]">
