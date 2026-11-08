@@ -217,6 +217,17 @@ function withPortals(prefix, portalsYml, fn) {
   }
 }
 
+function runWithOverlay(temp, job) {
+  let overlay;
+  const result = executeJob(temp, job, {
+    spawnFn: (_node, _args, options) => {
+      overlay = yaml.load(fs.readFileSync(options.env.CAREER_OPS_PORTALS, "utf8"));
+      return { status: 0, stdout: JSON.stringify({ postingsKept: 0 }), stderr: "" };
+    },
+  });
+  return { result, overlay };
+}
+
 const FULL_PORTALS = [
   "title_filter:",
   "  positive: [engineer]",
@@ -340,6 +351,36 @@ test("an empty or scalar portals.yml is named in the failure before the scanner 
   }
 });
 
+test("a portals.yml that is a sequence is refused in both modes before the scanner starts", () => {
+  withPortals("career-ops-scheduled-sequence-", "- engineer\n- architect\n", (temp) => {
+    for (const filtersFrom of ["file", "custom"]) {
+      let spawned = false;
+      const result = executeJob(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filtersFrom, filters: { positive: ["engineer"] } }, {
+        spawnFn: () => { spawned = true; throw new Error("scanner must not run"); },
+      });
+      assert.equal(spawned, false, filtersFrom);
+      assert.equal(result.attempt, 1);
+      assert.equal(result.message, `${path.join(temp, "portals.yml")}: must contain a mapping`);
+    }
+  });
+});
+
+test("a job positive replaces a title_filter_full the file sets to a falsy scalar", () => {
+  withPortals("career-ops-scheduled-full-false-", "title_filter:\n  positive: [engineer]\ntitle_filter_full: false\n", (temp) => {
+    const { result, overlay } = runWithOverlay(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "full", filters: { positive: ["designer"] } });
+    assert.equal(result.state, "success");
+    assert.deepEqual(overlay.title_filter_full.positive, ["designer"]);
+  });
+});
+
+test("a scalar title_filter in the file leaves no stray keys in the overlay", () => {
+  withPortals("career-ops-scheduled-scalar-section-", "title_filter: engineer\n", (temp) => {
+    const { result, overlay } = runWithOverlay(temp, { id: "33333333-3333-4333-8333-333333333333", engine: "portals", filters: { positive: ["designer"] } });
+    assert.equal(result.state, "success");
+    assert.deepEqual(overlay.title_filter, { positive: ["designer"], negative: [] });
+  });
+});
+
 test("a scalar title list is no title limit to the scanner, so both modes refuse it", () => {
   withPortals("career-ops-scheduled-scalar-", "title_filter:\n  positive: engineer\n", (temp) => {
     for (const [filtersFrom, message] of [
@@ -393,6 +434,10 @@ test("the title guard checks the list the full engine reads", () => {
   assert.equal(run(fullEmpty, { engine: "full", filters: { positive: ["designer"] } }).spawned, true);
   const fullNull = "title_filter:\n  positive: [engineer]\ntitle_filter_full: null\n";
   assert.equal(run(fullNull, { engine: "full", filtersFrom: "file" }).spawned, true, "a null title_filter_full falls back to title_filter");
+  const nullFallsBack = run("title_filter:\n  positive: []\ntitle_filter_full: null\n", { engine: "full", filtersFrom: "file" });
+  assert.equal(nullFallsBack.spawned, false, "a null title_filter_full is not a title limit of its own");
+  assert.equal(nullFallsBack.result.attempt, 1);
+  assert.equal(nullFallsBack.result.message, "Scheduled scans require title keywords in portals.yml title_filter.positive when a job uses the file's filters");
   const noEngine = run(fullEmpty, { engine: undefined, filtersFrom: "file" });
   assert.equal(noEngine.spawned, false, "a job with no engine runs the full engine");
   assert.match(noEngine.result.message, /title_filter_full\.positive/);

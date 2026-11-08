@@ -18,6 +18,7 @@ import { getCareerOpsRoot } from "../../path-resolver.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { scanFailureMessage } from "../src/lib/scheduled-scan-error.mjs";
 import { cleanChips } from "../src/lib/clean-chips.mjs";
+import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -169,6 +170,9 @@ function emptyTitleKey(config, engine) {
   return hasTitleKeywords(config[section]?.positive) ? null : `${section}.positive`;
 }
 
+// Spreading a string yields index keys and yaml.dump drops properties set on an array, so such a section restarts from {}.
+const mappingOrEmpty = (value) => (isMapping(value) ? value : {});
+
 function readPortals(file) {
   const text = fs.readFileSync(file, "utf8");
   let base;
@@ -177,7 +181,7 @@ function readPortals(file) {
   } catch (error) {
     throw new Error(`${file}: ${error.message}`);
   }
-  if (!base || typeof base !== "object") throw new Error(`${file}: must contain a mapping`);
+  if (!isMapping(base)) throw new Error(`${file}: must contain a mapping`);
   return base;
 }
 
@@ -186,9 +190,10 @@ function jobPortals(job, base) {
   const filters = job.filters || {};
   for (const [jobKey, section, fileKey] of FILTER_LISTS) {
     const own = cleanChips(filters[jobKey]);
-    base[section] = { ...(base[section] || {}), [fileKey]: own.length ? own : base[section]?.[fileKey] ?? [] };
-    if (section === "title_filter" && own.length && base.title_filter_full) {
-      base.title_filter_full = { ...base.title_filter_full, [fileKey]: own };
+    const current = mappingOrEmpty(base[section]);
+    base[section] = { ...current, [fileKey]: own.length ? own : current[fileKey] ?? [] };
+    if (section === "title_filter" && own.length && base.title_filter_full != null) {
+      base.title_filter_full = { ...mappingOrEmpty(base.title_filter_full), [fileKey]: own };
     }
   }
   return base;
