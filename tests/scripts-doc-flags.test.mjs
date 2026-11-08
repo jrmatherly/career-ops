@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pass, fail, ROOT, NODE } from './helpers.mjs';
 
-// Each handles --help before any side effect. build-dashboard.mjs (runs go build on any
-// argv) and cv-templates.mjs (no --help branch) are deliberately absent.
+// Each handles --help before any side effect and exits 0. build-dashboard.mjs (runs go build
+// on any argv) and cv-templates.mjs (prints its usage only as the unknown-command error path,
+// with a non-zero exit) are deliberately absent.
 const SCRIPTS = ['application-artifacts.mjs', 'clean-markers.mjs', 'eval-golden.mjs', 'gemini-eval.mjs', 'hired-wall-build.mjs', 'learn.mjs', 'linkedin-join.mjs', 'match-star.mjs', 'ollama-eval.mjs', 'openai-eval.mjs', 'openrouter-runner.mjs', 'session-activity.mjs', 'sponsor-check.mjs', 'story-provenance-check.mjs'];
 const doc = readFileSync(join(ROOT, 'docs', 'SCRIPTS.md'), 'utf8');
 const cwd = mkdtempSync(join(tmpdir(), 'co-scripts-doc-'));
@@ -25,7 +26,11 @@ const section = (name) => {
 for (const script of SCRIPTS) {
   let out = '';
   try { out = execFileSync(NODE, [join(ROOT, script), '--help'], { cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CAREER_OPS_ROOT: noRoot } }); }
-  catch (err) { out = `${err.stdout ?? ''}${err.stderr ?? ''}`; }
+  catch (err) {
+    // A crash or a hang that happens to print flag names must not read as documented.
+    fail(`${script} --help exited ${err.status ?? err.signal}: ${String(err.stderr ?? '').split('\n')[0]}`);
+    continue;
+  }
   const flags = [...new Set([...out.matchAll(/(?<![\w-])--[a-z][a-z0-9-]+/g)].map((m) => m[0]))];
   const text = section(script);
   const missing = flags.filter((flag) => !text.includes(flag));

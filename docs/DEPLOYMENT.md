@@ -35,7 +35,7 @@ These are the variables the pod needs beyond the table in `deploy/README.md`.
 | `CAREER_OPS_SCHEDULED_JOBS_PATH` | Moves the scheduled-jobs store off its default `data/scheduled-jobs.json` under the data root. Leave it unset unless the store must live elsewhere. |
 | `PUBLISH_URL` | The publish service the Shares page and `publish/share.mjs` call. |
 | `PUBLISH_API_KEY` | The key the publish service expects. `publish/share.mjs` reads both `PUBLISH_*` values from the environment first and from `{root}/.env` second. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | The Claude CLI credential, passed as a secret. Renew it by running `claude setup-token` again and replacing the secret. The token lifetime is Anthropic's, as stated in the deploy decision trail, and was not measured here. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | The Claude CLI credential, passed as a secret. Renew it by running `claude setup-token` again and replacing the secret. The token's lifetime is set by Anthropic and is not measured here. |
 
 The pod runs with `readOnlyRootFilesystem`. The writable paths are `/data`,
 `/home/app`, `/tmp`, `/dev/shm` and `/app/web/.next/cache`, each a volume or
@@ -44,10 +44,10 @@ smoke stack.
 
 ## What the pod reads from .env
 
-The Next process reads `{root}/.env` for exactly two things. `CAREER_OPS_CLI`
-through `web/src/lib/remembered-cli.mjs`, where a value in the environment wins,
-and `PUBLISH_URL` and `PUBLISH_API_KEY` through `publish/share.mjs`, with the
-same precedence. The image presets `CAREER_OPS_CLI=claude`, so a Mac `.env`
+The Next process itself reads `{root}/.env` for one thing, `CAREER_OPS_CLI`
+through `web/src/lib/remembered-cli.mjs`, where a value in the environment wins.
+The Shares page runs `publish/share.mjs` as a child, and that child reads
+`PUBLISH_URL` and `PUBLISH_API_KEY` with the same precedence. The image presets `CAREER_OPS_CLI=claude`, so a Mac `.env`
 holding only a `CAREER_OPS_CLI` line is inert in the pod.
 
 Script children read the file on their own terms. `scan.mjs` loads all of it
@@ -72,9 +72,9 @@ kinds get `Read,WebFetch,WebSearch,Glob,Grep` (the `networkReadOnly` scope) and
 MCP server. Without `Bash` a worker cannot run `browser-extract.mjs` or
 `fetch-jd.mjs`, so `scan.extractor: cli` does nothing in a dashboard run and JD
 text is WebFetch only. `fix-portal` is the one writing kind and keeps Bash and
-its MCP servers. The coordinator reports that Ashby job pages are JavaScript
-shells WebFetch cannot read. That is stated here as reported, and the findings'
-Open questions ask for one URL to confirm it. `node doctor.mjs` in the pod
+its MCP servers. Ashby job pages render client-side, so WebFetch is expected to
+return the page shell without the JD. This has not been confirmed against a
+live posting from the pod. `node doctor.mjs` in the pod
 always warns that Playwright MCP tools are not detected, for the same reason.
 
 ## Scheduled jobs
@@ -100,10 +100,11 @@ a failed scan shows only in the run history inside `data/scheduled-jobs.json`.
 
 Every push to `main` rebuilds the image. `docker-image.yml` has no path filter
 on push, and a pull request that touches image inputs builds without pushing.
-Renovate moves the image digest on its own schedule. The `Recreate` rollout
+Renovate, configured in the cluster manifests repository, moves the image
+digest on its own schedule. The `Recreate` rollout
 stops the pod, and `web/server.mjs` has no signal handler, so an evaluate, a
-PDF render or a scan in flight is lost. A claimed scan is requeued after 30
-seconds on the next tick.
+PDF render or a scan in flight is lost. A claimed scan whose claim is older
+than 30 seconds is requeued and rerun on the next tick.
 
 ## Behind a gateway
 
@@ -128,8 +129,8 @@ at `data/applications.md` under it. Create the archive with
 `COPYFILE_DISABLE=1 tar` so no AppleDouble `._*` files are added. Extract with
 GNU tar `--no-overwrite-dir` so the extract does not fail setting metadata on
 the mount point itself. Delete any `._*` files already copied. The first
-migration copied 138 of them, recorded in the 03:18Z row of
-`docs/superpowers/research/2026-11-06-reactive-resume-convergence/decisions.tsv`. Run `chmod 644` on `0600` files
+migration copied over a hundred of them (the migration row in
+`docs/superpowers/research/2026-11-06-reactive-resume-convergence/decisions.tsv`). Run `chmod 644` on `0600` files
 before copying. Unload both launchd agents first.
 `web/scripts/uninstall-scan-schedule.sh` removes only
 `io.career-ops.scheduled-scan`, and a recipe agent needs

@@ -294,8 +294,7 @@
 # First health observation is a lower bound, not the date config was added.
 # No configuration is removed automatically; review filters/names before pruning.
 # portal_prune_quiet_days: 30
-# portal_health_threshold: 3   # consecutive failed scans before a board counts as failing (stats.mjs default)
-# Failure suggestions use portal_health_threshold (default 3).
+# portal_health_threshold: 3   # consecutive failed scans before scan.mjs escalates a board and stats.mjs --prune lists it
 
 # -- Posting-age filter (optional) --
 # Opt-in freshness gate. Skips offers whose posting date (postedAt, supplied by
@@ -738,8 +737,8 @@ title_filter:
     - "Customer Care Agent"
     - "Kundenbetreuung"
   # Read only by an agent running modes/scan.md by hand. scan.mjs and
-  # scan-ats-full.mjs ignore it. Use skip_tiers or positive keywords to
-  # filter by seniority.
+  # scan-ats-full.mjs ignore it. Filter by seniority with positive keywords,
+  # or with skip_tiers for scan.mjs.
   seniority_boost:
     - "Senior"
     - "Staff"

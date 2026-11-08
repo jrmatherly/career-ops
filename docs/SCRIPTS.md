@@ -359,7 +359,7 @@ npm run pdf -- --batch=<manifest.json>                  # render every manifest 
 node generate-pdf.mjs --pdf-server                      # long-lived renderer; CAREER_OPS_PDF_SHARED=1 makes other renders use it
 ```
 
-`web/server.mjs` starts `generate-pdf.mjs --pdf-server` once and sets `CAREER_OPS_PDF_SHARED=1`, so dashboard renders share one Chromium instead of launching their own.
+`web/server.mjs` starts `generate-pdf.mjs --pdf-server` once, and the dashboard's render children run with `CAREER_OPS_PDF_SHARED=1` (`web/src/lib/pdf-render.mjs`), so they share one Chromium instead of launching their own.
 
 `--format` outranks `config/profile.yml`, which outranks the A4 default. Over the page budget the render warns with trimming guidance; `--strict-pages` (or `cv.strict_pages`) makes it fail.
 
@@ -2272,9 +2272,7 @@ Returns `200 { "html": "...", "warnings": [...] }`. An invalid payload is `400 {
 
 ## Fork entry points
 
-Two entry points exist only in this fork:
-
 | Command | What it does |
 |---|---|
-| `node web/server.mjs start` | The production web entry the server image runs under `tini`; see `deploy/README.md` |
-| `node publish/share.mjs` | The share CLI that publishes a CV to the publish service and pulls comments back; see `publish/README.md` |
+| `node web/server.mjs start` | The production web entry (upstream's `npm --prefix web start`). The fork's server image runs it under `tini`; see `deploy/README.md` |
+| `node publish/share.mjs` | Fork-only. The share CLI that publishes a CV to the publish service and pulls comments back; see `publish/README.md` |

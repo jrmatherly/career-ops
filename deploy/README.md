@@ -31,9 +31,9 @@ it for `linux/amd64` on every push to `main`, with provenance and an SBOM.
 
 The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
 
-A merge to `main`, or a Renovate digest bump, replaces the pod. Anything
-running at that moment (an evaluate, a PDF render, a scan) is lost, and a
-claimed scan is requeued 30 seconds later on the next tick.
+A merge to `main`, or a digest bump from the cluster manifests' Renovate, replaces the pod. Anything
+running at that moment (an evaluate, a PDF render, a scan) is lost. A claimed
+scan whose claim is older than 30 seconds is requeued and rerun on the next tick.
 
 ## Runtime contract
 
