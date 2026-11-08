@@ -80,11 +80,11 @@ const GATEWAY = 'http://proxy.example:8317';
 const GATEWAY_LINE = /route through a gateway at proxy\.example:8317/;
 const GATEWAY_PASS = /^✓ Billing source\. Requests route through a gateway at proxy\.example:8317, and the gateway's credential/m;
 const GATEWAY_NO_CREDENTIAL = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, but no credential is set/m;
-const GATEWAY_WITH_OAUTH = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set/m;
+const GATEWAY_WITH_OAUTH = /^⚠ Billing source\. Requests route through a gateway at proxy\.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set; Claude Code sends the OAuth token and ignores ANTHROPIC_AUTH_TOKEN, so the gateway gets a credential it cannot honour\./m;
 const NOT_HTTP_URL = /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m;
 
 // [name, env, must match, must not match]
-const BASE_URL_CASES = [
+const BILLING_CASES = [
   ['a gateway base URL with a token passes with the gateway, not per-token billing',
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x' }, GATEWAY_PASS, /bills per token/],
   ['a gateway base URL with an API key passes with the gateway',
@@ -93,6 +93,11 @@ const BASE_URL_CASES = [
     { ANTHROPIC_BASE_URL: GATEWAY }, GATEWAY_NO_CREDENTIAL, /a Claude subscription will be used/],
   ['a whitespace-only auth token beside a gateway counts as no credential',
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: '  ' }, GATEWAY_NO_CREDENTIAL, GATEWAY_PASS],
+  ['a whitespace-only API key beside a gateway counts as no credential',
+    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_API_KEY: '  ' }, GATEWAY_NO_CREDENTIAL, GATEWAY_PASS],
+  // Claude Code 2.1.317 answers on the subscription when ANTHROPIC_API_KEY is only whitespace.
+  ['a whitespace-only API key with no gateway counts as no API key',
+    { ANTHROPIC_API_KEY: '  ' }, /a Claude subscription will be used/, /ANTHROPIC_API_KEY is set/],
   ['a gateway base URL beside CLAUDE_CODE_OAUTH_TOKEN warns about the pair',
     { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x', CLAUDE_CODE_OAUTH_TOKEN: 'x' }, GATEWAY_WITH_OAUTH, GATEWAY_PASS],
   ['api.anthropic.com as base URL keeps the key warning',
@@ -109,7 +114,7 @@ const BASE_URL_CASES = [
     { CLAUDE_CODE_USE_BEDROCK: '1', ANTHROPIC_BASE_URL: GATEWAY }, /^⚠ CLAUDE_CODE_USE_BEDROCK is set/m, GATEWAY_LINE],
 ];
 
-for (const [name, env, want, never] of BASE_URL_CASES) {
+for (const [name, env, want, never] of BILLING_CASES) {
   const out = runDoctor({ ...CLEAN, ...env });
   if (want.test(out) && !never.test(out)) pass(name);
   else fail(`${name}: expected ${want} and not ${never}`);

@@ -61,7 +61,7 @@ Inside Claude Code, `/status` reports the active login and shows an API-key row 
 
 ### Through a gateway
 
-When `ANTHROPIC_BASE_URL` points at a host other than `api.anthropic.com`, Claude Code sends every request to that gateway (CLIProxyAPI, for example). The key or token in your environment then authenticates to the gateway, and the gateway's own upstream credential decides what is billed. `node doctor.mjs` reports the gateway host instead of the per-token warning. It warns instead when neither `ANTHROPIC_AUTH_TOKEN` nor `ANTHROPIC_API_KEY` is set, because a gateway that checks a key refuses the request. When a cloud-provider switch is also set, doctor reports the cloud switch, not the gateway.
+When `ANTHROPIC_BASE_URL` points at a host other than `api.anthropic.com`, Claude Code sends every request to that gateway (CLIProxyAPI, for example). The key or token in your environment then authenticates to the gateway, and the gateway's own upstream credential decides what is billed. `node doctor.mjs` reports the gateway host instead of the per-token warning. It warns instead when neither `ANTHROPIC_AUTH_TOKEN` nor `ANTHROPIC_API_KEY` is set, because a gateway that checks a key refuses the request. It also warns when `CLAUDE_CODE_OAUTH_TOKEN` is set beside the gateway URL, because Claude Code then sends the OAuth token in place of `ANTHROPIC_AUTH_TOKEN`, and the gateway cannot honour it. When a cloud-provider switch is also set, doctor reports the cloud switch, not the gateway.
 
 ### A settings.json helper can bring the key back
 

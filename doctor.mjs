@@ -216,7 +216,7 @@ function checkBillingSource() {
       if (String(process.env.CLAUDE_CODE_OAUTH_TOKEN ?? '').trim()) {
         return {
           warn: true,
-          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set; authenticate to the gateway with ANTHROPIC_AUTH_TOKEN alone.`,
+          label: `Billing source. Requests route through a gateway at ${host}, and CLAUDE_CODE_OAUTH_TOKEN is also set; Claude Code sends the OAuth token and ignores ANTHROPIC_AUTH_TOKEN, so the gateway gets a credential it cannot honour.`,
           fix: ['Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.'],
         };
       }
