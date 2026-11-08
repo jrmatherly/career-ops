@@ -26,7 +26,7 @@ it for `linux/amd64` on every push to `main`, with provenance and an SBOM.
   and the image has no Chrome, no display and not that revision.
 - No `.claude/settings.json` or hooks: `.dockerignore` excludes them. A
   dashboard `claude -p` run has the data root as cwd, so nothing under
-  `/app/.claude/` or `/app/CLAUDE.md` is loaded by it either way; the modes
+  `/app/.claude/` or `/app/CLAUDE.md` is loaded by it either way. The modes
   and templates reach the worker by path.
 
 The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.

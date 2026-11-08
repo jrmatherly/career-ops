@@ -145,8 +145,8 @@ Each job carries its own title and location filters. At run time they replace
 `title_filter.negative` and the `location_filter` lists `allow`, `block`,
 `block_hard` and `always_allow` in `portals.yml` (an absent job list means
 none), and only `title_filter.positive` falls back to `portals.yml`. When
-`title_filter_full` exists it receives the same lists, so a full-sweep job never
-uses its own keywords. Editing `portals.yml` changes neither saved job.
+`title_filter_full` exists it receives the same lists, so an `engine: full` job
+never uses `portals.yml`'s own full-scan keywords. Editing `portals.yml` changes neither saved job.
 
 When something outside this machine's OS scheduler fires the runs (a Kubernetes
 CronJob that POSTs `/api/scheduler` every 15 minutes, say), set

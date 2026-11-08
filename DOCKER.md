@@ -36,7 +36,7 @@ image inputs builds them without pushing.
 
 `career-ops-server` is the image with the Claude CLI, documented in
 `deploy/README.md`. `docker compose pull` fetches the dev image instead of
-building it; `./cops rebuild` still builds locally. The base image is
+building it. `./cops rebuild` still builds locally. The base image is
 Microsoft's Playwright image, pinned by digest in both the root and the
 `deploy/` Dockerfiles.
 
