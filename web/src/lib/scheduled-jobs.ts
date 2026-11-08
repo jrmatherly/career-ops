@@ -13,12 +13,14 @@ import { scheduledStorePath } from "./scheduled-runner-path.mjs";
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
 export type ScheduleUnit = "minutes" | "hours" | "days";
+export type FiltersFrom = "custom" | "file";
 
 export type ScheduledJob = {
   id: string;
   name: string;
   status: JobStatus;
   engine: ScanEngine;
+  filtersFrom?: FiltersFrom;
   filters: ExploreFilters;
   timezone: string;
   startAt: string;
@@ -46,7 +48,7 @@ export type JobRun = {
 
 type QueueItem = { id: string; jobId: string; queuedAt: string };
 type Store = { jobs: ScheduledJob[]; runs: JobRun[]; queue: QueueItem[] };
-type JobFields = Pick<ScheduledJob, "name" | "engine" | "filters" | "timezone" | "startAt" | "every" | "unit">;
+type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "filters" | "timezone" | "startAt" | "every" | "unit">;
 
 export class ScheduledJobValidationError extends Error {
   constructor(message: string) {
@@ -98,6 +100,8 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   const name = String(input.name ?? fallbackName).trim().slice(0, 80) || fallbackName;
   if (input.engine !== undefined && input.engine !== "portals" && input.engine !== "full") throw new ScheduledJobValidationError("Invalid scan engine.");
   const engine: ScanEngine = input.engine === "portals" || input.engine === "full" ? input.engine : base?.engine || "full";
+  if (input.filtersFrom !== undefined && input.filtersFrom !== "file" && input.filtersFrom !== "custom") throw new ScheduledJobValidationError("Invalid filters source.");
+  const filtersFrom = (input.filtersFrom ?? base?.filtersFrom ?? "custom") as FiltersFrom;
   const unit = cleanUnit(input.unit, base?.unit || "hours");
   const every = cleanEvery(input.every, unit, base?.every || 1);
   const timezone = validateTimezone(String(input.timezone ?? base?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC")
@@ -109,7 +113,7 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
     base?.filters || DEFAULT_FILTERS,
   );
 
-  return { name, engine, unit, every, timezone, startAt, filters };
+  return { name, engine, filtersFrom, unit, every, timezone, startAt, filters };
 }
 
 export function listScheduledJobs(): Pick<Store, "jobs" | "runs"> {

@@ -153,7 +153,9 @@ export function JobCard({
         </div>
 
         {/* Keywords clamped to max 2 lines */}
-        {positiveList.length > 0 && (
+        {job.filtersFrom === "file" ? (
+          <p className="text-[11px] text-faint">uses portals.yml</p>
+        ) : positiveList.length > 0 && (
           <div className="max-h-12 overflow-hidden flex flex-wrap items-center gap-1.5 text-[11px]">
             <span className="text-faint shrink-0">matched:</span>
             {positiveList.map((kw, i) => (

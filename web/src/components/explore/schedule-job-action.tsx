@@ -5,6 +5,7 @@ import { CalendarPlus } from "lucide-react";
 import type { ExploreFilters } from "@/lib/explore";
 import { Button } from "@/components/ui/button";
 import { cadenceMinimum, createScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
+import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
 
 type ScheduleUnit = "minutes" | "hours" | "days";
 
@@ -13,6 +14,7 @@ export function ScheduleJobAction({ filters }: { filters: ExploreFilters }) {
   const [name, setName] = useState("Scheduled scan");
   const [every, setEvery] = useState(3);
   const [unit, setUnit] = useState<ScheduleUnit>("hours");
+  const [fromFile, setFromFile] = useState(false);
   const [state, setState] = useState("");
   const [saving, setSaving] = useState(false);
   const minimum = cadenceMinimum(unit);
@@ -21,14 +23,15 @@ export function ScheduleJobAction({ filters }: { filters: ExploreFilters }) {
     setSaving(true);
     setState("Saving...");
     try {
-      await createScheduledJobRequest({
-          name,
-          every: Math.max(minimum, every),
-          unit,
-          filters,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          startAt: new Date().toISOString(),
-      });
+      await createScheduledJobRequest(scheduledJobBody({
+        name,
+        filtersFrom: fromFile ? "file" : "custom",
+        filters,
+        every: Math.max(minimum, every),
+        unit,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        startAt: new Date().toISOString(),
+      }));
       setState("Scheduled scan created.");
       setOpen(false);
     } catch (error) {
@@ -75,6 +78,10 @@ export function ScheduleJobAction({ filters }: { filters: ExploreFilters }) {
             <option value="hours">hours</option>
             <option value="days">days</option>
           </select>
+          <label className="inline-flex items-center gap-2 self-center text-xs text-muted">
+            <input type="checkbox" checked={fromFile} onChange={(event) => setFromFile(event.target.checked)} className="size-4 accent-brand" />
+            Use portals.yml filters
+          </label>
           <Button
             type="button"
             disabled={saving || !name.trim() || !Number.isFinite(every) || every < minimum}

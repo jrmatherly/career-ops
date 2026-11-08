@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Edit3, Loader2, X } from "lucide-react";
-import type { ScheduledJob, ScanEngine } from "@/lib/scheduled-jobs";
+import type { FiltersFrom, ScheduledJob, ScanEngine } from "@/lib/scheduled-jobs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
+import { FiltersFromToggle } from "@/components/scheduled-scans/create-job-modal";
+import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
 import { cadenceMinimum, cadenceValueForUnit, updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 
 export function EditJobModal({
@@ -21,6 +23,7 @@ export function EditJobModal({
 }) {
   const [name, setName] = useState("");
   const [engine, setEngine] = useState<ScanEngine>("full");
+  const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({ ...DEFAULT_FILTERS, ats: [...DEFAULT_FILTERS.ats] });
@@ -32,6 +35,7 @@ export function EditJobModal({
     if (job) {
       setName(job.name || "");
       setEngine(job.engine || "full");
+      setFiltersFrom(job.filtersFrom || "custom");
       setEvery(job.every || 6);
       setUnit(job.unit || "hours");
       // Merge job's persisted filters on top of defaults so all fields are defined
@@ -57,13 +61,7 @@ export function EditJobModal({
     setError("");
 
     try {
-      await updateScheduledJobRequest(job.id, {
-        name,
-        engine,
-        every,
-        unit,
-        filters,
-      });
+      await updateScheduledJobRequest(job.id, scheduledJobBody({ name, engine, filtersFrom, filters, every, unit }));
 
       onUpdated();
       onClose();
@@ -152,10 +150,14 @@ export function EditJobModal({
             </div>
           </div>
 
+          <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
+
           {/* ─── Reuse FilterBuilder from Explore ─── */}
-          <div className="rounded-xl border border-border bg-surface/30 p-4">
-            <FilterBuilder filters={filters} onChange={setFilters} />
-          </div>
+          {filtersFrom === "custom" && (
+            <div className="rounded-xl border border-border bg-surface/30 p-4">
+              <FilterBuilder filters={filters} onChange={setFilters} />
+            </div>
+          )}
 
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">

@@ -2,10 +2,11 @@
 
 import { useRef, useState } from "react";
 import { CalendarPlus, Loader2, Sparkles, X } from "lucide-react";
-import type { ScanEngine } from "@/lib/scheduled-jobs";
+import type { FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
+import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
 import { cadenceMinimum, cadenceValueForUnit, createScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 
 export function CreateJobModal({
@@ -19,6 +20,7 @@ export function CreateJobModal({
 }) {
   const [name, setName] = useState("Scheduled scan");
   const [engine, setEngine] = useState<ScanEngine>("full");
+  const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({
@@ -39,7 +41,7 @@ export function CreateJobModal({
     setError("");
 
     try {
-      await createScheduledJobRequest({ name, engine, every, unit, filters });
+      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit }));
 
       onCreated();
       onClose();
@@ -133,10 +135,14 @@ export function CreateJobModal({
             </div>
           </div>
 
+          <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
+
           {/* ─── Reuse FilterBuilder from Explore ─── */}
-          <div className="rounded-xl border border-border bg-surface/30 p-4">
-            <FilterBuilder filters={filters} onChange={setFilters} />
-          </div>
+          {filtersFrom === "custom" && (
+            <div className="rounded-xl border border-border bg-surface/30 p-4">
+              <FilterBuilder filters={filters} onChange={setFilters} />
+            </div>
+          )}
 
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
@@ -158,5 +164,22 @@ export function CreateJobModal({
           </div>
         </form>
     </Modal>
+  );
+}
+
+export function FiltersFromToggle({ value, onChange }: { value: FiltersFrom; onChange: (value: FiltersFrom) => void }) {
+  return (
+    <label className="flex items-start gap-2.5 text-[13px] text-foreground">
+      <input
+        type="checkbox"
+        checked={value === "file"}
+        onChange={(e) => onChange(e.target.checked ? "file" : "custom")}
+        className="mt-0.5 size-4 accent-brand"
+      />
+      <span>
+        <span className="font-medium">Use portals.yml filters</span>
+        <span className="block text-[11px] text-faint">Each run reads the title and location lists from portals.yml, so later edits to that file apply. Posted within, sources and scan depth keep their saved values.</span>
+      </span>
+    </label>
   );
 }
