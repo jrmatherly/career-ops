@@ -1,0 +1,29 @@
+189da72eee227fa979fca9685e023a0d481cb2dd
+## Why
+
+The web pod is moving to CLIProxyAPI through `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`. Today doctor reads that token as per-token Anthropic billing and warns. Behind a gateway, the token authenticates to the gateway, and the gateway's own credential decides billing.
+
+## What changed
+
+- `checkBillingSource` reads `ANTHROPIC_BASE_URL` after the cloud switches. A host other than `api.anthropic.com` passes with the gateway host. A value that does not parse warns, and the warning does not print the value.
+- `deploy/README.md` documents the proxy pair as exclusive with `CLAUDE_CODE_OAUTH_TOKEN`. Section 2b of `docs/RUNNING_ON_A_BUDGET.md` explains the gateway case.
+
+## Scope
+
+- Doctor and docs only. The cluster wiring is PR-P2 in home-cluster.
+- `--json` output keeps its shape. The billing check is not in its keys.
+
+## Blast Radius
+
+Only users with `ANTHROPIC_BASE_URL` set see a different billing line. A cloud switch still wins, and `api.anthropic.com` keeps the key warning.
+
+## Verification
+
+- `node test-all.mjs --quick --only doctor-billing-source`: 14 passed. Against the trunk `doctor.mjs`, the gateway and unparseable cases fail.
+- `node test-all.mjs --quick`: 21212 passed, 0 failed. `fork-deviations-covered` passed after the commit.
+- Real CLI on a scratch data root with `ANTHROPIC_BASE_URL=http://proxy.example:8317 ANTHROPIC_AUTH_TOKEN=x node doctor.mjs` prints the gateway line and no "bills per token" warning.
+
+No personal data was added. `node test-all.mjs` passed.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+

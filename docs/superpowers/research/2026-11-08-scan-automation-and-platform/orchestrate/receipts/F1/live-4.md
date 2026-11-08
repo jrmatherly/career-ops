@@ -1,0 +1,2 @@
+lane live-4, head 38e86d5c (the report's first SHA line has a typo, 38e86d4c; the git rev-parse line and dashboard footer read 38e86d5c), PASS
+Explore page, toggle on, Add scheduled scan: scratch data/scheduled-jobs.json holds one job with filtersFrom "file", six empty lists, sinceDays 3. `npm run dev -- -p 3104` honours the port. Screenshot /tmp/swarm-f1/worker-4/f1-explore-schedule.png (after save; toggle not visible in it). Defects: none.

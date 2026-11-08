@@ -1,0 +1,46 @@
+# env: {"ANTHROPIC_BASE_URL":"http://proxy.example:8317","CLAUDE_CODE_OAUTH_TOKEN":"test-oauth"}
+# args: 
+# exit: 0
+--- stdout
+
+career-ops doctor
+================
+
+✓ Node.js >= 22.13 (v24.22.2)
+⚠ Billing source. Requests route through a gateway at proxy.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set, a pair deploy/README.md rules out.
+  → Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.
+✓ Dependencies installed
+⚠ Web UI dependencies are not installed (11 missing, including @paper-design/shaders-react), so npm run ui cannot start
+  → Run: npm --prefix web ci
+✓ No tracked .bak backup files
+✓ CLI skill entrypoints are real files or symlinks
+✓ Playwright chromium installed
+⚠ Playwright MCP tools not detected (active CLI: claude)
+  → No project-level MCP config, no server in .claude.json (~/.claude.json, or $CLAUDE_CONFIG_DIR/.claude.json when set), and no enabled plugin providing one, was detected for claude.
+  → Add the Playwright MCP server to your claude config, or install a plugin that provides it (e.g. /plugin install playwright@claude-plugins-official).
+✓ Scan extractor: mcp (default)
+✓ cv.md found
+✓ config/profile.yml found
+✓ modes/_profile.md found
+✓ portals.yml found
+✓ Fonts directory ready
+⚠ Personalization incomplete: modes/_profile.md
+  → modes/_profile.md — still has 8 unfilled sections: 8 on template, 0 missing (targetRoles, adaptiveFraming, exitNarrative, crossCuttingAdvantage, portfolio, compTargets, negotiationScripts, locationPolicy); evaluations score against the template author's targeting, not yours
+  →   ask your agent: "personalize modes/_profile.md from my CV"
+✓ config/profile.yml: shape OK
+✓ title_filter positives all reachable
+✓ cv.md: Experience section recognized (2 entries)
+✓ data/ directory ready
+✓ data/pipeline.md ready
+✓ output/ directory ready
+✓ reports/ directory ready
+✓ Plugins: apify (off), gmail (off), h1b-sponsor (off), notion (off)
+✓ LinkedIn jobs: paste an alert email on the dashboard, or run node linkedin-import.mjs. No Google account.
+
+Result: All checks passed (4 warnings — see above). You're ready to go! Open your AI CLI in this folder (claude, codex, opencode, qwen, agy or grok) to start.
+
+Join the community: https://discord.gg/8pRpHETxa4
+Read the manifesto: `npm run manifesto` — a new way of job searching is taking shape, and you are now part of it.
+
+--- stderr
+

@@ -1,0 +1,33 @@
+01-gateway-plus-token  exit=0
+    ✓ Billing source. Requests route through a gateway at proxy.example:8317, and the gateway's credential decides billing
+02-gateway-alone  exit=0
+    ⚠ Billing source. Requests route through a gateway at proxy.example:8317, but no credential is set, so the gateway will refuse requests.
+      → Set ANTHROPIC_AUTH_TOKEN to the gateway's client key.
+03-gateway-plus-oauth  exit=0
+    ⚠ Billing source. Requests route through a gateway at proxy.example:8317, and CLAUDE_CODE_OAUTH_TOKEN is also set, a pair deploy/README.md rules out.
+      → Unset CLAUDE_CODE_OAUTH_TOKEN and authenticate to the gateway with ANTHROPIC_AUTH_TOKEN.
+04-gateway-plus-key  exit=0
+    ✓ Billing source. Requests route through a gateway at proxy.example:8317, and the gateway's credential decides billing
+05-anthropic-com-plus-key  exit=0
+    ⚠ ANTHROPIC_API_KEY is set, so it takes precedence over any Claude subscription: this session bills per token even if you pay for Pro or Max.
+      → Not intentional: remove the export of ANTHROPIC_API_KEY from ~/.zshrc, ~/.bashrc, ~/.profile or a project .env, restart your terminal, and run /login.
+06-bedrock-plus-gateway  exit=0
+    ⚠ CLAUDE_CODE_USE_BEDROCK is set, so requests bill to your cloud account, not to a Claude subscription.
+      → Not intentional: unset CLAUDE_CODE_USE_BEDROCK and restart your terminal.
+07-file-url  exit=0
+    ⚠ ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.
+08-ftp-url  exit=0
+    ⚠ ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.
+09-not-a-url  exit=0
+    ⚠ ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.
+10-whitespace-plus-key  exit=0
+    ⚠ ANTHROPIC_API_KEY is set, so it takes precedence over any Claude subscription: this session bills per token even if you pay for Pro or Max.
+      → Not intentional: remove the export of ANTHROPIC_API_KEY from ~/.zshrc, ~/.bashrc, ~/.profile or a project .env, restart your terminal, and run /login.
+11-json-unparseable exit=0
+    keys: onboardingNeeded,missing,unpersonalized,warnings,autoCopied,plugins,playwright_mcp,active_cli,cli_source
+    keys baseline: onboardingNeeded,missing,unpersonalized,warnings,autoCopied,plugins,playwright_mcp,active_cli,cli_source
+    keys equal: true
+    warnings is array of strings: true
+    billing warnings: ["ANTHROPIC_BASE_URL is set but is not an http(s) URL with a host, so no request will reach a gateway until it is fixed.\n→ Set it to a full URL such as http://proxy.example:8317, or unset it."]
+    baseline warnings billing count: 0
+13-json-gateway-alone exit=0 ["Billing source. Requests route through a gateway at proxy.example:8317, but no credential is set, so the gateway will refuse requests.\n→ Set ANTHROPIC_AUTH_TOKEN to the gateway's client key."]

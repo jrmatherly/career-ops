@@ -1,0 +1,2 @@
+lane perf (A1), head 93ae5a98 vs trunk d2fea890, INCONCLUSIVE under load (load average 11-26); PASS on the explained number
+Time to first NDJSON event, 5 interleaved runs: trunk evaluate median 103.3 (min 72.3), head evaluate 111.7 (min 82.9), head evaluate-text 134.7 (min 55.0) ms; spread 74-100 percent of the median, so the 5 percent rule cannot resolve. The diff adds an isEvaluateKind branch and seven argv strings before spawn, microseconds against a 70 ms floor. Quiet re-run with a production build is a merge-prep receipt. Receipts /tmp/swarm-a1/worker-11/.

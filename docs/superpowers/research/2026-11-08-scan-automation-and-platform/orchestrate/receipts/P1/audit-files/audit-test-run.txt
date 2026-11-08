@@ -1,0 +1,24 @@
+
+🧪 career-ops test suite (--only doctor-billing-source)
+
+
+doctor.mjs — billing source
+  ✅ CLAUDE_CODE_USE_BEDROCK=1 warns that requests bill to the cloud account
+  ✅ CLAUDE_CODE_USE_BEDROCK=true warns that requests bill to the cloud account
+  ✅ CLAUDE_CODE_USE_BEDROCK="0" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="false" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="no" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="off" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_VERTEX warns at =1 and stays quiet at =0
+  ✅ CLAUDE_CODE_USE_FOUNDRY warns at =1 and stays quiet at =0
+  ✅ an API key in the environment is still reported as the billing source
+  ✅ a gateway base URL with a token reports the gateway, not per-token billing
+  ✅ api.anthropic.com as base URL keeps the key warning
+  ✅ an unparseable base URL warns and does not throw
+  ✅ a cloud switch wins over a gateway base URL
+
+==================================================
+📊 Results: 14 passed, 0 failed, 0 warnings
+🟢 All tests passed — safe to push/merge
+

@@ -1,0 +1,31 @@
+
+🧪 career-ops test suite (--only doctor-billing-source)
+
+
+doctor.mjs — billing source
+  ✅ CLAUDE_CODE_USE_BEDROCK=1 warns that requests bill to the cloud account
+  ✅ CLAUDE_CODE_USE_BEDROCK=true warns that requests bill to the cloud account
+  ✅ CLAUDE_CODE_USE_BEDROCK="0" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="false" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="no" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="off" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_BEDROCK="" is an opt-out and stays quiet
+  ✅ CLAUDE_CODE_USE_VERTEX warns at =1 and stays quiet at =0
+  ✅ CLAUDE_CODE_USE_FOUNDRY warns at =1 and stays quiet at =0
+  ✅ an API key in the environment is still reported as the billing source
+  ✅ a gateway base URL with a token passes with the gateway, not per-token billing
+  ✅ a gateway base URL with an API key passes with the gateway
+  ✅ a gateway base URL alone warns that no credential is set and names the host
+  ✅ a gateway base URL beside CLAUDE_CODE_OAUTH_TOKEN warns about the pair
+  ✅ api.anthropic.com as base URL keeps the key warning
+  ✅ an unparseable base URL warns and does not throw
+  ✅ a file: base URL warns as not an http(s) URL
+  ❌ an ftp: base URL warns instead of passing as a gateway: expected /^⚠ ANTHROPIC_BASE_URL is set but is not an http\(s\) URL with a host/m and not /route through a gateway/
+  ✅ a whitespace-only base URL falls through to the key warning
+  ✅ a cloud switch wins over a gateway base URL
+  ✅ --json lists the billing warn and keeps every top-level key
+
+==================================================
+📊 Results: 20 passed, 1 failed, 0 warnings
+🔴 TESTS FAILED — do NOT push/merge until fixed
+

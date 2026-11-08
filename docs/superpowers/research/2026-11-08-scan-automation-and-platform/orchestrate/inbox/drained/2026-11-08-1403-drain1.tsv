@@ -1,0 +1,12 @@
+review-tests-R2-r2	R2	clean	receipts/R2-r2/review-tests.md
+review-comments-A1-r3	A1	findings 2 confirmed (docs)	receipts/A1-r3/review-comments.md
+review-comments-R2-r2	R2	finding 1 confirmed (docs)	receipts/R2-r2/review-comments.md
+review-code-A1-r3	A1	clean (one 65)	receipts/A1-r3/review-code.md
+review-tests-A1-r3	A1	low gaps only	receipts/A1-r3/review-tests.md
+review-code-R2-r2	R2	IMPORTANT 85 confirmed	receipts/R2-r2/review-code.md
+review-errors-R2-r2	R2	MEDIUM 85 confirmed (same)	receipts/R2-r2/review-errors.md
+review-errors-A1-r3	A1	MEDIUM A confirmed; LOW padded cliId	receipts/A1-r3/review-errors.md
+live-R2-r2	R2	PASS lanes 1-5	receipts/R2-r2/live.md
+review-code-K1-r4	K1	clean	receipts/K1-r4/review-code.md
+verifier-R2-r2	R2	PASS on brief; coordinator verifier-failed	receipts/R2-r2/verifier.md
+review-comments-K1-r4	K1	clean	receipts/K1-r4/review-comments.md

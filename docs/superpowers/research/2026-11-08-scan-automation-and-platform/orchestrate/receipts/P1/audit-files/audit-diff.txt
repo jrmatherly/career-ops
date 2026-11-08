@@ -1,0 +1,133 @@
+diff --git a/.claude/skills/upstream-review/SKILL.md b/.claude/skills/upstream-review/SKILL.md
+index 52d5a92d..6c6ae7b8 100644
+--- a/.claude/skills/upstream-review/SKILL.md
++++ b/.claude/skills/upstream-review/SKILL.md
+@@ -129,7 +129,7 @@ Rows added by the program's PRs, in PR order; the Rules entry of the same name p
+ | `web/README.md` documents `CAREER_OPS_WEB_ALLOWED_HOSTS` and the cron/launchd/Task Scheduler install | adds the `CAREER_OPS_SCHEDULER=external` paragraph under "Scheduled scans", and the navigate rule and `/api/healthz` paragraphs under "Exposing it beyond this machine" | landed 2026-11-06 (PR-18) | ADOPT upstream hunks, ours stay, a conflict keeps both paragraphs. No test; prose. |
+ | none | `resume.mjs`, `lib/resume/` (`schema.mjs`, `model.mjs`, `to-cv-md.mjs`, `absorb.mjs`, `to-payload.mjs`, and `vendor/` holding Reactive Resume's schema with types stripped): `data/resume.json` absorbed from `cv.md` behind a lossless gate | landed 2026-11-06 (PR-02) | ADAPT: an upstream file arriving at one of these paths is read and ported, never merged blind; `lib/resume/vendor/` re-vendors from the clone, not from upstream career-ops. Pinned by `tests/resume-model.test.mjs`, `tests/resume-gen.test.mjs`, `tests/resume-absorb.test.mjs`, `tests/resume-payload.test.mjs` and `tests/resume-cli.test.mjs`; the paths are claimed in `config/local-paths.txt`. |
+ | none | `tests/resume-model.test.mjs`, `tests/resume-gen.test.mjs`, `tests/resume-absorb.test.mjs`, `tests/resume-payload.test.mjs`, `tests/resume-cli.test.mjs`, `tests/fixtures/resume/` (the fictional Reactive Resume sample as JSON and a copy of `examples/cv-example.md`) | landed 2026-11-06 (PR-02) | KEEP: fork suites in a shipped directory; an upstream file at one of these names is renamed on our side, not merged. Pinned by `test-all.mjs` discovery (`--only resume-`). |
+-| `doctor.mjs` without a resume sidecar check | `checkResumeSidecar(root)` after `checkCvShape`, wired into `warnings` (`data/resume.json is behind cv.md; run node resume.mjs absorb`) | landed 2026-11-06 (PR-02) | ADOPT upstream hunks elsewhere in `doctor.mjs`; a hunk overlapping `checkResumeSidecar` or its `warnings` line is ADAPT. Pinned by the doctor case in `tests/resume-cli.test.mjs`. |
++| `doctor.mjs` without a resume sidecar check, and `checkBillingSource` with no gateway branch | `checkResumeSidecar(root)` after `checkCvShape`, wired into `warnings` (`data/resume.json is behind cv.md; run node resume.mjs absorb`). Scan automation and platform (PR-P1): `checkBillingSource` reads `ANTHROPIC_BASE_URL` after the cloud switches and before the key and token branch, passes with the gateway host when it is not `api.anthropic.com`, and warns when it does not parse | landed 2026-11-06 (PR-02); PR-P1 2026-11-08 | ADOPT upstream hunks elsewhere in `doctor.mjs`; a hunk overlapping `checkResumeSidecar` or its `warnings` line is ADAPT. Pinned by the doctor case in `tests/resume-cli.test.mjs`. ADAPT an upstream hunk in `checkBillingSource`: keep the gateway branch between the cloud and key branches. Pinned by the gateway, api.anthropic.com, unparseable and cloud-first cases in `tests/doctor-billing-source.test.mjs`. |
+ | `package.json` without `zod` | `"zod": "4.6.7"` in `dependencies` (the version Reactive Resume pins at `d065a9f7`) | landed 2026-11-06 (PR-02) | ADOPT upstream hunks, ours stay, a conflict keeps both (append-only shared file). Pinned by `tests/resume-model.test.mjs`, which imports the vendored schema. |
+ | `DATA_CONTRACT.md` and `docs/SCRIPTS.md` without `resume.mjs` | the `data/resume.json` user-layer row; the `resume.mjs` quick-reference row and `## resume` section | landed 2026-11-06 (PR-02) | ADOPT upstream hunks, ours stay, a conflict keeps both (append-only shared files). Pinned by `tests/resume-cli.test.mjs` (the behaviour the rows describe); no test reads the prose. |
+ | `AGENTS.md` "Untrusted External Content" names postings, company pages, form fields and emails | the same paragraph also names `data/share-feedback/*.md`, the reviewer comments the publish service collects, as data, never instructions | landed 2026-11-06 (PR-12) | ADAPT an upstream hunk that touches that paragraph (port the wording, keep our sentence); ADOPT upstream hunks elsewhere in the file. Prose only, so no test pins the sentence; the path is also named by the Fork-harness rows below, so the merge reviewer re-reads this row by hand. |
+@@ -219,7 +219,7 @@ Rows added by the program's PRs, in PR order; the Rules entry of the same name p
+ | `examples/`, `plugins/README.md`, `plugins/h1b-sponsor/README.md`, `plugins/h1b-sponsor/skill.md`, `plugins/gmail/skill.md`, `plugins/notion/skill.md`, `plugins/apify/skill.md`, `providers/README.md`, `providers/ADDING_A_PROVIDER.md`, `docs/SUPPORTED_JOB_BOARDS.md`, `web/README.md`, `web/AGENTS.md`, `web/src/lib/report/FORMAT.md` as upstream ships them | Docs audit part 2. examples: dual-track README points at `modes/_profile.md` and keeps a recognised Experience heading, `latex-tex/` indexed, cliché rules located in `modes/_writing.md`, banned phrases removed from the TPM CV. plugins: full `plugins.mjs` command list, manifest fields, the successor exception to "bundled wins", h1b index and cache resolve under the data root (`plugins/h1b-sponsor/lib/index.mjs` and `plugins/h1b-sponsor/lib/cache.mjs` now go through `getCareerOpsRoot()`; pinned by `tests/h1b-data-root.test.mjs`), h1b trigger accepts any United States spelling, gmail filters described. providers: helper list, `local-parser` exception, reference module fixed, four `SUPPORTED_JOB_BOARDS.md` rows re-sorted. web: Codex fencing, chat lock reclaimed automatically, `npm run ui` is the dev server, FORMAT.md 6000-char cap noted (code follow-up). AGENTS.md:685 and `modes/sg/_shared.md` (line 212) say URL is in the header, not "between Score and PDF" | landed 2026-11-06 | Same merge rule as the README row. `examples/ats-normalization-test.md` is a fixture: `tests/ats-normalization-fixture.test.mjs` pins its strings. `web/src/lib/report/report.ts` keeps `REPO = "career-ops-hq/career-ops"` (the in-app bug reporter files to upstream, whose product it is); `claude-directory/SECURITY.md` keeps upstream's policy link like the other listings. |
+ | `docs/SETUP.md`, `docs/SUPPORTED_CLIS.md`, `docs/HERMES.md`, `docs/COWORK.md`, `docs/WINDOWS.md`, `docs/CLAUDE_PLUGIN.md`, `docs/FREE_TIER.md`, `docs/WEB_UI.md`, `docs/FAQ.md` as upstream ships them | Docs audit 2026-11-06, slice A (setup and CLIs): Hermes accepted for every non-writing web worker, no blanket auto-approve advice for grok, `doctor.mjs` leads the skill-entrypoint repair and Verify Setup, user CV templates live under `data/templates/`, the A-G block count, real cross-listing output and the `fingerprint` column, `reports/NNN-RESERVED.md` sentinels, the plugin-copy folders that are refused, Node 22.13 or 23.4 floor, Chromium comes with `npm install`, `npm run ui -- --flag`, `remember-cli.mjs` ids | landed 2026-11-06 | Same merge rule as the README row: take upstream's hunks, re-apply only a fix upstream has not made itself, drop the file from this row when it converges. The full audit is in `private/archive/docs-audit-2026-11-06-docs-dir.md` (gitignored). Config audit (2026-11-06): `docs/SUPPORTED_CLIS.md` calls `GEMINI.md` an intentional no-op (Antigravity reads AGENTS.md itself); `docs/CLAUDE_PLUGIN.md` gives this fork's marketplace as the example. |
+ | `docs/SUPPORTED_JOB_BOARDS.md`, `docs/KEEPING_PORTALS_LIVE.md`, `docs/LINKEDIN_JOBS.md`, `docs/LINKEDIN_JOIN.md`, `docs/local-parser-cookbook.md`, `docs/recipes/gojobs/README.md`, `docs/SOURCE_INDEXING_LOG.md`, `docs/WORKPLACE_GEOGRAPHY.md` as upstream ships them | Slice B (boards and scanning): a16z provider path and `max_pages` default 6, merge dates for Computrabajo, Magneto365, jobs.cz and prace.cz, required `workplace_policy` fields, the `parser:` block activates a local parser and lives in the code checkout, `error` vs `empty` audit verdicts, `_custom.md` is created by onboarding, LinkedIn sample output and `.mbox`, retired providers and standalone `scan-*.mjs` scanners named in the intro | landed 2026-11-06 | Same merge rule as the README row. |
+-| `docs/AUTOMATION.md`, `docs/BACKUP_STRATEGIES.md`, `docs/RUNNING_ON_A_BUDGET.md`, `docs/CLEAN_MARKERS.md`, `docs/APPLY_AUTOFILL.md`, `docs/CV_VISUAL_TESTING.md`, `docs/NOTION_SETUP.md` as upstream ships them | Slice C (operations): pipeline mode evaluates every Pending row, not the shortlist (the one high finding), real profile keys in the triage prompt, `jq .scoreThreshold.recommended`, cron `PATH`, `.env` and `config/plugins.yml` are read from the data root, the `plugins:` parent key, `gemini-eval.mjs` default model, fresh batch worker per offer, `rank-pipeline.mjs` never sees the project `opencode.json`, Ashby spam-rejection handoff, scan exit 1, token figures re-measured 2026-11-06, `clean-markers` extensions, a fork sentence on the GHCR image in CV_VISUAL_TESTING | landed 2026-11-06 | Same merge rule as the README row. |
++| `docs/AUTOMATION.md`, `docs/BACKUP_STRATEGIES.md`, `docs/RUNNING_ON_A_BUDGET.md`, `docs/CLEAN_MARKERS.md`, `docs/APPLY_AUTOFILL.md`, `docs/CV_VISUAL_TESTING.md`, `docs/NOTION_SETUP.md` as upstream ships them | Slice C (operations): pipeline mode evaluates every Pending row, not the shortlist (the one high finding), real profile keys in the triage prompt, `jq .scoreThreshold.recommended`, cron `PATH`, `.env` and `config/plugins.yml` are read from the data root, the `plugins:` parent key, `gemini-eval.mjs` default model, fresh batch worker per offer, `rank-pipeline.mjs` never sees the project `opencode.json`, Ashby spam-rejection handoff, scan exit 1, token figures re-measured 2026-11-06, `clean-markers` extensions, a fork sentence on the GHCR image in CV_VISUAL_TESTING. Scan automation and platform (PR-P1): a "Through a gateway" subsection in `docs/RUNNING_ON_A_BUDGET.md` section 2b for `ANTHROPIC_BASE_URL` | landed 2026-11-06; PR-P1 2026-11-08 | Same merge rule as the README row. ADAPT for the gateway subsection: keep it while `doctor.mjs` has the gateway branch, pinned by `tests/doctor-billing-source.test.mjs`. |
+ | `docs/ARCHITECTURE.md`, `docs/CUSTOMIZATION.md`, `docs/PRIVACY.md`, `docs/PLUGINS.md`, `docs/PLUGIN_REVIEW.md`, `docs/REVIEWING.md`, `docs/sponsors/README.md`, `config/profile.example.yml` as upstream ships them | Slice D (governance): gate step and `_profile.md` in the architecture flow, both TSV names and the bundle PDF path, the Other tab, system sans font stack and the `style:` theming block, a local system-file edit stops updates rather than being replaced, `modes/_custom.md` section, `config/privacy.yml` read from the data root and `CAREER_OPS_PRIVACY`, the `privacy.redact_contact_info` section (and a commented block in `config/profile.example.yml`), 7-digit vs 5-digit matching, exa and keenable registry rows, `run` and `remove` commands, h1b-sponsor as a bundled plugin, the staged auto-merge marked as not yet automated, every tracked file needs a layer claim, "every translation" | landed 2026-11-06 | Same merge rule as the README row. |
+ | `update-system.mjs` USER_PATHS, `.github/workflows/no-user-data.yml`, `test-all.mjs` #1736 and `tests/data-root-guard.mjs` without `config/privacy.yml`; the guard also omits `voice-dna.md` ("ships as a populated system default", stale since upstream #2952 renamed it to `voice-dna.template.md`) and `config/cv-facts.json`; `scan-dayforce.mjs` USAGE says `--debug` keeps the browser visible | `config/privacy.yml` and `config/cv-facts.json` added to USER_PATHS and to the guard's user-layer list, `voice-dna.md` added to the guard and dropped from the test's `NOT_GUARDED` map (`tests/no-user-data-batch-guard.test.mjs` requires workflow and USER_PATHS to agree); `test-all.mjs` section #1736 flipped to require the voice-dna entry (upstream still asserts it is absent); `tests/data-root-guard.mjs` GUARDED_PATHS gained `config/cv-facts.json`; `--debug` described as a screenshot plus logging, and the `--tenant=` comment says the form is refused | landed 2026-11-06 | Code fixes from the docs audits (rows D12 and F4, and part 4 C1 and C2: the guard let gitignored user data through). Upstream PR candidates; until then re-apply on conflict. |
+ | `claude-directory/README.md`, `cursor-directory/README.md`, `openai-directory/README.md`, `antigravity-directory/README.md`, `.agents/skills/career-ops/SKILL.md` and its copies `claude-directory/skills/career-ops/SKILL.md`, `cursor-directory/skills/career-ops/SKILL.md`, `openai-directory/skills/career-ops/SKILL.md`, `antigravity-directory/skills/career-ops/SKILL.md` as upstream ships them | Docs audit part 2b (2026-11-06, `private/archive/docs-audit-b/consolidated.md`). READMEs: the "runs, sends and fetches" section names the opt-in plugins (Notion, Gmail, Apify, H-1B), any OpenAI-compatible endpoint, the headed retry on an anti-bot challenge, and that `CAREER_OPS_ROOT` finds an install only when it names a checkout. SKILL.md: all four directories named, installer needs git, the `CAREER_OPS_ROOT` caveat, the marketplace plugin's SessionStart hook, Cursor path qualified | landed 2026-11-06 | Same merge rule as the README row. The four SKILL.md copies must stay byte-identical to `.agents/skills/career-ops/SKILL.md` (`tests/*-directory-plugin.test.mjs`, `tests/readme-command-menus.test.mjs`): edit the `.agents` file and copy it over. The privacy facts `tests/claude-directory-plugin.test.mjs` greps for are unchanged. |
+diff --git a/deploy/README.md b/deploy/README.md
+index bac6abce..58ae0026 100644
+--- a/deploy/README.md
++++ b/deploy/README.md
+@@ -37,7 +37,9 @@ The process runs as uid 1000. The preset environment is in `deploy/Dockerfile`.
+ | `CAREER_OPS_ROOT` | `/data` | The data root. Mount the persistent volume here, writable by uid 1000 (`fsGroup: 1000`). An empty volume is fine since jrmatherly/career-ops#18: before it, a mount point named `data` with no `data/applications.md` made the tracker fallback `/data/applications.md`, the workspace resolver treated `/data` as a `data/` subdirectory and returned `/`, and the PDF server died on `mkdir /output`. |
+ | `CAREER_OPS_WEB_ALLOWED_HOSTS` | `<public host> career-ops-web` | A hostname makes `web/src/lib/bind-host.mjs` bind `0.0.0.0`, which a container needs. The request guard admits only these hosts and loopback. |
+ | `CAREER_OPS_CLI` | `claude` | Preset in the image. |
+-| `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this or `ANTHROPIC_API_KEY`. Pass it as a secret, never in the image. |
++| `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` | One of this, `ANTHROPIC_API_KEY`, or the proxy pair below. Pass it as a secret, never in the image. |
++| `ANTHROPIC_BASE_URL` | the gateway URL, such as `http://proxy.example:8317` | The proxy pair, with `ANTHROPIC_AUTH_TOKEN`. Routes every `claude` request through the gateway. Set it with the token, and never with `CLAUDE_CODE_OAUTH_TOKEN`. `node doctor.mjs` then reports the gateway host as the billing source. |
++| `ANTHROPIC_AUTH_TOKEN` | the gateway's client key | The proxy pair, with `ANTHROPIC_BASE_URL`. Pass it as a secret, never in the image. |
+ | `/home/app` | writable | The CLI writes `~/.claude`. |
+ | `/tmp` | emptyDir | The PDF server socket and Playwright scratch. |
+ | `/dev/shm` | emptyDir, `medium: Memory` | Chromium. |
+diff --git a/docs/RUNNING_ON_A_BUDGET.md b/docs/RUNNING_ON_A_BUDGET.md
+index 040e180a..35ce82bb 100644
+--- a/docs/RUNNING_ON_A_BUDGET.md
++++ b/docs/RUNNING_ON_A_BUDGET.md
+@@ -59,6 +59,10 @@ Inside Claude Code, `/status` reports the active login and shows an API-key row
+ 
+ `ANTHROPIC_AUTH_TOKEN` and the cloud-provider switches (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`) take precedence too, so check those if a stray key is not the culprit.
+ 
++### Through a gateway
++
++When `ANTHROPIC_BASE_URL` points at a host other than `api.anthropic.com`, Claude Code sends every request to that gateway (CLIProxyAPI, for example). The key or token in your environment then authenticates to the gateway, and the gateway's own upstream credential decides what is billed. `node doctor.mjs` reports the gateway host instead of the per-token warning. A cloud-provider switch still wins over a gateway.
++
+ ### A settings.json helper can bring the key back
+ 
+ Even with the environment clean, `~/.claude/settings.json` can set `apiKeyHelper` — a script Claude Code runs to produce an API key on every request. When it is set, that key wins over your subscription login, so the steps above alone will not fix billing.
+diff --git a/docs/superpowers/research/2026-11-08-scan-automation-and-platform/owners/P1.tsv b/docs/superpowers/research/2026-11-08-scan-automation-and-platform/owners/P1.tsv
+new file mode 100644
+index 00000000..efc7e612
+--- /dev/null
++++ b/docs/superpowers/research/2026-11-08-scan-automation-and-platform/owners/P1.tsv
+@@ -0,0 +1,9 @@
++ts	phase	decision	why	evidence	result
++2026-11-08T15:05:31Z	start	branch claude/p1-doctor-gateway from origin/main d2fea890	brief P1, plan section PR-P1	git checkout -b claude/p1-doctor-gateway origin/main	done
++2026-11-08T15:05:31Z	build	gateway branch sits after the cloud switches and before the key and token branch	plan Build box; live lane 5 wants the cloud warning to win	doctor.mjs checkBillingSource	done
++2026-11-08T15:05:31Z	build	unparseable warn names the variable, not its value	a base URL can carry userinfo credentials, and no key may be printed (standing order 5)	label "ANTHROPIC_BASE_URL is set but unparseable"	done
++2026-11-08T15:05:31Z	build	gateway label uses URL.host, so the port shows and userinfo never does	the You see box expects proxy.example:8317	you-see-gateway.txt line 6	done
++2026-11-08T15:05:31Z	test	three plan cases plus a cloud-first case, table-driven	plan Verify unit box; /simplify finding	node test-all.mjs --quick --only doctor-billing-source: 14 passed, 0 failed; trunk doctor.mjs: 12 passed, 2 failed	done
++2026-11-08T15:05:31Z	simplify	applied URL.canParse and the case table; skipped exporting checkBillingSource for in-process tests and a gatewayHost helper	doctor.mjs runs at import and has no exports; one reader of the variable today	four /simplify lanes	done
++2026-11-08T15:05:31Z	docs	deviations rows extend the existing doctor.mjs and RUNNING_ON_A_BUDGET.md rows instead of a new sub-heading	plan Global constraints: a path already in a row extends that row; PR-F1 creates the sub-heading	.claude/skills/upstream-review/SKILL.md	done
++2026-11-08T15:05:31Z	you-see	real CLI on scratch root /tmp/P1-owner/root seeded from examples/ and templates/	brief acceptance	/tmp/P1-owner/you-see-gateway.txt, you-see-malformed.txt, you-see-key.txt, you-see-json.txt	done
+diff --git a/doctor.mjs b/doctor.mjs
+index 02a31da2..e919e47f 100644
+--- a/doctor.mjs
++++ b/doctor.mjs
+@@ -201,6 +201,23 @@ function checkBillingSource() {
+     };
+   }
+ 
++  const baseUrl = String(process.env.ANTHROPIC_BASE_URL ?? '').trim();
++  if (baseUrl) {
++    const host = URL.canParse(baseUrl) ? new URL(baseUrl).host : '';
++    if (!host) {
++      return {
++        warn: true,
++        label: 'ANTHROPIC_BASE_URL is set but unparseable, so Claude Code cannot reach a gateway with it.',
++        fix: ['Set it to a full URL such as http://proxy.example:8317, or unset it.'],
++      };
++    }
++    // A gateway such as CLIProxyAPI holds its own upstream credential, so the
++    // key or token in this environment authenticates to the gateway, not to Anthropic.
++    if (host !== 'api.anthropic.com') {
++      return { pass: true, label: `Billing source. Requests route through a gateway at ${host}, and the gateway's credential decides billing` };
++    }
++  }
++
+   const which = key ? 'ANTHROPIC_API_KEY' : (authToken ? 'ANTHROPIC_AUTH_TOKEN' : null);
+   if (!which) {
+     return { pass: true, label: 'Billing source: no API key in the environment (a Claude subscription will be used if you are logged in)' };
+diff --git a/tests/doctor-billing-source.test.mjs b/tests/doctor-billing-source.test.mjs
+index ecb64ecf..f655d431 100644
+--- a/tests/doctor-billing-source.test.mjs
++++ b/tests/doctor-billing-source.test.mjs
+@@ -29,7 +29,7 @@ function runDoctor(env) {
+ const CLOUD_VARS = ['CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'];
+ // Clear every billing-related var so each case starts from a known state.
+ const CLEAN = Object.fromEntries(
+-  [...CLOUD_VARS, 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].map((v) => [v, '']),
++  [...CLOUD_VARS, 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL'].map((v) => [v, '']),
+ );
+ 
+ const warnsAbout = (out, v) => new RegExp(`${v} is set`).test(out);
+@@ -75,3 +75,24 @@ for (const v of ['CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY']) {
+     fail('the API key path regressed');
+   }
+ }
++
++const GATEWAY = 'http://proxy.example:8317';
++const GATEWAY_LINE = /Requests route through a gateway at proxy\.example:8317/;
++
++// [name, env, must match, must not match]
++const BASE_URL_CASES = [
++  ['a gateway base URL with a token reports the gateway, not per-token billing',
++    { ANTHROPIC_BASE_URL: GATEWAY, ANTHROPIC_AUTH_TOKEN: 'x' }, GATEWAY_LINE, /bills per token/],
++  ['api.anthropic.com as base URL keeps the key warning',
++    { ANTHROPIC_BASE_URL: 'https://api.anthropic.com', ANTHROPIC_API_KEY: 'sk-ant-test' }, /ANTHROPIC_API_KEY is set/, /route through a gateway/],
++  ['an unparseable base URL warns and does not throw',
++    { ANTHROPIC_BASE_URL: 'not a url', ANTHROPIC_AUTH_TOKEN: 'x' }, /ANTHROPIC_BASE_URL is set but unparseable/, /route through a gateway/],
++  ['a cloud switch wins over a gateway base URL',
++    { CLAUDE_CODE_USE_BEDROCK: '1', ANTHROPIC_BASE_URL: GATEWAY }, /CLAUDE_CODE_USE_BEDROCK is set/, GATEWAY_LINE],
++];
++
++for (const [name, env, want, never] of BASE_URL_CASES) {
++  const out = runDoctor({ ...CLEAN, ...env });
++  if (want.test(out) && !never.test(out)) pass(name);
++  else fail(`${name}: expected ${want} and not ${never}`);
++}

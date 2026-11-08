@@ -1,0 +1,4 @@
+id	track	state	branch	pr	sha	brief
+R1	build	owner-stopped-wip	claude/r1-rank-pass	(combined, not opened)	(WIP commit by orchestrator)	briefs/R1.md
+A2	build	not-started	claude/r1-rank-pass	(combined)		briefs/A2.md (draft, fill block)
+A3	build	not-started	claude/r1-rank-pass	(combined)		(no brief)
