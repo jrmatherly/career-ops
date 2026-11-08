@@ -81,8 +81,9 @@ export const KNOWN_KINDS = Object.freeze(["pdf", "research", "evaluate", "evalua
  *             The backend persists it. The agent must not write: the posting is
  *             untrusted input.
  * - evaluate-text  evaluate with the posting text in the request instead of a
- *             url, for unattended runs: no network tool, so a hostile posting
- *             has no channel out of the process.
+ *             url, for unattended runs: no network tool. The report the backend
+ *             persists is the one channel left, which is why claudeCliArgs
+ *             denies Read on secrets and PII for this kind.
  * - fix-portal rewrites one portals.yml entry after finding a working ATS URL.
  * - cover     runs cover.md's web research and re-reads the posting url, then
  *             returns the draft letter in its reply. It writes nothing.

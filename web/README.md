@@ -71,6 +71,15 @@ and `keywords`. Omitting it preserves the full evaluation; `[]` requests the
 required assessment without optional sections. Invalid selections return 400
 before starting an AI run.
 
+The `evaluate-text` kind evaluates posting text the caller already has, for
+unattended runs. Its body is `{kind: "evaluate-text", input, cliId: "claude",
+jdText}`: `input` is the posting URL, used only to name the posting, and
+`jdText` is the posting text, at most 16,384 characters. The worker gets no web
+tool and no write tool, runs on Claude only, and is denied Read on secrets and
+the PII files. Its report header reads `unconfirmed (auto mode, no web
+research)`. A kind the route does not know, or `jdText` on any other kind,
+returns 400.
+
 ## Safety
 
 - **Local-first:** the local web app runs entirely on your machine — no cloud,

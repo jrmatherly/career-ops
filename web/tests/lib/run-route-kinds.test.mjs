@@ -47,11 +47,14 @@ const GATE_STDOUT = `Stopping before Block A.
 VERDICT: N/A/5 — dealbreaker
 `;
 
-function fixtureRoot(t, prefix = "co-run-route-kinds-") {
+const CHECKOUT = path.resolve(import.meta.dirname, "../../..");
+
+// codeRoot "checkout" runs the real modes and persist scripts against the fixture data root.
+function fixtureRoot(t, prefix = "co-run-route-kinds-", { codeRoot } = {}) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
   const saved = { root: process.env.CAREER_OPS_ROOT, code: process.env.CAREER_OPS_CODE_ROOT };
   process.env.CAREER_OPS_ROOT = root;
-  process.env.CAREER_OPS_CODE_ROOT = root;
+  process.env.CAREER_OPS_CODE_ROOT = codeRoot === "checkout" ? CHECKOUT : root;
   t.after(() => {
     for (const [key, value] of [["CAREER_OPS_ROOT", saved.root], ["CAREER_OPS_CODE_ROOT", saved.code]]) {
       if (value === undefined) delete process.env[key];
@@ -80,9 +83,32 @@ async function refusal(response) {
   return (await response.json()).error;
 }
 
+async function events(response) {
+  assert.equal(response.status, 200);
+  return (await response.text()).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+}
+
+const argValue = (args, flag) => args[args.indexOf(flag) + 1];
+// Past the data-root check a run needs a POSIX root; a Windows temp dir answers 400 there.
+const POSIX_ROOT = { skip: process.platform === "win32" && "the Read denies need a POSIX data root, so Windows answers 400" };
+
 test("evaluate-text keeps evaluate's kill budget, leaving persist its 60 s", () => {
   assert.equal(killMsForKind("evaluate-text"), killMsForKind("evaluate"));
   assert.equal(killMsForKind("evaluate-text"), 740_000);
+});
+
+test("an unknown kind is refused by name before any CLI starts", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of ["evaluate_text", "evaluateText"]) {
+    assert.equal(await refusal(await run({ kind, jdText: "Role." })), `Unknown kind "${kind}".`);
+  }
+});
+
+test("jdText on any kind but evaluate-text is refused, not dropped", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.match(await refusal(await run({ kind: "evaluate", jdText: "Role." })), /jdText is for kind "evaluate-text" only, not "evaluate"/);
 });
 
 test("evaluate-text refuses any CLI but claude", async (t) => {
@@ -112,32 +138,138 @@ test("evaluate-text refuses jdText over 16,384 characters", async (t) => {
   assert.match(await refusal(await run({ jdText: "x".repeat(16 * 1024 + 1) })), /over the 16384-character limit/);
 });
 
-test("evaluate-text refuses a data root its Read denies cannot name exactly", async (t) => {
-  fixtureRoot(t, "co run, kinds-");
+test("evaluate-text refuses jdText with a NUL byte, which argv cannot carry", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
-  assert.match(await refusal(await run({ jdText: "Role." })), /no spaces, commas or glob characters/);
+  assert.match(await refusal(await run({ jdText: "Role.\0" })), /NUL byte/);
 });
 
-test("evaluate-text holds the tracker write token and spawns with its Read denies", {
-  skip: process.platform === "win32" && "the Read denies need a POSIX data root, so Windows answers 400",
-}, async (t) => {
+for (const [name, char] of [["space", " "], ["comma", ","], ["star", "*"], ["question mark", "?"], ["bracket", "["]]) {
+  test(`evaluate-text refuses a data root with a ${name}, which its Read denies cannot name exactly`, POSIX_ROOT, async (t) => {
+    fixtureRoot(t, `co-run${char}kinds-`);
+    globalThis.__onSpawn = () => assert.fail("no CLI may start");
+    const error = await refusal(await run({ jdText: "Role." }));
+    assert.match(error, /letters, digits, \. _ - and \/ only/);
+    assert.match(error, /Point CAREER_OPS_ROOT at such a path/);
+  });
+}
+
+test("evaluate-text refuses a data root it cannot resolve", async (t) => {
   const root = fixtureRoot(t);
-  let spawned;
-  globalThis.__onSpawn = (args) => { spawned = { args, writing: isTrackerWriting() }; };
+  process.env.CAREER_OPS_ROOT = path.join(root, "missing");
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.match(await refusal(await run({ jdText: "Role." })), /could not resolve the data root .*missing/);
+});
+
+test("evaluate-text needs a CV to score against", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t);
+  fs.rmSync(path.join(root, "cv.md"));
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.match(await refusal(await run({ jdText: "Role." })), /Add your CV first/);
+});
+
+test("evaluate-text needs the evaluation mode file", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t);
+  fs.rmSync(path.join(root, "modes/oferta.md"));
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.match(await refusal(await run({ jdText: "Role." })), /needs a complete career-ops checkout \(modes\/oferta\.md\)/);
+});
+
+test("evaluate-text refuses invalid evaluation sections", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.match(await refusal(await run({ jdText: "Role.", evaluationSections: ["no-such-section"] })), /Choose valid evaluation sections/);
+});
+
+test("evaluate-text runs a user-selected evaluation when sections are chosen", POSIX_ROOT, async (t) => {
+  fixtureRoot(t, undefined, { codeRoot: "checkout" });
+  let prompt;
+  globalThis.__onSpawn = (args) => { prompt = argValue(args, "-p"); };
   globalThis.__fakeStdout = GATE_STDOUT;
+  await events(await run({ jdText: "Role.", evaluationSections: ["summary"] }));
+  assert.match(prompt, /USER-SELECTED career-ops job evaluation/);
+  assert.match(prompt, /<<posting-text>>\nRole\.\n<<\/posting-text>>/);
+});
 
+test("evaluate-text spawns with its Read denies and no network tool", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t);
+  let args;
+  globalThis.__onSpawn = (spawnArgs) => { args = spawnArgs; };
+  globalThis.__fakeStdout = GATE_STDOUT;
   // At the cap in characters and three times it in UTF-8 bytes: a CJK posting fits.
-  const response = await run({ jdText: "界".repeat(16 * 1024) });
-  assert.equal(response.status, 200);
-  const events = (await response.text()).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  await events(await run({ jdText: "界".repeat(16 * 1024) }));
 
-  assert.equal(spawned.writing, true, "the token is held before the CLI starts");
-  const deny = spawned.args[spawned.args.indexOf("--disallowedTools") + 1].split(",");
+  const deny = argValue(args, "--disallowedTools").split(",");
   for (const rule of ["WebFetch", "WebSearch", "Read(//proc/**)", `Read(/${root}/.env)`]) {
     assert.ok(deny.includes(rule), `missing ${rule}`);
   }
-  assert.ok(!spawned.args[spawned.args.indexOf("--allowedTools") + 1].includes("WebFetch"));
-  assert.ok(events.some((event) => event.type === "gated"), `expected a gated event, got ${JSON.stringify(events)}`);
+  assert.ok(!argValue(args, "--allowedTools").includes("WebFetch"));
+});
+
+test("evaluate-text denies the real path behind a symlinked data root", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t);
+  const link = path.join(os.tmpdir(), `co-run-route-kinds-link-${process.pid}`);
+  fs.rmSync(link, { force: true });
+  fs.symlinkSync(root, link);
+  t.after(() => fs.rmSync(link, { force: true }));
+  process.env.CAREER_OPS_ROOT = link;
+  let args;
+  globalThis.__onSpawn = (spawnArgs) => { args = spawnArgs; };
+  globalThis.__fakeStdout = GATE_STDOUT;
+  await events(await run({ jdText: "Role." }));
+
+  const deny = argValue(args, "--disallowedTools").split(",");
+  assert.ok(deny.includes(`Read(/${root}/data/contacts.tsv)`), `expected the real path in ${deny.join(",")}`);
+  assert.ok(!deny.some((rule) => rule.includes(link)), "no rule names the symlink");
+});
+
+test("evaluate-text holds the tracker write token and writes nothing on a gated run", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t);
+  let writing;
+  globalThis.__onSpawn = () => { writing = isTrackerWriting(); };
+  globalThis.__fakeStdout = GATE_STDOUT;
+  const stream = await events(await run({ jdText: "Role." }));
+
+  assert.equal(writing, true, "the token is held before the CLI starts");
+  assert.ok(stream.some((event) => event.type === "gated"), `expected a gated event, got ${JSON.stringify(stream)}`);
   assert.equal(fs.existsSync(path.join(root, "reports")), false, "a gated run writes no report");
   assert.equal(isTrackerWriting(), false, "the token is released when the run ends");
+});
+
+test("evaluate-text persists the report, completes the inbox row and writes the tracker row", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t, undefined, { codeRoot: "checkout" });
+  const url = "https://jobs.example.test/1";
+  fs.mkdirSync(path.join(root, "data"));
+  fs.writeFileSync(path.join(root, "data/pipeline.md"), `## Pending\n- [ ] ${url} | Fictional Co | Platform Engineer\n`);
+  fs.writeFileSync(path.join(root, "data/scan-history.tsv"), `url\tfirst_seen\n${url}\t2026-11-01\n`);
+  fs.writeFileSync(path.join(root, "data/applications.md"), "# Applications Tracker\n\n| # | Date | Company | Role | Score | Status | PDF | Report | Notes |\n|---|------|---------|------|-------|--------|-----|--------|-------|\n");
+  globalThis.__fakeStdout = `<<report-md>>
+# Evaluation: Fictional Co — Platform Engineer
+
+**Verification:** unconfirmed (auto mode, no web research)
+
+## Machine Summary
+\`\`\`yaml
+company: "Fictional Co"
+role: "Platform Engineer"
+score: 4.1
+via: null
+\`\`\`
+
+## A) Role Summary
+A fictional role.
+<</report-md>>
+VERDICT: 4.1/5
+`;
+  const stream = await events(await run({ input: url, jdText: "Platform Engineer at Fictional Co." }));
+  assert.ok(!stream.some((event) => event.type === "error"), `run failed: ${JSON.stringify(stream)}`);
+
+  const reports = fs.readdirSync(path.join(root, "reports")).filter((file) => file.endsWith(".md"));
+  assert.equal(reports.length, 1, `expected one report, got ${reports}`);
+  const report = fs.readFileSync(path.join(root, "reports", reports[0]), "utf8");
+  assert.match(report, /\*\*Verification:\*\* unconfirmed \(auto mode, no web research\)/);
+  assert.match(fs.readFileSync(path.join(root, "data/pipeline.md"), "utf8"), /- \[x\] https:\/\/jobs\.example\.test\/1 /);
+  const tracker = fs.readFileSync(path.join(root, "data/applications.md"), "utf8");
+  assert.match(tracker, /\| Fictional Co \| Platform Engineer \|.*posted: 2026-11-01/);
+  assert.equal(isTrackerWriting(), false, "the token is released after persist");
 });

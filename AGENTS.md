@@ -543,7 +543,7 @@ When checking the browser fallback manually:
 
 **Known WebFetch failure mode — "Related jobs" sidebars:** a career page that lists sibling postings in a "Related jobs"/"Similar openings" sidebar can carry a per-item status badge (e.g. "Job removed") next to one of those *other* listings. WebFetch's HTML-to-markdown pass flattens the page into one text stream, and its summarization step has been observed misattributing that sidebar badge to the **primary** posting, reporting a live job as closed. Confirmed on `jobs.uber.com` (2026-10-17): two independent WebFetch calls on the same URL, a day apart, both claimed "Job removed" while a Playwright render showed a complete, live JD with no removal notice on the primary job. This is exactly why rule 1 above says never trust WebFetch for this: when it disagrees with a Playwright read, or the page carries any kind of sibling-postings list, trust Playwright.
 
-**Exception for batch workers (headless mode):** use public API verification where available. If the API cannot confirm the posting and browser verification is unavailable, WebFetch may supply JD text, but mark the report header `**Verification:** unconfirmed (batch mode)`; the user can verify manually later.
+**Exception for batch workers (headless mode):** use public API verification where available. If the API cannot confirm the posting and browser verification is unavailable, WebFetch may supply JD text, but mark the report header `**Verification:** unconfirmed (batch mode)`; the user can verify manually later. A web `evaluate-text` run, which gets the posting text in the request and has no web tool, marks it `**Verification:** unconfirmed (auto mode, no web research)` instead.
 
 ### LinkedIn JD loading guard (#4121)
 

@@ -18,7 +18,7 @@ import { createReportEnvelopeFilter } from "@/lib/report-envelope.mjs";
 import { persistEvaluation, evaluateRunOutcome, evaluationOutcomeEvent } from "@/lib/report-persist.mjs";
 import { buildPrompt, isShellSafeCompanyName } from "@/lib/run-prompts.mjs";
 import { parseCoverRequest } from "@/lib/cover-brief.mjs";
-import { capabilitiesFor, isEvaluateKind } from "@/lib/worker-capabilities.mjs";
+import { KNOWN_KINDS, capabilitiesFor, isEvaluateKind } from "@/lib/worker-capabilities.mjs";
 import { fencingReport, isCliAllowedForCapabilities } from "@/lib/cli-fencing.mjs";
 import { claudeCliArgs } from "@/lib/claude-invocation.mjs";
 import { resolveCvTemplate, resolveUserTemplatesDir } from "@/lib/core/cv-template.mjs";
@@ -35,14 +35,21 @@ export const maxDuration = 800; // a real oferta evaluation / pdf-mode CV tailor
 // fetchJdViaKnownApi caps the text it returns at 12,000 characters; this leaves
 // headroom. Characters, not bytes, so a CJK posting at that cap still fits.
 const JD_TEXT_MAX_CHARS = 16 * 1024;
-// The data root goes into evaluate-text's Read denies, a comma-separated flag
-// value; a comma, space or glob character there would split or widen a rule.
+// The data root is spelled into evaluate-text's Read denies, inside the
+// comma-separated --disallowedTools value: a comma would split a rule and a glob
+// character would widen one. So letters, digits, . _ - and / only. Checked after
+// the CLI rules, so a refused CLI is named first on any platform.
 const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
 
 export async function POST(req: Request) {
   const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown; jdText?: unknown }>(req);
   if (!body) return new Response(JSON.stringify({ error: "bad json" }), { status: 400 });
   const { kind = "evaluate", input, cliId: requestedCliId, brief } = body;
+  // An unknown kind would fall through to the URL-fetch prompt and spawn a paid run.
+  if (!KNOWN_KINDS.includes(kind)) return Response.json({ error: `Unknown kind ${JSON.stringify(kind)}.` }, { status: 400 });
+  if (kind !== "evaluate-text" && body.jdText !== undefined) {
+    return Response.json({ error: `jdText is for kind "evaluate-text" only, not "${kind}".` }, { status: 400 });
+  }
   const evaluation = isEvaluateKind(kind) ? parseEvaluationOptions(body.evaluationSections) : undefined;
   if (evaluation && !evaluation.ok) return Response.json({ error: evaluation.error }, { status: 400 });
   if (!input || !requestedCliId) {
@@ -75,8 +82,19 @@ export async function POST(req: Request) {
   if (kind === "evaluate-text" && cliId !== "claude") {
     return Response.json({ error: "evaluate-text runs on Claude only, and Claude is not available." }, { status: 400 });
   }
-  if (kind === "evaluate-text" && !DENY_SAFE_ROOT.test(careerOpsRoot())) {
-    return Response.json({ error: "evaluate-text needs a POSIX data root path with no spaces, commas or glob characters." }, { status: 400 });
+  let denyRoot: string | undefined;
+  if (kind === "evaluate-text") {
+    // The denies name the real path, so a symlinked data root still covers the files.
+    try {
+      denyRoot = fs.realpathSync(careerOpsRoot());
+    } catch {
+      return Response.json({ error: `evaluate-text could not resolve the data root ${careerOpsRoot()}.` }, { status: 400 });
+    }
+    if (!DENY_SAFE_ROOT.test(denyRoot)) {
+      return Response.json({
+        error: `evaluate-text needs a data root of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${denyRoot}). Point CAREER_OPS_ROOT at such a path.`,
+      }, { status: 400 });
+    }
   }
   const substitution = cliSubstitutionNotice(resolved);
   const capabilities = capabilitiesFor(kind);
@@ -223,6 +241,11 @@ export async function POST(req: Request) {
     profile: profileRef(careerOpsRoot()),
     evaluationInstructions,
   });
+  // The prompt is one argv element and a NUL cannot travel in argv: spawn would
+  // throw and the run would answer 500. jdText, input and a cover brief all land here.
+  if (prompt.includes("\0")) {
+    return Response.json({ error: "The request text contains a NUL byte, which cannot be passed to the CLI." }, { status: 400 });
+  }
 
   const isClaude = cliId === "claude";
   // Which tools each kind gets, and the whole claude argv, live in
@@ -238,7 +261,7 @@ export async function POST(req: Request) {
   // A CLI with its own structured stream gets the argv that turns it on, so its
   // stdout matches spec.parseEvent below; spec.args stays the plain-text argv the
   // envelope-parsing routes rely on.
-  const args = isClaude ? claudeCliArgs({ kind, prompt, dataRoot: careerOpsRoot() }) : (spec.streamArgs ?? spec.args)(prompt);
+  const args = isClaude ? claudeCliArgs({ kind, prompt, dataRoot: denyRoot }) : (spec.streamArgs ?? spec.args)(prompt);
 
   // Tracker-mutating runs hold a write token so a row delete can't race their
   // merge (tracker.mjs delete doesn't yet share a lock with merge-tracker,
