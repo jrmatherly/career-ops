@@ -61,6 +61,7 @@ import { loadYaml } from './lib/yaml-document.mjs';
 
 import { makeHttpCtx } from './providers/_http.mjs';
 import { loadProviders, resolveProvider } from './providers/_registry.mjs';
+import { boundedProbeCtx, ProbePageBudgetReached } from './verify-portals.mjs';
 import { mergeProviderPlugins } from './plugins/_engine.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
@@ -102,13 +103,6 @@ export const DEFAULT_DRIFT_FRACTION = 0.5;
 /** How many postings to keep as evidence per board. Enough to recognise a company. */
 const SAMPLE_SIZE = 3;
 
-/**
- * Only page 1 per board. This is an audit, not a scan: one page is enough to
- * answer "is anything here, and does it look like this company", and a full
- * sweep of 170 enterprise boards would be both slow and rude.
- */
-const AUDIT_MAX_PAGES = 1;
-
 export const VERDICTS = ['no-provider', 'error', 'empty', 'small', 'ok'];
 
 /**
@@ -117,7 +111,7 @@ export const VERDICTS = ['no-provider', 'error', 'empty', 'small', 'ok'];
  * Pure — no network, no clock. `jobs` is whatever the provider returned;
  * `error` is set instead when the fetch threw.
  *
- * @param {{jobs?: Array<object>, error?: string, provider?: string|null}} result
+ * @param {{jobs?: Array<object>, error?: string, provider?: string|null, partial?: boolean}} result
  * @param {{smallThreshold?: number}} [opts]
  * @returns {{verdict: string, count: number|null, detail: string}}
  */
@@ -144,14 +138,20 @@ export function classifyBoard(result, { smallThreshold = DEFAULT_SMALL_THRESHOLD
     return { verdict: 'error', count: null, detail: String(result.error).slice(0, 120) };
   }
   const jobs = Array.isArray(result.jobs) ? result.jobs : [];
+  // A provider cut off by the request budget before its first job-bearing page
+  // answered every request it made, so the board is live; its size is unknown.
+  if (jobs.length === 0 && result.partial) {
+    return { verdict: 'ok', count: null, detail: 'board answers; partial: the request budget ran out before the first postings' };
+  }
   if (jobs.length === 0) return { verdict: 'empty', count: 0, detail: 'board answers with zero postings' };
+  const partial = result.partial ? ' (partial: request budget reached)' : '';
   // A threshold of 0 disables the tier rather than flagging every board: the
   // `<=` below would otherwise never fire, which is the same thing, but saying
   // so here keeps `--small-threshold 0` from reading as a bug.
   if (isSmallBoard(jobs.length, smallThreshold)) {
-    return { verdict: 'small', count: jobs.length, detail: smallBoardDetail(jobs.length) };
+    return { verdict: 'small', count: jobs.length, detail: smallBoardDetail(jobs.length) + partial };
   }
-  return { verdict: 'ok', count: jobs.length, detail: `${jobs.length} postings` };
+  return { verdict: 'ok', count: jobs.length, detail: `${jobs.length} postings${partial}` };
 }
 
 /**
@@ -191,7 +191,8 @@ export function diffAgainstBaseline(current, baseline, { fraction = DEFAULT_DRIF
   }
   const drops = [];
   for (const row of Array.isArray(current) ? current : []) {
-    if (!row || typeof row.name !== 'string' || !Number.isFinite(row.count)) continue;
+    // A partial count stopped at the request budget, so a drop there is not drift.
+    if (!row || typeof row.name !== 'string' || !Number.isFinite(row.count) || row.partial) continue;
     const was = before.get(row.name);
     if (!Number.isFinite(was) || was <= 0) continue;
     const lost = was - row.count;
@@ -271,15 +272,22 @@ export async function auditCompanies(companies, {
 
       let result = { provider: providerId, scanMethod: entry.scan_method || null };
       if (providerId) {
+        // Same per-entry response cap scan.mjs applies, so a board that sets
+        // max_response_mb is audited with the limit it is scanned with. The ctx is
+        // copied because the cap and the timeout replace its fetchers, and httpCtx is shared.
+        // An audit, not a scan: page 1 and the probe's request budget answer "does
+        // this look like the company" without sweeping the board. The budget
+        // wraps outermost and per entry; a shared one would run out four requests in.
+        const { ctx, wasTripped } = boundedProbeCtx(
+          applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || makeHttpCtx()) }, entry), entry),
+        );
         try {
-          // Same per-entry response cap scan.mjs applies, so a board that sets
-          // max_response_mb is audited with the limit it is scanned with. The ctx is
-          // copied because the cap and the timeout replace its fetchers, and httpCtx is shared.
-          const ctx = applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || { ...makeHttpCtx(), maxPages: AUDIT_MAX_PAGES }) }, entry), entry);
           result.jobs = (await resolved.provider.fetch(entry, ctx)) || [];
         } catch (err) {
-          result.error = err?.message || String(err);
+          if (err instanceof ProbePageBudgetReached) result.jobs = [];
+          else result.error = err?.message || String(err);
         }
+        result.partial = wasTripped();
       }
 
       const { verdict, count, detail } = classifyBoard(result, { smallThreshold });
@@ -290,6 +298,7 @@ export async function auditCompanies(companies, {
         verdict,
         count,
         detail,
+        ...(result.partial ? { partial: true } : {}),
         samples: sampleJobs(result.jobs || []),
       });
     }
