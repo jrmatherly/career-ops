@@ -39,6 +39,7 @@ register(`data:text/javascript,${encodeURIComponent(`
 const { POST } = await import("../../src/app/api/run/route.ts");
 const { isTrackerWriting } = await import("../../src/lib/core/run-registry.ts");
 const { killMsForKind } = await import("../../src/lib/run-cli-support.mjs");
+const { KNOWN_KINDS } = await import("../../src/lib/worker-capabilities.mjs");
 
 const GATE_STDOUT = `Stopping before Block A.
 <<evaluation-gate>>
@@ -111,6 +112,27 @@ test("jdText on any kind but evaluate-text is refused, not dropped", async (t) =
   assert.match(await refusal(await run({ kind: "evaluate", jdText: "Role." })), /jdText is for kind "evaluate-text" only, not "evaluate"/);
 });
 
+test("a kind-scoped field on another kind is refused by field and kind", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of KNOWN_KINDS.filter((k) => k !== "cover")) {
+    assert.equal(await refusal(await run({ kind, brief: { why: "x" }, jdText: undefined })), `brief is for kind "cover" only, not "${kind}".`);
+  }
+  for (const kind of KNOWN_KINDS.filter((k) => !k.startsWith("evaluate"))) {
+    assert.equal(await refusal(await run({ kind, evaluationSections: ["summary"], jdText: undefined })), `evaluationSections is for the evaluate kinds only, not "${kind}".`);
+  }
+});
+
+test("an input that is not a non-empty string is refused before any CLI starts", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of KNOWN_KINDS) {
+    for (const input of [undefined, "", 0, 123, true, {}, [], "  "]) {
+      assert.equal(await refusal(await run({ kind, input, jdText: kind === "evaluate-text" ? "Role." : undefined })), "input must be a non-empty string.", `${kind} input=${JSON.stringify(input)}`);
+    }
+  }
+});
+
 test("evaluate-text refuses any CLI but claude", async (t) => {
   fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
@@ -158,7 +180,9 @@ test("evaluate-text refuses a data root it cannot resolve", async (t) => {
   const root = fixtureRoot(t);
   process.env.CAREER_OPS_ROOT = path.join(root, "missing");
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
-  assert.match(await refusal(await run({ jdText: "Role." })), /could not resolve the data root .*missing/);
+  const logged = t.mock.method(console, "error", () => {});
+  assert.match(await refusal(await run({ jdText: "Role." })), /could not resolve the data root .*missing \(ENOENT\)/);
+  assert.ok(logged.mock.calls.some((call) => String(call.arguments[0]).includes("ENOENT")), "the error code is logged");
 });
 
 test("evaluate-text needs a CV to score against", POSIX_ROOT, async (t) => {

@@ -47,12 +47,22 @@ export async function POST(req: Request) {
   const { kind = "evaluate", input, cliId: requestedCliId, brief } = body;
   // An unknown kind would fall through to the URL-fetch prompt and spawn a paid run.
   if (!KNOWN_KINDS.includes(kind)) return Response.json({ error: `Unknown kind ${JSON.stringify(kind)}.` }, { status: 400 });
-  if (kind !== "evaluate-text" && body.jdText !== undefined) {
-    return Response.json({ error: `jdText is for kind "evaluate-text" only, not "${kind}".` }, { status: 400 });
+  // A field sent to a kind that ignores it is refused, not dropped.
+  for (const [field, owns, owner] of [
+    ["jdText", kind === "evaluate-text", 'kind "evaluate-text"'],
+    ["brief", kind === "cover", 'kind "cover"'],
+    ["evaluationSections", isEvaluateKind(kind), "the evaluate kinds"],
+  ] as const) {
+    if (!owns && body[field] !== undefined) {
+      return Response.json({ error: `${field} is for ${owner} only, not "${kind}".` }, { status: 400 });
+    }
   }
   const evaluation = isEvaluateKind(kind) ? parseEvaluationOptions(body.evaluationSections) : undefined;
   if (evaluation && !evaluation.ok) return Response.json({ error: evaluation.error }, { status: 400 });
-  if (!input || !requestedCliId) {
+  if (typeof input !== "string" || !input.trim()) {
+    return Response.json({ error: "input must be a non-empty string." }, { status: 400 });
+  }
+  if (!requestedCliId) {
     return new Response(JSON.stringify({ error: "input and cliId required" }), { status: 400 });
   }
   // evaluate-text is the unattended kind: its Read denies are Claude flags, so
@@ -85,10 +95,13 @@ export async function POST(req: Request) {
   let denyRoot: string | undefined;
   if (kind === "evaluate-text") {
     // The denies name the real path, so a symlinked data root still covers the files.
+    const root = careerOpsRoot();
     try {
-      denyRoot = fs.realpathSync(careerOpsRoot());
-    } catch {
-      return Response.json({ error: `evaluate-text could not resolve the data root ${careerOpsRoot()}.` }, { status: 400 });
+      denyRoot = fs.realpathSync(root);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
+      console.error(`/api/run: evaluate-text realpath of the data root failed: ${code}`);
+      return Response.json({ error: `evaluate-text could not resolve the data root ${root} (${code}).` }, { status: 400 });
     }
     if (!DENY_SAFE_ROOT.test(denyRoot)) {
       return Response.json({

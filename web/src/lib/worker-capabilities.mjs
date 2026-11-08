@@ -62,8 +62,8 @@ export const CAPS = Object.freeze({
 /**
  * Every kind /api/run dispatches. Exported so guards iterate this rather than a
  * hand-written list — a list silently stops gating whatever kind is added next.
- * Unknown kinds still resolve (least-capable, see capabilitiesFor); this is the
- * set a test can enumerate, not a validity check.
+ * capabilitiesFor still resolves an unknown kind least-capable, and the run
+ * route refuses one before anything spawns.
  *
  * Lives here rather than in claude-invocation.mjs because it is a fact about the
  * run route's workers, not about Claude. Re-exported there for existing importers.
@@ -82,7 +82,7 @@ export const KNOWN_KINDS = Object.freeze(["pdf", "research", "evaluate", "evalua
  *             untrusted input.
  * - evaluate-text  evaluate with the posting text in the request instead of a
  *             url, for unattended runs: no network tool. The report the backend
- *             persists is the one channel left, which is why claudeCliArgs
+ *             persists is the residual channel, which is why claudeCliArgs
  *             denies Read on secrets and PII for this kind.
  * - fix-portal rewrites one portals.yml entry after finding a working ATS URL.
  * - cover     runs cover.md's web research and re-reads the posting url, then
