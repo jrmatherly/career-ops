@@ -523,7 +523,9 @@ export async function POST(req: Request) {
             reportNum: paths.reportNum,
           });
           if (result.kind === "render-failed") {
-            send({ type: "error", msg: result.error.slice(0, 200) });
+            // Wider than the other error caps: this message carries the fact
+            // gate's unsupported claims, which is what the user must act on.
+            send({ type: "error", msg: result.error.slice(0, 1000) });
             return;
           }
           // Non-fatal issues (a defaulted page format, a tracker row not marked) still

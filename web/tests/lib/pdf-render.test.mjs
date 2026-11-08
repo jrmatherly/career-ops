@@ -277,8 +277,10 @@ test("renderAndMarkPdf: generate-pdf.mjs fails -> render-failed, mark-pdf-ready 
     // When rendering
     const result = await renderAndMarkPdf({ spawnFn, execPath: "node", coreRoot: "/root", pdfPaths, format: "letter", reportNum: "3" });
 
-    // Then it reports render-failed with the render's stderr, never calls mark-pdf-ready, and still cleans scratch
-    assert.deepEqual(result, { kind: "render-failed", error: "Refusing to write the PDF outside the project directory" });
+    // Then it reports render-failed with the render's stderr, keeps the rejected CV, never calls mark-pdf-ready, and still cleans scratch
+    assert.equal(result.kind, "render-failed");
+    assert.match(result.error, /^Refusing to write the PDF outside the project directory Rejected CV kept at /);
+    assert.equal(result.kept.html, join(dir, "cv-web-3-rejected.html"));
     assert.equal(calls.length, 1);
     assert.deepEqual(readdirSync(dir).filter((f) => f.startsWith("cv-web-3.")), []);
     assert.deepEqual(readdirSync(join(dir, "output")), [], "a failed render keeps no HTML");
