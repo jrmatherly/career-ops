@@ -118,8 +118,8 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
 
       {toast && (
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
-          <div role="status" className="flex max-w-full items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
-            <p className="break-words">{toast.text}</p>
+          <div role="status" className="flex max-w-2xl items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
+            <p className="min-w-0 break-words">{toast.text}</p>
             <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-muted hover:text-foreground">
               <X className="size-3.5" />
             </button>
