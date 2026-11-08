@@ -12,11 +12,11 @@ import { normalizeUrl } from "./url-key.mjs";
 const RANK_LABEL = "| rank: ";
 const RANK_SEGMENT = /\| rank: (\d+(?:\.\d+)?)\/5 — ([^|]*)/;
 
-/** YYYY-MM-DD of `epochMs` in `timeZone`. formatToParts, because `format`'s field order varies across ICU builds. */
-export function localDate(epochMs, timeZone) {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(epochMs));
-  const part = (type) => parts.find((p) => p.type === type).value;
-  return `${part("year")}-${part("month")}-${part("day")}`;
+/** YYYY-MM-DD of `epochMs` on the host's clock: lib/local-today.mjs's arithmetic, which the scanners stamp `first_seen` with. */
+export function hostLocalDate(epochMs) {
+  const date = new Date(epochMs);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /**
@@ -39,15 +39,17 @@ export function pendingRows(text) {
 }
 
 /**
- * The later of the job's `evaluate.enabledAt` and the local date, in the
- * job's timezone, of its newest successful run other than `excludeRunId`.
+ * The later of the job's `evaluate.enabledAt` and the host-local date of its
+ * newest successful run other than `excludeRunId`. Host-local, not
+ * job.timezone: the scanners stamp `first_seen` on the host's clock, and the
+ * job's timezone governs when it runs, not what day a row was first seen.
  */
 export function candidateSince({ job, runs, excludeRunId }) {
   const previous = runs
     .filter((run) => run.jobId === job.id && run.state === "success" && run.id !== excludeRunId)
     .map((run) => Date.parse(run.at))
     .filter(Number.isFinite);
-  const runDate = previous.length ? localDate(Math.max(...previous), job.timezone || "UTC") : "";
+  const runDate = previous.length ? hostLocalDate(Math.max(...previous)) : "";
   const enabledAt = job.evaluate?.enabledAt || "";
   return enabledAt > runDate ? enabledAt : runDate;
 }
@@ -55,7 +57,7 @@ export function candidateSince({ job, runs, excludeRunId }) {
 /**
  * A pending row is a candidate when the last `added` scan-history row for
  * its URL (file order, which is append order) has a `first_seen` on or after
- * `since`. The last row matters: the scanner appends a row per status, and a
+ * `since`, both host-local days (see candidateSince). The last row matters: the scanner appends a row per status, and a
  * URL it skipped once can be added on a later day.
  *
  * @param {{ pendingRows: ReturnType<typeof pendingRows>, scanHistoryRows: Array<{ url: string, first_seen: string, status?: string }>, since: string }} input

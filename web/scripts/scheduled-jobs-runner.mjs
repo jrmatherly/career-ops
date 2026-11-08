@@ -17,7 +17,7 @@ import { isMainModule } from "../../lib/is-main-module.mjs";
 import { scheduledRunnerResourcePath, scheduledStorePath } from "../src/lib/scheduled-runner-path.mjs";
 import { getCareerOpsRoot } from "../../path-resolver.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
-import { scanFailureMessage } from "../src/lib/scheduled-scan-error.mjs";
+import { scanFailureMessage, stderrCause } from "../src/lib/scheduled-scan-error.mjs";
 import { cleanChips } from "../src/lib/clean-chips.mjs";
 import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
@@ -363,6 +363,40 @@ function readText(file) {
   }
 }
 
+const RANK_DETAIL_MAX = 290;
+// rank-pipeline.mjs's indented per-batch failure lines: the CLI's own cause in parentheses, or the batch's problem.
+const RANK_BATCH_FAILED = /^\s+batch \d+: (?:CLI call failed \((.*)\), entries left un-annotated|(.*?) — entries left un-annotated)$/;
+
+/*
+ * Why a rank pass failed, for evalMessage. Without a batch line, the cause is
+ * among rank-pipeline.mjs's column-0 lines, which state it first and a hint
+ * after (its usage errors, its "No supported agent CLI found"), so they go to
+ * stderrCause reversed: its last-line fallback then takes the first.
+ */
+export function rankFailureMessage(result, { timeoutMs = SCAN_TIMEOUT_MS, cli = process.env.CAREER_OPS_RANK_CLI } = {}) {
+  const error = result?.error;
+  const lines = String(result?.stderr || "").split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.trim());
+  const topLevel = lines.filter((line) => !/^\s/.test(line) && !/^Node\.js v\d/.test(line));
+  let detail;
+  if (error?.code === "ETIMEDOUT") detail = `ranker timed out after ${Math.round(timeoutMs / 60_000)} minutes.`;
+  else if (error) detail = String(error.message || error).split(/\r?\n/)[0];
+  else {
+    const batch = lines.map((line) => line.match(RANK_BATCH_FAILED)).findLast(Boolean);
+    detail = (batch && (batch[1] ?? batch[2]))
+      || stderrCause(topLevel.toReversed().join("\n"))
+      || (result?.signal ? `ranker stopped by ${result.signal}.` : `ranker exited ${result?.status ?? "unknown"}.`);
+  }
+  const bin = cli?.trim();
+  if (bin && path.basename(bin) !== bin) detail = detail.replaceAll(bin, path.basename(bin));
+  if (detail.length > RANK_DETAIL_MAX) {
+    const cut = detail.slice(0, RANK_DETAIL_MAX);
+    // Back up to a word boundary only when one is near the end, so one long token (a URL, a path) is not dropped whole.
+    const space = cut.search(/\s+\S*$/);
+    detail = `${space > RANK_DETAIL_MAX / 2 ? cut.slice(0, space) : cut}…`;
+  }
+  return `Rank: ${detail}`;
+}
+
 const RANK_LOCK = { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 60_000 };
 // Five ranker batches of ten at its default 180 s each stay inside SCAN_TIMEOUT_MS; the rest wait for the next tick.
 const RANK_MAX_PER_PASS = 50;
@@ -392,7 +426,11 @@ export async function rankPass(root, storePath, { spawnFn = spawnSync } = {}) {
   await withResourceLock(`${runnerResourcePath(storePath)}.rank`, async () => {
     const store = readScheduledStore(storePath);
     const pipelinePath = path.join(root, "data", "pipeline.md");
-    const scanHistoryRows = scanHistoryDataLines(readText(path.join(root, "data", "scan-history.tsv")))
+    const historyPath = path.join(root, "data", "scan-history.tsv");
+    if (!fs.existsSync(historyPath) && pendingRows(readText(pipelinePath)).length) {
+      process.stderr.write(`rank: ${historyPath} is missing, so no pending row counts as a scan's; nothing is ranked\n`);
+    }
+    const scanHistoryRows = scanHistoryDataLines(readText(historyPath))
       .filter((line) => line.trim())
       .map(parseScanHistoryLine);
     for (const job of due(store)) {
@@ -411,26 +449,37 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
   const candidates = candidatesFor({ pendingRows: pendingRows(readText(pipelinePath)), scanHistoryRows, since });
   const waiting = candidates.filter((candidate) => !candidate.ranked);
   const unranked = waiting.slice(0, RANK_MAX_PER_PASS);
-  let ranked = candidates.length - waiting.length;
+  const rankedBefore = candidates.length - waiting.length;
+  let ranked = rankedBefore;
   // The waiting message keeps the run due, so the next tick sends the rest.
   let evalMessage = waiting.length > unranked.length ? `${waiting.length - unranked.length}${RANK_WAITING}` : undefined;
   if (unranked.length) {
     const urlsFile = writeJobTemp(root, job.id, "rank", "txt", `${unranked.map((c) => c.url).join("\n")}\n`);
+    let rankerStderr = "";
     try {
       const result = spawnFn(
         process.execPath,
         ["rank-pipeline.mjs", "--urls-file", urlsFile, "--limit", String(unranked.length)],
         { cwd: CODE_ROOT, env: coreEnv(root), encoding: "utf8", timeout: SCAN_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
       );
-      if (result.status !== 0) evalMessage = scanFailureMessage(result, { timeoutMs: SCAN_TIMEOUT_MS });
+      rankerStderr = result.stderr || "";
+      if (result.status !== 0) evalMessage = rankFailureMessage(result);
     } catch (error) {
-      evalMessage = scanFailureMessage({ error });
+      evalMessage = rankFailureMessage({ error });
     } finally {
       fs.rmSync(urlsFile, { force: true });
     }
     // The scan history has not changed, so the candidates are the same rows; only whether they are ranked can have changed.
+    const rows = pendingRows(readText(pipelinePath));
     const urls = new Set(candidates.map((candidate) => candidate.url));
-    ranked = pendingRows(readText(pipelinePath)).filter((row) => row.ranked && urls.has(row.url)).length;
+    ranked = rows.filter((row) => row.ranked && urls.has(row.url)).length;
+    // rank-pipeline.mjs exits 0 unless every call failed. The run is not made due again, as for a failed pass.
+    const sent = new Set(unranked.map((candidate) => candidate.url));
+    const missed = unranked.length - rows.filter((row) => row.ranked && sent.has(row.url)).length;
+    if (!evalMessage && missed > 0) {
+      evalMessage = `Rank: ${missed} of ${unranked.length} sent rows came back unranked; the ranker's reasons are in the runner's stderr log.`;
+      process.stderr.write(rankerStderr);
+    }
   }
   process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
   if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage) await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage });
@@ -448,13 +497,13 @@ function requestedJobId(args) {
   return index >= 0 ? args[index + 1] || null : null;
 }
 
-async function main() {
-  const root = getCareerOpsRoot();
+/** One runner tick. `root` and `spawnFn` are seams for tests; the CLI passes neither. */
+export async function main(args = process.argv.slice(2), { root = getCareerOpsRoot(), spawnFn = spawnSync } = {}) {
   const storePath = scheduledStorePath(root);
   const runnerResource = runnerResourcePath(storePath);
-  const manualJobId = requestedJobId(process.argv.slice(2));
+  const manualJobId = requestedJobId(args);
 
-  const outcome = await withResourceLock(
+  const tick = withResourceLock(
     runnerResource,
     async () => {
       let claim;
@@ -473,18 +522,22 @@ async function main() {
 
       if (!claim) return { status: "idle" };
 
-      const result = executeJob(root, claim.job);
+      const result = executeJob(root, claim.job, { spawnFn });
       await recordCompletion(storePath, claim, result);
       if (result.state === "failed") throw new Error(result.message);
       return { status: "success", jobId: claim.job.id, ...result };
     },
     { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 60_000 },
   );
-  // The manual route returns when its scan finishes; the next tick ranks what it found.
-  if (!manualJobId) {
-    await rankPass(root, storePath).catch((error) => process.stderr.write(`rank pass failed: ${error instanceof Error ? error.message : String(error)}\n`));
+  try {
+    return await tick;
+  } finally {
+    // In a finally, so a failed scan or a busy runner lock still ranks the other jobs' rows.
+    // The manual route returns when its scan finishes; the next tick ranks what it found.
+    if (!manualJobId) {
+      await rankPass(root, storePath, { spawnFn }).catch((error) => process.stderr.write(`rank pass failed: ${error instanceof Error ? error.message : String(error)}\n`));
+    }
   }
-  return outcome;
 }
 
 if (isMainModule(import.meta.url)) {

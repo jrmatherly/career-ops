@@ -119,7 +119,7 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   const startAt = cleanStartAt(input.startAt, base?.startAt || new Date().toISOString());
   let evaluate: EvaluateSettings | undefined;
   try {
-    evaluate = scheduledEvaluate(input.evaluate, base?.evaluate, timezone) as EvaluateSettings | undefined;
+    evaluate = scheduledEvaluate(input.evaluate, base?.evaluate) as EvaluateSettings | undefined;
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Invalid evaluate settings.");
   }

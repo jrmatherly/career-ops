@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { candidateSince, candidatesFor, localDate, pendingRows } from "../../src/lib/core/evaluate-candidates.mjs";
+import { candidateSince, candidatesFor, hostLocalDate, pendingRows } from "../../src/lib/core/evaluate-candidates.mjs";
+import { localToday } from "../../../lib/local-today.mjs";
 
 const JOB_ID = "11111111-1111-4111-8111-111111111111";
 const history = (url, firstSeen, status = "added") => ({ url, first_seen: firstSeen, status });
@@ -41,8 +42,7 @@ test("the since day is inclusive and the day before it is not", () => {
   assert.deepEqual(candidatesFor({ pendingRows: rows, scanHistoryRows, since: "2026-11-08" }).map((c) => c.url), ["https://a.test/on"]);
 });
 
-test("since is the later of enabledAt and the previous successful run's date in the job's timezone", () => {
-  // 03:30 UTC on 2026-11-08 is still 2026-11-07 in New York.
+test("since is the later of enabledAt and the previous successful run's host-local date", () => {
   const runs = [
     { id: "22222222-2222-4222-8222-222222222222", jobId: JOB_ID, state: "success", at: "2026-11-09T12:00:00.000Z" },
     { id: "33333333-3333-4333-8333-333333333333", jobId: JOB_ID, state: "success", at: "2026-11-08T03:30:00.000Z" },
@@ -51,11 +51,32 @@ test("since is the later of enabledAt and the previous successful run's date in 
   ];
   const job = (timezone, enabledAt) => ({ id: JOB_ID, timezone, evaluate: { mode: "review", enabledAt, rankThreshold: 3.5, maxPerRun: 5 } });
   const latest = runs[0].id;
-  assert.equal(candidateSince({ job: job("America/New_York", "2026-11-01"), runs, excludeRunId: latest }), "2026-11-07");
-  assert.equal(candidateSince({ job: job("UTC", "2026-11-01"), runs, excludeRunId: latest }), "2026-11-08");
-  assert.equal(candidateSince({ job: job("UTC", "2026-11-09"), runs, excludeRunId: latest }), "2026-11-09", "a later enabledAt wins");
+  const previousDay = hostLocalDate(Date.parse("2026-11-08T03:30:00.000Z"));
+  for (const timezone of ["America/New_York", "UTC", "Asia/Tokyo"]) {
+    assert.equal(candidateSince({ job: job(timezone, "2026-11-01"), runs, excludeRunId: latest }), previousDay, `the job's ${timezone} does not move it`);
+  }
+  assert.equal(candidateSince({ job: job("UTC", "2026-11-10"), runs, excludeRunId: latest }), "2026-11-10", "a later enabledAt wins");
   assert.equal(candidateSince({ job: job("UTC", "2026-11-01"), runs: runs.slice(0, 1), excludeRunId: latest }), "2026-11-01", "with no earlier success, enabledAt is the bound");
-  assert.equal(localDate(Date.parse("2026-11-08T03:30:00.000Z"), "America/New_York"), "2026-11-07");
+});
+
+test("hostLocalDate is the day the scanners stamp first_seen with", () => {
+  for (const at of ["2026-11-08T00:30:00.000Z", "2026-11-08T12:00:00.000Z", "2026-11-08T23:30:00.000Z", "2026-03-08T07:30:00.000Z"]) {
+    assert.equal(hostLocalDate(Date.parse(at)), localToday(new Date(at)), at);
+  }
+});
+
+test("a job east of the host ranks the rows its own run added", () => {
+  // The scanner ran at 20:00Z and stamped the host's day; in Asia/Tokyo that instant is already the next day.
+  const runAt = Date.parse("2026-11-08T20:00:00.000Z");
+  const runs = [
+    { id: "22222222-2222-4222-8222-222222222222", jobId: JOB_ID, state: "success", at: new Date(runAt).toISOString() },
+    { id: "33333333-3333-4333-8333-333333333333", jobId: JOB_ID, state: "success", at: "2026-11-08T16:00:00.000Z" },
+  ];
+  const job = { id: JOB_ID, timezone: "Asia/Tokyo", evaluate: { mode: "review", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5 } };
+  const since = candidateSince({ job, runs, excludeRunId: runs[0].id });
+  const rows = pendingRows("- [ ] https://a.test/tokyo | A | Role\n");
+  const candidates = candidatesFor({ pendingRows: rows, scanHistoryRows: [history("https://a.test/tokyo", hostLocalDate(runAt))], since });
+  assert.deepEqual(candidates.map((c) => c.url), ["https://a.test/tokyo"]);
 });
 
 test("two spellings of one URL join by normalized key and the pipeline's spelling is returned", () => {

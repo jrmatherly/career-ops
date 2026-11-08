@@ -1,4 +1,4 @@
-import { localDate } from "./core/evaluate-candidates.mjs";
+import { hostLocalDate } from "./core/evaluate-candidates.mjs";
 
 export function assertScheduledJobBody(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -24,11 +24,11 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 
 /*
  * A body that omits `evaluate` keeps the base job's. `enabledAt` becomes
- * today in `timezone` when the job moves from off (or no settings) to review
+ * the host's local today, the clock `first_seen` is stamped on, when the job moves from off (or no settings) to review
  * or auto, or has none yet, so the rank pass never reaches back to rows found
  * before that day.
  */
-export function scheduledEvaluate(value, base, timezone, nowMs = Date.now()) {
+export function scheduledEvaluate(value, base, nowMs = Date.now()) {
   if (value === undefined) return base;
   if (!value || typeof value !== "object" || Array.isArray(value) || !EVALUATE_MODES.includes(value.mode)) {
     throw new Error("Invalid evaluate settings.");
@@ -36,7 +36,7 @@ export function scheduledEvaluate(value, base, timezone, nowMs = Date.now()) {
   const turnedOn = value.mode !== "off" && (!base || base.mode === "off");
   return {
     mode: value.mode,
-    enabledAt: turnedOn || !base?.enabledAt ? localDate(nowMs, timezone) : base.enabledAt,
+    enabledAt: turnedOn || !base?.enabledAt ? hostLocalDate(nowMs) : base.enabledAt,
     rankThreshold: clamped(value.rankThreshold, base?.rankThreshold ?? 3.5, 1, 5, (n) => Math.round(n * 10) / 10, "rank threshold"),
     maxPerRun: clamped(value.maxPerRun, base?.maxPerRun ?? 5, 1, 20, Math.round, "evaluations per run"),
   };
