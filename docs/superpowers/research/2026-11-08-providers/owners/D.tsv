@@ -1,0 +1,3 @@
+ts	phase	decision	why	evidence	result
+2026-11-08T23:40:00Z	start	branch claude/providers-drift-gates cut from origin/main f6177877; npm install	brief D and standing orders	branch created	open
+2026-11-08T23:32:42Z	D1	catalog-and-template-coverage test; eight stanzas; retired keyed on the catalog name cell (The Muse -> themuse) so PR C merges clean	plan D1; notes-text match could falsely exempt	failed first: apple, atlassian, bwi, google, hiringroom, radancy, remotli, tkms (matches plan); 3/3 after	done
