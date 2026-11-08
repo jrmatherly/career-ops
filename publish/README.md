@@ -112,9 +112,11 @@ Sign-in is limited to `PUBLISH_ALLOWED_EMAILS`: Better Auth's `validateUserInfo`
 The key flow:
 
 1. Register an OIDC client in Pocket ID with the redirect URI `$PUBLISH_BASE_URL/api/auth/callback/pocket-id`, and put its id, secret and discovery URL in the service's environment.
-2. Open `$PUBLISH_BASE_URL/account`, sign in with Pocket ID, and create a key. It is shown once.
-3. Put it in the data root's `.env` as `PUBLISH_API_KEY`, next to `PUBLISH_URL`. The share CLI sends it on every request.
+2. Open `$PUBLISH_BASE_URL/account` (the dashboard's Shares page links to it as "Manage publish keys" when `PUBLISH_URL` is an `https` URL), sign in with Pocket ID, and create a key. It is shown once.
+3. Put it where the share CLI reads it. On a cluster install, `PUBLISH_API_KEY` is pod env rendered from `cluster.toml`, so add the line the page prints, `publish_api_key = "cops_..."`, to the `[career_ops]` block; the environment wins over `.env`, so a key put in `.env` there is ignored. On a local install, put it in the data root's `.env` as `PUBLISH_API_KEY`, next to `PUBLISH_URL`. The share CLI sends it on every request.
 4. Revoke it on the same page when a machine is retired. Revoking takes effect on the next request. Removing an email from `PUBLISH_ALLOWED_EMAILS` and restarting the service stops that user's sign-ins, open sessions and keys; the keys stay in the database, refused, until revoked.
+
+The account page carries the dashboard's colour tokens inline, light and dark, with no script and no external URL, so it needs nothing beyond the CSP above.
 
 If Pocket ID is down when the service starts, shares and keys keep working and sign-in answers 503; the next sign-in after Pocket ID is back re-reads its discovery document.
 
@@ -142,6 +144,6 @@ node publish/share.mjs delete --slug <s>
 
 Exit codes: 0 done, 1 usage, a failed request (stderr names the method, path and status, never the key) or any other error, 3 the resume gate refused. `--from-resume` and a `republish` of a resume share run `node resume.mjs absorb`, which exits 3 while `cv.md` does not absorb losslessly into `data/resume.json`, so a renamed entry cannot be published with an overlay that hid the old item by id; run `node resume.mjs pair <orphanId> <newId>` (or `adopt --confirm`) to resolve it first.
 
-`PUBLISH_URL` (the service's base URL) and `PUBLISH_API_KEY` (a key from the account page, sent as `x-api-key`) come from the environment, else from the data root's `.env`. They are never taken from argv. `publish` and `republish` need `share:upload`; `stats`, `pull` and `delete` need `share:manage`. A key made on the account page has both.
+`PUBLISH_URL` (the service's base URL) and `PUBLISH_API_KEY` (a key from the account page, sent as `x-api-key`) come from the environment, else from the data root's `.env`. They are never taken from argv. On a cluster install both are pod env: `PUBLISH_URL` from the career-ops HelmRelease env and the key from `publish_api_key` in the `[career_ops]` block of `cluster.toml`. On a local install both go in the data root's `.env`. `publish` and `republish` need `share:upload`; `stats`, `pull` and `delete` need `share:manage`. A key made on the account page has both.
 
 Records in `data/shares.json` are written under a `data/shares.json.lock` directory lock (`lib/dir-lock.mjs`) with an atomic rename, so two CLI runs cannot interleave. `publish/tests/share-cli.test.mjs` runs the CLI against an in-process service and is part of `npm --prefix publish test`.

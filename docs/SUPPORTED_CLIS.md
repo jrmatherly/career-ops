@@ -18,7 +18,7 @@ Career-ops is AI-agnostic and runs on several command-line agent tools. The core
 | Hermes Agent | `AGENTS.md` | Interactive: `hermes` (then ask for a career-ops task). Web read-only workers: `hermes chat -q "prompt" --oneshot -Q --no-restore-cwd`. Batch ranking: unsupported. |
 | Oh My Pi | `.omp/AGENTS.md` | Interactive: `omp` (then `/skill:career-ops`). Headless/Batch: `omp -p "prompt"` |
 
-Record the CLI you use with `node remember-cli.mjs <cli>`, so `doctor.mjs`, `rank-pipeline.mjs` and the web UI use it. Accepted ids: `claude`, `codex`, `opencode`, `pi`, `antigravity` (not `agy`), `grok`, `qwen`, `kimi`, `copilot`, `gemini`, `hermes`, `omp`.
+Record the CLI you use with `node remember-cli.mjs <cli>`, so `doctor.mjs`, `rank-pipeline.mjs` and the web UI use it. Accepted ids: `claude`, `codex`, `opencode`, `pi`, `antigravity` (not `agy`), `grok`, `qwen`, `kimi`, `copilot`, `gemini`, `hermes`, `omp`. A `CAREER_OPS_CLI` set in the environment overrides the `.env` line.
 
 ## Hermes Agent
 

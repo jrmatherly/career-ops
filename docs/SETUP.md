@@ -114,6 +114,14 @@ The basic workflow is:
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contribution guidelines and examples of good first contributions.
 
+### Running on a cluster
+
+This fork also runs the web dashboard as a hosted pod built from
+`deploy/Dockerfile`, with `CAREER_OPS_ROOT` on a persistent volume and a CronJob
+firing the scheduled scans. `deploy/README.md` is that image's runtime contract.
+The full container and cluster path, including what the image lacks, is
+[`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ### PDF rendering (one-time)
 
 PDFs are rendered with a headless Chromium. `npm install` downloads it unless `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` is set. Run this only if that download failed:

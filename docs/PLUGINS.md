@@ -117,6 +117,15 @@ Broadly-useful, low/zero-key plugins may be shipped **bundled** in `plugins/`
 reviewed in-tree, always present, and a working example to copy — kept minimal
 and stable on purpose, **not** a home for ongoing feature work.
 
+### Bundled plugins
+
+| id | hooks | env keys | what it does |
+| --- | --- | --- | --- |
+| `apify` | `provider` | `APIFY_TOKEN` | Keyed job source: runs an Apify actor and maps its results into the scanner |
+| `gmail` | `ingest` | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Pulls job leads from a Gmail label into the pipeline (read-only, your OAuth token) |
+| `h1b-sponsor` | `ingest` | optional `H1B_API_TOKEN`, `H1B_API_BASE`, `H1B_INDEX_PATH` | US DOL H-1B/PERM sponsorship history per employer from a local index, or an HTTP endpoint when `H1B_API_BASE` is set |
+| `notion` | `export`, `search` | `NOTION_ACCESS_TOKEN`, `NOTION_PARENT_PAGE_ID` | Mirrors the tracker to a Notion database and reads records back as job leads |
+
 ### Improving a bundled plugin → publish a maintained successor
 
 We **don't take feature PRs against bundled plugins.** If you want to extend one

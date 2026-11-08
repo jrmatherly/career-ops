@@ -449,3 +449,16 @@ An independent reviewer (opus, read-only) checked the first draft of this plan a
 - The Ashby and token-lifetime statements are worded as reported, not measured.
 
 Not re-reviewed after the edits. Not checked by anyone: the Task 6 smoke stack (needs Docker) and whether the three upstream batches apply cleanly to `careerops/main`.
+
+### Execution, 2026-11-08
+
+Executed inline on branch `claude/distracted-ptolemy-303da4`, one commit per task, in the order Task 1, 2, 3, 4, 5, 6. Every task's checkbox steps ran as written, with these rulings:
+
+- Task 1. The pointer sentences in README, SETUP, FAQ, ARCHITECTURE, AUTOMATION, SUPPORTED_CLIS and CLAUDE_PLUGIN are not read by `tests/deployment-doc.test.mjs`. Their deviations rows say so instead of naming the test as a pin.
+- Task 2. `tests/web-import-guard.test.mjs` refuses a static import from `web/`, so the test loads `claude-invocation.mjs` and `worker-capabilities.mjs` with `import()` behind an `existsSync` guard. The commit was amended before any push so batch A stays one commit.
+- Task 4. None of the fourteen scripts has a `## <name>` section in `docs/SCRIPTS.md`. The test checks the lines that name the script when no section exists.
+- Task 6. The smoke stack ran with `read_only: true` and passed (`/api/version` and `/api/healthz` 200, `generate-pdf.mjs --pdf-server` in `ps -ef`, no `EROFS`), so the fallback was not needed.
+
+Upstream cherry-pick dry run (`git merge-tree --write-tree --merge-base <commit>^ careerops/main <commit>`, upstream at `abefa6db`): every batch conflicts only on `.claude/skills/upstream-review/SKILL.md`, which upstream lacks, so that file is dropped from a pick. Batch B is otherwise clean. Batches A and C conflict in `docs/SCRIPTS.md` (A also in `web/README.md`) where fork hunks sit beside the new text, so those picks are resolved by hand.
+
+A fresh-context reviewer (fable, read-only) reviewed the whole branch after Task 6. No Critical findings. Two Important, both fixed in a follow-up commit: the `web/README.md` overlay sentence said a full-sweep job never uses its own keywords, where the runner (`scheduled-jobs-runner.mjs:166`) spreads the job's lists over `title_filter_full`, so it is `portals.yml`'s full-scan keywords that go unused; and four new sentences joined clauses with a semicolon (`deploy/README.md`, `docs/AUTOMATION.md`, `modes/scan.md`, `DOCKER.md`). Minors deferred, not fixed: `always_allow: ["United States"]` keeps only the code for Georgia (`scan.mjs` `US_STATE_NAMES_ALSO_COUNTRIES`), so "every US state name" overstates by one; the `doctor.mjs` Playwright-MCP warning in the pod comes from the absent MCP config, not from the tool scopes; the `readOnlyRootFilesystem` sentence states the cluster manifests, which live outside the repo; `DOCKER.md` names two of the three digest-pinned Dockerfiles (`tests/cv-visual/Dockerfile` is the third); the new `docs/SCRIPTS.md` cells keep that table's semicolons and em dashes. One flake seen once in `tests/batch-dealbreaker-skip.test.mjs` while another worktree ran the suite, passing 24/24 twice alone.

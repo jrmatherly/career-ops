@@ -10,7 +10,7 @@ system/user data-contract layers live in [../ARCHITECTURE.md](../ARCHITECTURE.md
 ## Evaluation Flow (Single Offer)
 
 1. **Input**: User pastes JD text or URL
-2. **Extract**: Playwright/WebFetch extracts JD from URL, with `fetch-jd.mjs` as the fallback for a supported ATS API
+2. **Extract**: Playwright/WebFetch extracts JD from URL, with `fetch-jd.mjs` as the fallback for a supported ATS API. In the web dashboard's evaluate run the extraction is WebFetch only (`docs/DEPLOYMENT.md`)
 3. **Gate**: liveness, blacklist and dealbreakers; stop if any fails
 4. **Classify**: Detect archetype (your `modes/_profile.md` targets, or the 6 defaults; "none of these" is a valid outcome)
 5. **Evaluate**: 8 blocks (A-H; H is conditional on scores ≥ 4.5):

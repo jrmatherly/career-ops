@@ -4,7 +4,7 @@ import { careerOpsRoot } from "@/lib/career-ops";
 
 // The records publish/share.mjs writes to data/shares.json, plus the comments
 // it pulls into data/share-feedback/<slug>.md. Read-only: publishing stays in
-// the CLI so the service key never enters the web process.
+// the CLI: only publish/share.mjs uses the service key; the web never uses, returns or logs it.
 export type Share = {
   readonly slug: string;
   readonly url: string;

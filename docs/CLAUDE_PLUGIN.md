@@ -33,7 +33,7 @@ Then start a new session. The first start takes a few seconds longer while the p
 | Node packages | `${CLAUDE_PLUGIN_DATA}/node_modules`: `~/.claude/plugins/data/career-ops-career-ops/` for a `/plugin` install, `~/.claude/plugins/data/career-ops-synced/` for a Customize install | Yes |
 | Your CV, profile, tracker, reports | `~/career-ops-data` | Yes, Claude Code never touches it |
 
-Claude Code replaces the code folder on every plugin update, so career-ops never keeps your files there. `path-resolver.mjs` detects a plugin install and uses `~/career-ops-data` when nothing else names a data folder.
+Claude Code replaces the code folder on every plugin update, so career-ops never keeps your files there. `path-resolver.mjs` resolves the data root in this order: `CAREER_OPS_ROOT` or `CAREER_OPS_DATA_DIR`, then a `.career-ops-data` marker file, then `~/career-ops-data` for a plugin install, then the code folder itself. The marker is read from the code folder, which a plugin update replaces, so plugin users set `CAREER_OPS_ROOT` instead. The plugin folders are found under `CLAUDE_CODE_PLUGIN_CACHE_DIR` and `CLAUDE_CONFIG_DIR` when those are set, else under `~/.claude`.
 
 To use another folder, set `CAREER_OPS_ROOT` (or `CAREER_OPS_DATA_DIR`) to an absolute path in `~/.claude/settings.json`. A folder inside a plugin install copy (`~/.claude/plugins/cache/`, `marketplaces/` or `synced/`) is refused: career-ops scripts stop with an error that names the variable, and `node doctor.mjs` reports it.
 
@@ -69,7 +69,7 @@ Claude updates the plugin, not `update-system.mjs`. Inside a plugin install, `no
 - **Customize installs:** open the marketplace under **Customize → Plugins** and turn on **Sync automatically**, or select **Check for updates** to pull now.
 - **`/plugin` installs:** open `/plugin`, find career-ops under **Installed** and update it, or turn on auto-update for its marketplace on the **Marketplaces** tab.
 
-The manifest pins `version`, so an install stays on that version until `version` changes. If you ship changes from a fork, bump `version` in `.claude-plugin/plugin.json`, then copy that file verbatim to `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`. Bump both `version` fields in `.claude-plugin/marketplace.json` too. The `extra-files` list in `release-please-config.json` names every file that carries the version.
+The manifest pins `version`, so an install stays on that version until `version` changes. If you ship changes from a fork, bump `version` in `.claude-plugin/plugin.json`, then copy that file verbatim to `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`. Bump both `version` fields in `.claude-plugin/marketplace.json` too. The `extra-files` list in `release-please-config.json` names every file that carries the version. On this fork `check` reports `offline` by default and `--channel main` is the only channel that carries updates.
 
 ## Known limits
 
