@@ -162,6 +162,10 @@ test("a share the service no longer has comes back as missing on a successful pu
   assert.deepEqual((await post({})).body, { ok: true, missing: [], pulled: 0 }, "other stderr on exit 0 is logged, not reported");
 });
 
+// A cluster install takes both values as pod env, which wins over .env, so each message names where they are set there.
+const KEY_ON_CLUSTER = /publish_api_key = "cops_\.\.\." in the \[career_ops\] block of cluster\.toml/;
+const URL_DESTINATIONS = /PUBLISH_URL is set in the career-ops HelmRelease env on a cluster install and in the data root's \.env on a local install/;
+
 test("a refused key is a 503, rate limiting a 429 and a service error a 502, none naming a URL", async () => {
   const cases = [
     ["publish: GET /api/shares/alpha/stats answered 401 (api key required)\n", 503, /PUBLISH_API_KEY/],
@@ -179,6 +183,11 @@ test("a refused key is a 503, rate limiting a 429 and a service error a 502, non
     assert.match(r.body.error, message);
     if (status === 503 && /PUBLISH_API_KEY/.test(message)) assert.match(r.body.error, /environment/, stderr);
     assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\/api|\/home/);
+    if (status === 503 && /40[13]/.test(stderr)) {
+      assert.match(r.body.error, KEY_ON_CLUSTER);
+      assert.doesNotMatch(r.body.error, /local install/, "a refused key was found, so where to put one locally is noise");
+    }
+    if (status === 502) assert.match(r.body.error, URL_DESTINATIONS, "a wrong PUBLISH_URL also answers 5xx or non-JSON");
   }
 });
 
@@ -187,11 +196,15 @@ test("a service that does not answer is a 502 whose message names no URL or path
   const r = await post({ slug: "alpha" });
   assert.equal(r.status, 502);
   assert.doesNotMatch(r.body.error, /127\.0\.0\.1|\//);
+  assert.match(r.body.error, URL_DESTINATIONS);
   standIn(1, "publish: PUBLISH_URL is not set (environment or /home/u/root/.env)\n");
   const unset = await post({});
   assert.equal(unset.status, 503);
   assert.match(unset.body.error, /environment/);
   assert.doesNotMatch(unset.body.error, /\/home/);
+  assert.match(unset.body.error, URL_DESTINATIONS);
+  assert.match(unset.body.error, KEY_ON_CLUSTER);
+  assert.match(unset.body.error, /PUBLISH_API_KEY in the data root's \.env/);
 });
 
 test("any other non-zero exit is a 500 with a generic message; a missing record is a 404", async () => {
