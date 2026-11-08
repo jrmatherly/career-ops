@@ -53,10 +53,10 @@ export function candidateSince({ job, runs, excludeRunId }) {
 }
 
 /**
- * A pending row is a candidate when the latest `added` scan-history row for
- * its URL has a `first_seen` on or after `since`. The latest row matters: the
- * scanner appends a row per status, and a URL it skipped once can be added
- * on a later day.
+ * A pending row is a candidate when the last `added` scan-history row for
+ * its URL (file order, which is append order) has a `first_seen` on or after
+ * `since`. The last row matters: the scanner appends a row per status, and a
+ * URL it skipped once can be added on a later day.
  *
  * @param {{ pendingRows: ReturnType<typeof pendingRows>, scanHistoryRows: Array<{ url: string, first_seen: string, status?: string }>, since: string }} input
  * @returns {Array<{ url: string, ranked: boolean, rank?: number, reason?: string }>}

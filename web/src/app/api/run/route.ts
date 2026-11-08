@@ -47,7 +47,7 @@ const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
 const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
   evaluate: {
     pattern: /^(?:https?:\/\/\S+|local:[^\s\u0085](?:(?:[^\s\u0085]| )*[^\s\u0085])?)$/i,
-    shape: "a bare http(s) URL with no whitespace in it, or a local: path with no whitespace but interior spaces",
+    shape: "a bare http(s) URL with no whitespace in it, or a local: path whose only whitespace is interior spaces",
   },
   "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL with no whitespace in it" },
 };

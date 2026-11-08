@@ -23,9 +23,10 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 }
 
 /*
- * A body that omits `evaluate` keeps the base job's. `enabledAt` becomes today
- * in `timezone` on every move from off (or no settings) to review or auto, so
- * the rank pass never reaches back to rows found before that day.
+ * A body that omits `evaluate` keeps the base job's. `enabledAt` becomes
+ * today in `timezone` when the job moves from off (or no settings) to review
+ * or auto, or has none yet, so the rank pass never reaches back to rows found
+ * before that day.
  */
 export function scheduledEvaluate(value, base, timezone, nowMs = Date.now()) {
   if (value === undefined) return base;

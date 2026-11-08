@@ -363,12 +363,6 @@ function readText(file) {
   }
 }
 
-/*
- * Rank the rows each review or auto job's scans added. It reads only durable
- * state (pipeline.md, scan-history.tsv, the store), so a tick after a crash or
- * a failed scan ranks what the earlier run left, and a row already ranked is
- * never sent again. It records counts on a run but never changes its `state`.
- */
 const RANK_LOCK = { timeoutMs: 1_000, staleMs: SCAN_TIMEOUT_MS * MAX_ATTEMPTS + 60_000 };
 // Five ranker batches of ten at its default 180 s each stay inside SCAN_TIMEOUT_MS; the rest wait for the next tick.
 const RANK_MAX_PER_PASS = 50;
@@ -385,6 +379,12 @@ function runToRank(store, job) {
   return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) ? lastRun : null;
 }
 
+/*
+ * Rank the rows each review or auto job's scans added. It reads only durable
+ * state (pipeline.md, scan-history.tsv, the store), so a tick after a crash or
+ * a failed scan ranks what the earlier run left, and a row already ranked is
+ * never sent again. It records counts on a run but never changes its `state`.
+ */
 export async function rankPass(root, storePath, { spawnFn = spawnSync } = {}) {
   const due = (store) => evaluatingJobs(store).filter((job) => runToRank(store, job));
   if (!due(readScheduledStore(storePath)).length) return;
