@@ -104,7 +104,7 @@ export type InboxJob = {
   url: string; company: string; role: string; location?: string; compensation?: string; done: boolean; postedAt?: string;
   /** From the row's `rank: N/5 — reason` label (rank-pipeline.mjs): a cheap prior, not an evaluation score. */
   rank?: number; rankReason?: string;
-  /** The scan-history first_seen date, set by pipelineSummary; the Inbox groups a scan run's rows by it. */
+  /** The scan-history first_seen date, set by pipelineSummary; the Inbox groups a scan date's rows by it. */
   addedAt?: string;
 };
 

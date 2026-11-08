@@ -97,7 +97,7 @@ export function TriageRow({
           {job.location && <span className="truncate">{job.location}</span>}
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
-          {/* Never labelled a score: the A–F badge is the score, this is rank-pipeline.mjs's cheap prior. */}
+          {/* Never labelled a score: the N/5 Badge below is the evaluation score; this is rank-pipeline.mjs's cheap prior. */}
           {rankLabel && (
             <span title={job.rankReason} className="shrink-0 whitespace-nowrap rounded bg-brand-soft px-1 py-px font-medium tabular-nums text-brand-text">
               {rankLabel}

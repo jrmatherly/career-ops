@@ -27,7 +27,7 @@ const BATCH = 20;
 type UndoNotice = { label: string; fn: () => Promise<void>; busy?: boolean; error?: string };
 
 // The inbox as a TRIAGE surface: Abundance → Triage → Shortlist → Opt-in Score.
-// Default is a small fresh batch (never the full wall); free facets + Save/Skip narrow
+// Default is a small capped batch (never the full wall); free facets + Save/Skip narrow
 // it; only "Score shortlist" spends tokens. 🔴 The shell is agnostic to what makes a
 // role relevant — order goes through a single documented plug point.
 export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
@@ -46,7 +46,7 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
   const [locQ, setLocQ] = useState("");
   const [kw, setKw] = useState("");
   const [showAll, setShowAll] = useState(false);
-  // ?added=YYYY-MM-DD opens a scan run's rows. The chip never writes the URL back:
+  // ?added=YYYY-MM-DD opens a scan date's rows. The chip never writes the URL back:
   // Next treats history.replaceState as a navigation, which can abort in-flight runs.
   const params = useSearchParams();
   const [added, setAdded] = useState<string | null>(() => addedParam(params.get("added")));
@@ -158,6 +158,10 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
 
   const latestAdded = useMemo(() => latestAddedDates(enriched.map((e) => e.job), hidden), [enriched, hidden]);
   const availAdded = added && !latestAdded.includes(added) ? [added, ...latestAdded] : latestAdded;
+  const addedEmpty = useMemo(
+    () => added != null && !latestAddedDates(enriched.map((e) => e.job), hidden, Infinity).includes(added),
+    [enriched, hidden, added],
+  );
 
   const filtered = useMemo(
     () =>
@@ -471,8 +475,8 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
         </ul>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-10 text-center">
-          <p className="font-display text-lg">No matches</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">Loosen the filters to see more of your inbox.</p>
+          <p className="font-display text-lg">{addedEmpty ? `No roles were added on ${added}` : "No matches"}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{addedEmpty ? "Pick another scan date, or clear the filter." : "Loosen the filters to see more of your inbox."}</p>
         </div>
       )}
 

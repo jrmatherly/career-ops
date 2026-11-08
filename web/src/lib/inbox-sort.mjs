@@ -1,3 +1,5 @@
+import { dayInstant } from "./next-step.mjs";
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -17,13 +19,13 @@ export function compareInboxJobs(a, b) {
 }
 
 /**
- * The `?added=` value when it is a YYYY-MM-DD date, else null.
+ * The `?added=` value when it is a real YYYY-MM-DD calendar date, else null.
  *
  * @param {string | null} raw
  * @returns {string | null}
  */
 export function addedParam(raw) {
-  return raw && ISO_DATE.test(raw) ? raw : null;
+  return raw && ISO_DATE.test(raw) && dayInstant(raw) ? raw : null;
 }
 
 /**

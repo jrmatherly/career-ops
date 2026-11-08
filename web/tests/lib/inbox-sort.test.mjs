@@ -29,6 +29,11 @@ test("addedParam keeps only a YYYY-MM-DD date", () => {
   for (const raw of [null, "", "2026-11-8", "today", "2026-11-08x"]) assert.equal(addedParam(raw), null);
 });
 
+test("addedParam rejects a date the calendar does not have", () => {
+  assert.equal(addedParam("2024-02-29"), "2024-02-29");
+  for (const raw of ["2026-13-45", "2026-02-30", "2026-00-10"]) assert.equal(addedParam(raw), null);
+});
+
 test("latestAddedDates lists distinct scan dates newest first, skipping hidden rows", () => {
   const jobs = [
     { url: "a", addedAt: "2026-11-03" },
@@ -39,4 +44,9 @@ test("latestAddedDates lists distinct scan dates newest first, skipping hidden r
   ];
   assert.deepEqual(latestAddedDates(jobs, ["d"]), ["2026-11-08", "2026-11-03"]);
   assert.deepEqual(latestAddedDates(jobs, [], 2), ["2026-11-08", "2026-11-05"]);
+});
+
+test("latestAddedDates keeps the five newest dates by default", () => {
+  const jobs = ["01", "02", "03", "04", "05", "06"].map((d) => ({ url: d, addedAt: `2026-11-${d}` }));
+  assert.deepEqual(latestAddedDates(jobs, []), ["2026-11-06", "2026-11-05", "2026-11-04", "2026-11-03", "2026-11-02"]);
 });

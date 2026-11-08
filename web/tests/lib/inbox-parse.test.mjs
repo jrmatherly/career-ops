@@ -180,3 +180,24 @@ test("a rank label with no reason, a bad number or above 5 sets no rank", () => 
   assert.equal(jobs.length, 3);
   for (const job of jobs) assert.ok(!("rank" in job) && !("rankReason" in job));
 });
+
+test("the rank bounds parse: 5/5 and 5.0/5 as 5, 0/5 as 0", () => {
+  const jobs = parseInbox([
+    `- [ ] ${URL} | Acme | Engineer | Remote | rank: 5/5 — top`,
+    `- [ ] ${URL}/2 | Acme | Engineer | Remote | rank: 5.0/5 — top`,
+    `- [ ] ${URL}/3 | Acme | Engineer | Remote | rank: 0/5 — low`,
+  ].join("\n"));
+  assert.deepEqual(jobs.map((j) => j.rank), [5, 5, 0]);
+});
+
+test("a company cell that reads rank: but holds no rank value stays the company", () => {
+  const [job] = parseInbox(`- [ ] ${URL} | rank: pending | Engineer`);
+  assert.equal(job.company, "rank: pending");
+  assert.equal(job.role, "Engineer");
+  assert.ok(!("rank" in job));
+});
+
+test("a rank label on a short row matches in any case, like the label grammar", () => {
+  const [job] = parseInbox(`- [ ] ${URL} | Acme | Rank: 3.5/5 — capitalised by hand`);
+  assert.deepEqual([job.company, job.role, job.rank, job.rankReason], ["Acme", "", 3.5, "capitalised by hand"]);
+});
