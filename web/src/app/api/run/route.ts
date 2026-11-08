@@ -61,9 +61,6 @@ export async function POST(req: Request) {
     if (jdText.length > JD_TEXT_MAX_CHARS) {
       return Response.json({ error: `jdText is over the ${JD_TEXT_MAX_CHARS}-character limit.` }, { status: 400 });
     }
-    if (!DENY_SAFE_ROOT.test(careerOpsRoot())) {
-      return Response.json({ error: "evaluate-text needs a POSIX data root path with no spaces, commas or glob characters." }, { status: 400 });
-    }
   }
   const resolved = resolveCliOrFallback(requestedCliId);
   if (!resolved) {
@@ -77,6 +74,9 @@ export async function POST(req: Request) {
   const cliId = spec.id;
   if (kind === "evaluate-text" && cliId !== "claude") {
     return Response.json({ error: "evaluate-text runs on Claude only, and Claude is not available." }, { status: 400 });
+  }
+  if (kind === "evaluate-text" && !DENY_SAFE_ROOT.test(careerOpsRoot())) {
+    return Response.json({ error: "evaluate-text needs a POSIX data root path with no spaces, commas or glob characters." }, { status: 400 });
   }
   const substitution = cliSubstitutionNotice(resolved);
   const capabilities = capabilitiesFor(kind);

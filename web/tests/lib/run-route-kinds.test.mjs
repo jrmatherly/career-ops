@@ -118,7 +118,9 @@ test("evaluate-text refuses a data root its Read denies cannot name exactly", as
   assert.match(await refusal(await run({ jdText: "Role." })), /no spaces, commas or glob characters/);
 });
 
-test("evaluate-text holds the tracker write token and spawns with its Read denies", async (t) => {
+test("evaluate-text holds the tracker write token and spawns with its Read denies", {
+  skip: process.platform === "win32" && "the Read denies need a POSIX data root, so Windows answers 400",
+}, async (t) => {
   const root = fixtureRoot(t);
   let spawned;
   globalThis.__onSpawn = (args) => { spawned = { args, writing: isTrackerWriting() }; };
