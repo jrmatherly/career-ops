@@ -1153,7 +1153,7 @@ function fakeRanker(calls, status = 0, scored = Infinity) {
     const lines = fs.readFileSync(file, "utf8").split("\n").map((line) =>
       scoredUrls.some((url) => line.startsWith(`- [ ] ${url} `)) && !line.includes("| rank: ") ? `${line} | rank: 4.0/5 — fake` : line);
     fs.writeFileSync(file, lines.join("\n"));
-    return { status: 0, stdout: "Ranked", stderr: "" };
+    return { status: 0, stdout: `  Ranked ${scoredUrls.length} entr(ies) of ${urls.length} pending.\n`, stderr: "" };
   };
 }
 
@@ -1353,10 +1353,11 @@ test("parseScheduledJobInput sets evaluate and keeps it on an edit that omits it
 test("a ranker that exits 0 but scores only some rows leaves evalMessage naming both counts", async () => {
   await withRankRoot(REVIEW, async ({ root, storePath }) => {
     const calls = [];
-    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls, 0, 1) }));
+    const { stderr } = await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls, 0, 1) }));
     const run = runRecord(storePath);
     assert.equal(run.ranked, 1, "ranked is the scored count");
-    assert.equal(run.evalMessage, "Rank: 1 of 2 sent rows came back unranked; the ranker's reasons are in the runner's stderr log.");
+    assert.equal(run.evalMessage, "Rank: 1 of 2 sent rows came back unranked; the ranker's output is in the runner's stderr log.");
+    assert.match(stderr, /^rank: job \S+ \| +Ranked 1 entr\(ies\) of 2 pending\.$/m, "the ranker's stdout is forwarded with the job id");
     await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker(calls) }));
     assert.equal(calls.length, 1, "a partly failed pass is not paid for again on the next tick");
   });

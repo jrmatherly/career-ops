@@ -455,14 +455,14 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
   let evalMessage = waiting.length > unranked.length ? `${waiting.length - unranked.length}${RANK_WAITING}` : undefined;
   if (unranked.length) {
     const urlsFile = writeJobTemp(root, job.id, "rank", "txt", `${unranked.map((c) => c.url).join("\n")}\n`);
-    let rankerStderr = "";
+    let rankerOutput = "";
     try {
       const result = spawnFn(
         process.execPath,
         ["rank-pipeline.mjs", "--urls-file", urlsFile, "--limit", String(unranked.length)],
         { cwd: CODE_ROOT, env: coreEnv(root), encoding: "utf8", timeout: SCAN_TIMEOUT_MS, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
       );
-      rankerStderr = result.stderr || "";
+      rankerOutput = `${result.stdout || ""}${result.stderr || ""}`;
       if (result.status !== 0) evalMessage = rankFailureMessage(result);
     } catch (error) {
       evalMessage = rankFailureMessage({ error });
@@ -477,8 +477,9 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     const sent = new Set(unranked.map((candidate) => candidate.url));
     const missed = unranked.length - rows.filter((row) => row.ranked && sent.has(row.url)).length;
     if (!evalMessage && missed > 0) {
-      evalMessage = `Rank: ${missed} of ${unranked.length} sent rows came back unranked; the ranker's reasons are in the runner's stderr log.`;
-      process.stderr.write(rankerStderr);
+      evalMessage = `Rank: ${missed} of ${unranked.length} sent rows came back unranked; the ranker's output is in the runner's stderr log.`;
+      // Both streams: rank-pipeline explains skipped batches and unmatched rows on stdout, failed calls on stderr.
+      for (const line of rankerOutput.split(/\r?\n/)) if (line.trim()) process.stderr.write(`rank: job ${job.id} | ${line}\n`);
     }
   }
   process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
