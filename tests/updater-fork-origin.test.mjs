@@ -3,7 +3,7 @@
 // not prompt for an upstream release, and `apply` must never install upstream's
 // tree over the fork's system layer. The upgrade gate's mirror rewrites the
 // same URL, and must keep rewriting the two upstream URLs that old tags embed.
-// Plan: docs/superpowers/plans/2026-11-07-upstream-decoupling.md, Task 1.
+// Plan: docs/superpowers/plans/completed/2026-11-07-upstream-decoupling.md, Task 1.
 import { pass, fail } from './helpers.mjs';
 
 console.log('\nupdater fork origin — URL constants name this fork');

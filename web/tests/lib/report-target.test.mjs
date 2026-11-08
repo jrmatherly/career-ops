@@ -1,7 +1,7 @@
 // The beta bug-report link and the banner's "similar issues" search open on
 // THIS fork's repository, never on upstream's: a fork user must not file a
 // fork bug at career-ops-hq. Plan:
-// docs/superpowers/plans/2026-11-07-upstream-decoupling.md, Task 3.
+// docs/superpowers/plans/completed/2026-11-07-upstream-decoupling.md, Task 3.
 //
 // Run:  npm test   (or node --experimental-strip-types --test tests/lib/report-target.test.mjs)
 import { test } from "node:test";

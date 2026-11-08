@@ -1,5 +1,7 @@
 # Web browser-suite flakes Implementation Plan
 
+> **Landed:** PR 31 merged as `b49c754f` and its six-suite follow-up PR 32 as `5dcb2364` on 2026-11-07 (trail rows 22:16Z and 23:5xZ in `docs/superpowers/research/2026-11-06-reactive-resume-convergence/decisions.tsv`; failures tabled in `docs/superpowers/research/2026-11-07-web-browser-suite-flakes/REPORT.md`). Boxes ticked at the move to `completed/` from that evidence, not step by step.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make every `web/tests/lib/*.browser.test.mjs` suite immune to React 19.2's streaming reveal window, so Web CI stops failing on `back-link-scroll`, `inbox-undo` and their siblings without retries.
@@ -38,7 +40,7 @@
 **Interfaces:**
 - Produces: the three suites scoped to visible elements, as upstream will ship them.
 
-- [ ] **Step 1: Fetch and cherry-pick**
+- [x] **Step 1: Fetch and cherry-pick**
 
 ```bash
 git fetch careerops refs/pull/6641/head
@@ -47,16 +49,16 @@ git cherry-pick -x FETCH_HEAD
 
 Expected: one commit on the branch with upstream's subject `test(web): scope the pipeline browser suites to the visible table` and a `cherry picked from commit dcc65b70…` line. If the PR has merged by then, cherry-pick the merge's squash commit from `careerops/main` instead.
 
-- [ ] **Step 2: Syntax check**
+- [x] **Step 2: Syntax check**
 
 Run: `node --check web/tests/lib/back-link-scroll.browser.test.mjs web/tests/lib/pipeline-inline-status.browser.test.mjs web/tests/lib/pipeline-window.browser.test.mjs`
 Expected: silent exit 0.
 
-- [ ] **Step 3: Deviations rows**
+- [x] **Step 3: Deviations rows**
 
 Add one row per file: Upstream column names the file as PR 6641 ships it, Ours says "taken early by cherry-pick", Notes opens with ADOPT ("the merge absorbs the pick; a later upstream change to the file is ADOPT").
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 The cherry-pick is already a commit. Commit the rows as `docs(upstream-review): record the PR 6641 pick`.
 
@@ -71,27 +73,27 @@ The cherry-pick is already a commit. Commit the rows as `docs(upstream-review): 
 - Produces: `export async function settled(page, action)`: runs `action()` (a `goto` or `reload` promise), then waits until `document.querySelector('body > div[hidden][id^="S:"]')` is null and `document.readyState === "complete"`, with a 10 s timeout that throws naming the ids still hidden. Returns what `action()` resolved to.
 - Consumes: nothing from other tasks.
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 `web/tests/lib/streaming-helper.test.mjs` (plain node:test, no server): build a page object stub whose `waitForFunction` records the predicate, and assert (a) `settled` calls the action before waiting, (b) the predicate returns true for a document with no hidden `S:` div and false for one with `<div hidden id="S:0">`, evaluated against a tiny JSDOM-free fake `document` (`querySelector` and `readyState` only), (c) a rejected action rejects `settled`.
 
 Run: `cd web && node --test tests/lib/streaming-helper.test.mjs`
 Expected: FAIL, module not found.
 
-- [ ] **Step 2: Implement the helper**
+- [x] **Step 2: Implement the helper**
 
 One exported function, a header comment of three lines naming the mechanism ("React's streaming reveal keeps a server copy in `div#S:0[hidden]` for up to 300 ms after `load`; Playwright's strict mode counts hidden elements; see the research report path"). Keep the predicate a single `page.waitForFunction` so it survives a `reload`.
 
 Run the unit test. Expected: PASS.
 
-- [ ] **Step 3: Use it in the two inbox suites**
+- [x] **Step 3: Use it in the two inbox suites**
 
 Replace `await page.goto(x)` with `await settled(page, () => page.goto(x))` and `await page.reload()` with `await settled(page, () => page.reload())`. Leave the `row()` locators as they are: once the reveal has happened there is one copy, and an unscoped locator keeps catching a real duplicate render.
 
 Run: `cd web && npm run build && node tests/browser-suites.mjs inbox`
 Expected: `inbox-keys` and `inbox-undo` pass on the first attempt.
 
-- [ ] **Step 4: Deviations rows and commit**
+- [x] **Step 4: Deviations rows and commit**
 
 Rows for `web/tests/helpers/streaming.mjs`, `web/tests/lib/streaming-helper.test.mjs` (KEEP) and the two suites (ADAPT: "our hunk is the `settled(...)` wrapper on each navigation; an upstream hunk elsewhere is ADOPT"). Commit `test(web): wait for the streaming reveal in the inbox suites`.
 
@@ -105,7 +107,7 @@ Rows for `web/tests/helpers/streaming.mjs`, `web/tests/lib/streaming-helper.test
 - Consumes: the runner's `startServer`/`freePort`.
 - Produces: `node tests/browser-suites.mjs <name>` under `BROWSER_SUITES_SEGMENT_DELAY_MS=100` reproduces mode B on every load.
 
-- [ ] **Step 1: Prove the reproduction reproduces**
+- [x] **Step 1: Prove the reproduction reproduces**
 
 Before touching the suites' fix, check out the parent of Task 2's commit and run:
 
@@ -115,7 +117,7 @@ cd web && BROWSER_SUITES_SEGMENT_DELAY_MS=100 node tests/browser-suites.mjs inbo
 
 Expected: fails at `inbox-undo.browser.test.mjs:55` with the strict-mode message (the CI failure). Save the output under `/tmp/swarm-web-flakes/repro-before.txt`.
 
-- [ ] **Step 2: Prove the fix**
+- [x] **Step 2: Prove the fix**
 
 On the branch head, 10 runs each:
 
@@ -127,18 +129,18 @@ for i in $(seq 10); do BROWSER_SUITES_SEGMENT_DELAY_MS=100 node tests/browser-su
 
 Expected: no `FAIL` line and no "passed only on a second run" warning. Save under `/tmp/swarm-web-flakes/`.
 
-- [ ] **Step 3: The whole runner once, with and without the delay**
+- [x] **Step 3: The whole runner once, with and without the delay**
 
 Run: `node tests/browser-suites.mjs` and `BROWSER_SUITES_SEGMENT_DELAY_MS=100 node tests/browser-suites.mjs`
 Expected: the undelayed run is green. The delayed run names which of the other 33 suites also sit on the race; list them in the PR body as follow-ups (each is a one-line `settled` wrap) and fix none here.
 
-- [ ] **Step 4: Deviations row and commit**
+- [x] **Step 4: Deviations row and commit**
 
 Row for the proxy (KEEP) and the runner hunk (ADAPT: "our hunk is the `BROWSER_SUITES_SEGMENT_DELAY_MS` block; the rest of the runner is ADOPT"). Commit `test(web): reproduce the streaming reveal race on demand`.
 
 ### Task 4: PR
 
-- [ ] Pre-push checks from Global Constraints.
-- [ ] `gh pr create --base main` with a body that names the race in one sentence per fixed suite, the 10-of-10 evidence paths, the list from Task 3 Step 3, and the standard lines (no personal data added, `node test-all.mjs` passed).
-- [ ] `/pr-review-toolkit:review-pr`; triage per `references/bugbot-triage.md`.
-- [ ] Web CI green without the "Flaky browser suite" warning, then raise `gh pr merge <n> --merge --delete-branch` for the operator.
+- [x] Pre-push checks from Global Constraints.
+- [x] `gh pr create --base main` with a body that names the race in one sentence per fixed suite, the 10-of-10 evidence paths, the list from Task 3 Step 3, and the standard lines (no personal data added, `node test-all.mjs` passed).
+- [x] `/pr-review-toolkit:review-pr`; triage per `references/bugbot-triage.md`.
+- [x] Web CI green without the "Flaky browser suite" warning, then raise `gh pr merge <n> --merge --delete-branch` for the operator.

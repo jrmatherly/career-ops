@@ -1,5 +1,7 @@
 # Upstream decoupling Implementation Plan
 
+> **Landed:** PR 30 merged as `d44e5219` on 2026-11-07 (trail row 21:35Z in `docs/superpowers/research/2026-11-06-reactive-resume-convergence/decisions.tsv`). Boxes ticked at the move to `completed/` from that evidence, not step by step.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove every runtime path by which this fork, or a deployment of it, reaches `career-ops-hq/career-ops` or `santifer/career-ops` for code, versions or issue tracking, so an upstream change cannot alter what the fork installs, reports or tells its users.
@@ -57,20 +59,20 @@
 **Interfaces:**
 - Produces: `CANONICAL_REPO = 'https://github.com/jrmatherly/career-ops.git'`, `RAW_VERSION_URL`, `RELEASES_API` and `UPSTREAM_REF_API` on `jrmatherly/career-ops`; `upgrade-tests.mjs` `CANONICAL` equal to the new `CANONICAL_REPO`, with `CANONICAL_LEGACY` becoming an array of the two upstream URLs.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/updater-fork-origin.test.mjs`: import the constants (export them if they are not; `SEMVER_RE` already is) and assert each contains `jrmatherly/career-ops` and none contains `career-ops-hq` or `santifer`; import `upgrade-tests.mjs`'s `CANONICAL` and assert it equals `CANONICAL_REPO`, and that its legacy list still names both upstream URLs. Follow the discovered-suite rules (own file, no `process.exit`).
 
 Run: `node test-all.mjs --only updater-fork-origin`
 Expected: FAIL on the first assertion.
 
-- [ ] **Step 2: Change the constants**
+- [x] **Step 2: Change the constants**
 
 Four lines in `update-system.mjs`, two in `upgrade-tests.mjs`, plus the `insteadOf` lines in its git config writer (line 81) iterating the legacy list. Update the comments next to them in one line each.
 
 Run the test. Expected: PASS.
 
-- [ ] **Step 3: Prove the three behaviours**
+- [x] **Step 3: Prove the three behaviours**
 
 ```bash
 node update-system.mjs check
@@ -81,7 +83,7 @@ node upgrade-tests.mjs
 
 Expected: `no-remote-version`; a `main` status naming `origin/main`'s SHA; under 12 s; the gate green. Keep the outputs in the PR body.
 
-- [ ] **Step 4: Rows and commit**
+- [x] **Step 4: Rows and commit**
 
 Two ADAPT rows ("our hunk is the four URL constants" / "the two mirror URLs and the legacy list"). Commit `fix(update): track this fork, not upstream, for releases and main`.
 
@@ -91,9 +93,9 @@ Two ADAPT rows ("our hunk is the four URL constants" / "the two mirror URLs and 
 - Modify: `AGENTS.md` "Update Check" section (the release wording), `modes/update.md:23,55`
 - Modify: deviations table (two rows)
 
-- [ ] **Step 1: Edit** the `git fetch` line to the fork's URL and the release-notes line to `https://github.com/jrmatherly/career-ops/commits/main`. In `AGENTS.md`, replace "a newer career-ops release is published" with the fork's reality: no releases are cut, `check` is silent, and `--channel main` is the supported update.
-- [ ] **Step 2: Verify** `node test-all.mjs --only agents` (whichever suites parse `AGENTS.md`, found with `grep -l AGENTS.md tests/*.test.mjs`) stays green.
-- [ ] **Step 3: Rows and commit** `docs(update): describe the fork's update channel`.
+- [x] **Step 1: Edit** the `git fetch` line to the fork's URL and the release-notes line to `https://github.com/jrmatherly/career-ops/commits/main`. In `AGENTS.md`, replace "a newer career-ops release is published" with the fork's reality: no releases are cut, `check` is silent, and `--channel main` is the supported update.
+- [x] **Step 2: Verify** `node test-all.mjs --only agents` (whichever suites parse `AGENTS.md`, found with `grep -l AGENTS.md tests/*.test.mjs`) stays green.
+- [x] **Step 3: Rows and commit** `docs(update): describe the fork's update channel`.
 
 ### Task 3: Web bug reports open on the fork
 
@@ -102,10 +104,10 @@ Two ADAPT rows ("our hunk is the four URL constants" / "the two mirror URLs and 
 - Test: the existing test for `report.ts` under `web/tests/lib/` (extend) or `web/tests/lib/report-target.test.mjs` (new)
 - Modify: deviations table (two rows)
 
-- [ ] **Step 1: Failing test** asserting `issueUrl(diag, "x")` starts with `https://github.com/jrmatherly/career-ops/issues/new` and that `beta-banner.tsx`'s source has no `career-ops-hq` string.
-- [ ] **Step 2: Export** `REPO` from `report.ts` as the fork slug, import it in the banner.
-- [ ] **Step 3: Run** `cd web && npm test && npm run typecheck`. Expected: PASS.
-- [ ] **Step 4: Rows and commit** `fix(web): send bug reports to this fork`.
+- [x] **Step 1: Failing test** asserting `issueUrl(diag, "x")` starts with `https://github.com/jrmatherly/career-ops/issues/new` and that `beta-banner.tsx`'s source has no `career-ops-hq` string.
+- [x] **Step 2: Export** `REPO` from `report.ts` as the fork slug, import it in the banner.
+- [x] **Step 3: Run** `cd web && npm test && npm run typecheck`. Expected: PASS.
+- [x] **Step 4: Rows and commit** `fix(web): send bug reports to this fork`.
 
 ### Task 4: Install docs name the fork
 
@@ -113,9 +115,9 @@ Two ADAPT rows ("our hunk is the four URL constants" / "the two mirror URLs and 
 - Modify: `docs/SETUP.md:20,94,113`, `CONTRIBUTING.md` (clone and PR-target lines only)
 - Modify: deviations table (one row covering both)
 
-- [ ] **Step 1: Edit** the clone URL and the "open a pull request against" line to the fork. Leave the `npx @santifer/career-ops init` line and add one sentence after it: it installs upstream's release, and a fork checkout comes from the clone line above.
-- [ ] **Step 2: Verify** `node test-all.mjs --only docs` and any suite that greps `docs/SETUP.md` (`grep -l SETUP.md tests/*.test.mjs`).
-- [ ] **Step 3: Row and commit** `docs(setup): point the clone and PR lines at this fork`.
+- [x] **Step 1: Edit** the clone URL and the "open a pull request against" line to the fork. Leave the `npx @santifer/career-ops init` line and add one sentence after it: it installs upstream's release, and a fork checkout comes from the clone line above.
+- [x] **Step 2: Verify** `node test-all.mjs --only docs` and any suite that greps `docs/SETUP.md` (`grep -l SETUP.md tests/*.test.mjs`).
+- [x] **Step 3: Row and commit** `docs(setup): point the clone and PR lines at this fork`.
 
 ### Task 5: Crawler contact URL
 
@@ -123,21 +125,21 @@ Two ADAPT rows ("our hunk is the four URL constants" / "the two mirror URLs and 
 - Modify: `user-agent.mjs:13`
 - Modify: deviations table (one row)
 
-- [ ] **Step 1: Edit** the `+https://…` part to `https://github.com/jrmatherly/career-ops`; keep `career-ops/1.0`.
-- [ ] **Step 2: Verify** `node test-all.mjs --only user-agent` (and `grep -rn "career-ops-hq" tests/ | grep -i agent` for any pin).
-- [ ] **Step 3: Row and commit** `fix(scan): name this fork in the crawler contact URL`.
+- [x] **Step 1: Edit** the `+https://…` part to `https://github.com/jrmatherly/career-ops`; keep `career-ops/1.0`.
+- [x] **Step 2: Verify** `node test-all.mjs --only user-agent` (and `grep -rn "career-ops-hq" tests/ | grep -i agent` for any pin).
+- [x] **Step 3: Row and commit** `fix(scan): name this fork in the crawler contact URL`.
 
 ### Task 6: Record the KEEP decisions
 
 **Files:**
 - Modify: `.claude/skills/upstream-review/SKILL.md` ("Deviations decided", one row each for findings 7, 8 and 11 with Notes opening KEEP and the reason from the table)
 
-- [ ] **Step 1: Add the rows.** Finding 11's row names the compare endpoint the skill depends on.
-- [ ] **Step 2: Run** `node test-all.mjs --only fork-deviations` (the deviations-coverage test) and `node validate-system-paths-coverage.mjs`.
-- [ ] **Step 3: Commit** `docs(upstream-review): record the ties we keep and why`.
+- [x] **Step 1: Add the rows.** Finding 11's row names the compare endpoint the skill depends on.
+- [x] **Step 2: Run** `node test-all.mjs --only fork-deviations` (the deviations-coverage test) and `node validate-system-paths-coverage.mjs`.
+- [x] **Step 3: Commit** `docs(upstream-review): record the ties we keep and why`.
 
 ### Task 7: PR
 
-- [ ] One PR for Tasks 1-6 (they are small and share the deviations table). Pre-push checks from Global Constraints.
-- [ ] `gh pr create --base main`; body lists the findings table's verdicts in one line each and the Task 1 outputs; no personal data added; `node test-all.mjs` passed.
-- [ ] `/pr-review-toolkit:review-pr`, then raise `gh pr merge <n> --merge --delete-branch` for the operator.
+- [x] One PR for Tasks 1-6 (they are small and share the deviations table). Pre-push checks from Global Constraints.
+- [x] `gh pr create --base main`; body lists the findings table's verdicts in one line each and the Task 1 outputs; no personal data added; `node test-all.mjs` passed.
+- [x] `/pr-review-toolkit:review-pr`, then raise `gh pr merge <n> --merge --delete-branch` for the operator.
