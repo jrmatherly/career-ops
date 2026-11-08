@@ -261,7 +261,7 @@ npm run build:dashboard   # optional: build the standalone binary
 
 Features: 10 filter tabs (plus an Other tab when non-canonical statuses exist), 8 sort modes, grouped/flat view, lazy-loaded previews, inline status changes.
 
-There is also an **experimental web UI** (alpha and opt-in: nothing runs unless you start it): see [`web/README.md`](web/README.md).
+There is also an **experimental web UI** (alpha and opt-in: nothing runs unless you start it): see [`web/README.md`](web/README.md). This fork also runs it as a hosted pod, see `deploy/README.md`.
 
 ## Project Structure
 

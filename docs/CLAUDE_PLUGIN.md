@@ -69,7 +69,7 @@ Claude updates the plugin, not `update-system.mjs`. Inside a plugin install, `no
 - **Customize installs:** open the marketplace under **Customize → Plugins** and turn on **Sync automatically**, or select **Check for updates** to pull now.
 - **`/plugin` installs:** open `/plugin`, find career-ops under **Installed** and update it, or turn on auto-update for its marketplace on the **Marketplaces** tab.
 
-The manifest pins `version`, so an install stays on that version until `version` changes. If you ship changes from a fork, bump `version` in `.claude-plugin/plugin.json`, then copy that file verbatim to `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`. Bump both `version` fields in `.claude-plugin/marketplace.json` too. The `extra-files` list in `release-please-config.json` names every file that carries the version.
+The manifest pins `version`, so an install stays on that version until `version` changes. If you ship changes from a fork, bump `version` in `.claude-plugin/plugin.json`, then copy that file verbatim to `.codex-plugin/plugin.json` and `.github/plugin/plugin.json`. Bump both `version` fields in `.claude-plugin/marketplace.json` too. The `extra-files` list in `release-please-config.json` names every file that carries the version. On this fork `check` reports `offline` by default and `--channel main` is the only channel that carries updates.
 
 ## Known limits
 

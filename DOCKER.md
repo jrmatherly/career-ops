@@ -22,12 +22,23 @@ can't run inside the container at all.
 
 ## Pre-built images (this fork)
 
-`.github/workflows/docker-image.yml` publishes `ghcr.io/jrmatherly/career-ops`
-(this `Dockerfile`, linux/amd64 and arm64) and `ghcr.io/jrmatherly/career-ops-cv-visual`
-(the CI rendering image) on a push to `main` that touches them, on a `v*` tag, or by hand
-(`gh workflow run docker-image.yml --ref main`). `docker compose pull`
-fetches the dev image instead of building it; `./cops rebuild` still builds locally.
-The base image is Microsoft's Playwright image, pinned by digest in both Dockerfiles.
+`.github/workflows/docker-image.yml` publishes four images to GHCR on every
+push to `main`, on a `v*` tag, or by hand (`gh workflow run docker-image.yml
+--ref main`). There is no path filter on push. A pull request that touches
+image inputs builds them without pushing.
+
+| Image | Dockerfile | Platforms |
+| --- | --- | --- |
+| `ghcr.io/jrmatherly/career-ops` | `Dockerfile` (this dev container) | linux/amd64, linux/arm64 |
+| `ghcr.io/jrmatherly/career-ops-cv-visual` | `tests/cv-visual/Dockerfile` (the CI rendering image) | linux/amd64 |
+| `ghcr.io/jrmatherly/career-ops-server` | `deploy/Dockerfile` (the hosted web pod) | linux/amd64 |
+| `ghcr.io/jrmatherly/career-ops-publish` | `publish/Dockerfile` (the publish service) | linux/amd64 |
+
+`career-ops-server` is the image with the Claude CLI, documented in
+`deploy/README.md`. `docker compose pull` fetches the dev image instead of
+building it; `./cops rebuild` still builds locally. The base image is
+Microsoft's Playwright image, pinned by digest in both the root and the
+`deploy/` Dockerfiles.
 
 ## Prerequisites
 

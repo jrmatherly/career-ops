@@ -157,6 +157,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File web/scripts/uninstall-sc
 
 The task runs in the current user's interactive session, so you must be logged in.
 
+When a CronJob or another external scheduler fires the tick, set
+`CAREER_OPS_SCHEDULER=external`; see `docs/DEPLOYMENT.md`.
+
 #### Last OS check
 
 The macOS and Linux worker records each check in `<store>.tick`, next to the
