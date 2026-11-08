@@ -17,6 +17,9 @@ import { scheduledRunnerResourcePath, scheduledStorePath } from "../src/lib/sche
 import { getCareerOpsRoot } from "../../path-resolver.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { scanFailureMessage } from "../src/lib/scheduled-scan-error.mjs";
+import { cleanChips } from "../src/lib/clean-chips.mjs";
+import { isMapping } from "../src/lib/portals-config.mjs";
+import { foldTitle } from "../../title-keywords.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -142,48 +145,76 @@ export function extractRolesFound(engine, stdout) {
   return match ? Number(match[1]) : 0;
 }
 
-function writeJobPortals(root, job) {
-  if (!isSafeScheduledId(job.id)) throw new Error("Invalid scheduled job identifier.");
-  const portalsPath = path.join(root, "portals.yml");
-  const base = yaml.load(fs.readFileSync(portalsPath, "utf8"));
-  if (!base || typeof base !== "object") throw new Error("portals.yml must contain a mapping");
+function portalsPath(root, env = process.env) {
+  const override = env.CAREER_OPS_PORTALS?.trim();
+  return override ? path.resolve(root, override) : path.join(root, "portals.yml");
+}
 
-  const filters = job.filters || {};
-  const positive = Array.isArray(filters.positive)
-    ? filters.positive.filter((value) => typeof value === "string" && value.trim())
-    : [];
-  const fallbackPositive = Array.isArray(base.title_filter?.positive)
-    ? base.title_filter.positive.filter((value) => typeof value === "string" && value.trim())
-    : [];
-  if (!positive.length && !fallbackPositive.length) {
-    throw new Error("Scheduled scans require title keywords in the job or portals.yml title_filter.positive.");
+// Job filter key, portals.yml section, key inside that section.
+const FILTER_LISTS = [
+  ["positive", "title_filter", "positive"],
+  ["negative", "title_filter", "negative"],
+  ["allow", "location_filter", "allow"],
+  ["block", "location_filter", "block"],
+  ["blockHard", "location_filter", "block_hard"],
+  ["alwaysAllow", "location_filter", "always_allow"],
+];
+
+// The scanner's rule (normalizeKeywords in title-keywords.mjs): a non-array or all-blank list is no title limit.
+const hasTitleKeywords = (list) => Array.isArray(list) && list.some((k) => typeof k === "string" && foldTitle(k).trim());
+
+// Names the title list the scanner reads when it is empty, else null.
+// scan-ats-full.mjs reads title_filter_full in place of title_filter whenever it is set.
+function emptyTitleKey(config, engine) {
+  const section = engine !== "portals" && config.title_filter_full != null ? "title_filter_full" : "title_filter";
+  return hasTitleKeywords(config[section]?.positive) ? null : `${section}.positive`;
+}
+
+// Spreading a string yields index keys and yaml.dump drops properties set on an array, so such a section restarts from {}.
+const mappingOrEmpty = (value) => (isMapping(value) ? value : {});
+
+function readPortals(file) {
+  const text = fs.readFileSync(file, "utf8");
+  let base;
+  try {
+    base = yaml.load(text);
+  } catch (error) {
+    throw new Error(`${file}: ${error.message}`);
   }
-  base.title_filter = {
-    ...(base.title_filter || {}),
-    positive: positive.length ? positive : fallbackPositive,
-    negative: Array.isArray(filters.negative) ? filters.negative : [],
-  };
-  if (base.title_filter_full) base.title_filter_full = { ...base.title_filter_full, ...base.title_filter };
-  base.location_filter = {
-    ...(base.location_filter || {}),
-    allow: Array.isArray(filters.allow) ? filters.allow : [],
-    block: Array.isArray(filters.block) ? filters.block : [],
-    block_hard: Array.isArray(filters.blockHard) ? filters.blockHard : [],
-    always_allow: Array.isArray(filters.alwaysAllow) ? filters.alwaysAllow : [],
-  };
+  if (!isMapping(base)) throw new Error(`${file}: must contain a mapping`);
+  return base;
+}
 
+// A job list that is empty inherits the file's list unchanged; a non-empty one replaces it.
+function jobPortals(job, base) {
+  const filters = job.filters || {};
+  for (const [jobKey, section, fileKey] of FILTER_LISTS) {
+    const own = cleanChips(filters[jobKey]);
+    const current = mappingOrEmpty(base[section]);
+    base[section] = { ...current, [fileKey]: own.length ? own : current[fileKey] ?? [] };
+    if (section === "title_filter" && own.length && base.title_filter_full != null) {
+      base.title_filter_full = { ...mappingOrEmpty(base.title_filter_full), [fileKey]: own };
+    }
+  }
+  return base;
+}
+
+function writeJobPortals(root, jobId, config) {
+  if (!isSafeScheduledId(jobId)) throw new Error("Invalid scheduled job identifier.");
   const tempDir = path.join(root, "data", "tmp");
   fs.mkdirSync(tempDir, { recursive: true });
-  const tempPath = path.join(tempDir, `scheduled-${job.id}-${randomUUID()}.yml`);
-  fs.writeFileSync(tempPath, yaml.dump(base, { lineWidth: 120, noRefs: true }), "utf8");
+  const tempPath = path.join(tempDir, `scheduled-${jobId}-${randomUUID()}.yml`);
+  fs.writeFileSync(tempPath, yaml.dump(config, { lineWidth: 120, noRefs: true }), "utf8");
   return tempPath;
 }
 
 /*
- * Keep the temporary portal overlay scoped to each retry. A thrown setup or
+ * Keep the temporary portal overlay scoped to each retry. A thrown overlay or
  * spawn error is retryable just like a non-zero scanner exit, while cleanup
  * still runs before the next attempt. A scanner that ran into the timeout is
- * not retried: the same sweep would hit the same limit, three times over.
+ * not retried: the same sweep would hit the same limit, three times over. An
+ * unreadable portals.yml or an empty title list is not retried either; both are
+ * checked once before the loop.
  */
 
 export function executeJob(root, job, options = {}) {
@@ -191,11 +222,27 @@ export function executeJob(root, job, options = {}) {
   const startedAt = Date.now();
   let lastError = "Scan failed";
   let finalAttempt = MAX_ATTEMPTS;
+  const fromFile = job.filtersFrom === "file";
+  const basePortals = portalsPath(root);
+  process.stderr.write(`portals: ${basePortals} (${fromFile ? "file" : "overlay"})\n`);
+  let config;
+  try {
+    const base = readPortals(basePortals);
+    config = fromFile ? base : jobPortals(job, base);
+    const emptyKey = emptyTitleKey(config, job.engine);
+    if (emptyKey) {
+      throw new Error(fromFile
+        ? `Scheduled scans require title keywords in portals.yml ${emptyKey} when a job uses the file's filters`
+        : `Scheduled scans require title keywords in the job or portals.yml ${emptyKey}.`);
+    }
+  } catch (error) {
+    return { state: "failed", attempt: 1, rolesFound: 0, durationMs: Date.now() - startedAt, message: scanFailureMessage({ error }) };
+  }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let tempPortals = null;
     try {
-      tempPortals = writeJobPortals(root, job);
+      if (!fromFile) tempPortals = writeJobPortals(root, job.id, config);
       const command = buildScanCommand(job);
       const result = spawnFn(
         process.execPath,
@@ -205,9 +252,9 @@ export function executeJob(root, job, options = {}) {
           env: {
             ...process.env,
             CAREER_OPS_ROOT: root,
-            CAREER_OPS_PORTALS: tempPortals,
-            // The scanner runs with cwd = the checkout; a relative override is
-            // resolved here, the way the web resolves it, so both read one file.
+            CAREER_OPS_PORTALS: tempPortals || basePortals,
+            // The scanner runs with cwd = the checkout; a relative CAREER_OPS_PROFILE
+            // is resolved here, the way the web resolves it, so both read one file.
             ...(process.env.CAREER_OPS_PROFILE?.trim() ? { CAREER_OPS_PROFILE: getProfilePath(root) } : {}),
           },
           encoding: "utf8",

@@ -109,11 +109,14 @@ export function FilterBuilder({
   onChange,
   seededFrom = [],
   disabled = false,
+  hideLists = false,
 }: {
   filters: ExploreFilters;
   onChange: (f: ExploreFilters) => void;
   seededFrom?: string[];
   disabled?: boolean;
+  /** Hide the six title and location lists, for a scheduled job that takes them from portals.yml. */
+  hideLists?: boolean;
 }) {
   const employer = filters.preset === CHINA_PRESET;
   const [advanced, setAdvanced] = useState(false);
@@ -143,20 +146,20 @@ export function FilterBuilder({
         <p id="employer-scope" className="mt-2 text-xs text-muted">Employer selection does not guarantee mainland-China, technical or experienced-hire eligibility. Check the original JD. Role and location terms are optional; unknown locations may remain, and remote titles may match. Locations are term filters, not eligibility checks. No posting-date cutoff applies. Other ATS filters are inactive for this preset. Coverage is limited to 10 pages per employer; limits or source problems are reported as incomplete.</p>
       </fieldset>}
 
-      <div>
+      {!hideLists && <div>
         <Label hint={filters.positive.length === 0 ? (employer ? "empty = all titles" : "empty = every fresh posting") : undefined}>Roles to find</Label>
         <KeywordField ariaLabel="Roles to find" values={filters.positive} tone="inc" placeholder="AI platform, ML infrastructure, staff engineer…" onChange={(v) => set({ positive: v })} />
         {!employer && seededFrom.length > 0 && filters.positive.length > 0 && (
           <p className="mt-1 text-[11px] text-faint">Seeded from your {seededFrom.join(" + ")} — edit freely.</p>
         )}
-      </div>
+      </div>}
 
-      {!employer && <div>
+      {!employer && !hideLists && <div>
         <Label>Exclude</Label>
         <KeywordField ariaLabel="Exclude" values={filters.negative} tone="exc" placeholder="manager, sales, contract…" onChange={(v) => set({ negative: v })} />
       </div>}
 
-      <div>
+      {!hideLists && <div>
         <Label hint="matches any city, region, country, or Remote">
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5 text-muted" /> City or location
@@ -169,7 +172,7 @@ export function FilterBuilder({
           ariaLabel="City or location"
           onChange={(v) => set({ allow: v })}
         />
-      </div>
+      </div>}
 
       {!employer && <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
         <div className="min-w-[18rem]">
@@ -224,12 +227,13 @@ export function FilterBuilder({
         className="inline-flex items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
       >
         <SlidersHorizontal className="size-3.5" />
-        More location controls &amp; scan depth
+        {hideLists ? "Scan depth" : "More location controls & scan depth"}
         <ChevronDown className={cn("size-3.5 transition-transform", advanced && "rotate-180")} />
       </button>}
 
       {!employer && advanced && (
         <div className="space-y-3 rounded-xl border border-border bg-surface/30 p-3">
+          {!hideLists && <>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label hint="rescues a multi-location posting">Always include</Label>
@@ -244,6 +248,7 @@ export function FilterBuilder({
             <Label hint="hard reject — overrides Always include">Never include</Label>
             <KeywordField ariaLabel="Never include" values={filters.blockHard} tone="exc" placeholder="USA, Brazil…" onChange={(v) => set({ blockHard: v })} />
           </div>
+          </>}
           <div>
             <Label hint={`${filters.limitPerAts} companies / source`}>Scan depth</Label>
             <input

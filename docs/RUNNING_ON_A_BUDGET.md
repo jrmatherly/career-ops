@@ -57,7 +57,11 @@ Inside Claude Code, `/status` reports the active login and shows an API-key row 
 2. Restart the terminal.
 3. Run `/login` in Claude Code and sign in.
 
-`ANTHROPIC_AUTH_TOKEN` and the cloud-provider switches (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`) take precedence too, so check those if a stray key is not the culprit.
+`ANTHROPIC_AUTH_TOKEN` and the cloud-provider switches (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`) take precedence over the subscription too, so check those if a stray key is not the culprit. Behind a gateway the token bills to the gateway's credential instead, as the next section explains.
+
+### Through a gateway
+
+When `ANTHROPIC_BASE_URL` points at a host other than `api.anthropic.com`, Claude Code sends every request to that gateway (CLIProxyAPI, for example). `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY` then authenticates to the gateway and outranks `CLAUDE_CODE_OAUTH_TOKEN`. With neither set, Claude Code sends `CLAUDE_CODE_OAUTH_TOKEN`, or the keychain login, to the gateway (measured on Claude Code 2.1.319). The gateway's own upstream credential decides what is billed. `node doctor.mjs` reports the gateway host instead of the per-token warning. It warns instead when neither `ANTHROPIC_AUTH_TOKEN` nor `ANTHROPIC_API_KEY` is set, because a gateway that checks a key refuses the login Claude Code sends. It also warns when `CLAUDE_CODE_OAUTH_TOKEN` is set beside the gateway URL, because that subscription token is then either sent to the gateway or unused. When a cloud-provider switch is also set, doctor reports the cloud switch, not the gateway.
 
 ### A settings.json helper can bring the key back
 

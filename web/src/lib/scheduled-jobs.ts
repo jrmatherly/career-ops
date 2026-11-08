@@ -7,18 +7,20 @@ import {
   withScheduledStore,
 } from "./scheduled-jobs-store.mjs";
 import { nextScheduledRun } from "./scheduled-cadence.mjs";
-import { assertScheduledJobBody } from "./scheduled-job-input.mjs";
+import { assertScheduledJobBody, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
 export type ScheduleUnit = "minutes" | "hours" | "days";
+export type FiltersFrom = "custom" | "file";
 
 export type ScheduledJob = {
   id: string;
   name: string;
   status: JobStatus;
   engine: ScanEngine;
+  filtersFrom?: FiltersFrom;
   filters: ExploreFilters;
   timezone: string;
   startAt: string;
@@ -46,7 +48,7 @@ export type JobRun = {
 
 type QueueItem = { id: string; jobId: string; queuedAt: string };
 type Store = { jobs: ScheduledJob[]; runs: JobRun[]; queue: QueueItem[] };
-type JobFields = Pick<ScheduledJob, "name" | "engine" | "filters" | "timezone" | "startAt" | "every" | "unit">;
+type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "filters" | "timezone" | "startAt" | "every" | "unit">;
 
 export class ScheduledJobValidationError extends Error {
   constructor(message: string) {
@@ -89,8 +91,10 @@ function validateTimezone(value: string): string {
 
 export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFields {
   let input: Record<string, unknown>;
+  let filtersFrom: FiltersFrom;
   try {
     input = assertScheduledJobBody(raw) as Record<string, unknown>;
+    filtersFrom = scheduledFiltersFrom(input.filtersFrom, base?.filtersFrom) as FiltersFrom;
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Scheduled job body must be an object.");
   }
@@ -109,7 +113,7 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
     base?.filters || DEFAULT_FILTERS,
   );
 
-  return { name, engine, unit, every, timezone, startAt, filters };
+  return { name, engine, filtersFrom, unit, every, timezone, startAt, filters };
 }
 
 export function listScheduledJobs(): Pick<Store, "jobs" | "runs"> {
