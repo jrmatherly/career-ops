@@ -99,6 +99,21 @@ before starting an AI run.
   check does run the web unit suites (`test-all.mjs`), and `web/` is its own
   release-please component; nothing in the CLI depends on it.
 
+Which tools each run kind holds on Claude Code (`TOOL_SCOPES` in
+`src/lib/claude-invocation.mjs`, in scope order):
+
+| Kind | Allowed tools | Network |
+| --- | --- | --- |
+| `pdf` | Read, Glob, Grep | none |
+| `research` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
+| `evaluate` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
+| `cover` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
+| `fix-portal` | Read, WebFetch, WebSearch, Write, Edit, Bash, Glob, Grep | fetch and writes |
+
+A run without `Bash` cannot execute `browser-extract.mjs` or `fetch-jd.mjs`,
+so `scan.extractor: cli` does nothing in a dashboard run and JD text comes
+from WebFetch.
+
 ## Scheduled scans
 
 The web UI can save scan definitions without installing an OS task. To check and
@@ -116,13 +131,22 @@ sh web/scripts/install-scan-schedule.sh
 ```
 
 Remove it with `web/scripts/uninstall-scan-schedule.ps1` on Windows or
-`sh web/scripts/uninstall-scan-schedule.sh` on macOS and Linux. It runs as the
+`sh web/scripts/uninstall-scan-schedule.sh` on macOS and Linux.
+`uninstall-scan-schedule.sh` removes only the agent or cron line the installer
+wrote (`io.career-ops.scheduled-scan`). It runs as the
 current user (never as root), and Windows and macOS need a logged-in session. The task runs only
 `web/scripts/scheduled-jobs-runner.mjs`; it never evaluates roles, applies, or invokes
 an AI model. Job definitions and run history stay in the gitignored `data/`
 directory. The definitions live in `data/scheduled-jobs.json` under the data
 root; `CAREER_OPS_SCHEDULED_JOBS_PATH` moves that file, and a relative value
 resolves against the data root.
+
+Each job carries its own title and location filters. At run time they replace
+`title_filter.negative` and the `location_filter` lists `allow`, `block`,
+`block_hard` and `always_allow` in `portals.yml` (an absent job list means
+none), and only `title_filter.positive` falls back to `portals.yml`. When
+`title_filter_full` exists it receives the same lists, so a full-sweep job never
+uses its own keywords. Editing `portals.yml` changes neither saved job.
 
 When something outside this machine's OS scheduler fires the runs (a Kubernetes
 CronJob that POSTs `/api/scheduler` every 15 minutes, say), set
