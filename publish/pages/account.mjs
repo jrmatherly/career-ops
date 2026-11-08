@@ -1,7 +1,7 @@
 import { esc } from '../pages.mjs';
 
-// Token values copied from web/src/app/globals.css (:root, .dark and @theme), so the page matches the dashboard.
-// The CSP admits inline styles only, so they cannot be linked; tests/service.test.mjs fails when the two drift.
+// Token values copied from web/src/app/globals.css (:root, .dark and @theme).
+// The CSP admits inline styles only, so they cannot be linked; publish/tests/service.test.mjs fails when the two drift.
 const STYLE = `:root{--bg:#f7f6f3;--surface:#ffffff;--border:hsl(40 9% 86%);--fg:hsl(30 10% 11%);--muted:hsl(35 9% 34%);--brand-text:hsl(26 80% 36%);--color-brand:hsl(26 73% 51%);--color-brand-foreground:hsl(24 30% 12%);color-scheme:light}
 @media (prefers-color-scheme: dark){:root{--bg:#0a0a0a;--surface:#161616;--border:#262626;--fg:#fafafa;--muted:#a1a1aa;--brand-text:hsl(26 73% 51%);color-scheme:dark}}
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem;background:var(--bg);color:var(--fg);line-height:1.5}
@@ -16,7 +16,12 @@ const shell = (body) => `<!doctype html><meta charset="utf-8"><meta name="viewpo
 export const signInPage = (message = '') => shell(`<h1>Publish account</h1>${message ? `<p role="alert">${esc(message)}</p>` : ''}
 <p><a href="/account/sign-in">Sign in with Pocket ID</a></p>`);
 
-const keyRow = (k) => `<tr><td>${esc(k.name ?? '')}</td><td><code>${esc(k.start ?? k.prefix ?? '')}…</code></td><td>${esc(new Date(k.createdAt).toISOString().slice(0, 10))}</td>
+const day = (at) => {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? '—' : d.toISOString().slice(0, 10);
+};
+
+const keyRow = (k) => `<tr><td>${esc(k.name ?? '')}</td><td><code>${esc(k.start ?? k.prefix ?? '')}…</code></td><td>${esc(day(k.createdAt))}</td>
 <td><form method="post" action="/account/keys/revoke"><input type="hidden" name="keyId" value="${esc(k.id)}"><button>Revoke</button></form></td></tr>`;
 
 export function accountPage({ email, keys, created = null, message = '' }) {

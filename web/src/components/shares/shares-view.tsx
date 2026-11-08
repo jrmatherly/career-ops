@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, X } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,11 +17,12 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
   const router = useRouter();
   // Which pull is in flight: one slug, or every share from Pull all.
   const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
-  // An object, so a repeat of the same message is a new toast and restarts its timer.
-  const [toast, setToast] = useState<{ text: string } | null>(null);
+  // An object, so a repeat of the same message is a new toast (and restarts a transient one's timer).
+  // A toast stays until dismissed unless marked transient: error advice runs to a few hundred characters, too long to read in 6 s.
+  const [toast, setToast] = useState<{ text: string; transient?: true } | null>(null);
 
   useEffect(() => {
-    if (!toast) return;
+    if (!toast?.transient) return;
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
@@ -39,9 +40,9 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
       // The CLI skips a share the service no longer has and still exits 0; say so, or the row just stays stale.
       // When nothing answered at all, the likelier cause is the URL, not deleted shares: never advise deleting then.
       if (data.missing.length && data.pulled === 0) {
-        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL in the data root's .env before deleting anything.` });
+        setToast({ text: `The publish service answered for none of the shares (${data.missing.join(", ")}); check PUBLISH_URL (the HelmRelease env on a cluster install, the data root's .env on a local one) before deleting anything.` });
       } else if (data.missing.length) {
-        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}` });
+        setToast({ text: `Not on the publish service any more: ${data.missing.join(", ")}. Drop each with node publish/share.mjs delete --slug ${data.missing[0]}${data.missing.length > 1 ? " and so on" : ""}`, transient: true });
       }
       router.refresh();
     } catch (err) {
@@ -117,9 +118,12 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
 
       {toast && (
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
-          <p role="status" className="max-w-full break-words rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
-            {toast.text}
-          </p>
+          <div role="status" className="flex max-w-full items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
+            <p className="break-words">{toast.text}</p>
+            <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-muted hover:text-foreground">
+              <X className="size-3.5" />
+            </button>
+          </div>
         </div>
       )}
     </PageFrame>

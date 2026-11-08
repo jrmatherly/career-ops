@@ -348,7 +348,15 @@ test('account page has no script tag and no external URL', () => {
   for (const html of accountPages()) {
     assert.doesNotMatch(html, /<script/i);
     assert.doesNotMatch(html, /https?:|\/\/[a-z]|url\(|@import/i);
+    assert.match(html, /<meta name="viewport" content="width=device-width,initial-scale=1">/);
   }
+});
+
+test('the account page escapes the printed key and survives an invalid creation date', () => {
+  const html = accountPage({ email: 'ada@example.com', keys: [{ id: 'k2', name: 'old', start: 'cops_cd', createdAt: 'not a date' }], created: 'cops_<b>"x' });
+  assert.match(html, /<pre>publish_api_key = "cops_&#60;b&#62;&#34;x"<\/pre>/);
+  assert.doesNotMatch(html, /cops_<b>/);
+  assert.match(html, /<td>—<\/td>/);
 });
 
 test('account page carries the dashboard token values', () => {
