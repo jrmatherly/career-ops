@@ -32,6 +32,8 @@ check(!server.includes('GO_VERSION') && !/texlive/i.test(server),
 check(server.includes('ENTRYPOINT ["/usr/bin/tini", "--"]') && server.includes('CMD ["node", "web/server.mjs", "start"]'),
   'deploy/Dockerfile starts web/server.mjs under tini');
 check(/"127\.0\.0\.1:[^"]*:3000"/.test(compose), 'deploy/compose.yml publishes port 3000 on loopback only');
+check(/read_only:\s*true/.test(compose), 'deploy/compose.yml runs the smoke container with a read-only root');
+check(compose.includes('/app/web/.next/cache'), 'deploy/compose.yml gives .next/cache a writable mount');
 check(/^\s*-\s*CLAUDE_CODE_OAUTH_TOKEN\s*$/m.test(compose) && !/(TOKEN|API_KEY)=\S/.test(compose),
   'deploy/compose.yml passes CLAUDE_CODE_OAUTH_TOKEN through from the host and sets no secret value');
 check(/^\s*-\s*CAREER_OPS_ROOT=\/data\s*$/m.test(compose) && /^\s*-\s*".*:\/data"\s*$/m.test(compose),
