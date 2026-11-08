@@ -116,6 +116,7 @@ Which tools each run kind holds on Claude Code (`TOOL_SCOPES` in
 | `pdf` | Read, Glob, Grep | none |
 | `research` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
 | `evaluate` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
+| `evaluate-text` | Read, Glob, Grep | none |
 | `cover` | Read, WebFetch, WebSearch, Glob, Grep | fetch |
 | `fix-portal` | Read, WebFetch, WebSearch, Write, Edit, Bash, Glob, Grep | fetch and writes |
 
