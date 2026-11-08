@@ -1,6 +1,6 @@
 # Design memo for adversarial review (career-ops fork, docs-only planning)
 
-Repository: /Users/jason/dev/career-ops/.claude/worktrees/laughing-kilby-d8d174 (read it; nothing here is implemented yet). Constraints that bind: AGENTS.md "Headless worker permissions" (no auto-approve flags on a new spawner; tests/headless-permission-flags.test.mjs), the one-writer rule (lib/dir-lock.mjs judges staleness by pid, every writer runs in the web pod), Data Contract (no new tracker columns; user-layer sidecars under data/), Ethical Use (evaluate only, never apply), docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md Appendix B and C (publish service is internet-facing, script-free, the dashboard is never routed through it).
+Repository: this checkout of the fork (read it; nothing here is implemented yet). Constraints that bind: AGENTS.md "Headless worker permissions" (no auto-approve flags on a new spawner; tests/headless-permission-flags.test.mjs), the one-writer rule (lib/dir-lock.mjs judges staleness by pid, every writer runs in the web pod), Data Contract (no new tracker columns; user-layer sidecars under data/), Ethical Use (evaluate only, never apply), docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md Appendix B and C (publish service is internet-facing, script-free, the dashboard is never routed through it).
 
 ## Decision A. Scan-to-evaluate chain with a per-job mode
 

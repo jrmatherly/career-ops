@@ -13,7 +13,7 @@ The plan `../../plans/2026-11-08-scan-automation-and-platform.md` rests on the f
 
 ## Reviews
 
-`reviews/00-design-memo.md` is the memo the reviewers read. `reviews/01-design-interrogation.md` records the three-model adversarial review of the two contested choices (the queue and refactor shape of thread 1, the key-minting option of thread 3) and what the lead did with each finding.
+`reviews/00-design-memo.md` is the memo the first panel read. `reviews/01-design-interrogation.md` records the three-model adversarial review of the two contested choices (the queue and refactor shape of thread 1, the key-minting option of thread 3) and what the lead did with each finding. `reviews/02-plan-review.md` records the second round, three reviewers reading the finished plan against the code through one lens each (executor readiness, repository conventions, design and risk), with every finding's disposition; the plan at the following commit applies them.
 
 ## Trail review
 
