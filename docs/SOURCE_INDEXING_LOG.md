@@ -226,3 +226,23 @@ Re-read against rule 6 after a contributor checked the live `robots.txt` in [#57
 **Rule 6 (the source's own `robots.txt`).** Checked on 2026-10-23 and again on 2026-11-05: one GET of `https://jobspresso.co/robots.txt`, HTTP 200. Under `User-agent: *` it disallows `/*?` and sets `Crawl-delay: 3`; its only `Allow` lines are `/*.css` and `/*.js`. No group names career-ops. `/*?` covered the URL the provider originally fetched, `/?feed=job_feed`, the same shape as Lagou in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. Unlike Lagou, a usable request without a query string exists: WordPress serves the same feed at `https://jobspresso.co/feed/job_feed/`, which is the URL the feed's own `<atom:link rel="self">` names. On 2026-11-05 it answered HTTP 200 `application/rss+xml` with no redirect, and returned the same 10 items as the query-string URL. `/*?` does not cover it, so the provider now reads that path, once per scan.
 
 **Rules 1 to 5.** Not re-verified here.
+
+---
+
+## themuse.com (retired 2026-11-08)
+
+| | |
+|---|---|
+| **Proposed by** | issue [#1283](https://github.com/santifer/career-ops/issues/1283) |
+| **Provider** | `providers/themuse.mjs` |
+| **Merged** | before this policy existed (2026-08-04) |
+| **Retired** | 2026-11-08 (this fork; upstream still ships the live provider) |
+| **Status** | Not listed. `fetch()` throws a retirement message; the catalog row reads **Retired (2026-11-08)** |
+
+Found by a live probe of every provider on 2026-11-08: the scanner read The Muse as a board with no jobs.
+
+**What was checked.** On 2026-11-08 the providers assessment fetched the feed from two networks under the scanner's User-Agent and a desktop browser User-Agent, and the same day `curl -sI` re-checked these paths. `https://www.themuse.com/api/public/jobs` (bare, with `page=0`, with an `api_key` parameter, and under a browser User-Agent), `https://www.themuse.com/` and `https://www.themuse.com/jobs` each answered HTTP 403 with `cf-mitigated: challenge`, a Cloudflare managed challenge. `https://www.themuse.com/robots.txt` answered HTTP 200; under `User-agent: *` it disallows only `/apply/`. The feed is not closed by `robots.txt`; it is closed by bot protection, which career-ops does not work around.
+
+**Alternative.** A user with an Apify token can read the board through the keyed `provider: apify` plugin and the public actor `bibian/themuse-jobs-scraper` (`https://apify.com/bibian/themuse-jobs-scraper` answered HTTP 200 on 2026-11-08). That route is outside the zero-key core and is the user's own choice.
+
+**Rules 1 to 6.** Not re-verified: the source is unreachable, which decides on its own.
