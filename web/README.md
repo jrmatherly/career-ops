@@ -77,8 +77,18 @@ jdText}`: `input` is the posting URL, used only to name the posting, and
 `jdText` is the posting text, at most 16,384 characters. The worker gets no web
 tool and no write tool, runs on Claude only, and is denied Read on secrets and
 the PII files. Its report header reads `unconfirmed (auto mode, no web
-research)`. A kind the route does not know, or `jdText` on any other kind,
-returns 400.
+research)`.
+
+The route answers 400, before it starts any CLI, for:
+
+- a kind it does not know.
+- a field sent to a kind that does not own it: `jdText` outside
+  `evaluate-text`, `brief` outside `cover`, and `evaluationSections` outside
+  `evaluate` and `evaluate-text`.
+- an `input` or a `cliId` that is not a non-empty string.
+- an `evaluate` or `evaluate-text` input that is not a bare `http(s)://` URL
+  with no whitespace anywhere in it. `evaluate` also takes a `local:` inbox
+  row.
 
 ## Safety
 

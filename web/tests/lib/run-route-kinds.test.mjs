@@ -8,7 +8,7 @@ import "../helpers/web-ts-alias-loader.mjs";
 
 // The evaluate-text body rules and its spawn, through the real request handler with
 // a stand-in CLI. The stub records the argv it was given and prints a fixed stdout.
-const cliStub = `export const resolveCliOrFallback = (id) => ({ spec: { id: globalThis.__resolvedCliId ?? id }, binPath: "/fixture/never-run" });
+const cliStub = `export const resolveCliOrFallback = (id) => globalThis.__cliUnavailable ? null : ({ spec: { id: globalThis.__resolvedCliId ?? id }, binPath: "/fixture/never-run" });
 export const cliSubstitutionNotice = () => null;
 export const cliUnavailableError = () => ({ error: "Fixture CLI unavailable" });`;
 const spawnStub = `import { EventEmitter } from "node:events";
@@ -64,6 +64,7 @@ function fixtureRoot(t, prefix = "co-run-route-kinds-", { codeRoot } = {}) {
     delete globalThis.__onSpawn;
     delete globalThis.__fakeStdout;
     delete globalThis.__resolvedCliId;
+    delete globalThis.__cliUnavailable;
     fs.rmSync(root, { recursive: true, force: true });
   });
   fs.mkdirSync(path.join(root, "modes"));
@@ -115,12 +116,32 @@ test("jdText on any kind but evaluate-text is refused, not dropped", async (t) =
 test("a kind-scoped field on another kind is refused by field and kind", async (t) => {
   fixtureRoot(t);
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
-  for (const kind of KNOWN_KINDS.filter((k) => k !== "cover")) {
-    assert.equal(await refusal(await run({ kind, brief: { why: "x" }, jdText: undefined })), `brief is for kind "cover" only, not "${kind}".`);
+  // An explicit null counts as sent.
+  for (const kind of KNOWN_KINDS.filter((k) => k !== "evaluate-text")) {
+    assert.equal(await refusal(await run({ kind, jdText: null })), `jdText is for kind "evaluate-text" only, not "${kind}".`);
   }
-  for (const kind of KNOWN_KINDS.filter((k) => !k.startsWith("evaluate"))) {
-    assert.equal(await refusal(await run({ kind, evaluationSections: ["summary"], jdText: undefined })), `evaluationSections is for the evaluate kinds only, not "${kind}".`);
+  for (const brief of [{ why: "x" }, null]) {
+    for (const kind of KNOWN_KINDS.filter((k) => k !== "cover")) {
+      assert.equal(await refusal(await run({ kind, brief, jdText: undefined })), `brief is for kind "cover" only, not "${kind}".`);
+    }
   }
+  for (const evaluationSections of [["summary"], null]) {
+    for (const kind of KNOWN_KINDS.filter((k) => !k.startsWith("evaluate"))) {
+      assert.equal(await refusal(await run({ kind, evaluationSections, jdText: undefined })), `evaluationSections is for the evaluate kinds only, not "${kind}".`);
+    }
+  }
+});
+
+test("a cover request with a brief passes the field table and starts the CLI", async (t) => {
+  const root = fixtureRoot(t);
+  fs.writeFileSync(path.join(root, "modes/cover.md"), "# Fictional cover mode\n");
+  fs.mkdirSync(path.join(root, "reports"));
+  fs.writeFileSync(path.join(root, "reports/007-fictional-co-2026-11-01.md"), "# Evaluation: Fictional Co — Engineer\n");
+  let spawned = false;
+  globalThis.__onSpawn = () => { spawned = true; };
+  const brief = { why: "Mission.", problem: "Scale.", approach: "Ship.", tone: "direct" };
+  await events(await run({ kind: "cover", input: "7", brief, jdText: undefined }));
+  assert.ok(spawned, "the cover run reached the CLI");
 });
 
 test("an input that is not a non-empty string is refused before any CLI starts", async (t) => {
@@ -129,6 +150,47 @@ test("an input that is not a non-empty string is refused before any CLI starts",
   for (const kind of KNOWN_KINDS) {
     for (const input of [undefined, "", 0, 123, true, {}, [], "  "]) {
       assert.equal(await refusal(await run({ kind, input, jdText: kind === "evaluate-text" ? "Role." : undefined })), "input must be a non-empty string.", `${kind} input=${JSON.stringify(input)}`);
+    }
+  }
+});
+
+test("a malformed input is refused before the CLI is resolved", async (t) => {
+  fixtureRoot(t);
+  globalThis.__cliUnavailable = true;
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.equal(await refusal(await run({ kind: "pdf", input: "  ", jdText: undefined })), "input must be a non-empty string.");
+  assert.match(await refusal(await run({ input: "https://jobs.example.test/1\n", jdText: "Role." })), /bare http\(s\) URL/);
+  assert.match(await refusal(await run({ kind: "evaluate", input: "jobs.example.test/1" })), /bare http\(s\) URL/);
+  assert.equal(await refusal(await run({ cliId: 1, jdText: "Role." })), "cliId must be a non-empty string.");
+});
+
+test("an evaluate input that is not a bare posting URL is refused before any CLI starts", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of ["evaluate", "evaluate-text"]) {
+    for (const input of [" https://jobs.example.test/1", "https://jobs.example.test/1 ", "https://jobs.example.test/1\n", "https://jobs.example.test/1\r", "https://jobs.example.test/\t1", "https://jobs.example.test/a b", "https://jobs.example.test/1\u2028", "local: jds/acme.md", "jobs.example.test/1", "ftp://jobs.example.test/1"]) {
+      assert.match(await refusal(await run({ kind, input, jdText: kind === "evaluate-text" ? "Role." : undefined })), /^The posting URL must be a bare http\(s\) URL/, `${kind} input=${JSON.stringify(input)}`);
+    }
+  }
+  assert.match(await refusal(await run({ input: "local:jds/acme.md", jdText: "Role." })), /^The posting URL must be a bare http\(s\) URL,/);
+});
+
+test("evaluate keeps the local: inbox rows and a bare URL", async (t) => {
+  fixtureRoot(t);
+  let spawns = 0;
+  globalThis.__onSpawn = () => { spawns += 1; };
+  for (const input of ["local:jds/acme.md", "HTTPS://jobs.example.test/1"]) {
+    await events(await run({ kind: "evaluate", input, jdText: undefined }));
+  }
+  assert.equal(spawns, 2);
+});
+
+test("a cliId that is not a non-empty string is refused before the CLI is resolved", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  for (const kind of ["evaluate", "pdf"]) {
+    for (const cliId of [undefined, null, "", "  ", 1, {}, true]) {
+      assert.equal(await refusal(await run({ kind, input: kind === "pdf" ? "7" : "https://jobs.example.test/1", cliId, jdText: undefined })), "cliId must be a non-empty string.", `${kind} cliId=${JSON.stringify(cliId)}`);
     }
   }
 });

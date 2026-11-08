@@ -40,6 +40,12 @@ const JD_TEXT_MAX_CHARS = 16 * 1024;
 // character would widen one. So letters, digits, . _ - and / only. Checked after
 // the CLI rules, so a refused CLI is named first on any platform.
 const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
+// The input each evaluate kind takes. The inbox also queues local:jds/ rows for
+// evaluate, so that kind keeps them.
+const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
+  evaluate: { pattern: /^(?:https?:\/\/|local:)\S+$/i, shape: "a bare http(s) URL or a local: path" },
+  "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL" },
+};
 
 export async function POST(req: Request) {
   const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown; jdText?: unknown }>(req);
@@ -62,8 +68,14 @@ export async function POST(req: Request) {
   if (typeof input !== "string" || !input.trim()) {
     return Response.json({ error: "input must be a non-empty string." }, { status: 400 });
   }
-  if (!requestedCliId) {
-    return new Response(JSON.stringify({ error: "input and cliId required" }), { status: 400 });
+  // report-persist refuses a tab or newline only after the paid run, and writes
+  // the tracker row of a padded or schemeless input with no URL.
+  const posting = POSTING_INPUT[kind];
+  if (posting && !posting.pattern.test(input)) {
+    return Response.json({ error: `The posting URL must be ${posting.shape}, with no whitespace in it.` }, { status: 400 });
+  }
+  if (typeof requestedCliId !== "string" || !requestedCliId.trim()) {
+    return Response.json({ error: "cliId must be a non-empty string." }, { status: 400 });
   }
   // evaluate-text is the unattended kind: its Read denies are Claude flags, so
   // no other CLI may run it, and the posting text replaces the fetch.
