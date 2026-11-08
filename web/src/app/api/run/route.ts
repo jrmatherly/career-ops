@@ -18,7 +18,7 @@ import { createReportEnvelopeFilter } from "@/lib/report-envelope.mjs";
 import { persistEvaluation, evaluateRunOutcome, evaluationOutcomeEvent } from "@/lib/report-persist.mjs";
 import { buildPrompt, isShellSafeCompanyName } from "@/lib/run-prompts.mjs";
 import { parseCoverRequest } from "@/lib/cover-brief.mjs";
-import { capabilitiesFor } from "@/lib/worker-capabilities.mjs";
+import { KNOWN_KINDS, capabilitiesFor, isEvaluateKind } from "@/lib/worker-capabilities.mjs";
 import { fencingReport, isCliAllowedForCapabilities } from "@/lib/cli-fencing.mjs";
 import { claudeCliArgs } from "@/lib/claude-invocation.mjs";
 import { resolveCvTemplate, resolveUserTemplatesDir } from "@/lib/core/cv-template.mjs";
@@ -32,14 +32,69 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // a real oferta evaluation / pdf-mode CV tailoring + render is heavy and multi-step
 
+// fetchJdViaKnownApi caps the text it returns at 12,000 characters; this leaves
+// headroom. Characters, not bytes, so a CJK posting at that cap still fits.
+const JD_TEXT_MAX_CHARS = 16 * 1024;
+// The data root is spelled into evaluate-text's Read denies, inside the
+// comma-separated --disallowedTools value: a comma would split a rule and a glob
+// character would widen one. So letters, digits, . _ - and / only. Checked after
+// the CLI rules, so a refused CLI is named first on any platform.
+const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
+// The input each evaluate kind takes. The inbox also queues local:jds/ rows for
+// evaluate, so that kind keeps them, and scan mode names those files with the
+// company unslugged, so a local: path may hold an interior space.
+const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
+  evaluate: {
+    pattern: /^(?:https?:\/\/\S+|local:\S(?:[^\t\r\n]*\S)?)$/i,
+    shape: "a bare http(s) URL with no whitespace in it, or a local: path with no padding, tab or line break",
+  },
+  "evaluate-text": { pattern: /^https?:\/\/\S+$/i, shape: "a bare http(s) URL with no whitespace in it" },
+};
+
 export async function POST(req: Request) {
-  const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown }>(req);
+  const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown; jdText?: unknown }>(req);
   if (!body) return new Response(JSON.stringify({ error: "bad json" }), { status: 400 });
   const { kind = "evaluate", input, cliId: requestedCliId, brief } = body;
-  const evaluation = kind === "evaluate" ? parseEvaluationOptions(body.evaluationSections) : undefined;
+  // An unknown kind would fall through to the URL-fetch prompt and spawn a paid run.
+  if (!KNOWN_KINDS.includes(kind)) return Response.json({ error: `Unknown kind ${JSON.stringify(kind)}.` }, { status: 400 });
+  // A field sent to a kind that ignores it is refused, not dropped.
+  for (const [field, owns, owner] of [
+    ["jdText", kind === "evaluate-text", 'kind "evaluate-text"'],
+    ["brief", kind === "cover", 'kind "cover"'],
+    ["evaluationSections", isEvaluateKind(kind), "the evaluate kinds"],
+  ] as const) {
+    if (!owns && body[field] !== undefined) {
+      return Response.json({ error: `${field} is for ${owner} only, not "${kind}".` }, { status: 400 });
+    }
+  }
+  const evaluation = isEvaluateKind(kind) ? parseEvaluationOptions(body.evaluationSections) : undefined;
   if (evaluation && !evaluation.ok) return Response.json({ error: evaluation.error }, { status: 400 });
-  if (!input || !requestedCliId) {
-    return new Response(JSON.stringify({ error: "input and cliId required" }), { status: 400 });
+  if (typeof input !== "string" || !input.trim()) {
+    return Response.json({ error: "input must be a non-empty string." }, { status: 400 });
+  }
+  // report-persist refuses a tab or newline only after the paid run, and writes
+  // the tracker row of a padded or schemeless input with no URL.
+  const posting = POSTING_INPUT[kind];
+  if (posting && !posting.pattern.test(input)) {
+    return Response.json({ error: `The posting URL must be ${posting.shape}.` }, { status: 400 });
+  }
+  // A padded id would miss the registry and reach the substitution fallback.
+  if (typeof requestedCliId !== "string" || !requestedCliId || requestedCliId !== requestedCliId.trim()) {
+    return Response.json({ error: "cliId must be a non-empty string with no padding." }, { status: 400 });
+  }
+  // evaluate-text is the unattended kind: its Read denies are Claude flags, so
+  // no other CLI may run it, and the posting text replaces the fetch.
+  const jdText = kind === "evaluate-text" ? body.jdText : undefined;
+  if (kind === "evaluate-text") {
+    if (requestedCliId !== "claude") {
+      return Response.json({ error: "evaluate-text runs on Claude only: cliId must be \"claude\"." }, { status: 400 });
+    }
+    if (typeof jdText !== "string" || !jdText.trim()) {
+      return Response.json({ error: "evaluate-text needs jdText, the posting text, as a non-empty string." }, { status: 400 });
+    }
+    if (jdText.length > JD_TEXT_MAX_CHARS) {
+      return Response.json({ error: `jdText is over the ${JD_TEXT_MAX_CHARS}-character limit.` }, { status: 400 });
+    }
   }
   const resolved = resolveCliOrFallback(requestedCliId);
   if (!resolved) {
@@ -51,6 +106,26 @@ export async function POST(req: Request) {
   const { spec, binPath } = resolved;
   // The CLI actually running: fencing, capabilities and argv below are keyed on it.
   const cliId = spec.id;
+  if (kind === "evaluate-text" && cliId !== "claude") {
+    return Response.json({ error: "evaluate-text runs on Claude only, and Claude is not available." }, { status: 400 });
+  }
+  let denyRoot: string | undefined;
+  if (kind === "evaluate-text") {
+    // The denies name the real path, so a symlinked data root still covers the files.
+    const root = careerOpsRoot();
+    try {
+      denyRoot = fs.realpathSync(root);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
+      console.error(`/api/run: evaluate-text realpath of the data root failed: ${code}`);
+      return Response.json({ error: `evaluate-text could not resolve the data root ${root} (${code}).` }, { status: 400 });
+    }
+    if (!DENY_SAFE_ROOT.test(denyRoot)) {
+      return Response.json({
+        error: `evaluate-text needs a data root of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${denyRoot}). Point CAREER_OPS_ROOT at such a path.`,
+      }, { status: 400 });
+    }
+  }
   const substitution = cliSubstitutionNotice(resolved);
   const capabilities = capabilitiesFor(kind);
   if (!isCliAllowedForCapabilities(cliId, capabilities)) {
@@ -66,7 +141,7 @@ export async function POST(req: Request) {
   // it to modes/oferta.md meant a configured market passed a check on a file the
   // run never opens, and would have missed a market dir with no evaluation mode.
   const lang = readLanguageConfig();
-  const needsScript: Record<string, string> = { evaluate: lang.evalModeFile, "fix-portal": "verify-portals.mjs", pdf: "generate-pdf.mjs", cover: "modes/cover.md" };
+  const needsScript: Record<string, string> = { evaluate: lang.evalModeFile, "evaluate-text": lang.evalModeFile, "fix-portal": "verify-portals.mjs", pdf: "generate-pdf.mjs", cover: "modes/cover.md" };
   const required = needsScript[kind];
   // Scripts and system modes live in the code checkout, which on a split-layout
   // install is not the data root (cv.md, reports/ and output stay under that).
@@ -118,7 +193,7 @@ export async function POST(req: Request) {
 
   // An A–F score is meaningless without a CV to score against — the CLI would
   // hallucinate a fit narrative and still emit a VERDICT. Require cv.md first.
-  if ((kind === "evaluate" || kind === "pdf" || kind === "cover") && !fs.existsSync(path.join(careerOpsRoot(), "cv.md"))) {
+  if ((isEvaluateKind(kind) || kind === "pdf" || kind === "cover") && !fs.existsSync(path.join(careerOpsRoot(), "cv.md"))) {
     return new Response(
       JSON.stringify({ error: "Add your CV first so I can score this against you — drop it on the home page." }),
       { status: 400, headers: { "Content-Type": "application/json" } },
@@ -159,7 +234,7 @@ export async function POST(req: Request) {
   // renders absent as `—`, a wrong date as a fresh req). Unknown URL → undefined
   // → report-persist writes no segment at all.
   const postedAt =
-    kind === "evaluate"
+    isEvaluateKind(kind)
       ? readInbox().find((j) => j.url === input)?.postedAt ?? readScanDates().get(input)
       : undefined;
   // Which CV template the worker fills. Resolved HERE, for the same reason `lang`
@@ -182,6 +257,7 @@ export async function POST(req: Request) {
   const prompt = buildPrompt({
     kind,
     input,
+    jdText,
     memory: readMemory(),
     today,
     postedAt,
@@ -195,6 +271,11 @@ export async function POST(req: Request) {
     profile: profileRef(careerOpsRoot()),
     evaluationInstructions,
   });
+  // The prompt is one argv element and a NUL cannot travel in argv: spawn would
+  // throw and the run would answer 500. jdText, input and a cover brief all land here.
+  if (prompt.includes("\0")) {
+    return Response.json({ error: "The request text contains a NUL byte, which cannot be passed to the CLI." }, { status: 400 });
+  }
 
   const isClaude = cliId === "claude";
   // Which tools each kind gets, and the whole claude argv, live in
@@ -210,13 +291,13 @@ export async function POST(req: Request) {
   // A CLI with its own structured stream gets the argv that turns it on, so its
   // stdout matches spec.parseEvent below; spec.args stays the plain-text argv the
   // envelope-parsing routes rely on.
-  const args = isClaude ? claudeCliArgs({ kind, prompt }) : (spec.streamArgs ?? spec.args)(prompt);
+  const args = isClaude ? claudeCliArgs({ kind, prompt, dataRoot: denyRoot }) : (spec.streamArgs ?? spec.args)(prompt);
 
   // Tracker-mutating runs hold a write token so a row delete can't race their
   // merge (tracker.mjs delete doesn't yet share a lock with merge-tracker,
   // see run-registry). evaluate's agent no longer writes; the backend persist
   // path below still merges the tracker, so the token stays.
-  const writeToken = kind === "evaluate" || kind === "pdf" ? acquireTrackerWrite() : null;
+  const writeToken = isEvaluateKind(kind) || kind === "pdf" ? acquireTrackerWrite() : null;
 
   // stdin must reach EOF or the CLI waits on piped input that never comes: Codex's
   // `exec` blocks reading stdin for additional context, hangs until the kill timer,
@@ -311,10 +392,11 @@ export async function POST(req: Request) {
       // generate-pdf.mjs mid-render. 600s agent / ~200s render is ample —
       // a Chromium PDF render normally takes low tens of seconds even with a
       // cold Playwright launch.
-      // pdf keeps 600s because its render+mark phase runs AFTER this timer; a
-      // plain evaluate has no such phase, so it can use almost the whole 800s
-      // budget. 285s was cutting real evaluations off mid-run — reading the mode
-      // and profile, fetching the posting, ~25 Bash calls and a few web searches
+      // pdf keeps 600s because its render+mark phase runs AFTER this timer; the
+      // evaluate kinds keep 740s for report-persist, and the other kinds, with no
+      // such phase, use almost the whole 800s budget. 285s was cutting real
+      // evaluations off mid-run — reading the mode and profile, fetching the
+      // posting, ~25 Bash calls and a few web searches
       // routinely run past it — and the SIGTERM then surfaced as "didn't save a
       // report" (see the close handler), blaming the CLI for a limit we imposed
       // (#3124). 780s leaves ~20s under maxDuration for a graceful shutdown.
@@ -376,7 +458,7 @@ export async function POST(req: Request) {
       // report arrives in a <<report-md>> envelope. The filter keeps every byte
       // for the backend while holding the body out of the run log.
       const cvFilter = kind === "pdf" ? createCvEnvelopeFilter() : null;
-      const reportFilter = kind === "evaluate" ? createReportEnvelopeFilter() : null;
+      const reportFilter = isEvaluateKind(kind) ? createReportEnvelopeFilter() : null;
       // Assistant-authored text only, before report-body filtering. Tools/JDs
       // cannot directly declare a gated outcome. Process integrity is checked
       // first at close, before this text can be treated as a terminal stop.
@@ -390,7 +472,7 @@ export async function POST(req: Request) {
       // the stream never idles during the filtered phase. Unknown event types are
       // ignored by the client's switch, so this is safe for older tabs too.
       const sendAgentText = (text: string) => {
-        if (kind === "evaluate") evaluationText += text;
+        if (isEvaluateKind(kind)) evaluationText += text;
         const filter = cvFilter ?? reportFilter;
         const visible = filter ? filter.push(text) : text;
         if (visible) send({ type: "text", text: visible });
@@ -614,7 +696,7 @@ export async function POST(req: Request) {
           return close();
         }
 
-        if (kind === "evaluate") {
+        if (isEvaluateKind(kind)) {
           const tail = reportFilter?.flush();
           if (tail) send({ type: "text", text: tail });
           const envelope = reportFilter?.result();

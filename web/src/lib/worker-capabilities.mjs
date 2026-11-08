@@ -62,13 +62,13 @@ export const CAPS = Object.freeze({
 /**
  * Every kind /api/run dispatches. Exported so guards iterate this rather than a
  * hand-written list — a list silently stops gating whatever kind is added next.
- * Unknown kinds still resolve (least-capable, see capabilitiesFor); this is the
- * set a test can enumerate, not a validity check.
+ * capabilitiesFor still resolves an unknown kind least-capable, and the run
+ * route refuses one before anything spawns.
  *
  * Lives here rather than in claude-invocation.mjs because it is a fact about the
  * run route's workers, not about Claude. Re-exported there for existing importers.
  */
-export const KNOWN_KINDS = Object.freeze(["pdf", "research", "evaluate", "fix-portal", "cover"]);
+export const KNOWN_KINDS = Object.freeze(["pdf", "research", "evaluate", "evaluate-text", "fix-portal", "cover"]);
 
 /**
  * What each run-route kind needs. Derived from what its prompt actually does
@@ -80,6 +80,10 @@ export const KNOWN_KINDS = Object.freeze(["pdf", "research", "evaluate", "fix-po
  * - evaluate  "Use WebFetch to read the posting", then emits the report inline.
  *             The backend persists it. The agent must not write: the posting is
  *             untrusted input.
+ * - evaluate-text  evaluate with the posting text in the request instead of a
+ *             url, for unattended runs: no network tool. The report the backend
+ *             persists is the residual channel, which is why claudeCliArgs
+ *             denies Read on secrets and PII for this kind.
  * - fix-portal rewrites one portals.yml entry after finding a working ATS URL.
  * - cover     runs cover.md's web research and re-reads the posting url, then
  *             returns the draft letter in its reply. It writes nothing.
@@ -92,9 +96,21 @@ const KIND_CAPABILITIES = Object.freeze({
   pdf: CAPS.localReadOnly,
   research: CAPS.networkReadOnly,
   evaluate: CAPS.networkReadOnly,
+  "evaluate-text": CAPS.localReadOnly,
   "fix-portal": CAPS.workspaceWrite,
   cover: CAPS.networkReadOnly,
 });
+
+/**
+ * True for the kinds that produce an evaluation report: they share the report
+ * envelope, the gate, the cv.md precondition and the tracker write token.
+ *
+ * @param {string} kind
+ * @returns {boolean}
+ */
+export function isEvaluateKind(kind) {
+  return kind === "evaluate" || kind === "evaluate-text";
+}
 
 /**
  * Resolve what a worker kind needs.

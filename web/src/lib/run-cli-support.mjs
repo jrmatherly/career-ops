@@ -6,6 +6,7 @@
 // specified.
 import { isReservedReportFile } from "./report-files.mjs";
 import { claudeUsageTokens } from "./claude-usage.mjs";
+import { isEvaluateKind } from "./worker-capabilities.mjs";
 
 /**
  * Dashboard-friendly shape both `parseCodexEvent` and `parseClaudeEvent` return.
@@ -440,7 +441,7 @@ export function newCompletedReportNum(beforeEntries, afterEntries) {
 export const RUN_MAX_DURATION_S = 800;
 export function killMsForKind(kind) {
   if (kind === "pdf") return 600_000;
-  if (kind === "evaluate") return 740_000;
+  if (isEvaluateKind(kind)) return 740_000;
   return 780_000;
 }
 
