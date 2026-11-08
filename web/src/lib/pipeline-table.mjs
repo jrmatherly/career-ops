@@ -34,15 +34,21 @@ const LABELED_SEGMENT = /^(posted|trust|yrs|note|rank):\s(.*)$/i;
  *  (`local:jds/…`, the row modes/scan.md writes for a pasted posting). */
 const ROW_TARGET = /^(?:https?:\/\/|local:\S)/i;
 
+/** The value rank-pipeline.mjs writes after `rank: `: `4.2/5 — reason`, 0 to 5. */
+const RANK_VALUE = /^(5(?:\.0+)?|[0-4](?:\.\d+)?)\/5\s+[—–-]\s+(.+)$/;
+const RANK_CELL = /^rank:/i;
+
 /** Parse data/pipeline.md — `- [ ] URL | Company | Role [| Location [| Compensation]] [| label: …]*`.
  *  The http(s) or `local:` cell is the URL, so `#NNN | URL | …` and a bare
  *  checkbox URL both survive. Company and role are the first two cells after that URL and
- *  are never labels: a `word:` there is text. Labels (`posted:`/`trust:`/`yrs:`/`note:`/`rank:`)
+ *  are never labels, except a full `rank: N/5 — reason` value: any other
+ *  `word:` there is text. Labels (`posted:`/`trust:`/`yrs:`/`note:`/`rank:`)
  *  start at the third cell after the URL, so they do not occupy location or
  *  compensation. Missing company and role stay empty. A row with neither an
  *  http(s) nor a `local:` cell is skipped. Further trailing columns are ignored.
  *  @param {string} md - content of data/pipeline.md.
- *  @returns {{url: string, company: string, role: string, location?: string, compensation?: string, done: boolean, postedAt?: string}[]}
+ *  A `rank: N/5 — reason` label sets `rank` and `rankReason`; the keys are absent otherwise.
+ *  @returns {{url: string, company: string, role: string, location?: string, compensation?: string, done: boolean, postedAt?: string, rank?: number, rankReason?: string}[]}
  */
 export function parseInbox(md) {
   const jobs = [];
@@ -58,12 +64,18 @@ export function parseInbox(md) {
       const seg = all[i];
       // Company and role sit in the two cells after the URL. Reading `word:`
       // there as a tag turned a real company or title into a dropped column.
-      const lm = i >= urlIndex + 3 ? seg.match(LABELED_SEGMENT) : null;
+      // A full rank value is the exception: rank-pipeline.mjs appends it to a
+      // short row too, and no real title reads `rank: 4.2/5 — …`.
+      const early = i < urlIndex + 3;
+      // seg[4] (the colon after `rank`) is a prefilter, so a company or role cell costs one character check, not a regex.
+      let lm = early && !(seg[4] === ":" && RANK_CELL.test(seg)) ? null : seg.match(LABELED_SEGMENT);
+      if (lm && early && !RANK_VALUE.test(lm[2].trim())) lm = null;
       if (lm) labels.set(lm[1].toLowerCase(), lm[2].trim());
       else positional.push(seg);
     }
     const posted = labels.get("posted");
-    jobs.push({
+    const rank = labels.get("rank")?.match(RANK_VALUE);
+    const job = {
       done: m[1].toLowerCase() === "x",
       url: all[urlIndex],
       company: positional[0] ?? "",
@@ -73,7 +85,12 @@ export function parseInbox(md) {
       // the row's own posting date (scan.mjs `posted:` label) — a more direct
       // freshness signal than the scan-history join, which stays as fallback
       postedAt: posted && /^\d{4}-\d{2}-\d{2}$/.test(posted) ? posted : undefined,
-    });
+    };
+    if (rank) {
+      job.rank = Number(rank[1]);
+      job.rankReason = rank[2];
+    }
+    jobs.push(job);
   }
   return jobs;
 }

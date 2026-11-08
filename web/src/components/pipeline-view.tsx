@@ -45,12 +45,15 @@ export function PipelineView({
   applications,
   inbox,
   inboxCount,
+  scanDates,
   trackerShape = "rows",
   cvRows = [],
 }: {
   applications: Application[];
   inbox: InboxJob[] | null;
   inboxCount: number;
+  /** The dates on which a scan added roles, for the Inbox's Added empty state. */
+  scanDates: string[];
   trackerShape?: "missing" | "empty" | "malformed" | "rows";
   /** Tracker row numbers that have a tailored CV PDF on disk. */
   cvRows?: string[];
@@ -767,7 +770,7 @@ export function PipelineView({
           ) : (
             <>
               <LinkedInPaste />
-              <InboxTriage inbox={inbox} />
+              <InboxTriage inbox={inbox} scanDates={scanDates} />
               {inbox.length === 0 && <InboxEmpty tracked={visibleApplications.length} />}
             </>
           )}

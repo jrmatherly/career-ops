@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"; // always read fresh local files
 export default async function PipelinePage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
   const { tab } = await searchParams;
   const onInbox = pipelineTab(tab) === "INBOX";
-  const { inbox, applications } = pipelineSummary();
+  const { inbox, applications, scanDates } = pipelineSummary();
   const pending = pendingInbox(inbox);
   const trackerShape = readTrackerShape();
   // Tracker row numbers whose tailored CV is indexed (data/pdf-index.tsv) AND on
@@ -32,7 +32,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
       ).filter((n): n is string => n !== null);
   return (
     <Suspense>
-      <PipelineView applications={applications} inbox={onInbox ? pending : null} inboxCount={pending.length} trackerShape={trackerShape} cvRows={cvRows} />
+      <PipelineView applications={applications} inbox={onInbox ? pending : null} inboxCount={pending.length} scanDates={onInbox ? scanDates : []} trackerShape={trackerShape} cvRows={cvRows} />
     </Suspense>
   );
 }
