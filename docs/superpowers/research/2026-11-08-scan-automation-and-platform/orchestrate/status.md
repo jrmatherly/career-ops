@@ -1,22 +1,24 @@
-# Status (derived 2026-11-08T17:12Z from units.tsv and ledger.tsv)
+# Status (derived 2026-11-09T14:49Z from units.tsv and ledger.tsv)
 
 ## Units
 id	track	state	branch	pr	sha	brief
-F1	build	verifying	claude/f1-file-filters	35	d97707dc16a9f9a75aff04573ed0e466cae2dd34	briefs/F1-fix2.md
-R2	build	verifying	claude/r2-inbox-rank	40	ecb3c7ffcdb910333047adf6b995222b760ff44d	briefs/R2-fix1.md
-A1	build	fix-round	claude/a1-evaluate-text	39	e2888b6eaa70cb9d34626dbbe357bc128e0160e2	briefs/A1-fix2.md
-P1	build	verifying	claude/p1-doctor-gateway	37	28bcdc668798ba04a2a0fe4d07dbab77ce91a952	briefs/P1-fix3.md
-K1	build	fix-round	claude/k1-publish-key-link	38	085ad7a6b5323792dd5bf25fd5cbb8b8d3a7ef79	briefs/K1-fix2.md
-R1	build	pending				
-A2	build	pending				
-A3	build	pending				
+F1	build	merged	claude/f1-file-filters	35	cb826486	briefs/F1-fix4.md
+R2	build	merged	claude/r2-inbox-rank	40	fc31cb2161fb1a837d4a503ec497310a2582988e	briefs/R2-fix3.md
+A1	build	merged	claude/a1-evaluate-text	39	cedf9543	briefs/A1-r4-verify.md
+P1	build	merged	claude/p1-doctor-gateway	37	66f0cb7a2d8bfa6c61ee35cfcc813c225dd454c8	briefs/P1-fix4.md
+K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad93311c	briefs/K1-fix4.md
+A2	build	merged	claude/a2-evaluate-queue	45	20a53283	briefs/A2.md
+A3	build	building	claude/a3-evaluate-ui			briefs/A3.md
 P2	operator	pending				
+R1	build	merged	claude/r1-rank-pass	42	5505a546	briefs/R1-r2-verify.md
 
 ## Latest ledger row per PR
-35 d97707dc verifier-failed
-37 f817b14e verifier-failed
-38 085ad7a6 verifier-failed
-39 e2888b6e verifier-failed
-40 a64d71af verifier-failed
+35 50488b97 unit-test-verified
+37 66f0cb7a live-ui-verified
+38 b19a810b live-ui-verified
+39 b89a011c unit-test-verified
+40 fc31cb21 unit-test-verified
+42 26d57a1b unit-test-verified
+45 20a53283 merged
 
-## Gates open: 2
+## Gates open: 0
