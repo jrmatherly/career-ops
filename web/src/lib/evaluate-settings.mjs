@@ -60,3 +60,11 @@ export function addedLink(entry) {
   const at = entry.rows?.find((row) => row.state === "queued")?.at;
   return typeof at === "string" && /^\d{4}-\d{2}-\d{2}/.test(at) ? `/pipeline?added=${at.slice(0, 10)}` : null;
 }
+
+/** The modal's form state for a job's stored settings; no settings reads as Off with the defaults shown. */
+export function evaluateForm(stored) {
+  return { mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5) };
+}
+
+/** A ledger URL the panel may link to: http(s) only, since the ledger stores whatever the scan found. */
+export const postingHref = (url) => (/^https?:\/\//i.test(url) ? url : null);

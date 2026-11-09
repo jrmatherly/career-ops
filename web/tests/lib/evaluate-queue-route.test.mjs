@@ -35,7 +35,7 @@ async function get() {
   console.error = (...args) => errors.push(args.join(" "));
   try {
     const res = await GET();
-    return { status: res.status, body: await res.json(), launches: [...launches], errors };
+    return { status: res.status, body: await res.json(), skipped: res.headers.get("X-Evaluate-Queue-Skipped"), launches: [...launches], errors };
   } finally {
     console.error = realError;
   }
@@ -79,6 +79,7 @@ test("200 with the dump, launched as dump --json with this Node and windowsHide"
   assert.deepEqual(r.launches[0].args, [join(codeRoot, "evaluate-queue.mjs"), "dump", "--json"]);
   assert.equal(r.launches[0].options?.windowsHide, true);
   assert.ok(r.errors.some((line) => line.includes("malformed row")), "a warning on stderr is logged, and the dump still answers");
+  assert.equal(r.skipped, "1", "the malformed-row count rides the header, the stderr text does not");
 });
 
 test("an empty ledger answers 200 with []", async () => {
@@ -87,16 +88,18 @@ test("an empty ledger answers 200 with []", async () => {
   const r = await get();
   assert.equal(r.status, 200);
   assert.deepEqual(r.body, []);
+  assert.equal(r.skipped, null, "no header without a warning");
 });
 
 test("503 without the CLI's stderr when it exits non-zero, fails to spawn, times out or prints no JSON array", async () => {
   standIn('console.log("[]");');
+  // A valid array on stdout in the first three, so only the branch under test can produce the 503.
   const cases = {
-    "non-zero exit": { error: Object.assign(new Error("exit 1"), { code: 1 }), stderr: `Error: EISDIR ${SECRET_PATH}` },
-    "spawn failure": { error: Object.assign(new Error("spawn"), { code: "ENOENT" }), stderr: SECRET_PATH },
-    timeout: { error: Object.assign(new Error("killed"), { killed: true, signal: "SIGTERM" }), stderr: SECRET_PATH },
-    "unparseable stdout": { error: null, stdout: `not json ${SECRET_PATH}` },
-    "JSON that is not an array": { error: null, stdout: '{"path":"x"}' },
+    "non-zero exit": { error: Object.assign(new Error("exit 1"), { code: 1 }), stdout: "[]", stderr: `Error: EISDIR ${SECRET_PATH}`, logged: /exited 1/ },
+    "spawn failure": { error: Object.assign(new Error("spawn"), { code: "ENOENT" }), stdout: "[]", stderr: SECRET_PATH, logged: /failed to run/ },
+    timeout: { error: Object.assign(new Error("killed"), { killed: true, signal: "SIGTERM" }), stdout: "[]", stderr: SECRET_PATH },
+    "unparseable stdout": { error: null, stdout: `not json ${SECRET_PATH}`, logged: /not JSON: / },
+    "JSON that is not an array": { error: null, stdout: '{"path":"x"}', logged: /not a JSON array/ },
   };
   for (const [label, outcome] of Object.entries(cases)) {
     planned = outcome;
@@ -104,6 +107,8 @@ test("503 without the CLI's stderr when it exits non-zero, fails to spawn, times
     assert.equal(r.status, 503, label);
     assert.equal(typeof r.body.error, "string", label);
     assert.ok(!JSON.stringify(r.body).includes(SECRET_PATH), `${label}: no path in the answer`);
+    assert.ok(r.body.error.includes(label === "timeout" ? "try Refresh" : "server log"), `${label}: the answer names the next step`);
+    if (outcome.logged) assert.ok(r.errors.some((line) => outcome.logged.test(line)), `${label}: the cause is logged`);
   }
   planned = null;
 });

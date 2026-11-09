@@ -6,9 +6,9 @@ import type { FiltersFrom, ScheduledJob, ScanEngine } from "@/lib/scheduled-jobs
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
-import { EvaluateFields, FiltersFromToggle, evaluateForm, type EvaluateForm } from "@/components/scheduled-scans/create-job-modal";
+import { EvaluateFields, FiltersFromToggle, type EvaluateForm } from "@/components/scheduled-scans/create-job-modal";
 import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
-import { evaluateBody } from "@/lib/evaluate-settings.mjs";
+import { evaluateBody, evaluateForm } from "@/lib/evaluate-settings.mjs";
 import { cadenceMinimum, cadenceValueForUnit, updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 
 export function EditJobModal({
@@ -96,7 +96,7 @@ export function EditJobModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-5">
           {error && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-500">{error}</div>}
 
           {/* ─── Name + Engine + Cadence ─── */}

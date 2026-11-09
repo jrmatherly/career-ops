@@ -251,9 +251,8 @@ Review or Auto. Auto also takes a rank threshold (1 to 5, default 3.5) and a num
 of evaluations per run (1 to 20, default 5); a value outside those bounds is clamped
 when you save. The job card shows the mode, the run history shows each run's
 counts, and the Evaluate queue panel under the jobs lists every queued row and what
-happened to it. Set the
-job's evaluate mode to **review** and the runner ranks the rows that job's scans
-added, through `rank-pipeline.mjs`. Set it to **auto** and the runner also queues
+happened to it. In **Review** the runner ranks the rows that job's scans added,
+through `rank-pipeline.mjs`. In **Auto** the runner also queues
 the rows ranked at or above the job's rank threshold (at most its evaluations per
 run) in `data/evaluate-queue.tsv`, and evaluates them. Each evaluation is an
 `evaluate-text` run on the dashboard: the runner fetches the posting text from the

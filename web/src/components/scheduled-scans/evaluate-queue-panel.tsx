@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ListChecks, RefreshCw } from "lucide-react";
 import type { ScheduledJob } from "@/lib/scheduled-jobs";
-import { addedLink, groupLedger } from "@/lib/evaluate-settings.mjs";
+import { addedLink, groupLedger, postingHref } from "@/lib/evaluate-settings.mjs";
 
 type LedgerEntry = { key: string; url: string; state: string; reason: string; rank?: number; jobId: string; runId: string; rows: { at: string }[] };
 
@@ -12,17 +12,28 @@ type LedgerEntry = { key: string; url: string; state: string; reason: string; ra
 // read on mount and on Refresh, not on every reload of the jobs (each read spawns the CLI).
 export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
   const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
+  const [skipped, setSkipped] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  // Only the newest request may set state; a slow earlier one must not overwrite it.
+  const requestSeq = useRef(0);
 
   const load = async () => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
     try {
       const response = await fetch("/api/evaluate-queue", { cache: "no-store" });
       const body = await response.json().catch(() => null);
       if (!response.ok || !Array.isArray(body)) throw new Error(body?.error || "Could not read the evaluate queue.");
+      if (seq !== requestSeq.current) return;
       setEntries(body);
+      setSkipped(Number(response.headers.get("X-Evaluate-Queue-Skipped")) || 0);
       setError(null);
     } catch (cause) {
+      if (seq !== requestSeq.current) return;
       setError(cause instanceof Error ? cause.message : "Could not read the evaluate queue.");
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
@@ -39,8 +50,14 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
         <h2 id="evaluate-queue-title" className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <ListChecks className="size-4 text-brand-text" /> Evaluate queue
         </h2>
-        <button type="button" onClick={() => void load()} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-hover hover:text-foreground">
-          <RefreshCw className="size-3.5" /> Refresh
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          aria-busy={loading}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-60"
+        >
+          <RefreshCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} /> {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
       {error ? (
@@ -57,10 +74,11 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
               <ul className="mt-1.5 divide-y divide-border/60 text-xs">
                 {group.entries.map((entry: LedgerEntry) => {
                   const link = entry.state === "queued" ? addedLink(entry) : null;
+                  const href = postingHref(entry.url);
                   return (
                     <li key={entry.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
-                      {/^https?:\/\//i.test(entry.url) ? (
-                        <a href={entry.url} target="_blank" rel="noopener noreferrer" className="min-w-0 max-w-full truncate text-foreground hover:text-brand-text">
+                      {href ? (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 max-w-full truncate text-foreground hover:text-brand-text">
                           {entry.url}
                         </a>
                       ) : (
@@ -72,7 +90,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                       {link && (
                         <Link
                           href={link}
-                          title="Opens the Inbox on the UTC date this row was queued. A row queued near midnight UTC, or ranked a day after its scan, sits under a different scan date."
+                          title="Opens the Inbox on the UTC date this row was queued. The Inbox groups rows by the host-local scan day, so a row queued near midnight UTC, or ranked a day after its scan, sits under a different date."
                           className="text-brand-text underline-offset-2 hover:underline"
                         >
                           In the Inbox
@@ -85,6 +103,11 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
             </div>
           ))}
         </div>
+      )}
+      {entries && skipped > 0 && (
+        <p className="mt-3 text-xs text-muted">
+          {skipped} {skipped === 1 ? "row" : "rows"} in data/evaluate-queue.tsv could not be read and {skipped === 1 ? "is" : "are"} not shown; the server log names the lines.
+        </p>
       )}
     </section>
   );

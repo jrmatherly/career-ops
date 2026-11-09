@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { CalendarPlus, Loader2, Sparkles, X } from "lucide-react";
 import type { EvaluateSettings, FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
-import { clampEvaluate, evaluateBody, evaluateFieldsVisible } from "@/lib/evaluate-settings.mjs";
+import { clampEvaluate, evaluateBody, evaluateFieldsVisible, evaluateForm } from "@/lib/evaluate-settings.mjs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
@@ -77,7 +77,7 @@ export function CreateJobModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-5">
           {error && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-500">{error}</div>}
 
           {/* ─── Name + Engine + Cadence ─── */}
@@ -172,10 +172,6 @@ export function CreateJobModal({
 }
 
 export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string };
-
-export function evaluateForm(stored?: EvaluateSettings): EvaluateForm {
-  return { mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5) };
-}
 
 export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onChange: (value: EvaluateForm) => void }) {
   const id = useId();
