@@ -1,0 +1,5 @@
+# verify-B receipt (sonnet, read-only, 18:46 EST) — head e3cc37e10b21f4db22082e9bb1b92dfd5f463b49
+
+VERDICT PASS. Eight commits origin/main..HEAD; four picks carry "(cherry picked from commit …)" lines matching 90d0cde8 4c413c27 7af08dcc 946416b3. provider-policy-docs-agree: 7 passed; with origin/main's add-provider SKILL.md restored, 5 passed 2 failed (SKILL.md:12 gate, missing "read like a visitor"), then restored. fork-deviations-covered 1 passed; two rows under "### Providers program (2026-11-08)" (ADOPT picks row; KEEP test row) plus the Rules bullet. Review log follows the template; watermark.json unchanged at 0339acb4. Full suite 21424 passed, 0 failed, 15 warnings; no split-root failure this run, so no flake tally. Prose edits match Task B2 step 3; no candidate claims or user data.
+Minor, not blocking: the two fork-only policy files appear only in the test row's Ours cell; the review log's Landed section quotes the pre-fix counts (21415/3) with the note that the deviations rows cleared them.
+Not checked: pick content (out of scope), --github state, whether the 15 warnings exist on origin/main.

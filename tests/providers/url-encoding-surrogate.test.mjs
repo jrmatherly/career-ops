@@ -392,6 +392,41 @@ try {
     ).jobs,
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://www.aldi-nord.de/karriere/detail/good-id-101.html',
   );
+
+  // bullhorn.parseBullhornJobs — for…of over a JobOrder page; id feeds the #/jobs/{id} URL.
+  const { parseBullhornJobs } = await load('bullhorn.mjs');
+  check(
+    'bullhorn.parseBullhornJobs',
+    () => parseBullhornJobs(
+      [{ id: `${LONE}1`, title: 'Bad Id' }, { id: 101, title: 'Good Id' }],
+      'https://jobs.example.com',
+      'Acme',
+    ),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.example.com/#/jobs/101',
+  );
+
+  // eightythousandhours.parseAlgoliaHits — for…of over Algolia hits; post_pk feeds the board-page URL.
+  const { parseAlgoliaHits } = await load('eightythousandhours.mjs');
+  check(
+    'eightythousandhours.parseAlgoliaHits',
+    () => parseAlgoliaHits([
+      { post_pk: `${LONE}1`, title: 'Bad Id' },
+      { post_pk: 101, title: 'Good Id' },
+    ]),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.80000hours.org/?jobPk=101',
+  );
+
+  // manatal.parseManatalJobs — for…of over results[]; hash feeds the /{slug}/job/{hash} URL.
+  const { parseManatalJobs } = await load('manatal.mjs');
+  check(
+    'manatal.parseManatalJobs',
+    () => parseManatalJobs(
+      [{ hash: `${LONE}x`, position_name: 'Bad Hash' }, { hash: 'GOOD1', position_name: 'Good Hash' }],
+      'acme',
+      'Acme',
+    ),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://www.careers-page.com/acme/job/GOOD1',
+  );
 } catch (e) {
   fail(`per-provider surrogate tests crashed: ${e.message}`);
 }
@@ -426,15 +461,18 @@ try {
     'arbeitsagentur.mjs',
     'bamboohr.mjs',
     'bulldogjob.mjs',
+    'bullhorn.mjs',
     'darwinbox.mjs',
     'deel.mjs',
     'dover.mjs',
+    'eightythousandhours.mjs',
     'feishu-jobs.mjs',
     'garena.mjs',
     'hibob.mjs',
     'jibeapply.mjs',
     'kalibrr.mjs',
     'keka.mjs',
+    'manatal.mjs',
     'manfred.mjs',
     'meituan.mjs',
     'mokahr.mjs',

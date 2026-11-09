@@ -1,0 +1,30 @@
+OpenAI ashby board exceeds verify-portals maxBytes (10 MB): verify --strict fails on it independent of this program; raise the cap for ashby or page the request (seen 2026-11-08 18:19 EST, receipts/A1/verify-strict.txt)
+tests/split-root.test.mjs flake: batch-runner child exits 139 (SIGSEGV) about 1 run in 3 on PR B head (18:40 EST); unrelated diff; check whether origin/main shows it
+Simplify lanes on PR B: add-provider SKILL.md and .claude/rules/providers.md could point at CONTRIBUTING.md rule 6 instead of restating it, removing the need for provider-policy-docs-agree; conflicts with the plan, operator call
+Security scan on PR B head flags providers/sitemap.mjs regexes (complete(tag) and the <url> matchAll) as backtracking over a 10 MB body. That file is upstream 7af08dcc picked verbatim (ADOPT); the regexes are bounded by the fetchText byte cap and are not exponential, so no change in this program; candidate for an upstream issue or the next full merge
+Apify route for The Muse: the actor page answers 200 but whether bibian/themuse-jobs-scraper output fits the provider: apify field mapping is unchecked
+providers/_http.mjs isRetryableError treats ProbePageBudgetReached as retryable, so fetch*WithRetry backs off ~1.5 s before rethrowing; after D3 this reaches fetchResponse paths too (latency only, from owner-D)
+providers/peoplesoft.mjs ~69-77 and ~784-786 comments still say the probe budget does not wrap fetchResponse (stale after D3)
+audit-portals diffAgainstBaseline keys rows by name; a job board and a tracked company with the same name collide (predates D5)
+docs/SOURCE_INDEXING_LOG.md waiver line for themuse goes stale once PR C lands; nothing checks stale waiver lines
+docs/SOURCE_INDEXING_LOG.md backfill waiver has 38 token lines against 37 failing board providers on the D branch; the integrator should find the extra line (likely a provider that already has a log entry) and drop it or confirm it is harmless
+tests/split-root.test.mjs fails under concurrent suite runs with "Timed out waiting for follow-ups lock" (verify-C 19:22 EST), so the earlier exit-139 and this lock timeout are load flakes of one suite; worth making its lock path per-fixture or raising its timeout
+Shared _-prefixed helpers for the JSON-LD JobPosting finder (taleo, bwi, applicantpro, healthecareers each copy one), CHALLENGE_RE (computrabajo + healthecareers), toEpochMs, the trusted-host entry guard and titleFromSlug; would end the dynamitejobs -> healthecareers sibling import (owner-F)
+dynamitejobs: title gate runs on slug titles before detail so "R&D"/"C++" style keywords can miss; drops a row on a transient detail error (reviewer suggested keeping the slug row except on 404/410); detailLimit follows sitemap order not lastmod; whether the flat sitemap caps at 500 is unverified (a per-company index of 475 sitemaps exists)
+healthecareers: card order shifts between requests a minute apart, so a long walk can skip or repeat a posting at a page boundary
+bullhorn, eightythousandhours, manatal copy the same page loop (probe handling, keep-partial on page failure, max_pages warning); a shared paginate helper would keep them in step (owner-E)
+eightythousandhours partition is one fixed two-way split on tags_location_type (756 in the larger half); growth past 1000 there brings back an unreachable remainder, warned only; a split driven by facet counts is the general fix. A posting's URL can flip between employer link and board page as link sharing changes (techinasia precedent)
+bullhorn deep-offset limit unmeasured (no tenant over 500); manatal slug pattern checked on one tenant only
+test-all.mjs section 13 (batch-runner --status empty output) also flakes under load alongside split-root (owner-E, load average ~14)
+.githooks/commit-msg.mjs rejects a `merge` type, so program merge commits use chore(providers); either allow `merge` or change the brief template (integrate-I)
+indexing-log-coverage has no stale-waiver check: a waiver line for a provider that already has a log entry passes silently (integrate-I)
+Tech Jobs for Good counts drift across sources (84/890 in F's docs, 83/886 coordinator curl, 83/885 integrator curl); the plan says "about" and points at the log
+PR 43 body test counts are stale after the fix commit (21695 -> 21697, providers 5566 -> 5568); update with gh pr edit before merge (verify-PR43)
+bullhorn careersOrigin keeps only https://hostname, so a subpath-deployed portal with the tuple override builds wrong job URLs; CORP_TOKEN_RE casing rests on one tenant (code-reviewer; needs a second tenant's app.json)
+catalog-and-template-coverage template check accepts a commented stanza anywhere; indexing-log-coverage accepts the provider token in another entry's prose and exempts boards whose header omits job_boards; provider-policy-docs-agree ROBOTS_GATE is a narrow phrase regex (test-analyzer)
+madgex: no tests for an encoded keyword, ctx.maxPages: 2, max_pages above cap, 19-item short page; bullhorn: page-1 failure on the non-probe path, isGone eviction, empty page with total > start, non-numeric dateLastPublished; healthecareers challenge on page 2 and on the detail path; dynamitejobs 503 retry vs not, challenge on the sitemap request (test-analyzer suggestions)
+templates/portals.example.yml: ServiceNow stanza external claims undated; the upstream sitemap block says the sitemap is announced by a robots Sitemap: line while the provider requires sitemap.url (upstream text, raise upstream); Dynamite stanza lacks a separator and enabled line
+docs/SUPPORTED_JOB_BOARDS.md TurboHire row says a browser path is open for re-evaluation inside the NOT-eligible table (reads contradictory)
+eightythousandhours can warn twice when a partition page 1 has hits that all fail to parse (none parsed, then not reachable); harmless (fix-I2)
+healthecareers later-page with cards but nothing parsed still breaks silently (only page one throws) (fix-I2)
+Dynamite Jobs catalog row omits that the fetch throws when every detail page fails (header says it) (verify-PR43-r2)

@@ -770,7 +770,11 @@ async function discoverAlternates(name, { fetchJson, fetchText }) {
  * as "the budgeted pages came back fine → the endpoint is live", we just don't
  * learn the exact total. Distinct from a real HTTP error (a broken board).
  */
-class ProbePageBudgetReached extends Error {}
+export class ProbePageBudgetReached extends Error {
+  constructor() {
+    super('probe request budget reached');
+  }
+}
 
 /**
  * A handful of requests, not one: some providers must spend requests before
@@ -781,32 +785,45 @@ class ProbePageBudgetReached extends Error {}
 const PROBE_REQUEST_BUDGET = 4;
 
 /**
- * Wrap an http context so a provider gets a bounded number of successful list
- * requests (PROBE_REQUEST_BUDGET).
+ * Wrap an http context so a provider gets a bounded number of request attempts
+ * (PROBE_REQUEST_BUDGET), shared across fetchJson, fetchText and fetchResponse.
  *
  * Cooperating providers also see `maxPages: 1` and stop on their own (we then
  * learn the first-page count). Providers that ignore the hint are cut off via
  * the sentinel above — so the probe is bounded for every provider, whether or
  * not it honors `maxPages`. `wasTripped()` reports a cut-off even when the
  * provider swallowed the sentinel internally (e.g. a per-locale try/catch).
+ * `anySucceeded()` tells a board that answered apart from one whose every
+ * attempt failed before the budget ran out.
  *
  * @param {import('./providers/_types.js').Context} base
- * @returns {{ctx: import('./providers/_types.js').Context, wasTripped: () => boolean}}
+ * @returns {{ctx: import('./providers/_types.js').Context, wasTripped: () => boolean, anySucceeded: () => boolean}}
  */
-function boundedProbeCtx(base) {
+export function boundedProbeCtx(base) {
   let used = 0;
   let tripped = false;
+  let succeeded = false;
   const guard = (fn) => async (url, opts) => {
     if (used >= PROBE_REQUEST_BUDGET) {
       tripped = true;
       throw new ProbePageBudgetReached();
     }
     used += 1;
-    return fn(url, opts);
+    const out = await fn(url, opts);
+    succeeded = true;
+    return out;
   };
   return {
-    ctx: { ...base, maxPages: 1, fetchJson: guard(base.fetchJson), fetchText: guard(base.fetchText) },
+    ctx: {
+      ...base,
+      maxPages: 1,
+      fetchJson: guard(base.fetchJson),
+      fetchText: guard(base.fetchText),
+      // A provider picks its fallback with typeof ctx.fetchResponse, so keep it absent.
+      fetchResponse: base.fetchResponse && guard(base.fetchResponse),
+    },
     wasTripped: () => tripped,
+    anySucceeded: () => succeeded,
   };
 }
 
@@ -823,7 +840,17 @@ function boundedProbeCtx(base) {
  *   probe didn't measure.
  */
 export async function probeProvider(entry, provider, baseCtx) {
-  const { ctx, wasTripped } = boundedProbeCtx(baseCtx);
+  const { ctx, wasTripped, anySucceeded } = boundedProbeCtx(baseCtx);
+  // A tripped budget with no job is live only when the board answered at least
+  // once; a budget spent entirely on failed requests is a broken board.
+  const cutOff = () => (anySucceeded()
+    ? { provider: provider.id, status: 'live', partial: true }
+    : {
+      provider: provider.id,
+      status: 'missing',
+      errorKind: 'unknown',
+      reason: 'every request failed before the probe request budget ran out',
+    });
   try {
     const jobs = await provider.fetch(entry, ctx);
     const count = Array.isArray(jobs) ? jobs.length : 0;
@@ -833,15 +860,11 @@ export async function probeProvider(entry, provider, baseCtx) {
       return result;
     }
     // Zero jobs but the budget guard fired: the provider swallowed the sentinel
-    // (per-locale/per-page try/catch) after its budgeted requests all came back
-    // fine — the endpoint is reachable, we just never reached a job-bearing
-    // page. Same verdict as the propagated-sentinel case below.
-    if (wasTripped()) return { provider: provider.id, status: 'live', partial: true };
+    // (per-locale/per-page try/catch). Same verdict as the propagated case below.
+    if (wasTripped()) return cutOff();
     return { provider: provider.id, status: 'empty', jobCount: 0 };
   } catch (err) {
-    if (err instanceof ProbePageBudgetReached) {
-      return { provider: provider.id, status: 'live', partial: true };
-    }
+    if (err instanceof ProbePageBudgetReached) return cutOff();
     return {
       provider: provider.id,
       status: 'missing',

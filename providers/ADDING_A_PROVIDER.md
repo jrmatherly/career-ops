@@ -22,8 +22,7 @@ that gate is decided on the source's data, not on how the client is written.
 **A single-company ATS adapter** (a new Greenhouse/Workday/Ashby-class
 vendor, or a company on its own careers API) clears this by construction: the
 postings are the employer's own, and the adapter reads exactly one source.
-Nothing to do here — including the `robots.txt` bullet below, which is a
-board/aggregator gate — go to section 1.
+Nothing to do here: go to section 1.
 
 **A job board, aggregator, or talent network** is where the policy bites.
 In short:
@@ -38,16 +37,12 @@ In short:
 - **Complete inventory, no paid placement (rule 3).** The provider must
   traverse the source's full inventory, not a promoted or default-filtered
   view.
-- **`robots.txt`, per path (rule 6).** Check the source's `robots.txt`
-  before writing code. A `Disallow` under `User-agent: *` (or a group
-  matching the scanner) that covers the listing paths the provider reads is
-  a stop (precedent: Lagou); a `Disallow` on routes the parser never touches
-  — `/api`, `/data`, a subscribe form — is not (ITviec, CareerViet route
-  around theirs). A rule that only names an AI/agent crawler (`ClaudeBot`,
-  `anthropic-ai`) doesn't name the scanner — a distinct, bounded
-  `career-ops` fetcher — but a scan can still feed a later model-driven
-  `pipeline` step, so honouring it is a maintainer call on a source
-  proposal, not an automatic no.
+- **Read like a visitor (rule 6).** A provider reads only what any visitor
+  sees without signing in, with a bounded number of requests per host,
+  honouring a `Crawl-delay` the source states. A login, a user account or a
+  CAPTCHA in the way is a stop, and so is a source whose operator has asked
+  career-ops not to read it. `robots.txt` is not a gate: it is written for
+  crawlers, and a provider reads for one person who may apply there.
 
 If such a source is operator-run, or its eligibility is not obvious, open a
 [source proposal](../.github/ISSUE_TEMPLATE/source-proposal.yml) before
@@ -230,8 +225,8 @@ yet, say in the header comment that the hook is inert until it is.
   anchored full-host test instead. Two idioms in the tree: an anchored regex
   over the whole hostname (`/^[a-z0-9-]+\.vendordomain\.com$/` —
   `providers/bamboohr.mjs`, `providers/breezy.mjs`), or
-  `hostname.endsWith('.vendordomain.com')` (`providers/icims.mjs`; `providers/workday.mjs` uses the anchored-regex form,
-  `providers/icims.mjs`). Get the anchoring right or the guard is a no-op:
+  `hostname.endsWith('.vendordomain.com')` (`providers/icims.mjs`).
+  `providers/workday.mjs` matches hosts with anchored regexes. Get the anchoring right or the guard is a no-op:
   keep the trailing `$` (without it `tenant.vendordomain.com.evil.example`
   passes), escape the dots (`\.`, or `.` also matches `vendordomainXcom`), and
   keep the leading dot on a suffix test (`endsWith('vendordomain.com')` also
@@ -286,8 +281,8 @@ yet, say in the header comment that the hook is inert until it is.
   reads as a named failure rather than a generic one). Actually following a
   hop is out — if a source only serves content
   past a bootstrap 3xx, target the settled URL directly
-  (`providers/deutschebahn.mjs` — a portal that 302s into its own results
-  endpoint) or rewrite a known static 3xx up front (`providers/builtin.mjs` —
+  (`providers/deutschebahn.mjs` reads db.jobs's server-rendered results
+  endpoint directly, not the search page in front of it) or rewrite a known static 3xx up front (`providers/builtin.mjs` —
   bare hosts that 301 to `www`). The one case that needs an actual follow is
   a session-establishing bootstrap 3xx whose target is not knowable ahead of
   time — a portal that bounces through a session or theme-negotiation hop
@@ -747,7 +742,22 @@ went through them. Must cover:
 If `job.url` is built from a host-controlled `id` / `slug` in a loop, add one
 behavioural case to the shared `tests/providers/url-encoding-surrogate.test.mjs`
 (a batch with one lone-surrogate value alongside a clean one → no throw, clean
-posting kept, bad one dropped). Every provider is also swept by `tests/providers/host-guard-anchoring.test.mjs`, `inter-page-sleep-shared.test.mjs`, `registry-loads-every-provider.test.mjs`, `rss-entity-decoding.test.mjs` and `tests/provider-user-agent-convention.test.mjs`. That file also carries the cross-provider
+posting kept, bad one dropped). An RSS or XML provider joins the `rssProviders`
+list in `tests/providers/rss-entity-decoding.test.mjs` the same way. Seven tests
+find provider modules on their own, with no list to join, so a new provider
+runs against each one that applies to it unasked:
+
+- `tests/providers/host-guard-anchoring.test.mjs`
+- `tests/providers/inter-page-sleep-shared.test.mjs`
+- `tests/providers/registry-loads-every-provider.test.mjs`
+- `tests/provider-user-agent-convention.test.mjs`
+- `tests/providers-explicit-only-stanza.test.mjs` (a provider with no `detect()`)
+- `tests/providers/catalog-and-template-coverage.test.mjs` (a catalog row and an
+  example in `templates/portals.example.yml`)
+- `tests/providers/indexing-log-coverage.test.mjs` (a board provider's entry in
+  `docs/SOURCE_INDEXING_LOG.md`)
+
+`url-encoding-surrogate.test.mjs` also carries the cross-provider
 source guard (no bare `encodeURIComponent` on a `url:` line, helper imported
 where used) — nothing to add in your own `{name}.test.mjs` for this.
 
@@ -776,6 +786,7 @@ Dev loop: `node test-all.mjs --only providers/{name}`. Before a PR: the full
 | Retry/backoff via the shared helper, default policy | `providers/a16z-speedrun-talent.mjs`, `providers/getro.mjs` |
 | Retry/backoff via the shared helper, policy override | `providers/workday.mjs`, `providers/oraclecloud.mjs` |
 | Detecting a clamped `total`, recovering it via query fan-out + dedup | `providers/workday.mjs` (facet split) |
+| Employer careers-site sitemap, robots.txt checked before every fetch, detail enrichment only for `ctx.titleWanted` survivors | `providers/sitemap.mjs` |
 
 `fetchJsonWithRetry` / `fetchTextWithRetry` (`providers/_http.mjs`) take an
 optional 4th argument `policy: { retries, baseDelayMs, maxDelayMs }` for a
@@ -843,6 +854,12 @@ provider whose tuning needs differ from the shared default
       case-insensitive alphabetical position by board name (the table is
       sorted — a lowercase name like `softgarden` sorts among the `S…` rows,
       not after `Z`).
+- [ ] **Board / aggregator only:** an entry in
+      [`../docs/SOURCE_INDEXING_LOG.md`](../docs/SOURCE_INDEXING_LOG.md)
+      whose **Provider** row names `providers/{name}.mjs`.
+- [ ] **A source evaluated and not built:** a dated row in the
+      "Evaluated, not supported" table of `../docs/SUPPORTED_JOB_BOARDS.md`
+      with the measured reason, so the next evaluation starts from it.
 - [ ] `templates/portals.example.yml` is updated: (1) if `detect()` matches
       a host, a URL-pattern line under "Provider auto-detection"; otherwise
       an explicit `provider:` in the stanza; (2) in the "Built-in provider

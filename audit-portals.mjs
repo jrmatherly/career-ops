@@ -18,11 +18,14 @@
  *     coverage while contributing nothing. Talkdesk was one: its real board is
  *     Greenhouse `talkdesk2`, 48 roles, one character off the slug nobody had.
  *
- * So this script fetches each enabled board through the SAME providers/ modules
- * the scanner uses and reports the evidence — provider, posting count, and
- * sample titles/locations — next to a verdict:
+ * So this script fetches each enabled board, in tracked_companies and
+ * job_boards, through the SAME providers/ modules the scanner uses, within
+ * verify-portals' probe budget (page 1, a few requests), and reports the
+ * evidence — provider, posting count, and sample titles/locations — next to a
+ * verdict:
  *
- *   ok          board answers with a healthy number of postings
+ *   ok          board answers with a healthy number of postings, or the
+ *               request budget ran out first (partial, count unknown)
  *   small       answers, but under --small-threshold (default 5). Not an error:
  *               a quiet board and a wrong board look identical from here, which
  *               is exactly why the samples are printed.
@@ -38,10 +41,10 @@
  * as verdicts.
  *
  * Usage:
- *   node audit-portals.mjs                       # audit every enabled company
- *   node audit-portals.mjs --summary             # one line per company
+ *   node audit-portals.mjs                       # audit every enabled company and job board
+ *   node audit-portals.mjs --summary             # one line per entry
  *   node audit-portals.mjs --json                # machine-readable, for --baseline
- *   node audit-portals.mjs --company Adyen       # audit a single company
+ *   node audit-portals.mjs --company Adyen       # audit entries whose name matches
  *   node audit-portals.mjs --file <path>         # use a specific portals file
  *   node audit-portals.mjs --baseline prev.json  # flag boards that lost postings
  *   node audit-portals.mjs --small-threshold 10  # what counts as a small board
@@ -61,6 +64,7 @@ import { loadYaml } from './lib/yaml-document.mjs';
 
 import { makeHttpCtx } from './providers/_http.mjs';
 import { loadProviders, resolveProvider } from './providers/_registry.mjs';
+import { boundedProbeCtx, ProbePageBudgetReached } from './verify-portals.mjs';
 import { mergeProviderPlugins } from './plugins/_engine.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
@@ -102,13 +106,6 @@ export const DEFAULT_DRIFT_FRACTION = 0.5;
 /** How many postings to keep as evidence per board. Enough to recognise a company. */
 const SAMPLE_SIZE = 3;
 
-/**
- * Only page 1 per board. This is an audit, not a scan: one page is enough to
- * answer "is anything here, and does it look like this company", and a full
- * sweep of 170 enterprise boards would be both slow and rude.
- */
-const AUDIT_MAX_PAGES = 1;
-
 export const VERDICTS = ['no-provider', 'error', 'empty', 'small', 'ok'];
 
 /**
@@ -117,7 +114,7 @@ export const VERDICTS = ['no-provider', 'error', 'empty', 'small', 'ok'];
  * Pure — no network, no clock. `jobs` is whatever the provider returned;
  * `error` is set instead when the fetch threw.
  *
- * @param {{jobs?: Array<object>, error?: string, provider?: string|null}} result
+ * @param {{jobs?: Array<object>, error?: string, provider?: string|null, partial?: boolean}} result
  * @param {{smallThreshold?: number}} [opts]
  * @returns {{verdict: string, count: number|null, detail: string}}
  */
@@ -144,14 +141,23 @@ export function classifyBoard(result, { smallThreshold = DEFAULT_SMALL_THRESHOLD
     return { verdict: 'error', count: null, detail: String(result.error).slice(0, 120) };
   }
   const jobs = Array.isArray(result.jobs) ? result.jobs : [];
+  // Cut off by the request budget before any posting: the board is live only
+  // when at least one of its requests succeeded; its size is unknown.
+  if (jobs.length === 0 && result.partial) {
+    if (!result.answered) {
+      return { verdict: 'error', count: null, detail: 'every request failed before the request budget ran out' };
+    }
+    return { verdict: 'ok', count: null, detail: 'board answers; partial: the request budget ran out before the first postings' };
+  }
   if (jobs.length === 0) return { verdict: 'empty', count: 0, detail: 'board answers with zero postings' };
+  const partial = result.partial ? ' (partial: request budget reached)' : '';
   // A threshold of 0 disables the tier rather than flagging every board: the
   // `<=` below would otherwise never fire, which is the same thing, but saying
   // so here keeps `--small-threshold 0` from reading as a bug.
   if (isSmallBoard(jobs.length, smallThreshold)) {
-    return { verdict: 'small', count: jobs.length, detail: smallBoardDetail(jobs.length) };
+    return { verdict: 'small', count: jobs.length, detail: smallBoardDetail(jobs.length) + partial };
   }
-  return { verdict: 'ok', count: jobs.length, detail: `${jobs.length} postings` };
+  return { verdict: 'ok', count: jobs.length, detail: `${jobs.length} postings${partial}` };
 }
 
 /**
@@ -191,7 +197,8 @@ export function diffAgainstBaseline(current, baseline, { fraction = DEFAULT_DRIF
   }
   const drops = [];
   for (const row of Array.isArray(current) ? current : []) {
-    if (!row || typeof row.name !== 'string' || !Number.isFinite(row.count)) continue;
+    // A partial count stopped at the request budget, so a drop there is not drift.
+    if (!row || typeof row.name !== 'string' || !Number.isFinite(row.count) || row.partial) continue;
     const was = before.get(row.name);
     if (!Number.isFinite(was) || was <= 0) continue;
     const lost = was - row.count;
@@ -203,15 +210,15 @@ export function diffAgainstBaseline(current, baseline, { fraction = DEFAULT_DRIF
 }
 
 /**
- * Audit each enabled tracked company through the scanner's own provider layer.
+ * Audit each enabled tracked company and job board through the scanner's own provider layer.
  *
  * `local-parser` is skipped for the same reason verify-portals skips it: an
  * audit must stay network-only and never execute a command configured in a
  * portals file it did not write.
  *
- * @param {Array<object>} companies - tracked_companies entries.
+ * @param {Array<object>} companies - tracked_companies and job_boards entries.
  * @param {{providers?: Map, httpCtx?: object, smallThreshold?: number, concurrency?: number}} [deps]
- * @returns {Promise<Array<object>>} One row per enabled company.
+ * @returns {Promise<Array<object>>} One row per enabled entry.
  */
 export async function auditCompanies(companies, {
   providers = null,
@@ -271,15 +278,23 @@ export async function auditCompanies(companies, {
 
       let result = { provider: providerId, scanMethod: entry.scan_method || null };
       if (providerId) {
+        // Same per-entry response cap scan.mjs applies, so a board that sets
+        // max_response_mb is audited with the limit it is scanned with. The ctx is
+        // copied because the cap and the timeout replace its fetchers, and httpCtx is shared.
+        // An audit, not a scan: page 1 and the probe's request budget answer "does
+        // this look like the company" without sweeping the board. The budget
+        // wraps outermost and per entry; a shared one would run out four requests in.
+        const { ctx, wasTripped, anySucceeded } = boundedProbeCtx(
+          applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || makeHttpCtx()) }, entry), entry),
+        );
         try {
-          // Same per-entry response cap scan.mjs applies, so a board that sets
-          // max_response_mb is audited with the limit it is scanned with. The ctx is
-          // copied because the cap and the timeout replace its fetchers, and httpCtx is shared.
-          const ctx = applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || { ...makeHttpCtx(), maxPages: AUDIT_MAX_PAGES }) }, entry), entry);
           result.jobs = (await resolved.provider.fetch(entry, ctx)) || [];
         } catch (err) {
-          result.error = err?.message || String(err);
+          if (err instanceof ProbePageBudgetReached) result.jobs = [];
+          else result.error = err?.message || String(err);
         }
+        result.partial = wasTripped();
+        result.answered = anySucceeded();
       }
 
       const { verdict, count, detail } = classifyBoard(result, { smallThreshold });
@@ -290,6 +305,7 @@ export async function auditCompanies(companies, {
         verdict,
         count,
         detail,
+        ...(result.partial ? { partial: true } : {}),
         samples: sampleJobs(result.jobs || []),
       });
     }
@@ -353,11 +369,11 @@ export function findUnclaimedEntries(entries, providers) {
   return { silent, handoff, unknownProvider };
 }
 
-/** Read tracked_companies out of a portals file. Throws on a missing file. */
+/** Read tracked_companies, then job_boards, out of a portals file. Throws on a missing file. */
 export function loadCompanies(filePath = DEFAULT_PORTALS_PATH) {
   if (!existsSync(filePath)) throw new Error(`portals file not found: ${filePath}`);
   const cfg = loadYaml(readFileSync(filePath, 'utf-8')) || {};
-  return Array.isArray(cfg.tracked_companies) ? cfg.tracked_companies : [];
+  return ['tracked_companies', 'job_boards'].flatMap((key) => (Array.isArray(cfg[key]) ? cfg[key] : []));
 }
 
 // This is lexical advice, not semantic validation: synonyms and another
@@ -404,10 +420,10 @@ const KNOWN_FLAGS = [
 const VALUE_FLAGS = ['--company', '--file', '--baseline', '--small-threshold'];
 
 const USAGE = `Usage:
-  node audit-portals.mjs                       # audit every enabled company
-  node audit-portals.mjs --summary             # one line per company
+  node audit-portals.mjs                       # audit every enabled company and job board
+  node audit-portals.mjs --summary             # one line per entry
   node audit-portals.mjs --json                # machine-readable, for --baseline
-  node audit-portals.mjs --company Adyen       # audit a single company
+  node audit-portals.mjs --company Adyen       # audit entries whose name matches
   node audit-portals.mjs --file <path>         # use a specific portals file
   node audit-portals.mjs --baseline prev.json  # flag boards that lost postings
   node audit-portals.mjs --small-threshold 10  # what counts as a small board
@@ -449,7 +465,7 @@ async function main() {
     const needle = only.toLowerCase();
     companies = companies.filter((c) => String(c?.name || '').toLowerCase().includes(needle));
     if (companies.length === 0) {
-      console.error(`Error: no tracked company matches "${only}" in ${filePath}`);
+      console.error(`Error: no tracked company or job board matches "${only}" in ${filePath}`);
       process.exit(1);
     }
   }

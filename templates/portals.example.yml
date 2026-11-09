@@ -1307,6 +1307,7 @@ search_queries:
 #   gupy            portal.gupy.io       (pt-BR board-wide Gupy search; each gupy.keywords entry swept separately, results
 #                   deduped. A single tenant's <slug>.gupy.io career page is NOT claimed)
 #   feishu-jobs     jobs.bytedance.com or <tenant>.jobs.feishu.cn
+#   manatal         www.careers-page.com/<slug>  (Manatal-hosted careers page; the API has no posting date)
 #   mokahr          (app|hire-r1).mokahr.com/(social-recruitment|campus-recruitment|apply)/<org>/<siteId>
 #   workday         <tenant>.wd<N>.myworkdayjobs.com[/<locale>]/<board>
 #   avature         <tenant>.avature.net  (branded host → provider: avature + api: the /careers/SearchJobs URL)
@@ -1379,6 +1380,12 @@ search_queries:
 # origin. A custom frontend merely handing applications to Eploy (for example,
 # Specsavers' Attrax jobs page) is not the same protocol and is not supported.
 #
+# sitemap is explicit-only too: it reads an employer's own careers-site job
+# sitemap (sitemaps.org XML, as announced by a `Sitemap:` line in robots.txt)
+# for an employer with no public ATS API or whose ATS API host disallows
+# crawlers. Set `provider: sitemap` plus `sitemap: { url, job_path }`; every
+# sitemap URL is checked against the site's robots.txt before it is fetched.
+#
 # wp-job-manager is explicit-only too: it reads the WP Job Manager plugin's
 # `/?feed=job_feed` RSS feed off any WordPress job board, and a WordPress
 # host has nothing to detect. Set `provider: wp-job-manager` + `careers_url`
@@ -1392,7 +1399,9 @@ search_queries:
 # auto-claimed from its host instead, per the table above.)
 
 # ── Built-in provider examples ────────────────────────────────────
-# One commented stanza per provider in providers/. Uncomment one and adjust.
+# Every provider in providers/ has an example here: a provider: line or a URL
+# its detect() claims (retired providers excepted), enforced by
+# tests/providers/catalog-and-template-coverage.test.mjs. Uncomment one and adjust.
 # A provider whose host is auto-detected (company ATS or job board) only needs
 # careers_url; the rest need provider: plus any fields shown.
 #
@@ -1443,6 +1452,18 @@ search_queries:
 #
 # - name: Example Breezy Co
 #   careers_url: https://exampleco.breezy.hr              # any *.breezy.hr host
+#   enabled: true
+#
+# - name: Example Bullhorn Co              # a staffing agency's Bullhorn career portal
+#   provider: bullhorn                    # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.exampleco.com/   # the portal host serving /app.json
+#   # bullhorn: { swimlane: "31", corpToken: "AB12CD" }  # optional; skips the app.json lookup
+#   max_pages: 20                         # optional page cap (500 postings/page, default 20, max 200)
+#   enabled: true
+#
+# - name: Example Manatal Co
+#   careers_url: https://www.careers-page.com/exampleco   # Manatal-hosted careers page
+#   max_pages: 20                         # optional page cap (20 postings/page, default 20, max 200)
 #   enabled: true
 #
 # - name: Example Deel Board Co
@@ -1633,6 +1654,24 @@ search_queries:
 #   eploy:                       # optional detail-page enrichment
 #     fetchDetails: false        # default false; sitemap-only is one request
 #     detailLimit: 25            # 1..100; ignored unless fetchDetails is true
+#   enabled: true
+#
+# - name: Example Sitemap Co
+#   # An employer's own careers-site job sitemap (sitemaps.org <urlset> or
+#   # <sitemapindex>). Use it when the employer has no public ATS API, or its
+#   # ATS API host disallows crawlers. robots.txt is checked before every
+#   # sitemap fetch; a disallowed sitemap is a named error.
+#   careers_url: https://careers.exampleco.com/jobs/
+#   provider: sitemap            # required — no URL pattern to auto-detect
+#   sitemap:
+#     url: https://careers.exampleco.com/sitemap.xml   # https, on the careers host
+#     # Regex over each <loc> path. (?<slug>) is required (the title);
+#     # (?<posting_id>) → externalId, (?<req_id>) → requisitionId.
+#     job_path: '^/jobs/(?<posting_id>\d+)/(?<slug>[^/]+)/?$'
+#     index_filter: ''           # optional regex over child <loc> in a sitemapindex
+#     max_sitemaps: 50           # 1..1000 child sitemaps read from an index
+#     fetchDetails: false        # JSON-LD JobPosting enrichment, title-filter survivors only
+#     detailLimit: 25            # 1..200; ignored unless fetchDetails is true
 #   enabled: true
 #
 # - name: Example Phenom Co
@@ -1839,6 +1878,50 @@ search_queries:
 #   max_pages: 20          # optional page cap (100 postings/page, default 20, max 100)
 #   enabled: true
 #
+# - name: Example HiringRoom Co
+#   careers_url: https://exampleco.hiringroom.com/jobs   # any <tenant>.hiringroom.com host
+#                          # a tenant whose /jobs redirects to /portal: use .../portal/jobs
+#   enabled: true
+#
+# - name: Example Radancy Co                   # Radancy (TalentBrew) branded career site
+#   provider: radancy                          # branded hosts carry no Radancy token, so set it
+#   careers_url: https://careers.example.com/en/search-jobs
+#   enabled: true
+#
+# Single-employer providers (one fixed careers site each):
+#
+# - name: Apple
+#   careers_url: https://jobs.apple.com/en-us/search
+#   apple:                 # at least one non-empty queries or teams list is required
+#     location: united-states-USA            # optional, this is the default
+#     queries: ["business operations"]
+#     # teams: ["business-process-management-OPMFG-BPM"]
+#   max_pages: 2           # optional page cap per search
+#   enabled: true
+#
+# - name: Atlassian
+#   provider: atlassian    # or careers_url: https://www.atlassian.com/company/careers (auto-detected)
+#   careers_url: https://www.atlassian.com/company/careers/all-jobs
+#   enabled: true
+#
+# - name: BWI GmbH
+#   careers_url: https://www.bwi.de/karriere/stellenangebote
+#   bwi:
+#     fetchDetails: true   # optional: real title and city from each detail page
+#     detailLimit: 45      # optional max detail requests when fetchDetails=true (1-100)
+#   enabled: true
+#
+# - name: Google
+#   provider: google
+#   google:
+#     location: "United States"      # optional
+#     queries: ["business strategy", "business operations"]
+#   enabled: true
+#
+# - name: TKMS (thyssenkrupp Marine Systems)
+#   careers_url: https://jobs.tkmsgroup.com/en   # auto-detected host
+#   enabled: true
+#
 # -- Job boards / aggregators  (→ job_boards:; set provider: explicitly unless the host auto-detects) --
 #
 # - name: Amazon / AWS                    # global amazon.jobs board
@@ -1857,6 +1940,11 @@ search_queries:
 #
 # - name: Generalist World                # curated generalist / operator roles (SSR HTML, one fetch)
 #   provider: generalist-world            # or careers_url: https://generalist.world/jobs/ (auto-detected)
+#   enabled: true
+#
+# - name: Remotli                         # remote roles at Swiss companies (CHF), public JSON API
+#   careers_url: https://remotli.ch/      # auto-detected host
+#   max_pages: 20          # optional page cap (50 jobs/page, default 20)
 #   enabled: true
 #
 # - name: Built In                        # US tech aggregator, many employers
@@ -1896,6 +1984,14 @@ search_queries:
 # - name: Example Bulldogjob              # Polish tech board, many employers
 #   careers_url: https://bulldogjob.pl/companies/jobs/s/role,devops/experienceLevel,medium/city,Remote  # auto-detected; any search URL
 #   max_pages: 5                          # optional page cap (50 jobs/page, default 25, max 100)
+#   enabled: true                         # 250ms pacing between pages
+#
+# - name: Example Health eCareers Co      # US healthcare board, many employers
+#   provider: healthecareers              # no URL detection; only reachable via provider:
+#   max_pages: 10                         # optional page cap (25 jobs/page, default 10, max 500)
+#   healthecareers:
+#     fetchDetails: false                 # optional; true fills date, employer and JD from each detail page
+#     detailLimit: 25                     # 1..100, default 25
 #   enabled: true                         # 250ms pacing between pages
 #
 # - name: The Hub                         # Nordic/EU startup board
@@ -2086,6 +2182,12 @@ search_queries:
 #
 # - name: Himalayas
 #   provider: himalayas
+# - name: Example Dynamite Jobs Co        # remote-only board, many employers
+#   provider: dynamitejobs                # no URL detection; only reachable via provider:
+#   dynamitejobs:
+#     detailLimit: 200                    # 1..1000; posting pages read for title-filter survivors
+#   enabled: true                         # 250ms pacing between posting-page batches
+#
 # - name: Landing.jobs                    # tech board, Europe-focused
 #   provider: landingjobs
 #   enabled: true
@@ -2114,8 +2216,12 @@ search_queries:
 #   provider: workingnomads
 #   enabled: true
 #
-# - name: Jobicy
+# - name: Jobicy                          # remote-only board; walks its whole 7-day feed
 #   provider: jobicy
+#   # geo: latam            # optional: a geoSlug from https://jobicy.com/api/v2/remote-jobs?get=locations
+#   # industry: engineering # optional: an industrySlug from https://jobicy.com/api/v2/remote-jobs?get=industries
+#   # tag: python           # optional: keyword matched against the job title
+#   # max_pages: 25         # optional page cap (100 postings/page, default 25, max 100)
 #   enabled: true
 #
 # - name: getManfred                      # Spanish/EU tech roles, salary ranges published
@@ -2147,8 +2253,21 @@ search_queries:
 #   provider: jobspresso
 #   enabled: true
 #
-# - name: The Muse                        # board-wide public jobs API
-#   provider: themuse
+# - name: Example 80,000 Hours Co         # 80,000 Hours job board (public Algolia index; keys read from the page)
+#   provider: eightythousandhours         # explicit provider: only (no URL-pattern detect)
+#   max_pages: 3                          # optional page cap per query (1000 hits/page, default 3, max 20)
+#   enabled: true
+#
+# - name: Example Crypto Jobs List Co     # Web3 / crypto jobs (public RSS feed, 100 postings in one request)
+#   provider: cryptojobslist              # explicit provider: only (no URL-pattern detect)
+#   enabled: true
+#
+# - name: Example Madgex Co               # Madgex employer board (public RSS), higher-ed / science
+#   provider: madgex                      # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.chronicle.com/   # or careers.insidehighered.com / jobs.sciencecareers.org
+#   madgex:
+#     keywords: ["data analyst"]          # optional; one search pass each, else profile.yml target_roles
+#   max_pages: 25                         # optional page cap per keyword (20 items/page, default 25, max 1500)
 #   enabled: true
 #
 # - name: LaraJobs                        # Laravel / PHP jobs (public RSS feed)
@@ -2626,6 +2745,19 @@ tracked_companies:
     api: https://boards-api.greenhouse.io/v1/boards/boomilp/jobs
     notes: "Integration and automation platform."
     enabled: true
+
+  - name: ServiceNow
+    # Its SmartRecruiters Posting API host disallows crawlers in robots.txt;
+    # the careers site's own sitemap is open to all agents and lists every
+    # live job. Detail pages challenge non-browser clients, so titles come
+    # from URL slugs (fetchDetails stays off).
+    careers_url: https://careers.servicenow.com/jobs/
+    provider: sitemap
+    sitemap:
+      url: https://careers.servicenow.com/sitemap.xml
+      job_path: '^/jobs/(?<posting_id>\d+)/(?<slug>[^/]+)/?$'
+    notes: "Workflow automation / AI platform."
+    enabled: false
 
   # -- Ashby-based (Playwright direct) --
 

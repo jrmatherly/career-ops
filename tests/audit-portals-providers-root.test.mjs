@@ -61,7 +61,17 @@ function fixture() {
   mkdirSync(join(dataRoot, 'data'), { recursive: true });
   writeFileSync(
     join(dataRoot, 'portals.yml'),
-    ['job_boards: []', 'tracked_companies:', '  - name: Data Root Co', '    careers_url: https://job-boards.greenhouse.io/datarootco', '    enabled: true', ''].join('\n'),
+    [
+      'job_boards:',
+      '  - name: Data Root Board',
+      '    careers_url: https://board.example.com/jobs',
+      '    enabled: true',
+      'tracked_companies:',
+      '  - name: Data Root Co',
+      '    careers_url: https://job-boards.greenhouse.io/datarootco',
+      '    enabled: true',
+      '',
+    ].join('\n'),
     'utf-8',
   );
   return dataRoot;
@@ -90,9 +100,13 @@ test('portals.yml still follows the data root', async () => {
     const companies = mod.loadCompanies();
     assert.deepEqual(
       companies.map((c) => c.name),
-      ['Data Root Co'],
+      ['Data Root Co', 'Data Root Board'],
       'the default portals path must read the user data root, not the checkout',
     );
+
+    const stub = { id: 'stub', detect: () => ({ url: 'x' }), fetch: async () => [{ title: 'Engineer', url: 'https://board.example.com/jobs/1' }] };
+    const rows = await mod.auditCompanies(companies, { providers: new Map([['stub', stub]]), httpCtx: {}, concurrency: 1 });
+    assert.deepEqual(rows.map((r) => r.name).sort(), ['Data Root Board', 'Data Root Co'], 'job_boards entries are audited alongside tracked_companies');
   } finally {
     rmSync(dataRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
