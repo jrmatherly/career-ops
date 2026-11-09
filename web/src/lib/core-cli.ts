@@ -36,6 +36,8 @@ export function runCoreCli(script: string, args: string[]): Promise<CliResult> {
       {
         cwd: resolveCodeRoot(process.cwd(), process.env),
         timeout: CORE_CLI_TIMEOUT_MS,
+        // evaluate-queue.mjs dump --json pretty-prints the whole ledger; execFile's 1 MiB default cut it off at a few thousand rows.
+        maxBuffer: 64 * 1024 * 1024,
         env: { ...process.env, ...boundedLockWait() },
         // windowsHide: see api/doctor/route.ts — a stale inherited console
         // kills every child with 0xC0000142 on Windows; never inherit one.

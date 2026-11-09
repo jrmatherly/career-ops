@@ -206,7 +206,8 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
             </div>
           </div>
           <p className="text-[11px] text-faint">
-            Rank is a guess from the title and URL. Auto evaluates only postings whose board exposes the job text, and rows another job found on the same day can be picked up, because scan history records the board, not the job.
+            Rank is a guess from the title and URL.
+            {value.mode === "auto" && " Auto evaluates only postings whose board exposes the job text, and rows another job found on the same day can be picked up, because scan history records the board, not the job."}
           </p>
         </>
       )}

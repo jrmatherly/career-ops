@@ -28,8 +28,11 @@ export function evaluateBody(form, stored) {
 export function evaluateModeLabel(evaluate) {
   if (evaluate?.mode === "review") return "Review, rank only";
   if (evaluate?.mode !== "auto") return null;
-  // Number(): a store edited by hand may lack a field; show NaN rather than crash the page.
-  return `Auto, rank ${Number(evaluate.rankThreshold).toFixed(1)} and above, ${Number(evaluate.maxPerRun)} per run`;
+  const threshold = Number(evaluate.rankThreshold);
+  const max = Number(evaluate.maxPerRun);
+  // A store edited by hand may lack a field; name the gap instead of printing NaN.
+  if (!Number.isFinite(threshold) || !Number.isFinite(max)) return "Auto, settings unreadable; open Edit and save";
+  return `Auto, rank ${threshold.toFixed(1)} and above, ${max} per run`;
 }
 
 const RUN_COUNTS = [["ranked", "ranked"], ["autoQueued", "queued"], ["evaluated", "evaluated"], ["gated", "gated"], ["evalErrors", "errors"]];

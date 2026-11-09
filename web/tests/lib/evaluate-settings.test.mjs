@@ -53,6 +53,8 @@ test("the card label names the mode and, for Auto, its numbers", () => {
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5 }), "Auto, rank 3.5 and above, 5 per run");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 4, maxPerRun: 3 }), "Auto, rank 4.0 and above, 3 per run");
   assert.equal(evaluateModeLabel({ mode: "review", rankThreshold: 3.5, maxPerRun: 5 }), "Review, rank only");
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5 }), "Auto, settings unreadable; open Edit and save", "a hand-edited store missing a field never shows NaN");
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: "high", maxPerRun: 5 }), "Auto, settings unreadable; open Edit and save");
   assert.equal(evaluateModeLabel({ mode: "off" }), null);
   assert.equal(evaluateModeLabel(undefined), null);
 });

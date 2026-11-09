@@ -21,7 +21,7 @@ export async function GET() {
     console.error(`/api/evaluate-queue: ${why}`);
     return Response.json({ error: "the evaluate queue could not be read; the server log has the details" }, { status: 503 });
   };
-  // A dump past execFile's 1 MiB maxBuffer lands here too, with no stderr.
+  // A dump past runCoreCli's maxBuffer lands here too, with no stderr.
   if (r.spawnFailed) return unreadable("evaluate-queue.mjs failed to run");
   if (r.code !== 0) return unreadable(`evaluate-queue.mjs exited ${r.code}`);
   let entries: unknown;
