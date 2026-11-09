@@ -103,6 +103,8 @@ The last line lists fork-local files the batch touched. It should be empty excep
 - **Scan automation and platform** (`docs/superpowers/plans/2026-11-08-scan-automation-and-platform.md`; its rows sit under the sub-heading of the same name in "Deviations decided"):
   - Upstream files this program edits, for example the scheduled-scan runner, `web/src/lib/scheduled-jobs.ts`, the Scheduled scans components, the Explore schedule action, the Inbox parser and components, and their tests. The row names the hunks we own; an upstream hunk elsewhere in the file is ADOPT, one that overlaps ours is ADAPT, and the pinning test decides.
   - New files the program adds under `web/`, `tests/` or `docs/` get a row too, since upstream could ship a file at the same path; such a file is KEEP and shows `~` at merge.
+- **Providers program** (`docs/superpowers/plans/2026-11-08-providers.md`; its rows sit under the sub-heading "Providers program (2026-11-08)" in "Deviations decided"):
+  - New provider modules and their tests (`providers/{id}.mjs`, `tests/providers/{id}.test.mjs`) are fork files at paths upstream could also ship: KEEP, and an upstream file arriving at the same path is a comparison review, never a blind merge.
 
 ## Deleted or moved paths
 
@@ -301,6 +303,20 @@ Rows added by the program's PRs, in PR order; the Rules entry of the same name p
 | no `tests/rank-pipeline-urls-file.test.mjs` | runs `rank-pipeline.mjs` with `CAREER_OPS_RANK_CLI` set to a fake ranker: `--dry-run` ranks only the listed URLs (two spellings join) and leaves a backlog row alone, a live run writes the listed row only, a missing file exits 1 with the usage text | in this PR (PR-R1) | KEEP (fork-only file in a shipped directory; an upstream file at this path is ADAPT). Pinned by the suite itself, run by `node test-all.mjs`. |
 | no `web/src/lib/core/evaluate-candidates.mjs` | `hostLocalDate(epochMs)` (the host-local day, `lib/local-today.mjs`'s arithmetic, which the scanners stamp `first_seen` with), `pendingRows(text)` (the `- [ ]` rows read the way `rank-pipeline.mjs` reads them: ranked when the row holds `\| rank: `, with the score and reason when they parse), `candidateSince({ job, runs, excludeRunId })` (the later of `evaluate.enabledAt` and the host-local date of its newest other successful run; host-local, not the job's timezone, so a job east of the host ranks its own rows) and `candidatesFor({ pendingRows, scanHistoryRows, since })` (a pending row whose URL's latest `added` scan-history row has `first_seen` on or after `since`, joined by `normalizeUrl` from `web/src/lib/core/url-key.mjs`) | in this PR (PR-R1) | KEEP; fork-only file, `~` at merge. Pinned by `web/tests/lib/evaluate-candidates.test.mjs`. |
 | no `web/tests/lib/evaluate-candidates.test.mjs` | the candidate rule's suite: the latest added row decides, a hand-added row is never a candidate, a blank status is added, the `since` day is inclusive, `since` is the host-local day whatever the job's timezone, `hostLocalDate` matches `localToday` from `lib/local-today.mjs`, a job east of the host ranks the rows its own run added, two URL spellings join, ranked rows carry their score and done rows are not pending, and `pendingRows` reads unranked rows as `parsePendingEntries` in `rank-pipeline.mjs` does | in this PR (PR-R1) | KEEP (fork-only file in a shipped directory; an upstream file at this path is ADAPT). Pinned by the suite itself, run by `npm test` in `web/`. |
+
+### Providers program (2026-11-08)
+
+Rows added by the program's branches; the Rules entry of the same name points at the plan. Each Notes cell opens with the hunk rule for the path (ADOPT, ADAPT, KEEP or SKIP) and names the fork test that pins the behaviour.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| no `providers/madgex.mjs` | Madgex RSS provider for `jobs.chronicle.com`, `careers.insidehighered.com` and `jobs.sciencecareers.org`: explicit-only `detect()`, `careers_url` host allowlist checked in `fetch()` before any request, one keyword pass per `madgex.keywords` entry (else profile `target_roles`) behind one URL set, exported `parseMadgexFeed` | branch `claude/providers-new-api` (Task E1) | KEEP; new fork file. Pinned by `tests/providers/madgex.test.mjs` and `tests/providers/rss-entity-decoding.test.mjs`. |
+| no `tests/providers/madgex.test.mjs` | the madgex provider's suite (fictional fixtures, no network) | branch `claude/providers-new-api` (Task E1) | KEEP; new fork file. |
+| `tests/providers/rss-entity-decoding.test.mjs` lists six RSS parsers in `rssProviders` | adds `madgex.mjs` / `parseMadgexFeed` | branch `claude/providers-new-api` (Task E1) | ADAPT. Our hunks are the added `rssProviders` lines; an upstream line elsewhere in the list is ADOPT, a conflict keeps both. |
+| `docs/SUPPORTED_JOB_BOARDS.md` has no row for the program's new providers | adds the Madgex row in alphabetical position | branch `claude/providers-new-api` (Task E1) | ADAPT. Our hunks are the added rows; an upstream row elsewhere is ADOPT, a conflict keeps both. |
+| `templates/portals.example.yml` has no stanza for the program's new providers | adds the commented `Example Madgex Co` stanza under "Job boards / aggregators" | branch `claude/providers-new-api` (Task E1) | ADAPT. Our hunks are the added stanzas; an upstream stanza elsewhere is ADOPT, a conflict keeps both. |
+| `docs/SOURCE_INDEXING_LOG.md` has no entry for the program's new boards | appends the "Madgex boards" entry (rules 1 to 6, measured 2026-11-08) | branch `claude/providers-new-api` (Task E1) | ADAPT. Our hunks are the appended entries; an upstream entry is ADOPT, a conflict keeps both. |
+| no `docs/superpowers/research/2026-11-08-providers/owners/E.tsv` | owner E's decision trail | branch `claude/providers-new-api` | KEEP; fork research file. |
 
 ## Decision log template
 

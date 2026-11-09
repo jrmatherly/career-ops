@@ -2151,6 +2151,14 @@ search_queries:
 #   provider: themuse
 #   enabled: true
 #
+# - name: Example Madgex Co               # Madgex employer board (public RSS), higher-ed / science
+#   provider: madgex                      # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.chronicle.com/   # or careers.insidehighered.com / jobs.sciencecareers.org
+#   madgex:
+#     keywords: ["data analyst"]          # optional; one search pass each, else profile.yml target_roles
+#   max_pages: 25                         # optional page cap per keyword (20 items/page, default 25, max 1500)
+#   enabled: true
+#
 # - name: LaraJobs                        # Laravel / PHP jobs (public RSS feed)
 #   provider: larajobs
 #   enabled: true

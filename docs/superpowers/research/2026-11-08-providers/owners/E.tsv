@@ -1,0 +1,3 @@
+time	step	decision	evidence
+2026-11-08T18:30	E1 measure	Madgex feed pinned: RSS 2.0, 20 items/page, page past end returns 0 items	curl jobs.chronicle.com/jobsrss/?page=99999 -> totalResults 28734, 0 items; IHE 23398; Science 531
+2026-11-08T18:35	order 16	No PR, no merge-main, no babysit; push branch and report code-ready head	coordinator message 18:26 + preferences.md order 16

@@ -226,3 +226,29 @@ Re-read against rule 6 after a contributor checked the live `robots.txt` in [#57
 **Rule 6 (the source's own `robots.txt`).** Checked on 2026-10-23 and again on 2026-11-05: one GET of `https://jobspresso.co/robots.txt`, HTTP 200. Under `User-agent: *` it disallows `/*?` and sets `Crawl-delay: 3`; its only `Allow` lines are `/*.css` and `/*.js`. No group names career-ops. `/*?` covered the URL the provider originally fetched, `/?feed=job_feed`, the same shape as Lagou in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. Unlike Lagou, a usable request without a query string exists: WordPress serves the same feed at `https://jobspresso.co/feed/job_feed/`, which is the URL the feed's own `<atom:link rel="self">` names. On 2026-11-05 it answered HTTP 200 `application/rss+xml` with no redirect, and returned the same 10 items as the query-string URL. `/*?` does not cover it, so the provider now reads that path, once per scan.
 
 **Rules 1 to 5.** Not re-verified here.
+
+---
+
+## Madgex boards (Chronicle, Inside Higher Ed, Science Careers)
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E1); not affiliated with any of the three boards |
+| **Provider** | `providers/madgex.mjs` |
+| **PR** | fork branch `claude/providers-new-api` |
+| **Merged** | pending |
+| **Status** | Listed in the fork |
+
+Three employer job boards, one per host, on the same vendor (Madgex) and the same feed: `jobs.chronicle.com` (The Chronicle of Higher Education), `careers.insidehighered.com` (Inside Higher Ed) and `jobs.sciencecareers.org` (Science Careers). Each host is its own source; one provider reads whichever host the entry names, and never mixes them.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08 with a plain `curl` of `/jobsrss/?page=1` on each host: every `<title>` is "Employer: Job title" naming a college, university or research employer, and a posting page (`/job/{id}/{slug}/`) answers 200 with no login. Applying needs no payment.
+
+**Rule 2 (canonical URL is the employer's).** The feed carries one link per posting, the board's own posting page; no upstream employer URL is in the payload, so that page is the canonical URL. The provider strips the `TrackID` and `utm_*` click-tracking params from it.
+
+**Rule 3 (complete inventory, no paid placement).** `<opensearch:totalResults>` read 28,734 (Chronicle), 23,398 (Inside Higher Ed) and 531 (Science Careers) on 2026-11-08, at 20 items a page, and a page past the end (`page=99999`) answers a well-formed feed with zero items. Each keyword pass asks for `sort=Date` (without it a keyword search comes back ranked by relevance, measured on all three hosts) and walks to that empty page; `max_pages` (default 25, cap 1500) bounds it, and the cap covers Chronicle's 1,437 unfiltered pages, so raising `max_pages` on the entry reaches the full result set. The feed carries no featured, sponsored or premium field.
+
+**Rule 4 (operator declared).** Not an operator proposal.
+
+**Rule 5 (aggregation stays in core).** The provider reads one host per entry, the employers' own postings on that board.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of each host's `/robots.txt` on 2026-11-08. Under `User-agent: *` all three disallow only `/invalid-request/`, `/analytics/`, `*/emailjob/*` and `*/previewjob/*` (Science Careers adds `/apply-profile/`). None covers `/jobsrss/`, the only path the provider requests. No group names career-ops, and no `Crawl-delay` is set; the provider paces pages at 250 ms.
