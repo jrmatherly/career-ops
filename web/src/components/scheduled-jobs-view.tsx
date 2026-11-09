@@ -19,6 +19,7 @@ import { CreateJobModal } from "./scheduled-scans/create-job-modal";
 import { EditJobModal } from "./scheduled-scans/edit-job-modal";
 import { JobCard } from "./scheduled-scans/job-card";
 import { RunHistoryDrawer } from "./scheduled-scans/run-history-drawer";
+import { EvaluateQueuePanel } from "./scheduled-scans/evaluate-queue-panel";
 import type { ScheduledJob, JobRun } from "@/lib/scheduled-jobs";
 import { instrumentSerif } from "@/lib/fonts";
 import { updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
@@ -321,6 +322,8 @@ export function ScheduledJobsView() {
           ))}
         </div>
       )}
+
+      <EvaluateQueuePanel jobs={store.jobs} />
 
       {/* Create Modal, Edit Modal & History Drawer */}
       <CreateJobModal

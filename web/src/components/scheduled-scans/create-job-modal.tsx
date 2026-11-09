@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { CalendarPlus, Loader2, Sparkles, X } from "lucide-react";
-import type { FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
+import type { EvaluateSettings, FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
+import { clampEvaluate, evaluateBody, evaluateFieldsVisible, evaluateForm } from "@/lib/evaluate-settings.mjs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
@@ -21,6 +22,7 @@ export function CreateJobModal({
   const [name, setName] = useState("Scheduled scan");
   const [engine, setEngine] = useState<ScanEngine>("full");
   const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
+  const [evaluate, setEvaluate] = useState<EvaluateForm>(evaluateForm());
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({
@@ -41,7 +43,9 @@ export function CreateJobModal({
     setError("");
 
     try {
-      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit }));
+      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate) }));
+      // The next new job starts Off rather than inheriting this one's evaluations.
+      setEvaluate(evaluateForm());
 
       onCreated();
       onClose();
@@ -73,7 +77,7 @@ export function CreateJobModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-5">
           {error && <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-500">{error}</div>}
 
           {/* ─── Name + Engine + Cadence ─── */}
@@ -142,6 +146,8 @@ export function CreateJobModal({
             <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} />
           </div>
 
+          <EvaluateFields value={evaluate} onChange={setEvaluate} />
+
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
             <button
@@ -162,6 +168,49 @@ export function CreateJobModal({
           </div>
         </form>
     </Modal>
+  );
+}
+
+export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string };
+
+export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onChange: (value: EvaluateForm) => void }) {
+  const id = useId();
+  // Show the stored number as soon as a field loses focus; an unreadable value waits for save to name the error.
+  const clampShown = () => {
+    try {
+      const clamped = clampEvaluate(value);
+      onChange({ ...value, rankThreshold: String(clamped.rankThreshold), maxPerRun: String(clamped.maxPerRun) });
+    } catch {}
+  };
+  const field = "w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60";
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-surface/30 p-4">
+      <div>
+        <label htmlFor={`${id}-mode`} className="mb-1 block text-[13px] font-medium text-foreground">Evaluate new rows</label>
+        <select id={`${id}-mode`} value={value.mode} onChange={(e) => onChange({ ...value, mode: e.target.value as EvaluateForm["mode"] })} className={field}>
+          <option value="off">Off</option>
+          <option value="review">Review: rank them</option>
+          <option value="auto">Auto: rank them and evaluate the best</option>
+        </select>
+      </div>
+      {evaluateFieldsVisible(value.mode) && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor={`${id}-threshold`} className="mb-1 block text-[13px] font-medium text-foreground">Rank threshold (1 to 5)</label>
+              <input id={`${id}-threshold`} type="number" min={1} max={5} step={0.1} value={value.rankThreshold} onChange={(e) => onChange({ ...value, rankThreshold: e.target.value })} onBlur={clampShown} className={field} />
+            </div>
+            <div>
+              <label htmlFor={`${id}-max`} className="mb-1 block text-[13px] font-medium text-foreground">Evaluations per run (1 to 20)</label>
+              <input id={`${id}-max`} type="number" min={1} max={20} step={1} value={value.maxPerRun} onChange={(e) => onChange({ ...value, maxPerRun: e.target.value })} onBlur={clampShown} className={field} />
+            </div>
+          </div>
+          <p className="text-[11px] text-faint">
+            Rank is a guess from the title and URL. Auto evaluates only postings whose board exposes the job text, and rows another job found on the same day can be picked up, because scan history records the board, not the job.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

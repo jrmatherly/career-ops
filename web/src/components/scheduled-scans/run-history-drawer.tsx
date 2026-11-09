@@ -6,6 +6,7 @@ import type { JobRun } from "@/lib/scheduled-jobs";
 import { cn } from "@/lib/cn";
 import { Modal } from "@/components/ui/modal";
 import { runStatusTone } from "@/lib/scheduled-run-status.mjs";
+import { runCountsLine } from "@/lib/evaluate-settings.mjs";
 
 export function RunHistoryDrawer({
   isOpen,
@@ -48,6 +49,7 @@ export function RunHistoryDrawer({
               const isQueued = run.state === "queued";
               const isCancelled = run.state === "cancelled";
               const tone = runStatusTone(run.state);
+              const counts = runCountsLine(run);
               return (
                 <div
                   key={`${run.id || "run"}-${i}`}
@@ -82,6 +84,8 @@ export function RunHistoryDrawer({
                   </div>
 
                   <p className="mt-2 text-muted leading-relaxed">{run.message || "Execution completed"}</p>
+                  {counts && <p className="mt-1 font-medium text-foreground">{counts}</p>}
+                  {run.evalMessage && <p className="mt-1 text-muted leading-relaxed">{run.evalMessage}</p>}
 
                   <div className="mt-2 flex items-center justify-between text-[11px] text-faint border-t border-border/40 pt-1.5">
                     <span>Date: {new Date(run.at).toLocaleDateString()}</span>
