@@ -11,13 +11,28 @@ with a few operational changes of its own.
 Every deliberate difference from upstream has a row in the deviations table in
 [`.claude/skills/upstream-review/SKILL.md`](.claude/skills/upstream-review/SKILL.md).
 In short: a Claude Code harness (`.claude/`, `.githooks/`), the fork's own CI
-set (nine workflows instead of upstream's maintainer bots and release
-automation; a push that changes only documentation runs the suite on Ubuntu
-alone), a GHCR image build, and contact addresses that route reports to the
+set (ten workflows instead of upstream's maintainer bots; a push that changes
+only documentation runs the suite on Ubuntu alone), the fork's own releases
+(below), a GHCR image build, and contact addresses that route reports to the
 fork owner. The product code is upstream's, plus the Reactive Resume
 convergence (resume model, editor, board, shares, publish service); a user
 arriving from Reactive Resume follows
 [`docs/MIGRATING_FROM_REACTIVE_RESUME.md`](docs/MIGRATING_FROM_REACTIVE_RESUME.md).
+
+## Releases
+
+The fork cuts its own releases with release-please (`.github/workflows/release.yml`),
+on the 2.x line so its numbers never collide with upstream's 1.x. The web
+component is versioned separately from 1.0.0 and shows in the web UI's version
+pill. Conventional commits on `main` keep a release PR open; merging it tags
+`career-ops-vX.Y.Z` and `web-vX.Y.Z`, publishes the GitHub Releases, writes
+`CHANGELOG.fork.md` and `web/CHANGELOG.fork.md`, and builds the server image
+under the release tag. The updater (`node update-system.mjs check`) and the
+Claude plugin (`.claude-plugin/plugin.json`) follow these releases. Upstream's
+`CHANGELOG.md`, root `package.json` version and the npm-facing directory
+listings keep upstream's 1.x numbers, because they describe upstream's
+packages; upstream's releases ship inside the next fork release after an
+upstream review.
 
 ## How it syncs
 

@@ -164,7 +164,7 @@ export function issueBody(d: Diag, description: string): string {
 }
 
 export function issueUrl(d: Diag, description: string): string {
-  const title = `[web ${d.channel}] ${(scrub(description) || "bug report").replace(/\s+/g, " ").trim().slice(0, 70)}`;
-  const params = new URLSearchParams({ title, body: issueBody(d, description), labels: "web-alpha,area:web" });
+  const title = `[${d.version || "web"}] ${(scrub(description) || "bug report").replace(/\s+/g, " ").trim().slice(0, 70)}`;
+  const params = new URLSearchParams({ title, body: issueBody(d, description), labels: "area:web" });
   return `https://github.com/${REPO}/issues/new?${params.toString()}`;
 }

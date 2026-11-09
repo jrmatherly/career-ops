@@ -49,9 +49,9 @@ export async function GET() {
   const web = webVersion();
   const m = coreVersion.match(/-(rc|beta|alpha|next)\b/i);
   // Channel precedence: an explicit core pre-release suffix wins (RC installs);
-  // otherwise the web component's own maturity decides — pre-1.0 on main IS the
-  // alpha (release-please versions web/ independently), and the banner/bug-report
-  // stay visible until the web graduates to 1.0.
+  // otherwise the web component's own maturity decides: pre-1.0 is the alpha
+  // (release-please versions web/ independently). The pill shows the channel
+  // only off "stable"; the bug reporter stays on every channel.
   const channel = m ? m[1].toLowerCase() : web && /^0\./.test(web) ? "alpha" : "stable";
   const version = web ? `web ${web}` : coreVersion;
   return Response.json({ version, coreVersion, channel, sha: shortSha() });

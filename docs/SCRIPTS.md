@@ -96,6 +96,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `npm run privacy:status` | `privacy-status.mjs` | Report the outbound LLM privacy guard's state without printing any guarded value (`--json`; exit 1 unloadable config, 2 bypassed) |
 | `npm run ui` | `scripts/ui-server.mjs` | Start the local web UI (`--port=<num>`, default 3000; `--host=<addr>`, default 127.0.0.1) |
 | `npm run lint` | `scripts/check-syntax.mjs` | Syntax-check every repository `.mjs` file |
+| `node scripts/stamp-version.mjs [--check]` | `scripts/stamp-version.mjs` | Write the fork's released versions from `.release-please-manifest.json` into every token file the release-please config names; `--check` exits 1 on drift (run after an upstream merge) |
 
 ---
 

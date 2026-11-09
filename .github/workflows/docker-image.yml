@@ -17,14 +17,15 @@ name: "🐳 Docker images"
 # publish/ is not in that list yet, so a pull request that changes only the
 # publish service does not build its image; the push to main does.
 #
-# Tags: `latest` on main, `sha-<short>` on every build, the git tag on `v*` tags.
+# Tags: `latest` on main, `sha-<short>` on every build, and on a fork release tag
+# (`career-ops-vX.Y.Z`, cut by release.yml) both the tag itself and the bare `X.Y.Z`.
 # The first push creates each package as private; make them public in the
 # package settings once, or every pull needs a token.
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['career-ops-v*']
   pull_request:
     paths:
       - Dockerfile
@@ -102,6 +103,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
             type=ref,event=tag
+            type=match,pattern=career-ops-v(.*),group=1
       - name: "🚀 Build and push"
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

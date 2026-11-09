@@ -1,0 +1,68 @@
+name: "🏷️ Release Please"
+
+# The fork's own releases. release-please reads the conventional commits on
+# `main` since the last fork tag, keeps a release PR up to date, and on merge
+# tags `career-ops-vX.Y.Z` (root) and `web-vX.Y.Z` (web/) and publishes the
+# GitHub Releases. The fork is on the 2.x line so its numbers never collide
+# with upstream's 1.x; see FORK.md "Releases". No npm publish: the scaffolder
+# package belongs to upstream.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: "🏷️ release-please"
+    runs-on: ubuntu-latest
+    steps:
+      # This repository does not let Actions create pull requests, so the
+      # release PR is opened with a GitHub App token (Contents, Pull requests
+      # and Issues read/write on this repository only). private/runbooks/
+      # release-github-app.md walks through creating the App and the two
+      # secrets. Releases created with the App token also fire `on: release`
+      # workflows, which GITHUB_TOKEN never does.
+      - name: "🔑 App token"
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: "🏷️ Release PR or release"
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # GitHub marks whichever release was created LAST as "Latest", and the
+      # `web` component is created after `career-ops`. update-system.mjs
+      # resolves what to install from /releases/latest and refuses a `web-*`
+      # tag, so without this step every install would stop updating until the
+      # next root release. Runs on any release, web-only ones included.
+      - name: "⬇️ Checkout"
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "📌 Keep the career-ops release marked as Latest"
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver=$(jq -r '."."' .release-please-manifest.json)
+          if [ -z "$ver" ] || [ "$ver" = "null" ]; then
+            echo "::error::could not read the career-ops version from .release-please-manifest.json"
+            exit 1
+          fi
+          echo "marking career-ops-v${ver} as Latest"
+          gh release edit "career-ops-v${ver}" --repo "$GITHUB_REPOSITORY" --latest
