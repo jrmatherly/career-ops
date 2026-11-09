@@ -387,6 +387,62 @@ A Web3 and crypto job board. The provider reads its public RSS feed at `https://
 
 ---
 
+## Health eCareers
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F1); no affiliation with the source |
+| **Provider** | `providers/healthecareers.mjs` |
+| **PR** | the providers program PR in `jrmatherly/career-ops` (branch `claude/providers-new-html`) |
+| **Merged** | not yet |
+| **Status** | Provider listed; no live `job_boards:` entry ships, only the commented example stanza. |
+
+A US healthcare board: physicians, nurses, advanced practice and allied health. Measured with curl on 2026-11-08, no key, cookie or session: `https://www.healthecareers.com/search-jobs` answered HTTP 200 with 25 server-rendered cards, `?pg=2` the next 25, and `?pg=1` a 301 to `/search-jobs/?` (so the provider requests page one at the bare path). Page 883 was the last page with cards and page 1000 a well-formed empty results page, so the board held about 22,000 postings. No bot challenge on any page sampled.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Employer attribution, measured: all 125 cards on pages 1, 2, 100, 400 and 401 name an employer (hospital systems, medical groups, the Department of Veterans Affairs, and some staffing firms such as AMN Healthcare and CompHealth), each with a `data-clientid`. Free for candidates: listings and detail pages read without an account. Applying was not walked through. **Backfill:** none observed. Every sampled card carries an employer contract type (`VALUE_BASED`, `NURSING_ALLIED`, `PPA`, `SLOTPlus`, `PROMO`), an apply type of `Resume` (apply on the board) or `ATS` (apply at the employer), and no card links off the board or through the robots-disallowed `/JobDetailsRedirect/` route. Whether a deeper page carries feed backfill: unverified beyond those five pages.
+
+**Rule 2 (canonical URL is the employer's).** The card carries only the board's own `/job/{slug}/{id}` page, so `url` is that page. The detail page's JSON-LD names the employer but not an ATS link.
+
+**Rule 3 (complete inventory, no paid placement).** Partly met. `PROMO` and `SLOTPlus` are paid placements interleaved in the default order; the provider keeps every card it reads and ranks nothing. It reads up to `max_pages` (default 10, so the newest 250), not the whole board, and the catalog row says so. Card order changed between two requests a minute apart on 2026-11-08, so a walk over many pages can skip or repeat a posting at a page boundary.
+
+**Rule 4 (operator declared).** Operator not declared; unverified.
+
+**Rule 5 (aggregation stays in core).** Verified in code: the provider reads `/search-jobs` (and, under `fetchDetails`, `/job/{slug}/{id}`) on `www.healthecareers.com` only.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of `https://www.healthecareers.com/robots.txt` on 2026-11-08. Under `User-agent: *` it has `Disallow: /searchjobs/`, `Disallow: /new-search-jobs/` and `Disallow: /JobDetailsRedirect/` among others, none covering `/search-jobs` or `/job/`. A second group naming AI crawlers (`ClaudeBot`, `GPTBot`, `PerplexityBot` and others) carries `Allow: /`, `Allow: /career-resources/` and `Allow: /search-jobs/`. The provider never requests a disallowed path, and its test pins the `/search-jobs` path literal.
+
+## Tech Jobs for Good (not listed)
+
+Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F2) and stopped at the endpoint check on 2026-11-08, before any code. Checked with curl, no key, cookie or session: `https://techjobsforgood.com/jobs/?page=N` served 30, 30 and 24 server-rendered cards on pages 1 to 3 and HTTP 404 on page 4, and `robots.txt` is `User-agent: *` / `Allow: /`. The same page reads "84 jobs found" next to "Upgrade to see 890 additional jobs", and `https://techjobsforgood.com/upgrade-to-premium/` sells candidates a Premium Membership at $19 a month to "see 11.6x more jobs" (the coordinator's re-read at 19:13 EST showed 83 and 886). Rule 1 bars a source that paywalls listings for candidates, and the free rows are not the complete inventory rule 3 asks for, so the board is not listed. It is in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table.
+
+---
+
+## Dynamite Jobs
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F3); no affiliation with the source |
+| **Provider** | `providers/dynamitejobs.mjs` |
+| **PR** | the providers program PR in `jrmatherly/career-ops` (branch `claude/providers-new-html`) |
+| **Merged** | not yet |
+| **Status** | Provider listed; no live `job_boards:` entry ships, only the commented example stanza. |
+
+A remote-only board, many small employers. Measured with curl and the provider's own fetch on 2026-11-08, no key, cookie or session: `https://dynamitejobs.com/sitemap/jobs-of-company.xml` answered HTTP 200 (`application/xml`, about 480 KB) with 3,441 `<loc>` entries, 500 of them posting URLs of the form `/company/{company}/remote-job/{slug}`. Each posting page carries a JSON-LD `JobPosting` with `title`, `hiringOrganization`, `datePosted`, `validThrough`, `jobLocationType: TELECOMMUTE` and `applicantLocationRequirements`. No bot challenge on any page read. A `HEAD` of the sitemap answers 404 while `GET` answers 200; the provider only sends `GET`.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Employer attribution: every posting URL carries an employer segment, and the three posting pages read in the smoke test named their employer in `hiringOrganization` (with a `sameAs` website). Free for candidates: no paywall, membership or upgrade text on `/remote-jobs` or on a posting page; the "Apply Now" flow was not walked through.
+
+**Rule 2 (canonical URL is the employer's).** `directApply` is `false` on the posting sampled and the page exposes no employer ATS link, so `url` is the board's own posting page.
+
+**Rule 3 (complete inventory, no paid placement).** Partly met. Posting pages label some roles "Featured Job" and "Promoted Job"; the sitemap does not mark them, and the provider keeps every sitemap row in sitemap order and ranks nothing. The board also publishes `jobs-of-companies-index.xml`, 475 per-company sitemaps; whether the flat sitemap's 500 posting URLs are the whole live inventory or a cap of 500 is unverified. The provider reads the flat sitemap only.
+
+**Rule 4 (operator declared).** Operator not declared; unverified.
+
+**Rule 5 (aggregation stays in core).** Verified in code: the provider reads the one sitemap and posting pages on `dynamitejobs.com` only.
+
+**Rule 6 (the source's own `robots.txt`).** One GET of `https://dynamitejobs.com/robots.txt` on 2026-11-08 (served gzip-encoded). Under `User-agent: *` it has `Disallow: /api/`, `/form/`, `/webhook/`, `/job-edit/`, `/company-dashboard/`, `/my-jobs/`, `/admin/` and `/app/`, and lists `/sitemap/index.xml`, `/sitemap/jobs-of-companies-index.xml` and three other sitemaps. Neither `/sitemap/jobs-of-company.xml` nor `/company/{company}/remote-job/{slug}` is disallowed. No group names career-ops or an AI crawler.
+
+---
+
 ## Backfill waiver (2026-11-08)
 
 These board providers merged without an entry in this log: most before the log existed on 2026-08-07, the rest after it without one. Each line names the provider and the author date of the commit that added its file (`git log --diff-filter=A --format=%as -- providers/{id}.mjs`). A line here records the gap; it is not a verification. A full entry for a provider replaces its line. `tests/providers/indexing-log-coverage.test.mjs` fails when a board provider has neither.
