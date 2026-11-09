@@ -1,1 +1,1 @@
-{"generation": 3, "prs": [{"pr": 43, "branch": "claude/providers-program", "head": "d3315f6aca40aa38ab242a88217f6a6739430be2", "base": "main", "state": "open"}], "lowestUnmerged": 43}
+{"generation": 5, "prs": [{"pr": 43, "branch": "claude/providers-program", "head": "57c7a614c1e7139909030bf3f1a7ce52d41b8360", "base": "main", "state": "merged", "mergeCommit": "602cc0bd81cfe0c229a3e13a996a83bbe3bb4063"}], "lowestUnmerged": null}
