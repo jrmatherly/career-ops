@@ -1,0 +1,17 @@
+# A2 r1 verifier (opus), head fdca6aa365af6c3524de00f4f70a6c81285c46f1, base 4de7f15b
+
+VERDICT: ISSUES. One PR-added test fails on Windows CI on both runs at the head; all ten items closed, every local gate green, all 11 mutants killed.
+
+Scope: diff is exactly the PR's 20 files. Method: code and test read, gates, runner by hand against a scratch root, 11 mutants with backup/restore, CI via gh pr checks and gh run view --log-failed. Tree clean at the end.
+
+Items 1-10 CLOSED with file:line (lib grouping by root normalizeUrl, fold at L52-73, RUNNING_STALE_MS 860 s, final at 3; escapeFormulaCell(tsvCell()) L37; startedToday L104-107 counts URLs; drainPlan L115-124; CLI dump/add/drain-plan with isMainModule and getCareerOpsRoot; local-paths :34-35; runner auto branch :486-498 via queueCandidates, autoQueued :497; drain probe Host: localhost L79/L156, skips L37-58, no-api-text L185 before fetch, running before POST L201-206, outcomes incl. imported limit regexes, baseUrl L136, counts L222-229; route EVALUATIONS_IN_FLIGHT L46, 409 at L309-312 before token and spawn, cleared L345 and L376, codeRoot L119; drainPass L526-533 under the .drain lock only without --job L573-575, stdout exactly {"status":"idle"} by hand; pod gate L144-147 both branches; denies L188-211 pinned at test :300-340; docs rows incl. SKILL.md extensions; headless-permission-flags passes, no child_process in drain or ledger).
+
+Deviations from the plan, none blocking: appendRow inlines appendSidecarRow's body so the header check runs in the same lock; drainPlan returns entries (CLI maps to URLs); a transport failure appends a queued row on top of running (plan said nothing) and that URL counts against the cap; extra `refused` outcome stops the batch; unranked rows re-queue once ranked; drain param is fetchJd plus an env seam. A2.md premises false: tsvCell is shared (application-meta.mjs:22); POST needs no Origin (origin-guard.mjs:185). browser-extract.mjs loads in 0.16 s; the runner loads the drain lazily.
+
+Gates: check-syntax 2233 ok; test-all --quick 21765/0 (run 3 alone; run 1 split-root flake under concurrent web tests, passes alone; run 2 inline section 13 batch rate-limit flake); --only evaluate-queue 29/0, headless-permission-flags 1/0, fork-deviations-covered 1/0; validate-system-paths-coverage OK 3908; web typecheck clean, npm test 2654 pass 0 fail 45 skipped; four suites alone 15/15, 33/33, 77/77, 23/23.
+CI at fdca6aa3 NOT green: test (windows-latest) fails on runs 42568765809 and 42568787785 at web/tests/lib/run-route-kinds.test.mjs:312 "evaluate-text refuses a code checkout it cannot resolve": on Windows the data-root check answers first ("needs a data root of letters, digits…") so the L317 regex never matches; the test lacks the POSIX_ROOT skip its siblings carry (L95). Browser and LaTeX job 504 on tectonic download on one run (infra, passed on the other).
+
+Mutants, all killed: m1 header (1 failed) · m2 stale running (4) · m3 cap counts evaluated (1) · m4 report-exists (1) · m5 no-api-text (1) · m6 limit stop (2) · m7 route 409 (1) · m8 drain with --job (1) · m9 pod gate (1) · m10 ~/.ssh deny (1) · m11 running after POST (1).
+
+TO REACH PASS: add POSIX_ROOT to the test at :312 (or make it reachable on Windows); CI green incl. a clean Browser and LaTeX rerun; re-verify at the new head.
+Logs: scratchpad/verifier-A2-r1/ (test-all-quick*.log, only-*.log, web-gates.log, mutant-m1..m11.log, run-refused.*, run-offline.*, ledger-dump.json, mutate.py, mutants.sh).
