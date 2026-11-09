@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { CalendarPlus, Loader2, Sparkles, X } from "lucide-react";
 import type { EvaluateSettings, FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
-import { clampEvaluate, evaluateBody, evaluateFieldsVisible, evaluateForm } from "@/lib/evaluate-settings.mjs";
+import { clampEvaluate, evaluateBody, evaluateFieldsVisible, evaluateForm, evaluateCaveat } from "@/lib/evaluate-settings.mjs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
@@ -183,6 +183,7 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
     } catch {}
   };
   const field = "w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60";
+  const caveat = evaluateCaveat(value.mode);
   return (
     <div className="space-y-3 rounded-xl border border-border bg-surface/30 p-4">
       <div>
@@ -205,11 +206,9 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
               <input id={`${id}-max`} type="number" min={1} max={20} step={1} value={value.maxPerRun} onChange={(e) => onChange({ ...value, maxPerRun: e.target.value })} onBlur={clampShown} className={field} />
             </div>
           </div>
-          <p className="text-[11px] text-faint">
-            Rank is a guess from the title and URL. Auto evaluates only postings whose board exposes the job text, and rows another job found on the same day can be picked up, because scan history records the board, not the job.
-          </p>
         </>
       )}
+      {caveat && <p className="text-[11px] text-faint">{caveat}</p>}
     </div>
   );
 }

@@ -7,7 +7,7 @@
 // replaces the launch when one is set.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import childProcess from "node:child_process";
+import childProcess, { execFileSync } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -78,8 +78,28 @@ test("200 with the dump, launched as dump --json with this Node and windowsHide"
   assert.equal(r.launches[0].file, process.execPath);
   assert.deepEqual(r.launches[0].args, [join(codeRoot, "evaluate-queue.mjs"), "dump", "--json"]);
   assert.equal(r.launches[0].options?.windowsHide, true);
+  assert.ok(r.launches[0].options?.maxBuffer >= 64 * 1024 * 1024, "a ledger past execFile's 1 MiB default still answers");
   assert.ok(r.errors.some((line) => line.includes("malformed row")), "a warning on stderr is logged, and the dump still answers");
   assert.equal(r.skipped, "1", "the malformed-row count rides the header, the stderr text does not");
+});
+
+test("the real evaluate-queue.mjs: a row added through the CLI comes back from the route", async () => {
+  planned = null;
+  const repoRoot = join(import.meta.dirname, "..", "..", "..");
+  process.env.CAREER_OPS_CODE_ROOT = repoRoot;
+  try {
+    const url = "https://jobs.example.com/real-1";
+    execFileSync(process.execPath, [join(repoRoot, "evaluate-queue.mjs"), "add", "--url", url, "--state", "queued", "--job", "job-1", "--run", "run-1", "--rank", "4.2"], { env: { ...process.env, CAREER_OPS_ROOT: dataRoot }, stdio: ["ignore", "ignore", "inherit"] });
+    const r = await get();
+    assert.equal(r.status, 200);
+    assert.equal(r.launches[0].args[0], join(repoRoot, "evaluate-queue.mjs"));
+    const entry = r.body.find((e) => e.url === url);
+    assert.equal(entry?.state, "queued");
+    assert.equal(entry?.rank, 4.2);
+    assert.equal(r.skipped, null);
+  } finally {
+    process.env.CAREER_OPS_CODE_ROOT = codeRoot;
+  }
 });
 
 test("an empty ledger answers 200 with []", async () => {
@@ -97,6 +117,7 @@ test("503 without the CLI's stderr when it exits non-zero, fails to spawn, times
   const cases = {
     "non-zero exit": { error: Object.assign(new Error("exit 1"), { code: 1 }), stdout: "[]", stderr: `Error: EISDIR ${SECRET_PATH}`, logged: /exited 1/ },
     "spawn failure": { error: Object.assign(new Error("spawn"), { code: "ENOENT" }), stdout: "[]", stderr: SECRET_PATH, logged: /failed to run/ },
+    "output past maxBuffer": { error: Object.assign(new Error("stdout maxBuffer length exceeded"), { code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" }), stdout: "[", stderr: "", logged: /exceeded runCoreCli's maxBuffer/ },
     timeout: { error: Object.assign(new Error("killed"), { killed: true, signal: "SIGTERM" }), stdout: "[]", stderr: SECRET_PATH },
     "unparseable stdout": { error: null, stdout: `not json ${SECRET_PATH}`, logged: /not JSON: / },
     "JSON that is not an array": { error: null, stdout: '{"path":"x"}', logged: /not a JSON array/ },

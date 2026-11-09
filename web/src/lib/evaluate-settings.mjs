@@ -28,8 +28,18 @@ export function evaluateBody(form, stored) {
 export function evaluateModeLabel(evaluate) {
   if (evaluate?.mode === "review") return "Review, rank only";
   if (evaluate?.mode !== "auto") return null;
-  // Number(): a store edited by hand may lack a field; show NaN rather than crash the page.
-  return `Auto, rank ${Number(evaluate.rankThreshold).toFixed(1)} and above, ${Number(evaluate.maxPerRun)} per run`;
+  const { rankThreshold: threshold, maxPerRun: max } = evaluate;
+  // A store edited by hand may lack a field or hold null or text; name the gap instead of printing NaN or 0.0.
+  if (!Number.isFinite(threshold) || !Number.isFinite(max)) return "Auto, settings unreadable; open Edit and save";
+  return `Auto, rank ${threshold.toFixed(1)} and above, ${max} per run`;
+}
+
+/** The modal's explanation line: Review and Auto share the rank sentence, Auto adds its API-text limit; null for Off. */
+export function evaluateCaveat(mode) {
+  if (mode !== "review" && mode !== "auto") return null;
+  const rank = "Rank is a guess from the title and URL.";
+  if (mode === "review") return rank;
+  return `${rank} Auto evaluates only postings whose board exposes the job text, and rows another job found on the same day can be picked up, because scan history records the board, not the job.`;
 }
 
 const RUN_COUNTS = [["ranked", "ranked"], ["autoQueued", "queued"], ["evaluated", "evaluated"], ["gated", "gated"], ["evalErrors", "errors"]];
