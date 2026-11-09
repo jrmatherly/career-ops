@@ -21,6 +21,7 @@ import { fetchJdViaKnownApi } from "../../browser-extract.mjs";
 import { resolveTrackerPath } from "../../path-resolver.mjs";
 import { parseTrackerRow, resolveColumns } from "../../tracker-parse.mjs";
 import { reportUrlToken } from "../../tracker-utils.mjs";
+import { tsvCell } from "../../lib/application-meta.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
 // A wall-clock deadline on one evaluation: the route's 740 s kill, 60 s of
@@ -130,8 +131,9 @@ function outcomeOf(response) {
   if (!terminal) return { state: "queued", reason: "dashboard-offline", stop: "offline", detail: "the stream ended with no terminal event" };
   if (terminal.type === "done") return { state: "evaluated", reason: terminal.reportN ? `report ${terminal.reportN}` : "" };
   if (terminal.type === "gated") return { state: "gated", reason: terminal.reason || terminal.message || "" };
-  const limited = events.some((event) => event.type === "error" && isLimitError(String(event.msg ?? "")));
-  return { state: "failed", reason: String(terminal.msg ?? ""), ...(limited ? { stop: "limit" } : {}) };
+  // The limit event names why the batch stops; the terminal error after it is generic.
+  const limit = events.find((event) => event.type === "error" && isLimitError(String(event.msg ?? "")));
+  return limit ? { state: "failed", reason: String(limit.msg), stop: "limit" } : { state: "failed", reason: String(terminal.msg ?? "") };
 }
 
 /**
@@ -217,7 +219,9 @@ export async function runDrain({
       if (!jdText?.trim()) {
         log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
         // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
-        if (entry.reason !== `no-text: ${why}`) await append("queued", `no-text: ${why}`);
+        // Compared in the form the ledger stores, or a message with a newline would never match.
+        const reason = tsvCell(`no-text: ${why}`);
+        if (entry.reason !== reason) await append("queued", reason);
         continue;
       }
 

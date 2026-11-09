@@ -54,10 +54,25 @@ try {
     await appendRow(deaths, { ...base, url: G, at: at(900), state: 'queued', reason: 'dashboard-offline', source: 'drain' });
     const late = readLedger(deaths, { now: T0 + 1_000_000 }).find((e) => e.url === G);
     check(late.failures === 1 && late.state === 'queued', 'a row written after a running row went stale keeps the failure it charged', JSON.stringify(late));
+    const H = 'https://jobs.example.test/h';
+    await appendRow(deaths, { ...base, url: H, at: at(0), state: 'running', source: 'drain' });
+    await appendRow(deaths, { ...base, url: H, at: at(870), state: 'failed', reason: 'slow error', source: 'drain' });
+    check(readLedger(deaths, { now: T0 + 1_000_000 }).find((e) => e.url === H).failures === 1, 'a failed row that is a running row\'s late outcome counts once', '');
+    const K = 'https://jobs.example.test/k';
+    for (let i = 0; i < 3; i += 1) {
+      await appendRow(deaths, { ...base, url: K, at: at(i * 1000), state: 'running', source: 'drain' });
+      await appendRow(deaths, { ...base, url: K, at: at(i * 1000 + 900), state: 'queued', reason: 'dashboard-offline', source: 'drain' });
+    }
+    const spent = readLedger(deaths, { now: T0 + 5_000_000 }).find((e) => e.url === K);
+    check(spent.final && spent.state === 'failed' && spent.reason === '3 failed attempts', 'three dead runs end the URL and it reads as failed, not queued', JSON.stringify({ ...spent, rows: undefined }));
     writeFileSync(ledgerPath(deaths), `${B}\t${at(0)}\tjob-1\trun-1\thigh\t\tqueued\trank-pass\n`, { flag: 'a' });
     const bad = [];
     readLedger(deaths, { skipped: bad });
     check(bad.length === 1, 'a rank cell that is not a number is reported, not read as NaN', JSON.stringify(bad));
+    writeFileSync(ledgerPath(deaths), `${B}\tyesterday\tjob-1\trun-1\t\t\tqueued\trank-pass\n`, { flag: 'a' });
+    const badAt = [];
+    readLedger(deaths, { skipped: badAt });
+    check(badAt.length === 2, 'an `at` that is not a timestamp is reported, not read as outlived', JSON.stringify(badAt));
   } finally {
     rmSync(deaths, { recursive: true, force: true });
   }

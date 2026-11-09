@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { runDrain } from "../../scripts/evaluate-drain.mjs";
+import { rankPass } from "../../scripts/scheduled-jobs-runner.mjs";
 import { readScheduledStore } from "../../src/lib/scheduled-jobs-store.mjs";
 import { checkRequest } from "../../src/lib/origin-guard.mjs";
 import { appendRow, readLedger } from "../../../lib/evaluate-queue.mjs";
@@ -139,7 +140,7 @@ test("each skip reason is recorded and none of them POSTs", async (t) => {
 test("a null or thrown posting-text fetch leaves the row queued with its reason, written once", async (t) => {
   for (const [fetchJd, reason] of [
     [async () => null, "no-text: the ATS API returned no text"],
-    [async () => { throw new Error("socket hang up"); }, "no-text: socket hang up"],
+    [async () => { throw new Error("socket hang up\n  at fetch"); }, "no-text: socket hang up   at fetch"],
     [async () => ({ text: " \0 " }), "no-text: the ATS API returned no text"],
   ]) {
     const { drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1)] });
@@ -197,6 +198,28 @@ test("malformed ledger rows are named on stderr", async (t) => {
   assert.match(stderr.join(""), /1 malformed row\(s\) in data\/evaluate-queue\.tsv skipped/);
 });
 
+test("a row queued by a job that left auto mode is taken over by an auto job's rank pass and drained", async (t) => {
+  const { root, storePath, drain, state, posts } = await withDrainRoot(t, { urls: [url(1)] });
+  const B = "33333333-3333-4333-8333-333333333333";
+  const RUN_B = "44444444-4444-4444-8444-444444444444";
+  fs.writeFileSync(path.join(root, "data", "pipeline.md"), `## Pending\n- [ ] ${url(1)} | Fictional Co | Engineer | rank: 4.5/5 — fixture\n`);
+  fs.writeFileSync(path.join(root, "data", "scan-history.tsv"), `url\tfirst_seen\tportal\ttitle\tcompany\tstatus\n${url(1)}\t2026-11-08\tgreenhouse\tEngineer\tFictional Co\tadded\n`);
+  const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  store.jobs[0].evaluate.mode = "review";
+  store.jobs.push({ ...store.jobs[0], id: B, name: "Auto B", evaluate: { ...AUTO } });
+  store.runs.unshift({ id: RUN_B, jobId: B, at: "2026-11-08T12:00:00.000Z", state: "success", attempt: 1, rolesFound: 1 });
+  fs.writeFileSync(storePath, JSON.stringify(store));
+
+  assert.equal((await drain()).status, "idle", "no auto job owns the row yet");
+  await rankPass(root, storePath, { spawnFn: () => assert.fail("every candidate is ranked, so no ranker runs") });
+  assert.deepEqual([state(url(1)).jobId, state(url(1)).runId, state(url(1)).state], [B, RUN_B, "queued"]);
+  assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN_B).autoQueued, 1);
+  await drain();
+  assert.equal(state(url(1)).state, "evaluated");
+  assert.equal(posts.length, 1);
+  assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN_B).evaluated, 1);
+});
+
 test("the dashboard's guard lets the drain's POST through: Host localhost, no Origin", () => {
   const decision = checkRequest({ secFetchSite: null, origin: null, host: "localhost", allowedHosts: new Set(), allowedOrigins: new Set(), method: "POST", secFetchMode: null, secFetchDest: null, pathname: "/api/run" });
   assert.deepEqual(decision, { ok: true });
@@ -220,6 +243,7 @@ test("a usage-limit error stops the batch and leaves the rest queued", async (t)
   const result = await drain();
   assert.equal(result.status, "stopped");
   assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "failed", "queued"]);
+  assert.equal(state(url(2)).reason, "Claude AI usage limit reached|1762650000", "the row names the limit, not the generic terminal error");
   assert.equal(posts.length, 2);
   assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN).evalErrors, 1);
 });

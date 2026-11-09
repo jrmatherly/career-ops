@@ -491,7 +491,8 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     // Loaded here, not at the top, so a job outside auto mode never loads the ledger module.
     const { queueCandidates } = await import("../../lib/evaluate-queue.mjs");
     const rows = pendingRows(readText(pipelinePath)).filter((row) => passed.has(row.url));
-    autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold }, rows);
+    const autoJobIds = new Set(evaluatingJobs(store).filter((other) => other.evaluate.mode === "auto").map((other) => other.id));
+    autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds }, rows);
   }
   if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage || lastRun.autoQueued !== autoQueued) {
     await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage, autoQueued });
