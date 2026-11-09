@@ -258,3 +258,23 @@ Re-read against rule 3 after the feed's documentation ([jobi.cy/apidocs](https:/
 **Fair use.** The documentation asks integrations to start an automated pass no more than once an hour and to follow its cursor pages in order. One scan is one pass per `provider: jobicy` entry, with 250 ms between pages.
 
 **Rules 1, 4 and 5.** Not re-verified here.
+
+---
+
+## themuse.com (retired 2026-11-08)
+
+| | |
+|---|---|
+| **Proposed by** | issue [#1283](https://github.com/santifer/career-ops/issues/1283) |
+| **Provider** | `providers/themuse.mjs` |
+| **Merged** | before this policy existed (2026-08-04) |
+| **Retired** | 2026-11-08 (this fork; upstream still ships the live provider) |
+| **Status** | Not listed. `fetch()` throws a retirement message; the catalog row reads **Retired (2026-11-08)** |
+
+Found by a live probe of every provider on 2026-11-08: the scanner read The Muse as a board with no jobs.
+
+**What was checked.** On 2026-11-08 the providers assessment fetched the feed from two networks under the scanner's User-Agent and a desktop browser User-Agent, and the same day `curl -sI` re-checked these paths. `https://www.themuse.com/api/public/jobs` (bare, with `page=0`, with an `api_key` parameter, and under a browser User-Agent), `https://www.themuse.com/` and `https://www.themuse.com/jobs` each answered HTTP 403 with `cf-mitigated: challenge`, a Cloudflare managed challenge. `https://www.themuse.com/robots.txt` answered HTTP 200; under `User-agent: *` it disallows only `/apply/`. The feed is not closed by `robots.txt`; it is closed by bot protection, which career-ops does not work around.
+
+**Alternative.** A user with an Apify token can read the board through the keyed `provider: apify` plugin and the public actor `bibian/themuse-jobs-scraper` (`https://apify.com/bibian/themuse-jobs-scraper` answered HTTP 200 on 2026-11-08). That route is outside the zero-key core and is the user's own choice.
+
+**Rules 1 to 6.** Not re-verified: the source is unreachable, which decides on its own.
