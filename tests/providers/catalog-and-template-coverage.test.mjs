@@ -19,20 +19,34 @@ if (ids.length > 0) {
   fail('loaded zero providers; this suite would pass vacuously');
 }
 
-// Catalog rows whose name is not the id with hyphens as spaces.
+// A row is matched by its name cell with punctuation dropped, never by notes
+// text that may name another provider: "The Muse" -> themuse, and a name that
+// starts with the id ("Amazon / AWS") counts. Rows named otherwise are listed here.
 const CATALOG_ALIASES = {
-  'adp-workforcenow': 'adp workforce now',
-  'remote-com': 'remote.com',
+  'agentic-jobs': 'Agentic Engineering Jobs',
+  applitrack: 'Frontline AppliTrack',
+  csod: 'Cornerstone OnDemand',
+  eightythousandhours: '80,000 Hours',
+  getonbrd: 'Get on Board',
+  manfred: 'getManfred',
+  oraclecloud: 'Oracle Recruiting Cloud (ORC)',
+  'remote-com': 'Remote (remote.com)',
+  successfactors: 'SAP SuccessFactors',
+  'telegram-channel': 'Telegram (public channels)',
+  ultipro: 'UKG Pro / UltiPro Recruiting',
+  wttj: 'Welcome to the Jungle',
 };
 
-const catalogText = readFileSync(join(ROOT, 'docs', 'SUPPORTED_JOB_BOARDS.md'), 'utf-8');
-const catalog = catalogText.toLowerCase();
-const missingRow = ids.filter((id) => ![
-  `provider: ${id}`,
-  `\`${id}\``,
-  id.replaceAll('-', ' '),
-  CATALOG_ALIASES[id],
-].some((needle) => needle && catalog.includes(needle)));
+const squash = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const catalogRows = readFileSync(join(ROOT, 'docs', 'SUPPORTED_JOB_BOARDS.md'), 'utf-8')
+  .split('\n')
+  .filter((line) => line.startsWith('|'));
+const nameOf = (line) => squash(line.split('|')[1] ?? '');
+const names = catalogRows.map(nameOf);
+const missingRow = ids.filter((id) => {
+  const alias = CATALOG_ALIASES[id];
+  return alias ? !names.includes(squash(alias)) : !names.some((name) => name.startsWith(squash(id)));
+});
 
 if (missingRow.length === 0) {
   pass('every provider has a row in docs/SUPPORTED_JOB_BOARDS.md');
@@ -40,12 +54,7 @@ if (missingRow.length === 0) {
   fail(`provider(s) with no row in docs/SUPPORTED_JOB_BOARDS.md: ${missingRow.join(', ')}`);
 }
 
-// A retired row is matched by its name cell with punctuation dropped
-// ("The Muse" -> themuse), never by notes text that may name another provider.
-const squash = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-const retiredNames = new Set(catalogText.split('\n')
-  .filter((line) => line.includes('**Retired'))
-  .map((line) => squash(line.split('|')[1] ?? '')));
+const retiredNames = new Set(catalogRows.filter((line) => line.includes('**Retired')).map(nameOf));
 const retired = new Set(ids.filter((id) => retiredNames.has(squash(id))));
 
 const exampleYml = readFileSync(join(ROOT, 'templates', 'portals.example.yml'), 'utf-8');
