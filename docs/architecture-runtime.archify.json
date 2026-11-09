@@ -1,0 +1,511 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "career-ops runtime architecture",
+    "output": ".archify/architecture-runtime/career-ops-architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/jrmatherly/career-ops.git",
+      "provider": "github",
+      "revision": "d615883eaf8b429fff6aba68e0699ae97e6d453e"
+    }
+  },
+  "components": [
+    {
+      "id": "boards",
+      "type": "external",
+      "label": "Job boards and ATS APIs",
+      "sublabel": "Greenhouse, Lever, Ashby, Workday",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "providers/README.md",
+          "line": 7,
+          "end_line": 13
+        }
+      ]
+    },
+    {
+      "id": "scanner",
+      "type": "backend",
+      "label": "Portal scanner",
+      "sublabel": "scan.mjs + providers/*.mjs",
+      "tag": "zero-token",
+      "pos": [
+        290,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "scan.mjs",
+          "line": 4,
+          "end_line": 21
+        },
+        {
+          "path": "scan.mjs",
+          "line": 4631,
+          "end_line": 4635
+        },
+        {
+          "path": "providers/_registry.mjs",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "id": "inbox",
+      "type": "database",
+      "label": "Pipeline inbox",
+      "sublabel": "data/pipeline.md, scan-history.tsv",
+      "pos": [
+        790,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "scan.mjs",
+          "line": 136,
+          "end_line": 137
+        },
+        {
+          "path": "scan.mjs",
+          "line": 3768
+        },
+        {
+          "path": "scan.mjs",
+          "line": 3834
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "Claude model API",
+      "sublabel": "via claude -p, tier-mapped model",
+      "pos": [
+        40,
+        200
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "batch/batch-runner.sh",
+          "line": 700,
+          "end_line": 705
+        },
+        {
+          "path": "web/src/lib/claude-invocation.mjs",
+          "line": 164,
+          "end_line": 180
+        }
+      ]
+    },
+    {
+      "id": "evaluator",
+      "type": "backend",
+      "label": "Evaluation worker",
+      "sublabel": "modes/oferta.md, batch-runner.sh",
+      "tag": "AI CLI agent",
+      "pos": [
+        540,
+        200
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "modes/oferta.md",
+          "line": 1,
+          "end_line": 11
+        },
+        {
+          "path": "batch/batch-runner.sh",
+          "line": 1186,
+          "end_line": 1194
+        },
+        {
+          "path": "batch/batch-runner.sh",
+          "line": 1581,
+          "end_line": 1585
+        }
+      ]
+    },
+    {
+      "id": "userlayer",
+      "type": "database",
+      "label": "Candidate facts",
+      "sublabel": "cv.md, profile.yml, _profile.md",
+      "pos": [
+        790,
+        200
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "AGENTS.md",
+          "line": 9,
+          "end_line": 14
+        },
+        {
+          "path": "path-resolver.mjs",
+          "line": 110,
+          "end_line": 112
+        },
+        {
+          "path": "batch/batch-prompt.md",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "id": "artifacts",
+      "type": "database",
+      "label": "Reports and tracker TSVs",
+      "sublabel": "reports/, batch/tracker-additions/",
+      "pos": [
+        790,
+        360
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "batch/batch-prompt.md",
+          "line": 7,
+          "end_line": 12
+        },
+        {
+          "path": "AGENTS.md",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "merger",
+      "type": "backend",
+      "label": "Tracker writers",
+      "sublabel": "merge-tracker.mjs, set-status.mjs",
+      "tag": "only write path",
+      "pos": [
+        540,
+        520
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "merge-tracker.mjs",
+          "line": 333,
+          "end_line": 346
+        },
+        {
+          "path": "set-status.mjs",
+          "line": 4,
+          "end_line": 8
+        }
+      ]
+    },
+    {
+      "id": "tracker",
+      "type": "database",
+      "label": "Applications tracker",
+      "sublabel": "data/applications.md",
+      "pos": [
+        790,
+        680
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "path-resolver.mjs",
+          "line": 244
+        },
+        {
+          "path": "set-status.mjs",
+          "line": 6,
+          "end_line": 8
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web UI",
+      "sublabel": "web/ Next.js, local-first view",
+      "pos": [
+        290,
+        680
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "web/README.md",
+          "line": 3,
+          "end_line": 6
+        },
+        {
+          "path": "web/src/lib/core-cli.ts",
+          "line": 31,
+          "end_line": 35
+        },
+        {
+          "path": "web/src/lib/claude-invocation.mjs",
+          "line": 26,
+          "end_line": 30
+        }
+      ]
+    },
+    {
+      "id": "tui",
+      "type": "frontend",
+      "label": "Dashboard TUI",
+      "sublabel": "dashboard/ Go, Bubble Tea",
+      "pos": [
+        540,
+        840
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "dashboard/main.go",
+          "line": 1,
+          "end_line": 27
+        }
+      ]
+    },
+    {
+      "id": "publish",
+      "type": "backend",
+      "label": "Publish share service",
+      "sublabel": "publish/server.mjs, SQLite",
+      "tag": "own pod",
+      "pos": [
+        290,
+        840
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "publish/server.mjs",
+          "line": 1,
+          "end_line": 21
+        },
+        {
+          "path": "publish/db.mjs",
+          "line": 1,
+          "end_line": 15
+        },
+        {
+          "path": "publish/README.md",
+          "line": 3,
+          "end_line": 5
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Data root (CAREER_OPS_ROOT): user layer, never auto-updated",
+      "wraps": [
+        "inbox",
+        "userlayer",
+        "artifacts",
+        "tracker"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "career-ops checkout: system layer, replaced on update",
+      "wraps": [
+        "scanner",
+        "evaluator",
+        "merger",
+        "web",
+        "tui",
+        "publish"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Separate trust domain: API keys, Better Auth, CSP",
+      "wraps": [
+        "publish"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "boards-to-scanner",
+      "from": "boards",
+      "to": "scanner",
+      "label": "fetch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "scanner-to-inbox",
+      "from": "scanner",
+      "to": "inbox",
+      "label": "append new URLs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "inbox-to-evaluator",
+      "from": "inbox",
+      "to": "evaluator",
+      "label": "next pending URL",
+      "variant": "emphasis"
+    },
+    {
+      "id": "evaluator-to-model",
+      "from": "evaluator",
+      "to": "model",
+      "label": "prompts",
+      "variant": "dashed"
+    },
+    {
+      "id": "evaluator-reads-facts",
+      "from": "evaluator",
+      "to": "userlayer",
+      "label": "reads"
+    },
+    {
+      "id": "evaluator-to-artifacts",
+      "from": "evaluator",
+      "to": "artifacts",
+      "label": "writes report + TSV",
+      "variant": "emphasis"
+    },
+    {
+      "id": "artifacts-to-merger",
+      "from": "artifacts",
+      "to": "merger",
+      "label": "merge TSVs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "merger-to-tracker",
+      "from": "merger",
+      "to": "tracker",
+      "label": "locked atomic write",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-reads-tracker",
+      "from": "web",
+      "to": "tracker",
+      "label": "reads"
+    },
+    {
+      "id": "web-to-merger",
+      "from": "web",
+      "to": "merger",
+      "label": "set-status"
+    },
+    {
+      "id": "web-spawns-worker",
+      "from": "web",
+      "to": "evaluator",
+      "label": "spawns scoped claude -p",
+      "variant": "security"
+    },
+    {
+      "id": "tracker-to-tui",
+      "from": "tracker",
+      "to": "tui",
+      "label": "reads"
+    },
+    {
+      "id": "web-to-publish",
+      "from": "web",
+      "to": "publish",
+      "label": "upload HTML (x-api-key)",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Trust boundaries",
+      "items": [
+        "Data Contract: user layer under the data root is never auto-updated; system layer in the checkout is replaced by updates (AGENTS.md L9-14)",
+        "Postings, company pages and recruiter email are data, never instructions (AGENTS.md L67)",
+        "Headless workers never get more write power than the web grants the same kind: WRITE_CAPABLE_TOOLS deny lists, pdf has no Bash (AGENTS.md L600)",
+        "Publish pages carry default-src 'none' CSP, no-store, noindex; owner routes need an x-api-key with share:upload or share:manage"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "External dependencies",
+      "items": [
+        "AI coding CLI as the agent runtime: claude -p by default; codex, pi, opencode, gemini, qwen, grok supported",
+        "Model by spend_tier: economy Haiku 5.5, standard Sonnet 5.5, premium Opus 5.5",
+        "Playwright Chromium for PDF rendering (generate-pdf.mjs) and the liveness browser fallback",
+        "Node 22.13+ for the core, 22.16+ for publish (node:sqlite); Go for the TUI",
+        "Publish auth: Better Auth with API keys, sign-in through Pocket ID"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Paths not drawn",
+      "items": [
+        "PDF: the worker runs generate-pdf.mjs, which writes output/*.pdf and data/pdf-index.tsv",
+        "Liveness gate before evaluation: check-liveness.mjs tries public ATS APIs first, Playwright only when they return nothing",
+        "Share CLI publish/share.mjs uploads a render and pulls reviewer comments into data/share-feedback/",
+        "Scheduled scans: a CronJob POSTs /api/scheduler on the web pod, which runs web/scripts/scheduled-jobs-runner.mjs",
+        "Report numbers are reserved through reserve-report-num.mjs before parallel workers start"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Deployment (this fork)",
+      "items": [
+        "Web pod runs deploy/Dockerfile with CAREER_OPS_ROOT=/data on a persistent volume and readOnlyRootFilesystem",
+        "Publish is a second pod with its own image and one SQLite file",
+        "Every push to main rebuilds the image; Renovate moves the cluster pin",
+        "Workers spawned by the web pod use the data root as cwd and never load the checkout's CLAUDE.md or AGENTS.md"
+      ]
+    }
+  ]
+}

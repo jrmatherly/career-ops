@@ -3,6 +3,18 @@
 This file describes the runtime flows. Design principles and the
 system/user data-contract layers live in [../ARCHITECTURE.md](../ARCHITECTURE.md).
 
+## Runtime Architecture (this fork)
+
+<p align="center"><img src="architecture-runtime.svg" alt="Runtime architecture: job boards and ATS APIs feed the zero-token portal scanner (scan.mjs and providers/), which appends new URLs to the pipeline inbox (data/pipeline.md and scan-history.tsv). The evaluation worker (modes/oferta.md, batch-runner.sh, an AI CLI agent) takes the next pending URL, reads the candidate facts (cv.md, profile.yml, _profile.md), prompts the Claude model API through claude -p, and writes a report and a tracker TSV (reports/ and batch/tracker-additions/). The tracker writers (merge-tracker.mjs and set-status.mjs) are the only write path into the applications tracker (data/applications.md), with a locked atomic write. The web UI (Next.js) and the dashboard TUI (Go) read the tracker; the web UI changes status through set-status and spawns scoped claude -p workers; it uploads rendered HTML to the publish share service with an API key. Two regions mark ownership: the data root (user layer, never auto-updated) and the career-ops checkout (system layer, replaced on update); the publish service is its own trust domain." width="760"></p>
+
+One SVG, dark by default, switching to light on `prefers-color-scheme: light`;
+the fonts are embedded, so it renders the same anywhere an image does. It is
+exported from Archify (the `archify` CLI, v3.2.0) and is not
+produced by `.github/scripts/architecture-diagrams.mjs`. To change it, edit
+`architecture-runtime.archify.json` (every component carries source references
+pinned to the commit in `meta.repository`), run the Archify `finalize` command
+on it, and export the SVG again from the rendered page.
+
 ## System Overview
 
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="architecture-system-overview-dark.svg"><img src="architecture-system-overview-light.svg" alt="System overview: an AI coding CLI agent reads AGENTS.md and modes/*.md and runs one of three flows. Single evaluation (modes/auto-pipeline.md) goes straight to output. Portal scan (scan.mjs and modes/scan.md) fills the URL inbox, data/pipeline.md, which pipeline mode then evaluates. Batch processing (batch/batch-runner.sh) runs N headless workers, one per offer: claude -p workers run in parallel, other CLIs one offer at a time. All three feed the output pipeline: a report (reports/NNN-*.md, the A-H evaluation), a PDF (generate-pdf.mjs, HTML through Playwright) and a tracker TSV (batch/tracker-additions/, merged by merge-tracker.mjs) into the canonical tracker, data/applications.md." width="760"></picture></p>

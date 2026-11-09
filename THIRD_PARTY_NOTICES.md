@@ -60,3 +60,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## JetBrains Mono
+
+- Source: https://github.com/JetBrains/JetBrainsMono
+- Licence: SIL Open Font License, Version 1.1, copyright 2020 The JetBrains Mono Project Authors.
+- Where: `docs/architecture-runtime.svg` embeds six variable WOFF2 subsets (Google Fonts service revision v24) as data URIs, so the diagram renders with its own font anywhere an image does. The SVG's leading comment carries the subset hashes and the full licence text; nothing else in this repository uses the font.
