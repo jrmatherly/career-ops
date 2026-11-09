@@ -164,3 +164,14 @@ for (const careers_url of ['https://evil.example/', 'http://dynamitejobs.com/', 
   try { mod.parseSitemap(urlset([`${jobLoc('exampleco', 'ai-engineer')}/`, 'https://dynamitejobs.com/company/ExampleCo/remote-job/AI_Engineer'])); } catch (err) { drift = err.message; }
   check(/URL scheme changed/.test(drift), '/remote-job/ URLs none of which parse throw instead of reading as an empty board', drift);
 }
+
+{
+  const err403 = Object.assign(new Error('HTTP 403'), { status: 403, body: 'Forbidden' });
+  const { ctx } = stubCtx((url, n) => {
+    if (url === SITEMAP) return many(3);
+    if (n % 2 === 0) throw err403;
+    return '<html>no json-ld</html>';
+  });
+  const { error } = await captureStderr(() => provider.fetch(ENTRY, ctx));
+  check(/all 3 posting pages/.test(error?.message ?? ''), 'every posting page failing throws naming the count instead of returning []', error?.message);
+}

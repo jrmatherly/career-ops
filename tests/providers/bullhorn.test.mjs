@@ -196,3 +196,19 @@ for (const [label, service] of [
   try { await bullhorn.fetch(entry(), { ...ctx, maxPages: 1 }); } catch (e) { got = e; }
   check(got === sentinel, 'a fetch rejection while probing propagates unwrapped');
 }
+
+{
+  const renamed = rows(0, 3).map(({ title, ...r }) => ({ ...r, Title: title }));
+  const { ctx } = stubCtx({ page: () => ({ total: 3, data: renamed }) });
+  const msg = await rejects(() => bullhorn.fetch(entry(), ctx));
+  check(/3 JobOrder rows/.test(msg) && /title/.test(msg), 'page 1 with rows present and none parsed throws naming the count and the field');
+}
+
+for (const [label, body] of [
+  ['data missing', { total: 2000 }],
+  ['rows present and none parsed', { total: 2000, data: rows(500, 500).map(({ title, ...r }) => r) }],
+]) {
+  const { ctx } = stubCtx({ page: (start) => (start === 0 ? { total: 2000, data: rows(0, 500) } : body) });
+  const { value: jobs, lines } = await captureStderr(() => bullhorn.fetch(entry(), ctx));
+  check(jobs.length === 500 && lines.some((l) => /page 2/.test(l) && /keeping 500/.test(l)), `a page-2 body with ${label} warns and keeps page 1`);
+}

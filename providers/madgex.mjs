@@ -97,7 +97,8 @@ function employerSplit(rawTitle, lines) {
 /**
  * Parse one Madgex `/jobsrss/` page. Exported for unit tests.
  *
- * `<title>` is "Employer: Job title" (split on the first ": "), and the last
+ * `<title>` is "Employer: Job title", split at the ": " whose prefix matches the
+ * description's employer line (else the first ": "), and the last
  * line of `<description>` is the location.
  *
  * @param {string} xml
@@ -176,7 +177,14 @@ export default {
           break;
         }
         const rawCount = (xml.match(/<item\b/gi) || []).length;
-        for (const job of parseMadgexFeed(xml, host)) {
+        const parsed = parseMadgexFeed(xml, host);
+        if (rawCount > 0 && parsed.length === 0) {
+          const msg = `madgex: ${entry?.name || host} "${keyword}" page ${page} has ${rawCount} <item> rows but none parsed (each needs a <title> and a <link> on ${host}); the feed markup may have changed`;
+          if (page === 1) throw new Error(msg);
+          console.error(`⚠️  ${msg} — keeping the pages already read`);
+          break;
+        }
+        for (const job of parsed) {
           if (!byUrl.has(job.url)) byUrl.set(job.url, job);
         }
         if (rawCount < PAGE_SIZE) break;

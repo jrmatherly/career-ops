@@ -12,8 +12,8 @@ import { safeEncodeURIComponent } from './_safe-url.mjs';
 //
 // The Algolia app id, search key and jobs index name are public but belong to
 // the site's build, so they are read from the board page's
-// `window.__NUXT__.config` block on every run, never hard-coded (D2; the
-// techinasia.mjs precedent). The key is referer-gated, so each query sends the
+// `window.__NUXT__.config` block on every run and never stored, so a rotated
+// key needs no release (the techinasia.mjs precedent). The key is referer-gated, so each query sends the
 // board's Referer.
 //
 // Measured 2026-11-08: `posted_at` is epoch SECONDS (1793923500 is
@@ -28,7 +28,8 @@ import { safeEncodeURIComponent } from './_safe-url.mjs';
 // `url_external` links were shared by 23 postings, so an employer link is the
 // job URL only when one posting owns it (the techinasia.mjs rule, since the URL
 // is the dedup key); otherwise the board's own `?jobPk={post_pk}` page.
-// `closes_at` is not read (D6).
+// `closes_at` is not mapped: the fork has not taken upstream's close-date
+// change, so Job has no field for it yet.
 
 const BOARD_ORIGIN = 'https://jobs.80000hours.org';
 const ALGOLIA_HOST_RE = /^[a-z0-9]+-dsn\.algolia\.net$/;
@@ -139,10 +140,11 @@ export default {
     /** @type {Map<string, any>} */
     const byId = new Map();
     let requests = 0;
-    // One query walked page by page; returns whether it reached every hit it counts.
+    // One query walked page by page. Returns { received, nbHits } so the caller
+    // can tell whether it reached every hit the index counts.
     const walk = async (filters) => {
       let received = 0;
-      let nbHits = 0;
+      let nbHits = NaN;
       for (let page = 0; page < maxPages; page++) {
         if (requests++ > 0) await sleep(INTER_PAGE_DELAY_MS, ctx);
         const json = await fetchJsonWithRetry(ctx, endpoint, {
@@ -156,12 +158,18 @@ export default {
           const got = json && typeof json === 'object' ? Object.keys(json).join(', ') : typeof json;
           throw new Error(`eightythousandhours: unexpected response — expected hits[], got: [${got}]`);
         }
+        nbHits = Number.isFinite(json.nbHits) ? json.nbHits : NaN;
+        if (hits.length > 0 && parseAlgoliaHits(hits).length === 0) {
+          const msg = `eightythousandhours: ${filters ? `"${filters}" ` : ''}page ${page + 1} has ${hits.length} hits but none parsed (each needs a title and a post_pk); the index shape may have changed`;
+          if (page === 0 && !filters) throw new Error(msg);
+          console.error(`⚠️  ${msg} — keeping the ${byId.size} postings already read`);
+          break;
+        }
         for (const hit of hits) {
           const key = String(hit?.objectID ?? hit?.post_pk ?? '');
           if (key && !byId.has(key)) byId.set(key, hit);
         }
         received += hits.length;
-        nbHits = Number(json.nbHits) || 0;
         if (hits.length === 0 || page + 1 >= Number(json.nbPages)) break;
         if (page === maxPages - 1 && !probing) {
           console.error(`⚠️  eightythousandhours: stopped at max_pages ${maxPages} with pages left — raise max_pages on this entry`);
@@ -170,12 +178,15 @@ export default {
       return { received, nbHits };
     };
 
+    const noCount = (what) => console.error(`⚠️  eightythousandhours: ${what} answered no numeric nbHits, so the 1,000-hit window check could not run — postings past the window may be missing`);
     const all = await walk('');
+    if (!probing && !Number.isFinite(all.nbHits)) noCount('the index query');
     if (!probing && all.received < all.nbHits) {
       for (const filters of PARTITIONS) {
         try {
           const part = await walk(filters);
-          if (part.received < part.nbHits) {
+          if (!Number.isFinite(part.nbHits)) noCount(`"${filters}"`);
+          else if (part.received < part.nbHits) {
             console.error(`⚠️  eightythousandhours: "${filters}" holds ${part.nbHits} postings but the search window served ${part.received} — the rest are not reachable`);
           }
         } catch (err) {

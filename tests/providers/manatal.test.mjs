@@ -139,3 +139,22 @@ for (const [label, url] of [['off-host', 'https://evil.example/acme'], ['non-htt
   try { await manatal.fetch(entry(), { ...stubCtx(() => sentinel).ctx, maxPages: 1 }); } catch (e) { got = e; }
   check(got === sentinel, 'a fetch rejection while probing propagates unwrapped');
 }
+
+const renamedPage = (start, n, more) => {
+  const body = pageOf(start, n, more);
+  return { ...body, results: body.results.map(({ position_name, ...r }) => ({ ...r, name: position_name })) };
+};
+
+{
+  const msg = await rejects(() => manatal.fetch(entry(), stubCtx(() => renamedPage(1, 3, false)).ctx));
+  check(/3 results rows/.test(msg) && /position_name/.test(msg), 'page 1 with rows present and none parsed throws naming the count and the field');
+}
+
+for (const [label, body] of [
+  ['results missing', { count: 999, next: null }],
+  ['rows present and none parsed', renamedPage(21, 20, false)],
+]) {
+  const { ctx } = stubCtx((page) => (page === 1 ? pageOf(1, 20, true) : body));
+  const { value: jobs, lines } = await captureStderr(() => manatal.fetch(entry(), ctx));
+  check(jobs.length === 20 && lines.some((l) => /page 2/.test(l) && /keeping 20/.test(l)), `a page-2 body with ${label} warns and keeps page 1`);
+}

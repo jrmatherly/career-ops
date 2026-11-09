@@ -203,3 +203,18 @@ for (const [label, e] of [
     else process.env.CAREER_OPS_PROFILE = before;
   }
 }
+
+{
+  const offHost = fullPage(1).replaceAll('https://jobs.chronicle.com/job/', 'https://elsewhere.example/job/');
+  const { ctx } = stubCtx(() => offHost);
+  let msg = '';
+  try { await madgex.fetch(entry(), ctx); } catch (e) { msg = e.message; }
+  check(/20 <item> rows/.test(msg) && /<link>/.test(msg), 'page 1 with rows present and none parsed throws naming the count and the field');
+}
+
+{
+  const renamed = fullPage(21).replaceAll('<title>', '<name>').replaceAll('</title>', '</name>');
+  const { ctx } = stubCtx((page) => (page === 1 ? fullPage(1) : renamed));
+  const { value: jobs, lines } = await captureStderr(() => madgex.fetch(entry(), ctx));
+  check(jobs.length === 20 && lines.some((l) => /none parsed/.test(l) && /keeping the pages/.test(l)), 'a later page with rows present and none parsed warns and keeps page 1');
+}

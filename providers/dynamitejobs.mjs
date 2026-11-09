@@ -16,11 +16,15 @@
 //
 // The sitemap only gives a slug, so a real title, employer, date and location
 // need the posting page. Detail fetches run only for rows the scan's title
-// filter keeps (`ctx.titleWanted`), capped by `detailLimit`:
+// filter keeps (`ctx.titleWanted`; without it every row is fetched), capped
+// by `detailLimit`:
 //
 //   dynamitejobs: { detailLimit: 200 }   # 1..1000
 //
-// A health probe (`ctx.maxPages`) reads the sitemap alone.
+// A health probe (`ctx.maxPages`) reads the sitemap alone. The flat sitemap's
+// round 500 posting URLs may be a cap rather than the whole board (unverified).
+// When every posting page read fails the fetch throws; a partial failure
+// drops those rows with a warning.
 
 import { intInRange } from './_config-utils.mjs';
 import { decodeEntities } from './_html-entities.mjs';
@@ -159,6 +163,9 @@ export default {
         if (detail.postedAt !== undefined) job.postedAt = detail.postedAt;
         if (detail.description) job.description = detail.description;
       }));
+    }
+    if (failed.size > 0 && failed.size === candidates.length) {
+      throw new Error(`dynamitejobs: ${name}: all ${candidates.length} posting pages failed to load or carried no JobPosting; the board may be blocking reads or its markup changed`);
     }
     if (failed.size > 0) {
       console.error(`⚠️  dynamitejobs: ${name}: dropped ${failed.size} posting(s) whose page could not be read`);

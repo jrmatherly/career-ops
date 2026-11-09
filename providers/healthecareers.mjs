@@ -10,10 +10,9 @@
 // Measured on 2026-11-08 with curl: `https://www.healthecareers.com/search-jobs`
 // is server-rendered HTML, no key, cookie or challenge, 25 cards a page, and
 // `?pg=N` pages the whole board (page 883 was the last non-empty one, so about
-// 22,000 postings). `?pg=1` answers 301, so page one is the bare path. robots.txt
-// disallows `/searchjobs/` and `/new-search-jobs/` under `User-agent: *` and
-// allows `/search-jobs/`; this provider only ever requests `/search-jobs` and,
-// with `fetchDetails`, `/job/{slug}/{id}` pages. Every sampled card named its
+// 22,000 postings). `?pg=1` answers 301, so page one is the bare path. This
+// provider only ever requests `/search-jobs` and, with `fetchDetails`,
+// `/job/{slug}/{id}` pages. Every sampled card named its
 // employer; no backfill from other boards was seen (docs/SOURCE_INDEXING_LOG.md).
 //
 // Optional enrichment, off by default and skipped under a health probe:
@@ -220,8 +219,7 @@ export default {
   async fetch(entry, ctx) {
     assertEntryUrl(entry);
     const probing = Number.isInteger(ctx?.maxPages) && ctx.maxPages > 0;
-    const v = entry?.max_pages;
-    const entryMax = Number.isInteger(v) && v > 0 ? Math.min(v, MAX_PAGES_CAP) : DEFAULT_MAX_PAGES;
+    const entryMax = intInRange(entry?.max_pages, DEFAULT_MAX_PAGES, 1, MAX_PAGES_CAP);
     const maxPages = probing ? Math.min(entryMax, ctx.maxPages) : entryMax;
 
     /** @type {Job[]} */
@@ -259,6 +257,9 @@ export default {
         jobs.push(job);
       }
       if (page === 1) pageSize = rawCards;
+      if (jobs.length === before && rawCards >= pageSize && page < maxPages) {
+        console.error(`⚠️  healthecareers: ${entry?.name || 'Health eCareers'} page ${page} added no new posting; ?pg paging may have changed, keeping ${jobs.length} jobs`);
+      }
       if (jobs.length === before || rawCards < pageSize) break;
       if (page === maxPages && !probing) {
         console.error(`⚠️  healthecareers: ${entry?.name || 'Health eCareers'} truncated at max_pages=${maxPages} (${jobs.length} jobs); raise max_pages on this entry for more`);
@@ -268,16 +269,25 @@ export default {
     const cfg = entry?.healthecareers || {};
     if (cfg.fetchDetails !== true || probing) return jobs;
     const candidates = jobs.slice(0, intInRange(cfg.detailLimit, 25, 1, 100));
+    // Enrichment is best-effort: a row whose page fails keeps its card fields.
+    let failed = 0;
+    let challenged = 0;
     for (let i = 0; i < candidates.length; i += DETAIL_BATCH) {
       if (i > 0) await sleep(DETAIL_PACE_MS, ctx);
       await Promise.all(candidates.slice(i, i + DETAIL_BATCH).map(async (job) => {
+        let html;
         try {
-          const detail = parseDetailPage(await fetchTextWithRetry(ctx, job.url, { redirect: 'error' }));
-          Object.assign(job, detail);
+          html = await fetchTextWithRetry(ctx, job.url, { redirect: 'error' });
         } catch {
-          // Enrichment is best-effort: the listing row stands as parsed.
+          failed += 1;
+          return;
         }
+        if (CHALLENGE_RE.test(html)) challenged += 1;
+        else Object.assign(job, parseDetailPage(html));
       }));
+    }
+    if (failed || challenged) {
+      console.error(`⚠️  healthecareers: ${entry?.name || 'Health eCareers'} detail enrichment skipped ${failed} posting page(s) that failed to load and ${challenged} that answered a bot-challenge page, of ${candidates.length}; those rows keep their card fields`);
     }
     return jobs;
   },

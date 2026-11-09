@@ -136,7 +136,7 @@ for (const careers_url of ['https://evil.example/search-jobs', 'http://www.healt
 
 {
   const err503 = Object.assign(new Error('HTTP 503'), { status: 503 });
-  const { ctx } = stubCtx((url) => { if (url.includes('pg=2')) throw err503; return fullPage(1); });
+  const { ctx } = stubCtx((url) => { if (url.includes('pg=2')) throw err404; return fullPage(1); });
   const { result, lines } = await captureStderr(() => provider.fetch({ name: 'HEC', provider: 'healthecareers' }, ctx));
   check(result?.length === 25, 'a page-two 5xx that retry cannot clear keeps page one', result?.length);
   check(lines.some((l) => /stopped at page 2/.test(l)) && !lines.some((l) => /raise max_pages/.test(l)),
@@ -190,4 +190,33 @@ for (const careers_url of ['https://evil.example/search-jobs', 'http://www.healt
   const small = stubCtx((url) => page(Array.from({ length: 20 }, (_, i) => card(Number(url.split('pg=')[1] || 1) * 100 + i))));
   const { result } = await captureStderr(() => provider.fetch({ name: 'HEC', provider: 'healthecareers', max_pages: 3 }, small.ctx));
   check(small.calls.length === 3 && result?.length === 60, "the short-page stop keys off page one's card count, not a fixed 25", small.calls.length);
+}
+
+{
+  const err404 = Object.assign(new Error('HTTP 404'), { status: 404 });
+  const { ctx } = stubCtx((url) => {
+    if (url.includes('/job/')) {
+      if (url.endsWith('/101')) throw err404;
+      if (url.endsWith('/102') || url.endsWith('/103')) return CHALLENGE;
+      return '<p>no json-ld</p>';
+    }
+    return url.includes('pg=') ? EMPTY_PAGE : fullPage(1);
+  });
+  const { result, lines } = await captureStderr(() => provider.fetch({ name: 'HEC', provider: 'healthecareers', healthecareers: { fetchDetails: true, detailLimit: 5 } }, ctx));
+  const warned = lines.filter((l) => /detail/.test(l));
+  check(result?.length === 25 && warned.length === 1 && /1 posting page/.test(warned[0]) && /2 .*bot-challenge/.test(warned[0]),
+    'dead enrichment warns once naming the failure and challenge counts', lines);
+}
+
+{
+  const { ctx, calls } = stubCtx(() => fullPage(1));
+  const { result, lines } = await captureStderr(() => provider.fetch({ name: 'HEC', provider: 'healthecareers' }, ctx));
+  check(calls.length === 2 && result?.length === 25 && lines.some((l) => /page 2 added no new posting/.test(l)),
+    'a full page below max_pages that repeats page one warns and stops', lines);
+}
+
+{
+  const { ctx, calls } = stubCtx((url) => fullPage(Number(url.split('pg=')[1] || 1)));
+  await captureStderr(() => provider.fetch({ name: 'HEC', provider: 'healthecareers', max_pages: '50' }, ctx));
+  check(calls.length === 50, 'max_pages: "50" is read as 50 pages, as other providers read it', calls.length);
 }

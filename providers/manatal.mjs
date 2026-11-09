@@ -97,11 +97,16 @@ export default {
         break;
       }
       const rows = json && Array.isArray(json.results) ? json.results : null;
-      if (!rows) {
-        const got = json && typeof json === 'object' ? Object.keys(json).join(', ') : typeof json;
-        throw new Error(`manatal: unexpected response — expected results[], got: [${got}]`);
+      const parsed = rows ? parseManatalJobs(rows, slug, company) : [];
+      const problem = !rows ? `unexpected response — expected results[], got: [${json && typeof json === 'object' ? Object.keys(json).join(', ') : typeof json}]`
+        : rows.length > 0 && parsed.length === 0 ? `${rows.length} results rows but none parsed (each needs a position_name and a hash); the response shape may have changed`
+          : '';
+      if (problem) {
+        if (probing || page === 1) throw new Error(`manatal: ${problem}`);
+        console.error(`⚠️  manatal: ${company} page ${page}: ${problem} — keeping ${jobs.length} postings`);
+        break;
       }
-      for (const job of parseManatalJobs(rows, slug, company)) {
+      for (const job of parsed) {
         // A posting added mid-walk shifts rows onto the next page.
         if (!seen.has(job.url)) { seen.add(job.url); jobs.push(job); }
       }

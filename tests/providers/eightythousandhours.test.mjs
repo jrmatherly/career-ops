@@ -189,3 +189,40 @@ for (const [label, e] of [
   const msg = await rejects(() => eh.fetch(entry(), stubCtx(() => err).ctx));
   check(/403/.test(msg), 'an index failure fails loud rather than returning a partial board');
 }
+
+const untitled = (n) => { const { title, ...h } = hit(n); return h; };
+
+{
+  const msg = await rejects(() => eh.fetch(entry(), stubCtx(() => ({ hits: [untitled(1), untitled(2), untitled(3)], nbHits: 3, nbPages: 1 })).ctx));
+  check(/3 hits/.test(msg) && /title/.test(msg) && /post_pk/.test(msg), 'page 1 with hits present and none parsed throws naming the count and the fields');
+}
+
+{
+  const { ctx } = stubCtx(({ page, filters }) => {
+    if (filters) return { hits: [], nbHits: 0, nbPages: 0 };
+    return page === 0 ? { hits: [hit(1), hit(2)], nbHits: 4, nbPages: 2 } : { hits: [untitled(3), untitled(4)], nbHits: 4, nbPages: 2 };
+  });
+  const { value: jobs, lines } = await captureStderr(() => eh.fetch(entry(), ctx));
+  check(jobs.length === 2 && lines.some((l) => /none parsed/.test(l)), 'a later page with hits present and none parsed warns and keeps the hits already read');
+}
+
+{
+  const { ctx, calls } = stubCtx(() => ({ hits: [hit(1)], nbPages: 1 }));
+  const { value: jobs, lines } = await captureStderr(() => eh.fetch(entry(), ctx));
+  check(jobs.length === 1 && queries(calls).length === 1 && lines.some((l) => /nbHits/.test(l) && /window check could not run/.test(l)), 'a response without nbHits warns that the window check could not run');
+}
+
+for (const [label, field, value] of [
+  ['an app id with a host fragment', 'algoliaApplicationId', 'evil.example#'],
+  ['an app id with a path', 'algoliaApplicationId', 'a/../b'],
+  ['an index name with a slash', 'algoliaJobsIndex', 'jobs/../keys'],
+  ['an index name with a query', 'algoliaJobsIndex', 'jobs?x=1'],
+  ['a key with a slash', 'algoliaApiKey', `${KEY}/x`],
+  ['a key with a query', 'algoliaApiKey', `${KEY}?x=1`],
+]) {
+  const hostile = PAGE.replace(new RegExp(`${field}:"[^"]*"`), `${field}:"${value}"`);
+  const { ctx, calls } = stubCtx(() => ({ hits: [hit(1)], nbHits: 1, nbPages: 1 }));
+  ctx.fetchText = async (url, opts) => { calls.push({ url, opts }); return hostile; };
+  const msg = await rejects(() => eh.fetch(entry(), ctx));
+  check(msg.includes(field) && queries(calls).length === 0, `a page config with ${label} throws before any POST`);
+}

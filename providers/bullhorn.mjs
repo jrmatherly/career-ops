@@ -18,7 +18,8 @@ import { safeEncodeURIComponent } from './_safe-url.mjs';
 //
 // Configure as a `tracked_companies:` entry, one per agency, with
 // `provider: bullhorn` and the portal's https `careers_url` (explicit-only: the
-// hosts are branded). `company` is the entry's name, the agency (D4).
+// hosts are branded). `company` is the entry's name: the agency, which rule 2
+// of the Source Indexing Policy accepts as the company.
 // Optional `bullhorn: { swimlane, corpToken }` skips the app.json lookup.
 //
 // Measured 2026-11-08 on a live tenant: `address` and `publishedCategory` come
@@ -183,11 +184,16 @@ export default {
         break;
       }
       const rows = json && Array.isArray(json.data) ? json.data : null;
-      if (!rows) {
-        const got = json && typeof json === 'object' ? Object.keys(json).join(', ') : typeof json;
-        throw new Error(`bullhorn: unexpected response — expected data[], got: [${got}]`);
+      const parsed = rows ? parseBullhornJobs(rows, origin, company) : [];
+      const problem = !rows ? `unexpected response — expected data[], got: [${json && typeof json === 'object' ? Object.keys(json).join(', ') : typeof json}]`
+        : rows.length > 0 && parsed.length === 0 ? `${rows.length} JobOrder rows but none parsed (each needs a title and an id); the response shape may have changed`
+          : '';
+      if (problem) {
+        if (probing || page === 0) throw new Error(`bullhorn: ${problem}`);
+        console.error(`⚠️  bullhorn: ${company} page ${page + 1}: ${problem} — keeping ${jobs.length} postings`);
+        break;
       }
-      jobs.push(...parseBullhornJobs(rows, origin, company));
+      jobs.push(...parsed);
       start += rows.length;
       const total = Number(json.total);
       if (rows.length === 0 || (Number.isFinite(total) ? start >= total : rows.length < PAGE_SIZE)) break;
