@@ -9,7 +9,7 @@
 //    and keep the leading dot on a suffix test (`endsWith('vendordomain.com')`
 //    also accepts `evilvendordomain.com`)"
 //
-// All 105 providers comply today — measured before writing this, so it is a
+// Every provider complied when this was written (measured first), so it is a
 // ratchet rather than a backlog. What was missing is anything that keeps them
 // complying. The only existing SSRF test, tests/providers/ats-ssrf-hardening.
 // test.mjs, covers two providers BY NAME ("these two were missing it") as a

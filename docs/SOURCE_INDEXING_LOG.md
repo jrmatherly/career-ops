@@ -6,7 +6,7 @@ Two things this log deliberately is not: a ranking, and a promise. Rule 4 says i
 
 **How to read an entry.** "Verified" means someone ran a command and reported the output, not that a claim was accepted. Where a check could only be done against a live endpoint, the entry says what was sampled and when, because live checks expire: a source that passed in August can drift in November, and re-verification is normal rather than an accusation.
 
-**Adding an entry.** A source is logged when its provider merges. Anyone can open a [source proposal](https://github.com/santifer/career-ops/issues/new?template=source-proposal.yml); the discussion happens in the issue and the PR, and this file is the durable summary with links back to both.
+**Adding an entry.** A source is logged when its provider merges. Anyone can open a [source proposal](https://github.com/career-ops-hq/career-ops/issues/new?template=source-proposal.yml); the discussion happens in the issue and the PR, and this file is the durable summary with links back to both.
 
 ---
 

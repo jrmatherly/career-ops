@@ -18,16 +18,17 @@
 //
 // The same thing one layer down — the provider module itself vanishing — had
 // nothing watching it. The existing tests assert `providers.size > 0`, which
-// catches an empty registry and not the loss of one provider out of 105: size
-// becomes 104, stays > 0, and every assertion passes.
+// catches an empty registry and not the loss of one provider: size drops by
+// one, stays > 0, and every assertion passes.
 //
-// All 105 load today with no warnings, measured, so this is a ratchet.
+// Every provider loaded with no warnings when this was written, measured, so
+// this is a ratchet.
 //
 // Review (#4981) found the first version of this file blind to the very case
 // its title names, and both gaps are now covered here:
 //
 //   - A misspelled id VALUE sailed through. `id: 'greenhous'` still loads, the
-//     count stays at 105 and no warning is printed, so every assertion passed
+//     count stays the same and no warning is printed, so every assertion passed
 //     while `provider: greenhouse` in portals.yml resolved to "unknown
 //     provider" and that board was skipped on every scan. Counting modules can
 //     never catch this: the module is there, it is registered under the wrong
@@ -78,7 +79,7 @@ try {
 if (providers.size === files.length) {
   pass(`all ${providers.size} providers registered`);
 } else {
-  // Name the missing ones: "104 of 105" sends the reader to diff two lists by
+  // Name the missing ones: "N-1 of N" sends the reader to diff two lists by
   // hand, which is the work this test exists to have already done.
   const registeredFiles = new Set();
   for (const p of providers.values()) {
@@ -167,7 +168,7 @@ if (declared.length === files.length) {
 // is the external pin — it is what the reader, the docs and `portals.yml`
 // entries all spell, and it does not change when someone edits the id string.
 //
-// True for all 105 today, measured, so this is a ratchet with no allowlist. A
+// True for every provider when this was written, measured, so this is a ratchet with no allowlist. A
 // provider that genuinely needs an id different from its filename is a
 // deliberate decision, and belongs here as a named exception rather than as a
 // silently loosened rule.

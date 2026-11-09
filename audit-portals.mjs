@@ -18,11 +18,14 @@
  *     coverage while contributing nothing. Talkdesk was one: its real board is
  *     Greenhouse `talkdesk2`, 48 roles, one character off the slug nobody had.
  *
- * So this script fetches each enabled board through the SAME providers/ modules
- * the scanner uses and reports the evidence — provider, posting count, and
- * sample titles/locations — next to a verdict:
+ * So this script fetches each enabled board, in tracked_companies and
+ * job_boards, through the SAME providers/ modules the scanner uses, within
+ * verify-portals' probe budget (page 1, a few requests), and reports the
+ * evidence — provider, posting count, and sample titles/locations — next to a
+ * verdict:
  *
- *   ok          board answers with a healthy number of postings
+ *   ok          board answers with a healthy number of postings, or the
+ *               request budget ran out first (partial, count unknown)
  *   small       answers, but under --small-threshold (default 5). Not an error:
  *               a quiet board and a wrong board look identical from here, which
  *               is exactly why the samples are printed.
@@ -38,10 +41,10 @@
  * as verdicts.
  *
  * Usage:
- *   node audit-portals.mjs                       # audit every enabled company
- *   node audit-portals.mjs --summary             # one line per company
+ *   node audit-portals.mjs                       # audit every enabled company and job board
+ *   node audit-portals.mjs --summary             # one line per entry
  *   node audit-portals.mjs --json                # machine-readable, for --baseline
- *   node audit-portals.mjs --company Adyen       # audit a single company
+ *   node audit-portals.mjs --company Adyen       # audit entries whose name matches
  *   node audit-portals.mjs --file <path>         # use a specific portals file
  *   node audit-portals.mjs --baseline prev.json  # flag boards that lost postings
  *   node audit-portals.mjs --small-threshold 10  # what counts as a small board
@@ -413,10 +416,10 @@ const KNOWN_FLAGS = [
 const VALUE_FLAGS = ['--company', '--file', '--baseline', '--small-threshold'];
 
 const USAGE = `Usage:
-  node audit-portals.mjs                       # audit every enabled company
-  node audit-portals.mjs --summary             # one line per company
+  node audit-portals.mjs                       # audit every enabled company and job board
+  node audit-portals.mjs --summary             # one line per entry
   node audit-portals.mjs --json                # machine-readable, for --baseline
-  node audit-portals.mjs --company Adyen       # audit a single company
+  node audit-portals.mjs --company Adyen       # audit entries whose name matches
   node audit-portals.mjs --file <path>         # use a specific portals file
   node audit-portals.mjs --baseline prev.json  # flag boards that lost postings
   node audit-portals.mjs --small-threshold 10  # what counts as a small board
