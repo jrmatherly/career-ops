@@ -37,8 +37,9 @@ import { isMainModule } from './lib/is-main-module.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 export const CANONICAL = 'https://github.com/jrmatherly/career-ops.git';
-// Every tag this gate upgrades from was cut upstream, so its embedded updater
-// fetches one of these; each must resolve to the mirror or the leg reaches the real network.
+// Tags up to career-ops-v1.39.0 were cut upstream, so their embedded updater
+// fetches one of these (fork tags, 2.x on, fetch CANONICAL); each must resolve to
+// the mirror or the leg reaches the real network.
 export const CANONICAL_LEGACY = ['https://github.com/career-ops-hq/career-ops.git', 'https://github.com/santifer/career-ops.git'];
 const GITHUB_API_HOST = 'api.github.com';
 // What apply() prints when its cross-check against the GitHub ref API gets no

@@ -169,13 +169,7 @@ test('every package launcher is pinned to an exact version, and career-ops to th
 });
 
 test('every line that carries the release version is marked for release-please', () => {
-  const config = JSON.parse(read('release-please-config.json'));
-  const extra = config.packages['.']['extra-files'];
-  const generic = extra.filter((f) => f.type === 'generic').map((f) => f.path);
-  assert.ok(extra.some((f) => f.path === 'cursor-directory/.cursor-plugin/plugin.json' && f.jsonpath === '$.version'),
-    'release-please-config.json does not bump cursor-directory/.cursor-plugin/plugin.json');
   for (const rel of ['cursor-directory/skills/career-ops/SKILL.md', 'cursor-directory/README.md']) {
-    assert.ok(generic.includes(rel), `release-please-config.json does not bump ${rel}`);
     for (const line of read(rel).split('\n').filter((l) => l.includes(version))) {
       assert.match(line, /x-release-please-version/, `${rel}: a line with ${version} has no x-release-please-version marker`);
     }

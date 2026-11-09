@@ -10,11 +10,11 @@ the core↔web data contract.
 
 - Issues are opened via `github.com/<repo>/issues/new` query params by the
   **user** (preview-then-confirm; nothing is auto-filed).
-- Labels: `web-alpha, area:web`.
+- Labels: `area:web` (`ISSUE_LABELS` in `report.ts`; the banner's similar-issue search filters on the same set).
 - Title: `[web <channel>] <first 70 chars of the user's description>`.
 - The body's last line contains the literal marker `report-format: v1`. The
   whole body is cut at 6000 characters (`issueBody` in `report.ts`), so a long
-  `## Recent errors` block can push the marker off the end; a `web-alpha` issue
+  `## Recent errors` block can push the marker off the end; an `area:web` issue
   with no marker is a truncated v1 body, not another format.
 
 ## Body sections (stable order)

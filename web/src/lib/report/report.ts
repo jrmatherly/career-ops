@@ -4,6 +4,9 @@ import { recentLogs } from "./logbuf";
  *  open here, never on upstream (career-ops-hq). */
 export const REPO = "jrmatherly/career-ops";
 
+/** Labels on every issue the reporter files; the banner's similar-issue search filters on the same set. */
+export const ISSUE_LABELS = ["area:web"];
+
 /** Strip PII / secrets that could ride in error text, paths or logs BEFORE anything
  *  leaves the machine. Defence-in-depth — the user also reviews the full payload
  *  (preview-then-confirm) before the issue opens. */
@@ -164,7 +167,7 @@ export function issueBody(d: Diag, description: string): string {
 }
 
 export function issueUrl(d: Diag, description: string): string {
-  const title = `[web ${d.channel}] ${(scrub(description) || "bug report").replace(/\s+/g, " ").trim().slice(0, 70)}`;
-  const params = new URLSearchParams({ title, body: issueBody(d, description), labels: "web-alpha,area:web" });
+  const title = `[${d.version || "web"}] ${(scrub(description) || "bug report").replace(/\s+/g, " ").trim().slice(0, 70)}`;
+  const params = new URLSearchParams({ title, body: issueBody(d, description), labels: ISSUE_LABELS.join(",") });
   return `https://github.com/${REPO}/issues/new?${params.toString()}`;
 }
