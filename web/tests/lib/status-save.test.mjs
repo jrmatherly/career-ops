@@ -1,4 +1,4 @@
-// Review Focus item 4 of docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md:
+// Review Focus item 4 of docs/superpowers/plans/completed/2026-11-06-reactive-resume-convergence.md:
 // a drop onto the same column writes nothing; a drop answered 503 with code
 // "lock-timeout" (set-status.mjs exit 4) retries three times, then reverts.
 import assert from "node:assert/strict";

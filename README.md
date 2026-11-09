@@ -102,6 +102,7 @@ LinkedIn job alerts: paste the email. No Google account. See [docs/LINKEDIN_JOBS
 ### Other ways to run it
 
 - **From any folder, as a Claude Code plugin:** [docs/CLAUDE_PLUGIN.md](docs/CLAUDE_PLUGIN.md).
+- **Coming from Reactive Resume:** import your resume and your tracker. See [docs/MIGRATING_FROM_REACTIVE_RESUME.md](docs/MIGRATING_FROM_REACTIVE_RESUME.md).
 - **Without an AI CLI:** standalone Gemini, Ollama and OpenAI-compatible scripts evaluate a JD on their own. See [docs/SCRIPTS.md](docs/SCRIPTS.md#geminieval--ollamaeval--openaieval).
 
 > **The system is designed to be customized by your AI coding CLI itself.** Modes, archetypes, scoring weights, negotiation scripts -- just ask it to change them. It reads the same files it uses, so it knows exactly what to edit.

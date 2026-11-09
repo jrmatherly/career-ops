@@ -1,5 +1,7 @@
 # Reactive Resume convergence implementation plan
 
+> **Landed:** all 20 PRs merged and PR-19 deployed to the home cluster by 2026-11-08 (trail: `../../research/2026-11-06-reactive-resume-convergence/decisions.tsv`). The user-facing migration steps live in `docs/MIGRATING_FROM_REACTIVE_RESUME.md`. The unticked boxes below are review recordings, perf baselines and operator checks that were never captured; the operator tracks their collection outside the repository.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring Reactive Resume v6's resume model, importers, Check rules, design controls, richer application tracking with a board view, DOCX export, and public share links with reviewer feedback into this career-ops fork, while every agent and script keeps reading the same markdown, TSV and YAML files.
@@ -1420,7 +1422,7 @@ Each live lane runs in its own worktree at the PR head. CLI lanes drive through 
 
 - [ ] Every box above is checked with its evidence.
 - [ ] Run the migration steps (resume import, tracker import, data root to the cluster) and retire `~/dev/job-search/tools/build_cv_md.py`, `push_tailored.py` and `rebuild_career.py` (a note in that repo's README, outside this plan).
-- [ ] Move this plan and the spec to their `completed/` folders.
+- [x] Move this plan and the spec to their `completed/` folders. (done 2026-11-08)
 - [ ] Reply to the operator with what landed, what the lanes proved, and what stays deferred.
 
 ## Appendix A. Prototype evidence

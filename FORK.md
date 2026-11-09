@@ -14,7 +14,10 @@ In short: a Claude Code harness (`.claude/`, `.githooks/`), the fork's own CI
 set (nine workflows instead of upstream's maintainer bots and release
 automation; a push that changes only documentation runs the suite on Ubuntu
 alone), a GHCR image build, and contact addresses that route reports to the
-fork owner. The product code is upstream's.
+fork owner. The product code is upstream's, plus the Reactive Resume
+convergence (resume model, editor, board, shares, publish service); a user
+arriving from Reactive Resume follows
+[`docs/MIGRATING_FROM_REACTIVE_RESUME.md`](docs/MIGRATING_FROM_REACTIVE_RESUME.md).
 
 ## How it syncs
 

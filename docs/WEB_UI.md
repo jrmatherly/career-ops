@@ -20,6 +20,8 @@ npm run ui
 
 The server starts locally on `http://127.0.0.1:3000` by default and automatically opens your browser once the server is ready.
 
+Coming from Reactive Resume? [MIGRATING_FROM_REACTIVE_RESUME.md](MIGRATING_FROM_REACTIVE_RESUME.md) imports your resume and tracker before you open the Resume and Board pages.
+
 ---
 
 ## Command-Line Options
