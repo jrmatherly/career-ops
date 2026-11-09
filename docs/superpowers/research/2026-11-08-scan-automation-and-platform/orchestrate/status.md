@@ -1,4 +1,4 @@
-# Status (derived 2026-11-09T15:47:42Z from units.tsv and ledger.tsv)
+# Status (derived 2026-11-09T16:45:43Z from units.tsv and ledger.tsv)
 
 ## Units
 id	track	state	branch	pr	sha	brief
@@ -21,5 +21,6 @@ R1	build	merged	claude/r1-rank-pass	42	5505a546	briefs/R1-r2-verify.md
 42 26d57a1b unit-test-verified
 45 20a53283 merged
 46 8a9dcc76 merged
+47 163b066a merged
 
 ## Gates open: 0
