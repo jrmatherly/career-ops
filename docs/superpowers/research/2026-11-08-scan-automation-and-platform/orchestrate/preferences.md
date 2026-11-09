@@ -1,4 +1,4 @@
-1. Repository jrmatherly/career-ops, trunk main. Plan: docs/superpowers/plans/2026-11-08-scan-automation-and-platform.md. Your PR's section of the plan is your spec; the Global constraints, Review focus and Data shapes sections bind every PR.
+1. Repository jrmatherly/career-ops, trunk main. Plan: docs/superpowers/plans/completed/2026-11-08-scan-automation-and-platform.md. Your PR's section of the plan is your spec; the Global constraints, Review focus and Data shapes sections bind every PR.
 2. Forge is gh. Never gh pr merge. The operator merges every PR. Stop at merge-ready and report head SHA, verdict receipts and PR URL.
 3. One writer per branch. Work only in your own worktree and branch. Never rebase, retarget or push another branch. Force-push only your own branch with --force-with-lease pinned to the SHA you last pushed.
 4. No headless worker gains a write tool or an auto-approve flag (AGENTS.md Headless worker permissions; tests/headless-permission-flags.test.mjs). The evaluate-text kind gets no network tool.
