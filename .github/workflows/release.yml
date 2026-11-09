@@ -45,10 +45,11 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       # GitHub marks whichever release was created LAST as "Latest", and the
-      # `web` component is created after `career-ops`. update-system.mjs
-      # resolves what to install from /releases/latest and refuses a `web-*`
-      # tag, so without this step every install would stop updating until the
-      # next root release. Runs on any release, web-only ones included.
+      # packages are released in config order (`.` then `web`), so the web
+      # release lands last. update-system.mjs resolves what to install from
+      # /releases/latest and refuses a `web-*` tag, so without this step every
+      # install would stop updating until the next root release. Runs on any
+      # release, web-only ones included.
       - name: "⬇️ Checkout"
         if: ${{ steps.release.outputs.releases_created == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

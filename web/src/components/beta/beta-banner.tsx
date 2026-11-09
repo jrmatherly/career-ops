@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bug, X, ShieldCheck, ThumbsUp, Search, Loader2 } from "lucide-react";
-import { REPO, collect, fingerprint, issueBody, issueUrl, type Diag } from "@/lib/report/report";
+import { ISSUE_LABELS, REPO, collect, fingerprint, issueBody, issueUrl, type Diag } from "@/lib/report/report";
 import { searchIssues } from "@/lib/beta/issue-search.mjs";
 import { Modal } from "@/components/ui/modal";
 import "@/lib/report/logbuf"; // install the client error ring-buffer (side-effect)
@@ -15,6 +15,7 @@ type SimilarIssue = { number: number; title: string; url: string };
 // null when it could NOT run rather than folding that into an empty array —
 // see that file for the two days of silent false negatives that cost us.
 const findSimilar = (q: string) => searchIssues(q, REPO, fetch);
+const FALLBACK_META = { version: "web", channel: "stable", sha: "" };
 
 // A small version pill (the channel joins it on a pre-release build) + a
 // one-click "Report a bug" that opens a PRE-FILLED GitHub issue. No
@@ -42,7 +43,7 @@ export function BetaBanner() {
     if (!words) return;
     setSearching(true);
     setSearchFailed(false);
-    const found = await findSimilar(`label:web-alpha ${words}`);
+    const found = await findSimilar(`${ISSUE_LABELS.map((l) => `label:${l}`).join(" ")} ${words}`);
     setSearching(false);
     // The user ASKED this question, so the user gets an answer — including
     // "I could not check". Returning the button to its resting state on a
@@ -57,10 +58,9 @@ export function BetaBanner() {
   useEffect(() => {
     fetch("/api/version")
       .then((r) => r.json())
-      .then((d) => {
-        if (d?.version) setMeta(d);
-      })
-      .catch(() => {});
+      .then((d) => setMeta(d?.version ? d : FALLBACK_META))
+      // A broken /api/version must not hide the bug reporter: that is when it is needed.
+      .catch(() => setMeta(FALLBACK_META));
   }, []);
 
   const openReport = async () => {
