@@ -115,7 +115,7 @@ If yes:
 
 If no:
 1. Run `node update-system.mjs dismiss --version {remote}`
-2. Tell the user they will be asked again when a newer release is published, and can run `/career-ops update` anytime to check again.
+2. Tell the user they will be asked again when a newer release is out, and can run `/career-ops update` anytime to check again.
 
 ## Step 5 — Rollback (if requested)
 

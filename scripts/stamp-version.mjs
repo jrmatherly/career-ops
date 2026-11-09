@@ -99,7 +99,7 @@ if (isMainModule(import.meta.url)) {
   }
   const check = args.includes('--check');
   const rootArg = args.indexOf('--root');
-  if (rootArg !== -1 && !args[rootArg + 1]) {
+  if (rootArg !== -1 && (!args[rootArg + 1] || args[rootArg + 1].startsWith('-'))) {
     console.error(USAGE);
     process.exit(2);
   }

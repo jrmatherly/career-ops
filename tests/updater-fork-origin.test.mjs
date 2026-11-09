@@ -29,16 +29,18 @@ const legacy = gate.CANONICAL_LEGACY;
 if (Array.isArray(legacy) && UPSTREAM.every((u) => legacy.includes(u))) pass('upgrade-tests CANONICAL_LEGACY still names both upstream URLs');
 else fail(`upgrade-tests CANONICAL_LEGACY must list ${UPSTREAM.join(' and ')}; got ${JSON.stringify(legacy)}`);
 
-// The product prompts must walk the channel that exists on this fork: the only
-// update-available the fork produces comes from `check --channel main`, so the
-// mode's fetch, apply and the AGENTS.md "If yes" line must all name it, and no
-// prompt may fetch a `career-ops-v{remote}` tag the fork never has.
+// The product prompts must walk the channel that exists on this fork. Since
+// 2026-11-09 the fork cuts its own `career-ops-v*` releases, so the mode fetches
+// `refs/tags/career-ops-v{remote}` from the fork, `check` and `apply` stay on
+// the default release channel, and `--channel main --confirm` (the unreleased
+// `main`) must not be what the prompts run. Before that date the fork had no
+// releases and the prompts walked `main`.
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ROOT } from './helpers.mjs';
 
 const mode = readFileSync(join(ROOT, 'modes', 'update.md'), 'utf-8');
-if (!/career-ops-hq/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/tags\/career-ops-v\{remote\}/.test(mode)) pass('modes/update.md fetches the fork\'s own release tag');
+if (!/career-ops-hq\/career-ops\.git/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/tags\/career-ops-v\{remote\}/.test(mode)) pass('modes/update.md fetches the fork\'s own release tag');
 else fail('modes/update.md does not fetch career-ops-v{remote} from jrmatherly/career-ops (the fork cuts its own releases since 2026-11-09)');
 if (/check --force/.test(mode) && /apply --confirm/.test(mode) && !/--channel main --confirm/.test(mode)) pass('modes/update.md checks and applies on the default release channel');
 else fail('modes/update.md check/apply commands are not on the default release channel');
