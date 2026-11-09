@@ -39,3 +39,7 @@ What done looks like: `plugins/usajobs/{manifest.json,index.mjs,skill.md}` and `
 - `.githooks/commit-msg.mjs` rejects a `merge` type; use `chore(<scope>)` for merge commits.
 - A review agent may read a rules file from main instead of the branch; brief verifiers to check out the head first.
 - Raw `audit-portals` / `verify-portals` output over the data-root `portals.yml` lists every tracked company; keep only counts in anything committed (the repo is public).
+
+## Close-out (2026-11-08 22:50 EST)
+
+Phase G is done: PR 44 (`claude/usajobs-plugin`) merged as `dfe5f747` with CI 25/25 green. The plan moved to `docs/superpowers/plans/completed/`. Still owed: gate `G-cluster-sync` (the pod's `portals.yml` copy) and the two commented USAJOBS lines in `.env.example`, which a `Read(**/.env.*)` deny rule in the operator's global Claude settings kept the session from writing. `open-items.md` is unchanged.

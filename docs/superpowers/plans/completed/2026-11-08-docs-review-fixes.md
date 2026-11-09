@@ -1,5 +1,7 @@
 # Docs review fixes Implementation Plan
 
+> **Landed:** PR 36 merged as `66bb4d54` on 2026-11-08, six tasks as separate commits with the three upstream-candidate batches kept cherry-pickable (trail row 2026-11-08T14:35Z in `../../research/2026-11-08-docs-review/decisions.tsv`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the career-ops docs true for the fork's container and cluster deployment, fix the claims that are wrong for every user, and pin each fix with a test where a drift guard is cheap.

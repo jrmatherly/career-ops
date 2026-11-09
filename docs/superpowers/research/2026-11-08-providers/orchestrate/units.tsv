@@ -7,3 +7,4 @@ F	build	verified	claude/providers-new-html		d76339bc	briefs/F.md
 I	landing	merged	claude/providers-program	43	602cc0bd	briefs/I.md
 I-fix1	landing	done	claude/providers-program	43	ab8d1e70	briefs/I-fix1.md
 I-fix2	landing	done	claude/providers-program	43	d3315f6a	briefs/I-fix2.md
+G	build	merged	claude/usajobs-plugin	44	dfe5f747	handoff.md

@@ -1,5 +1,7 @@
 # Providers: config fixes, upstream policy sync, retirement, drift gates, eight new sources
 
+> **Landed:** PR 43 merged as `602cc0bd` (Phases A to F; Task B3 applied in the live `portals.yml`) and PR 44 as `dfe5f747` (Phase G, `plugins/usajobs/`) on 2026-11-08. The store is `../../research/2026-11-08-providers/orchestrate/`: `open-items.md` holds the follow-ups and `gates.md` the pod sync still owed (`G-cluster-sync`).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the scanner reach every company the operator targets, bring the fork's provider policy and provider set level with upstream, retire the one dead provider, add CI gates for the three provider docs that rot silently, and add eight curl-proven US or remote sources.

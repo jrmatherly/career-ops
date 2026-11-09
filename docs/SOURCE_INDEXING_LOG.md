@@ -311,7 +311,7 @@ Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/
 
 | | |
 |---|---|
-| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E1); not affiliated with any of the three boards |
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/completed/2026-11-08-providers.md`, Task E1); not affiliated with any of the three boards |
 | **Provider** | `providers/madgex.mjs` |
 | **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
 | **Merged** | lands with PR #43 |
@@ -337,7 +337,7 @@ Three employer job boards, one per host, on the same vendor (Madgex) and the sam
 
 | | |
 |---|---|
-| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E3); not affiliated with 80,000 Hours |
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/completed/2026-11-08-providers.md`, Task E3); not affiliated with 80,000 Hours |
 | **Provider** | `providers/eightythousandhours.mjs` |
 | **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
 | **Merged** | lands with PR #43 |
@@ -365,7 +365,7 @@ A curated board of roles at named employers, run by the 80,000 Hours nonprofit. 
 
 | | |
 |---|---|
-| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E5); not affiliated with the board |
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/completed/2026-11-08-providers.md`, Task E5); not affiliated with the board |
 | **Provider** | `providers/cryptojobslist.mjs` |
 | **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
 | **Merged** | lands with PR #43 |
@@ -391,7 +391,7 @@ A Web3 and crypto job board. The provider reads its public RSS feed at `https://
 
 | | |
 |---|---|
-| **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F1); no affiliation with the source |
+| **Proposed by** | the fork's providers program (`docs/superpowers/plans/completed/2026-11-08-providers.md`, Task F1); no affiliation with the source |
 | **Provider** | `providers/healthecareers.mjs` |
 | **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
 | **Merged** | lands with PR #43 |
@@ -413,7 +413,7 @@ A US healthcare board: physicians, nurses, advanced practice and allied health. 
 
 ## Tech Jobs for Good (not listed)
 
-Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F2) and stopped at the endpoint check on 2026-11-08, before any code. Checked with curl, no key, cookie or session: `https://techjobsforgood.com/jobs/?page=N` served 30, 30 and 24 server-rendered cards on pages 1 to 3 and HTTP 404 on page 4, and `robots.txt` is `User-agent: *` / `Allow: /`. The same page reads "84 jobs found" next to "Upgrade to see 890 additional jobs", and `https://techjobsforgood.com/upgrade-to-premium/` sells candidates a Premium Membership at $19 a month to "see 11.6x more jobs" (a second read the same day, during the PR #43 review, showed 83 and 886). Rule 1 bars a source that paywalls listings for candidates, and the free rows are not the complete inventory rule 3 asks for, so the board is not listed. It is in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table.
+Planned in the fork's providers program (`docs/superpowers/plans/completed/2026-11-08-providers.md`, Task F2) and stopped at the endpoint check on 2026-11-08, before any code. Checked with curl, no key, cookie or session: `https://techjobsforgood.com/jobs/?page=N` served 30, 30 and 24 server-rendered cards on pages 1 to 3 and HTTP 404 on page 4, and `robots.txt` is `User-agent: *` / `Allow: /`. The same page reads "84 jobs found" next to "Upgrade to see 890 additional jobs", and `https://techjobsforgood.com/upgrade-to-premium/` sells candidates a Premium Membership at $19 a month to "see 11.6x more jobs" (a second read the same day, during the PR #43 review, showed 83 and 886). Rule 1 bars a source that paywalls listings for candidates, and the free rows are not the complete inventory rule 3 asks for, so the board is not listed. It is in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table.
 
 ---
 
@@ -421,7 +421,7 @@ Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-prov
 
 | | |
 |---|---|
-| **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F3); no affiliation with the source |
+| **Proposed by** | the fork's providers program (`docs/superpowers/plans/completed/2026-11-08-providers.md`, Task F3); no affiliation with the source |
 | **Provider** | `providers/dynamitejobs.mjs` |
 | **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
 | **Merged** | lands with PR #43 |

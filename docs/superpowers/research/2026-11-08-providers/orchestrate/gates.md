@@ -2,4 +2,4 @@
 
 id	question	options	default	state
 G-cluster-sync	Apply the A1 and B3 portals.yml edits to the pod /data/portals.yml	operator applies via web config UI or PVC copy	owed, outside plan	open (A1 and B3 edits both owed on the pod copy)
-G-usajobs	Run Phase G at all, and in-tree plugins/usajobs/ (KEEP deviation) or publish as career-ops-plugin-usajobs	in-tree | publish | skip	in-tree, last in queue	decided 2026-11-08 22:06 EST: build G, in-tree plugins/usajobs/ (default), in a FRESH session as its own PR; not in this session
+G-usajobs	Run Phase G at all, and in-tree plugins/usajobs/ (KEEP deviation) or publish as career-ops-plugin-usajobs	in-tree | publish | skip	in-tree, last in queue	closed 2026-11-08 22:45 EST: built in-tree, PR 44 merged as dfe5f747 (decided 22:06 EST: build G, in-tree plugins/usajobs/ (default), in a FRESH session as its own PR; not in this session
