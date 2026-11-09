@@ -1,0 +1,13 @@
+{
+  "id": "usajobs",
+  "name": "USAJOBS",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Keyed job source: US federal openings from the USAJOBS Search API.",
+  "hooks": ["provider"],
+  "requiredEnv": ["USAJOBS_API_KEY", "USAJOBS_USER_AGENT"],
+  "allowedHosts": ["data.usajobs.gov"],
+  "skill": "skill.md",
+  "humanInTheLoop": true,
+  "homepage": "https://developer.usajobs.gov"
+}

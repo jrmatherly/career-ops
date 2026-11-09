@@ -303,7 +303,7 @@ Evaluated on 2026-11-08 in the providers program; not listed. `https://dribbble.
 
 ## USAJOBS front-end search (not used)
 
-Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API.
+Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API. Since 2026-11-08 the keyed API is read by the bundled `plugins/usajobs/` plugin; core still does not use the undocumented endpoint.
 
 ---
 
