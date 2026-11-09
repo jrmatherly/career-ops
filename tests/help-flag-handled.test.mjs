@@ -34,6 +34,7 @@ const FIXED = [
   'calibrate.mjs', 'salary-gap.mjs', 'tracker-sync-check.mjs',
   'story-provenance-check.mjs', 'negotiation-roi.mjs', 'jd-skill-gap.mjs',
   'fetch-jd.mjs', 'seed-fixture.mjs', 'batch-evaluate-gemini.mjs', 'match-star.mjs',
+  'scripts/stamp-version.mjs',
 ];
 
 // ── Isolation ───────────────────────────────────────────────────────────────

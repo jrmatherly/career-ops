@@ -76,5 +76,10 @@ const rootChangelog = config.packages['.']['changelog-path'];
 check(SYSTEM_PATHS.includes(rootChangelog), `${rootChangelog}, which the first release PR creates, is claimed by SYSTEM_PATHS`);
 check(!Object.values(config.packages).some((pkg) => 'release-as' in pkg), 'no release-as pin is left in the config (a one-shot pin would repeat the same version)');
 
+for (const argv of [['--root'], ['--root', '--check']]) {
+  const r = spawnSync(NODE, [join(ROOT, 'scripts', 'stamp-version.mjs'), ...argv], { encoding: 'utf8' });
+  check(r.status === 2 && /^Usage:/m.test(r.stderr) && r.stdout === '', `${argv.join(' ')} is a usage error (exit 2, Usage on stderr, nothing stamped)`);
+}
+
 const self = spawnSync(NODE, [join(ROOT, 'scripts', 'stamp-version.mjs'), '--check'], { encoding: 'utf8' });
 check(self.status === 0, `this checkout's version tokens match .release-please-manifest.json${self.status === 0 ? '' : `\n${self.stdout}${self.stderr}`}`);

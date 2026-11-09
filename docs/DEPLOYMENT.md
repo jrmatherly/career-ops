@@ -139,8 +139,9 @@ writing the same tracker.
 
 ## Updating
 
-The pod has no `.git`, and the fork cuts no releases, so `update-system.mjs` is
-not the path. On a Mac checkout `node update-system.mjs check --channel main`
-is the fork's only channel. For the pod, merge to `main` and let the image
-rebuild. User CV template copies live at `/data/data/templates/`, on the
+The pod has no `.git`, so `update-system.mjs` is not the path: merge to `main`
+and let the image rebuild (a fork release tag, `career-ops-vX.Y.Z`, also builds
+the image under that version). On a Mac checkout the default
+`node update-system.mjs check` compares against the fork's latest release, and
+`--channel main` against an unreleased `main`. User CV template copies live at `/data/data/templates/`, on the
 volume, never in the image.
