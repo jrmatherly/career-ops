@@ -141,9 +141,12 @@ export function classifyBoard(result, { smallThreshold = DEFAULT_SMALL_THRESHOLD
     return { verdict: 'error', count: null, detail: String(result.error).slice(0, 120) };
   }
   const jobs = Array.isArray(result.jobs) ? result.jobs : [];
-  // A provider cut off by the request budget before its first job-bearing page
-  // answered every request it made, so the board is live; its size is unknown.
+  // Cut off by the request budget before any posting: the board is live only
+  // when at least one of its requests succeeded; its size is unknown.
   if (jobs.length === 0 && result.partial) {
+    if (!result.answered) {
+      return { verdict: 'error', count: null, detail: 'every request failed before the request budget ran out' };
+    }
     return { verdict: 'ok', count: null, detail: 'board answers; partial: the request budget ran out before the first postings' };
   }
   if (jobs.length === 0) return { verdict: 'empty', count: 0, detail: 'board answers with zero postings' };
@@ -281,7 +284,7 @@ export async function auditCompanies(companies, {
         // An audit, not a scan: page 1 and the probe's request budget answer "does
         // this look like the company" without sweeping the board. The budget
         // wraps outermost and per entry; a shared one would run out four requests in.
-        const { ctx, wasTripped } = boundedProbeCtx(
+        const { ctx, wasTripped, anySucceeded } = boundedProbeCtx(
           applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || makeHttpCtx()) }, entry), entry),
         );
         try {
@@ -291,6 +294,7 @@ export async function auditCompanies(companies, {
           else result.error = err?.message || String(err);
         }
         result.partial = wasTripped();
+        result.answered = anySucceeded();
       }
 
       const { verdict, count, detail } = classifyBoard(result, { smallThreshold });
