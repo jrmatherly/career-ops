@@ -178,10 +178,18 @@ test("a 409 leaves the row queued as in-flight", async (t) => {
   assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["queued", "in-flight"]);
 });
 
-test("a refused request fails the row and stops, since the rest would be refused too", async (t) => {
+test("a refused request stops the batch and leaves the row queued with its retries", async (t) => {
   const { drain, state } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => 400 });
   assert.equal((await drain()).status, "stopped");
-  assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(2)).state], ["failed", "refused 400", "queued"]);
+  const entry = state(url(1));
+  assert.deepEqual([entry.state, entry.reason, entry.failures, state(url(2)).state], ["queued", "refused: refused 400", 0, "queued"]);
+});
+
+test("a row with no posting text yet does not hold the job's only slot", async (t) => {
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  await drain({ fetchJd: async (u) => (u === url(1) ? null : { text: "Posting text." }) });
+  assert.deepEqual([state(url(1)).state, state(url(2)).state], ["queued", "evaluated"]);
+  assert.equal(posts.length, 1, "maxPerRun still caps the evaluations started");
 });
 
 test("a POST that fails in transport leaves the row queued as dashboard-offline with no retry used", async (t) => {

@@ -110,8 +110,9 @@ function outcomeOf(response) {
     try {
       error = JSON.parse(response.text).error || error;
     } catch { /* not JSON */ }
-    // A refused request is the dashboard's setup, not this row, so the rest would be refused too.
-    return { state: "failed", reason: error, stop: "refused" };
+    // A refused request is the dashboard's setup, not this row: the rest would be
+    // refused too, and the row keeps its retries for when the setup is fixed.
+    return { state: "queued", reason: `refused: ${error}`, stop: "refused" };
   }
   const events = streamEvents(response.text);
   const terminal = events.findLast((event) => TERMINAL.has(event.type));
@@ -146,8 +147,11 @@ export async function runDrain({
   }
 
   const dailyCap = readDailyCap(getProfilePath(root));
-  // Re-planned per job, so the evaluations an earlier job started count against the cap.
-  const planFor = (job) => drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun, dailyCap, now: now() });
+  // Re-planned before each row, so the cap counts what this drain started and a
+  // row tried this tick (a posting with no text yet, say) does not hold a slot.
+  const planFor = (job, tried = new Set(), started = 0) => drainPlan(root, {
+    jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun - started, dailyCap, now: now(), exclude: tried,
+  });
   if (!jobs.some((job) => planFor(job).length)) return { status: "idle", ...counts };
   const health = await request(baseUrl, "/api/healthz", { timeoutMs: HEALTH_TIMEOUT_MS });
   const online = health.status === 200;
@@ -157,7 +161,10 @@ export async function runDrain({
   let status = "drained";
 
   jobs: for (const job of jobs) {
-    for (const entry of planFor(job)) {
+    const tried = new Set();
+    let started = 0;
+    for (let entry; (entry = planFor(job, tried, started)[0]);) {
+      tried.add(entry.key);
       const { url } = entry;
       const append = async (state, reason = "") => {
         await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
@@ -192,6 +199,7 @@ export async function runDrain({
       }
 
       await append("running");
+      started += 1;
       const outcome = outcomeOf(await request(baseUrl, "/api/run", {
         body: { kind: "evaluate-text", input: url, cliId: "claude", jdText: jd.text },
         timeoutMs: RUN_TIMEOUT_MS,

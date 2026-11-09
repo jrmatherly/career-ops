@@ -40,6 +40,19 @@ try {
   const stale = readLedger(tmp, { now: T0 + 860_000 }).find((e) => e.url === B);
   check(stale.state === 'failed' && stale.failures === 1 && !stale.final, 'a running row 860 s old reads as failed, once', JSON.stringify(stale));
 
+  const deaths = mkdtempSync(join(tmpdir(), 'co-evaluate-queue-deaths-'));
+  try {
+    for (let i = 0; i < 3; i += 1) await appendRow(deaths, { ...base, url: B, at: at(i), state: 'running', source: 'drain' });
+    const dead = readLedger(deaths, { now: T0 + 900_000 })[0];
+    check(dead.failures === 3 && dead.final, 'every running row a later running row follows counts as a failure, so a drain that keeps dying ends final', JSON.stringify(dead));
+    writeFileSync(ledgerPath(deaths), `${B}\t${at(0)}\tjob-1\trun-1\thigh\t\tqueued\trank-pass\n`, { flag: 'a' });
+    const bad = [];
+    readLedger(deaths, { skipped: bad });
+    check(bad.length === 1, 'a rank cell that is not a number is reported, not read as NaN', JSON.stringify(bad));
+  } finally {
+    rmSync(deaths, { recursive: true, force: true });
+  }
+
   const C = 'https://jobs.example.test/c';
   await appendRow(tmp, { ...base, url: C, at: at(0), rank: 4.8, state: 'queued' });
   for (let i = 1; i <= 2; i += 1) await appendRow(tmp, { ...base, url: C, at: at(i), state: 'failed', reason: 'boom', source: 'drain' });
