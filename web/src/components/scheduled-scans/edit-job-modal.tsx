@@ -6,8 +6,9 @@ import type { FiltersFrom, ScheduledJob, ScanEngine } from "@/lib/scheduled-jobs
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
 import { FilterBuilder } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
-import { FiltersFromToggle } from "@/components/scheduled-scans/create-job-modal";
+import { EvaluateFields, FiltersFromToggle, evaluateForm, type EvaluateForm } from "@/components/scheduled-scans/create-job-modal";
 import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
+import { evaluateBody } from "@/lib/evaluate-settings.mjs";
 import { cadenceMinimum, cadenceValueForUnit, updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 
 export function EditJobModal({
@@ -24,6 +25,7 @@ export function EditJobModal({
   const [name, setName] = useState("");
   const [engine, setEngine] = useState<ScanEngine>("full");
   const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
+  const [evaluate, setEvaluate] = useState<EvaluateForm>(evaluateForm());
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({ ...DEFAULT_FILTERS, ats: [...DEFAULT_FILTERS.ats] });
@@ -36,6 +38,7 @@ export function EditJobModal({
       setName(job.name || "");
       setEngine(job.engine || "full");
       setFiltersFrom(job.filtersFrom || "custom");
+      setEvaluate(evaluateForm(job.evaluate));
       setEvery(job.every || 6);
       setUnit(job.unit || "hours");
       // Merge job's persisted filters on top of defaults so all fields are defined
@@ -61,7 +64,7 @@ export function EditJobModal({
     setError("");
 
     try {
-      await updateScheduledJobRequest(job.id, scheduledJobBody({ name, engine, filtersFrom, filters, every, unit }));
+      await updateScheduledJobRequest(job.id, scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate, job.evaluate) }));
 
       onUpdated();
       onClose();
@@ -156,6 +159,8 @@ export function EditJobModal({
           <div className="rounded-xl border border-border bg-surface/30 p-4">
             <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} />
           </div>
+
+          <EvaluateFields value={evaluate} onChange={setEvaluate} />
 
           {/* ─── Actions ─── */}
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4">

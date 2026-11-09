@@ -50,3 +50,10 @@ test("an edit body without the six lists keeps the base job's lists", async () =
   for (const key of ["positive", "negative", "allow", "block", "blockHard", "alwaysAllow"]) assert.deepEqual(saved[key], stored[key], key);
   assert.equal(saved.sinceDays, 14, "the rest of the body still applies");
 });
+
+test("the body carries evaluate when given and leaves the key out when not, so an edit keeps the stored settings", () => {
+  const evaluate = { mode: "auto", rankThreshold: 4, maxPerRun: 3 };
+  assert.deepEqual(scheduledJobBody({ name: "Scan", filters, every: 1, unit: "days", evaluate }).evaluate, evaluate);
+  assert.deepEqual(scheduledJobBody({ name: "Scan", filters, every: 1, unit: "days", evaluate: { mode: "off" } }).evaluate, { mode: "off" });
+  assert.equal("evaluate" in scheduledJobBody({ name: "Scan", filters, every: 1, unit: "days" }), false);
+});

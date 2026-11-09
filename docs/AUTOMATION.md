@@ -245,11 +245,13 @@ that already cleared a free title/location filter.
 
 ### Let a scheduled scan evaluate its best rows (auto mode)
 
-A dashboard scheduled scan can do the triage and the evaluation for you. The
-Scheduled scans page gets the control for this in the next release; until then, set
-the job's `evaluate` object in `data/scheduled-jobs.json` (under the data root) by
-hand, for example `"evaluate": { "mode": "auto", "enabledAt": "2026-11-09",
-"rankThreshold": 3.5, "maxPerRun": 5 }`, with the dashboard stopped. Set the
+A dashboard scheduled scan can do the triage and the evaluation for you. On the
+Scheduled scans page, create or edit a job and pick **Evaluate new rows**: Off,
+Review or Auto. Auto also takes a rank threshold (1 to 5, default 3.5) and a number
+of evaluations per run (1 to 20, default 5); a value outside those bounds is clamped
+when you save. The job card shows the mode, the run history shows each run's
+counts, and the Evaluate queue panel under the jobs lists every queued row and what
+happened to it. Set the
 job's evaluate mode to **review** and the runner ranks the rows that job's scans
 added, through `rank-pipeline.mjs`. Set it to **auto** and the runner also queues
 the rows ranked at or above the job's rank threshold (at most its evaluations per

@@ -52,6 +52,10 @@ export type JobRun = {
   rolesFound?: number;
   engine?: ScanEngine;
   ranked?: number;
+  autoQueued?: number;
+  evaluated?: number;
+  gated?: number;
+  evalErrors?: number;
   evalMessage?: string;
 };
 

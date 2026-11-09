@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Clock, Edit3, Globe, Loader2, MoreVertical, Pause, Play, Trash2, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Edit3, Globe, Loader2, MoreVertical, Pause, Play, Sparkles, Trash2, Zap } from "lucide-react";
 import type { ScheduledJob } from "@/lib/scheduled-jobs";
+import { evaluateModeLabel } from "@/lib/evaluate-settings.mjs";
 import { cn } from "@/lib/cn";
 import { instrumentSerif } from "@/lib/fonts";
 
@@ -65,6 +66,7 @@ export function JobCard({
   const isActive = job.status === "active";
   const positiveList = job.filters?.positive || [];
   const letter = (job.name || "S").trim().charAt(0).toUpperCase();
+  const modeLabel = evaluateModeLabel(job.evaluate);
 
   return (
     <div className="co-rise group flex min-w-0 flex-col justify-between h-full gap-2.5 rounded-xl border border-border bg-surface/40 p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-sm">
@@ -150,6 +152,13 @@ export function JobCard({
             <span className={cn("size-1.5 rounded-full", isActive ? "bg-emerald-500" : "bg-zinc-400")} />
             {job.status}
           </span>
+
+          {modeLabel && (
+            <span className="inline-flex items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 font-medium text-foreground">
+              <Sparkles className="size-3" />
+              {modeLabel}
+            </span>
+          )}
         </div>
 
         {/* Keywords clamped to max 2 lines */}
