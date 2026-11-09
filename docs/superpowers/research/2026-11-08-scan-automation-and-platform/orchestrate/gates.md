@@ -23,3 +23,9 @@
 - Options: A: A2 ships auto mode as pod-only (a Mac install refuses the drain unless an explicit CAREER_OPS_AUTO_EVALUATE_LOCAL=1 is set) and A1's deny list gains ~/.ssh/**, ~/.aws/**, ~/.config/gh/**, ~/.gnupg/**, and the checkout's .env*; B: A2 documents Mac auto mode as unsupported (Appendix D default 6 already says best-effort) with the extra denies only; C: hold A2 until a sandboxed worker exists
 - Default: A unless the operator picks otherwise; it keeps the plan's shape and makes the exposure a deliberate opt-in
 - Answer: A, operator 2026-11-08. A2 ships auto mode pod-only with the CAREER_OPS_AUTO_EVALUATE_LOCAL=1 opt-in and the extra denies.
+
+## G-cluster-sync
+
+- Status: resolved
+- Question: The pod's /data carried the Nov 8 deploy copies of portals.yml (four provider entries still in websearch form: talkdesk, genesys, shopify, zendesk) and the Nov 3 copies of config/profile.yml and modes/_profile.md, while the Mac's ~/career-ops-data had the providers-program edits and, from 2026-11-09, the role-fit targeting (co-equal Infrastructure Leader and AI Platform Leader primaries, Principal Platform Engineer primary, AI Solutions Architect secondary, GenAI Enterprise Architect adjacent, Ops/Product Director removed, Scoring Preferences section, two new hard rules).
+- Answer: synced 2026-11-09 by the operator from the home-cluster session (private/career-ops-sync-2026-11-09.sh there): pre-copy diff showed no pod-side edits to keep; all three files copied into pod career-ops-5f96b7f88b-p4n5r via temp name plus mv, cmp byte-for-byte against ~/career-ops-data, GET /api/healthz with Host: localhost 200, no restart. The last volume-backup had run at 01:50 UTC the same day.
