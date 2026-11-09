@@ -114,6 +114,15 @@ for (const [label, service] of [
 }
 
 {
+  const tuple = { swimlane: '1234', corpToken: 'AB12CD' };
+  for (const [label, e, app] of [['override', entry({ bullhorn: tuple }), APP], ['app.json', entry(), { ...APP, service: tuple }]]) {
+    const { ctx, calls } = stubCtx({ app });
+    const msg = await rejects(() => resolveTenant(e, ctx));
+    check(/swimlane/.test(msg) && listCalls(calls).length === 0, `a 4-digit ${label} swimlane throws before any list request`);
+  }
+}
+
+{
   const { ctx, calls } = stubCtx({ app: { companyName: 'x' } });
   const msg = await rejects(() => bullhorn.fetch(entry(), ctx));
   check(/no service block/.test(msg) && listCalls(calls).length === 0, 'an app.json with no service block throws');

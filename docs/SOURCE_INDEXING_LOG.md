@@ -465,7 +465,6 @@ These board providers merged without an entry in this log: most before the log e
 - `providers/himalayas.mjs`, merged 2026-06-29
 - `providers/itviec.mjs`, merged 2026-08-26
 - `providers/jobbankca.mjs`, merged 2026-08-21
-- `providers/jobicy.mjs`, merged 2026-06-29
 - `providers/landingjobs.mjs`, merged 2026-06-29
 - `providers/larajobs.mjs`, merged 2026-07-08
 - `providers/manfred.mjs`, merged 2026-08-04
@@ -478,7 +477,6 @@ These board providers merged without an entry in this log: most before the log e
 - `providers/remotive.mjs`, merged 2026-06-17
 - `providers/senjob.mjs`, merged 2026-08-17
 - `providers/thehub.mjs`, merged 2026-06-29
-- `providers/themuse.mjs`, merged 2026-06-29
 - `providers/vdab.mjs`, merged 2026-07-27
 - `providers/weworkremotely.mjs`, merged 2026-06-27
 - `providers/workingnomads.mjs`, merged 2026-06-17
