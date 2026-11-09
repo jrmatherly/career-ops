@@ -225,8 +225,8 @@ yet, say in the header comment that the hook is inert until it is.
   anchored full-host test instead. Two idioms in the tree: an anchored regex
   over the whole hostname (`/^[a-z0-9-]+\.vendordomain\.com$/` —
   `providers/bamboohr.mjs`, `providers/breezy.mjs`), or
-  `hostname.endsWith('.vendordomain.com')` (`providers/icims.mjs`; `providers/workday.mjs` uses the anchored-regex form,
-  `providers/icims.mjs`). Get the anchoring right or the guard is a no-op:
+  `hostname.endsWith('.vendordomain.com')` (`providers/icims.mjs`).
+  `providers/workday.mjs` matches hosts with anchored regexes. Get the anchoring right or the guard is a no-op:
   keep the trailing `$` (without it `tenant.vendordomain.com.evil.example`
   passes), escape the dots (`\.`, or `.` also matches `vendordomainXcom`), and
   keep the leading dot on a suffix test (`endsWith('vendordomain.com')` also
@@ -281,8 +281,8 @@ yet, say in the header comment that the hook is inert until it is.
   reads as a named failure rather than a generic one). Actually following a
   hop is out — if a source only serves content
   past a bootstrap 3xx, target the settled URL directly
-  (`providers/deutschebahn.mjs` — a portal that 302s into its own results
-  endpoint) or rewrite a known static 3xx up front (`providers/builtin.mjs` —
+  (`providers/deutschebahn.mjs` reads db.jobs's server-rendered results
+  endpoint directly, not the search page in front of it) or rewrite a known static 3xx up front (`providers/builtin.mjs` —
   bare hosts that 301 to `www`). The one case that needs an actual follow is
   a session-establishing bootstrap 3xx whose target is not knowable ahead of
   time — a portal that bounces through a session or theme-negotiation hop
@@ -742,7 +742,22 @@ went through them. Must cover:
 If `job.url` is built from a host-controlled `id` / `slug` in a loop, add one
 behavioural case to the shared `tests/providers/url-encoding-surrogate.test.mjs`
 (a batch with one lone-surrogate value alongside a clean one → no throw, clean
-posting kept, bad one dropped). Every provider is also swept by `tests/providers/host-guard-anchoring.test.mjs`, `inter-page-sleep-shared.test.mjs`, `registry-loads-every-provider.test.mjs`, `rss-entity-decoding.test.mjs` and `tests/provider-user-agent-convention.test.mjs`. That file also carries the cross-provider
+posting kept, bad one dropped). An RSS or XML provider joins the `rssProviders`
+list in `tests/providers/rss-entity-decoding.test.mjs` the same way. Seven tests
+find provider modules on their own, with no list to join, so a new provider
+runs against each one that applies to it unasked:
+
+- `tests/providers/host-guard-anchoring.test.mjs`
+- `tests/providers/inter-page-sleep-shared.test.mjs`
+- `tests/providers/registry-loads-every-provider.test.mjs`
+- `tests/provider-user-agent-convention.test.mjs`
+- `tests/providers-explicit-only-stanza.test.mjs` (a provider with no `detect()`)
+- `tests/providers/catalog-and-template-coverage.test.mjs` (a catalog row and an
+  example in `templates/portals.example.yml`)
+- `tests/providers/indexing-log-coverage.test.mjs` (a board provider's entry in
+  `docs/SOURCE_INDEXING_LOG.md`)
+
+`url-encoding-surrogate.test.mjs` also carries the cross-provider
 source guard (no bare `encodeURIComponent` on a `url:` line, helper imported
 where used) — nothing to add in your own `{name}.test.mjs` for this.
 
@@ -839,6 +854,12 @@ provider whose tuning needs differ from the shared default
       case-insensitive alphabetical position by board name (the table is
       sorted — a lowercase name like `softgarden` sorts among the `S…` rows,
       not after `Z`).
+- [ ] **Board / aggregator only:** an entry in
+      [`../docs/SOURCE_INDEXING_LOG.md`](../docs/SOURCE_INDEXING_LOG.md)
+      whose **Provider** row names `providers/{name}.mjs`.
+- [ ] **A source evaluated and not built:** a dated row in the
+      "Evaluated, not supported" table of `../docs/SUPPORTED_JOB_BOARDS.md`
+      with the measured reason, so the next evaluation starts from it.
 - [ ] `templates/portals.example.yml` is updated: (1) if `detect()` matches
       a host, a URL-pattern line under "Provider auto-detection"; otherwise
       an explicit `provider:` in the stanza; (2) in the "Built-in provider

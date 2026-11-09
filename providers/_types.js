@@ -193,10 +193,22 @@
  *                              entire careers site. Providers that ignore it stay correct:
  *                              the probe caps their requests defensively via the context's
  *                              own fetch functions.
- * @property {(ms: number) => Promise<void>} [sleep] Optional cross-provider pacing hook used by
- *                              paginating providers (avature, workday) to throttle between page
- *                              requests. May be absent — providers fall back to a native
- *                              `setTimeout`-based delay.
+ * @property {(ms: number) => Promise<void>} [sleep] Optional pacing hook. Providers wait
+ *                              between pages through `sleep(ms, ctx)` from `_http.mjs`, which
+ *                              calls this when present and otherwise waits with `setTimeout`.
+ *                              scan.mjs does not set it; tests set it to skip real delays.
+ * @property {number} [sinceMs]  Epoch ms of the scan's posting-age window (`--since`, or the
+ *                              early-stop cutoff scan.mjs derives). A date-sorted provider may
+ *                              stop paginating once a page is past it (workday.mjs).
+ * @property {boolean} [includeUndated] When true, a provider must not drop or stop on
+ *                              postings with no date; scan.mjs always sets it and decides
+ *                              about undated postings itself.
+ * @property {object} [locationHints] The scan's `location_filter` config, for a provider
+ *                              that picks a location facet to split a large board
+ *                              (workday.mjs `chooseSplitFacet`).
+ * @property {boolean} [syntheticEntries] True when the entries were built by a scanner
+ *                              (scan-ats-full.mjs) rather than read from portals.yml, so a
+ *                              provider's warnings must not tell the user to edit the entry.
  * @property {boolean} [dedupIncludeLanguage] Whether the scan keeps language versions of
  *                              one posting apart (`scan_history.dedup_include_language`).
  *                              A provider whose extra language versions cost extra

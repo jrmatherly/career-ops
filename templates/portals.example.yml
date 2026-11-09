@@ -1398,7 +1398,9 @@ search_queries:
 # auto-claimed from its host instead, per the table above.)
 
 # ── Built-in provider examples ────────────────────────────────────
-# One commented stanza per provider in providers/. Uncomment one and adjust.
+# Every provider in providers/ has an example here: a provider: line or a URL
+# its detect() claims (retired providers excepted), enforced by
+# tests/providers/catalog-and-template-coverage.test.mjs. Uncomment one and adjust.
 # A provider whose host is auto-detected (company ATS or job board) only needs
 # careers_url; the rest need provider: plus any fields shown.
 #
@@ -1863,6 +1865,50 @@ search_queries:
 #   max_pages: 20          # optional page cap (100 postings/page, default 20, max 100)
 #   enabled: true
 #
+# - name: Example HiringRoom Co
+#   careers_url: https://exampleco.hiringroom.com/jobs   # any <tenant>.hiringroom.com host
+#                          # a tenant whose /jobs redirects to /portal: use .../portal/jobs
+#   enabled: true
+#
+# - name: Example Radancy Co                   # Radancy (TalentBrew) branded career site
+#   provider: radancy                          # branded hosts carry no Radancy token, so set it
+#   careers_url: https://careers.example.com/en/search-jobs
+#   enabled: true
+#
+# Single-employer providers (one fixed careers site each):
+#
+# - name: Apple
+#   careers_url: https://jobs.apple.com/en-us/search
+#   apple:                 # at least one non-empty queries or teams list is required
+#     location: united-states-USA            # optional, this is the default
+#     queries: ["business operations"]
+#     # teams: ["business-process-management-OPMFG-BPM"]
+#   max_pages: 2           # optional page cap per search
+#   enabled: true
+#
+# - name: Atlassian
+#   provider: atlassian    # or careers_url: https://www.atlassian.com/company/careers (auto-detected)
+#   careers_url: https://www.atlassian.com/company/careers/all-jobs
+#   enabled: true
+#
+# - name: BWI GmbH
+#   careers_url: https://www.bwi.de/karriere/stellenangebote
+#   bwi:
+#     fetchDetails: true   # optional: real title and city from each detail page
+#     detailLimit: 45      # optional max detail requests when fetchDetails=true (1-100)
+#   enabled: true
+#
+# - name: Google
+#   provider: google
+#   google:
+#     location: "United States"      # optional
+#     queries: ["business strategy", "business operations"]
+#   enabled: true
+#
+# - name: TKMS (thyssenkrupp Marine Systems)
+#   careers_url: https://jobs.tkmsgroup.com/en   # auto-detected host
+#   enabled: true
+#
 # -- Job boards / aggregators  (→ job_boards:; set provider: explicitly unless the host auto-detects) --
 #
 # - name: Amazon / AWS                    # global amazon.jobs board
@@ -1881,6 +1927,11 @@ search_queries:
 #
 # - name: Generalist World                # curated generalist / operator roles (SSR HTML, one fetch)
 #   provider: generalist-world            # or careers_url: https://generalist.world/jobs/ (auto-detected)
+#   enabled: true
+#
+# - name: Remotli                         # remote roles at Swiss companies (CHF), public JSON API
+#   careers_url: https://remotli.ch/      # auto-detected host
+#   max_pages: 20          # optional page cap (50 jobs/page, default 20)
 #   enabled: true
 #
 # - name: Built In                        # US tech aggregator, many employers

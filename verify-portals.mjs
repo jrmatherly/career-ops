@@ -770,7 +770,7 @@ async function discoverAlternates(name, { fetchJson, fetchText }) {
  * as "the budgeted pages came back fine → the endpoint is live", we just don't
  * learn the exact total. Distinct from a real HTTP error (a broken board).
  */
-class ProbePageBudgetReached extends Error {}
+export class ProbePageBudgetReached extends Error {}
 
 /**
  * A handful of requests, not one: some providers must spend requests before
@@ -782,7 +782,8 @@ const PROBE_REQUEST_BUDGET = 4;
 
 /**
  * Wrap an http context so a provider gets a bounded number of successful list
- * requests (PROBE_REQUEST_BUDGET).
+ * requests (PROBE_REQUEST_BUDGET), shared across fetchJson, fetchText and
+ * fetchResponse.
  *
  * Cooperating providers also see `maxPages: 1` and stop on their own (we then
  * learn the first-page count). Providers that ignore the hint are cut off via
@@ -793,7 +794,7 @@ const PROBE_REQUEST_BUDGET = 4;
  * @param {import('./providers/_types.js').Context} base
  * @returns {{ctx: import('./providers/_types.js').Context, wasTripped: () => boolean}}
  */
-function boundedProbeCtx(base) {
+export function boundedProbeCtx(base) {
   let used = 0;
   let tripped = false;
   const guard = (fn) => async (url, opts) => {
@@ -805,7 +806,14 @@ function boundedProbeCtx(base) {
     return fn(url, opts);
   };
   return {
-    ctx: { ...base, maxPages: 1, fetchJson: guard(base.fetchJson), fetchText: guard(base.fetchText) },
+    ctx: {
+      ...base,
+      maxPages: 1,
+      fetchJson: guard(base.fetchJson),
+      fetchText: guard(base.fetchText),
+      // A provider picks its fallback with typeof ctx.fetchResponse, so keep it absent.
+      fetchResponse: base.fetchResponse && guard(base.fetchResponse),
+    },
     wasTripped: () => tripped,
   };
 }

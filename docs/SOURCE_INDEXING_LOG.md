@@ -6,7 +6,7 @@ Two things this log deliberately is not: a ranking, and a promise. Rule 4 says i
 
 **How to read an entry.** "Verified" means someone ran a command and reported the output, not that a claim was accepted. Where a check could only be done against a live endpoint, the entry says what was sampled and when, because live checks expire: a source that passed in August can drift in November, and re-verification is normal rather than an accusation.
 
-**Adding an entry.** A source is logged when its provider merges. Anyone can open a [source proposal](https://github.com/santifer/career-ops/issues/new?template=source-proposal.yml); the discussion happens in the issue and the PR, and this file is the durable summary with links back to both.
+**Adding an entry.** A source is logged when its provider merges. Anyone can open a [source proposal](https://github.com/career-ops-hq/career-ops/issues/new?template=source-proposal.yml); the discussion happens in the issue and the PR, and this file is the durable summary with links back to both.
 
 ---
 
@@ -278,3 +278,73 @@ Found by a live probe of every provider on 2026-11-08: the scanner read The Muse
 **Alternative.** A user with an Apify token can read the board through the keyed `provider: apify` plugin and the public actor `bibian/themuse-jobs-scraper` (`https://apify.com/bibian/themuse-jobs-scraper` answered HTTP 200 on 2026-11-08). That route is outside the zero-key core and is the user's own choice.
 
 **Rules 1 to 6.** Not re-verified: the source is unreachable, which decides on its own.
+
+---
+
+## Loxo (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program, with no proposal issue; not listed, recorded in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. `GET https://app.loxo.co/{agency}` serves server-rendered job cards (`app.loxo.co/loxo`: HTTP 200, 7 cards) and `robots.txt` is `Allow: /` under `User-agent: *`. Detail pages carry no JSON-LD and no posting date, `/{agency}.rss` answers 404, and pagination on a large board was not observed. Tenants are recruiting agencies, which rule 2 accepts with the agency as the company (decision D4), but the date gap and the unconfirmed pagination kept it out of this round.
+
+## Harri (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `POST https://gateway.harri.com/core/api/v1/harri_search/search_jobs` needs no auth (the site bundle marks it `noAuth`) and reported 57,089 hits, 10 per page. `start=10000` answers HTTP 400 `CLOUDSEARCH_MAX_WINDOW_SIZE_EXCEEDED`, and no filter body that partitions the index was found, so rule 3 (the complete inventory) is unconfirmed. The sample mixed many UK listings with US ones. `harri.com/robots.txt` disallows only unrelated paths; `gateway.harri.com/robots.txt` answers 403.
+
+## Jobgether (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed and needs a [source proposal](https://github.com/career-ops-hq/career-ops/issues/new?template=source-proposal.yml). `GET https://jobgether.com/astroapi/ai/jobs.json?limit=25&page=N` is a documented public API with no key, rate-limited at 60 requests a minute, and `robots.txt` allows that path by name. Any `page` past 10 comes back as page 10, so one query reaches 250 rows (rule 3); each `url` is a jobgether.com page, not the employer's (rule 2); and the board may republish other sources (rule 5).
+
+## idealist.org (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `https://www.idealist.org/sitemap-jobs-en-1.xml` listed 2,252 `/en/nonprofit-job/{id}-{slug}` URLs, newest `lastmod` that day, and `robots.txt` blocks only a third-party-login path for `User-agent: *`. The sitemap route costs one detail fetch per posting per scan, and a JSON-LD parse of the detail page was not confirmed. The search page reads an Algolia index through a public search key; under decision D2 such a key counts as zero-auth when discovered at runtime, so that route stays open for a later round.
+
+## Dribbble Jobs (evaluated, not built)
+
+Evaluated on 2026-11-08 in the providers program; not listed. `https://dribbble.com/jobs.rss` answered `application/rss+xml` with 46 items and `robots.txt` disallows only `/jobs/*/apply_now`. Some items were posted in 2022 to 2024, the HTML listing returns no jobs past page 1 without client-side code, and the board is design-only, so the yield did not justify a provider.
+
+## USAJOBS front-end search (not used)
+
+Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Decision D3: core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API.
+
+---
+
+## Backfill waiver (2026-11-08)
+
+These board providers merged without an entry in this log: most before the log existed on 2026-08-07, the rest after it without one. Each line names the provider and the author date of the commit that added its file (`git log --diff-filter=A --format=%as -- providers/{id}.mjs`). A line here records the gap; it is not a verification. A full entry for a provider replaces its line. `tests/providers/indexing-log-coverage.test.mjs` fails when a board provider has neither.
+
+- `providers/4dayweek.mjs`, merged 2026-06-29
+- `providers/agentic-jobs.mjs`, merged 2026-07-20
+- `providers/arbeitnow.mjs`, merged 2026-06-29
+- `providers/arbeitsagentur.mjs`, merged 2026-06-18
+- `providers/bulldogjob.mjs`, merged 2026-10-30
+- `providers/careerviet.mjs`, merged 2026-08-27
+- `providers/consider.mjs`, merged 2026-08-08
+- `providers/flowxtra.mjs`, merged 2026-07-27
+- `providers/generalist-world.mjs`, merged 2026-09-11
+- `providers/germantechjobs.mjs`, merged 2026-11-03
+- `providers/getonbrd.mjs`, merged 2026-07-03
+- `providers/getro.mjs`, merged 2026-08-08
+- `providers/gupy.mjs`, merged 2026-10-03
+- `providers/hackernews.mjs`, merged 2026-06-29
+- `providers/higheredjobs.mjs`, merged 2026-07-01
+- `providers/himalayas.mjs`, merged 2026-06-29
+- `providers/itviec.mjs`, merged 2026-08-26
+- `providers/jobbankca.mjs`, merged 2026-08-21
+- `providers/jobicy.mjs`, merged 2026-06-29
+- `providers/landingjobs.mjs`, merged 2026-06-29
+- `providers/larajobs.mjs`, merged 2026-07-08
+- `providers/manfred.mjs`, merged 2026-08-04
+- `providers/mycareersfuture.mjs`, merged 2026-08-21
+- `providers/nodesk.mjs`, merged 2026-06-30
+- `providers/occ.mjs`, merged 2026-09-29
+- `providers/platsbanken.mjs`, merged 2026-10-12
+- `providers/pythonorg.mjs`, merged 2026-09-14
+- `providers/remoteok.mjs`, merged 2026-06-17
+- `providers/remotive.mjs`, merged 2026-06-17
+- `providers/senjob.mjs`, merged 2026-08-17
+- `providers/thehub.mjs`, merged 2026-06-29
+- `providers/themuse.mjs`, merged 2026-06-29
+- `providers/vdab.mjs`, merged 2026-07-27
+- `providers/weworkremotely.mjs`, merged 2026-06-27
+- `providers/workingnomads.mjs`, merged 2026-06-17
+- `providers/wp-job-manager.mjs`, merged 2026-10-26
+- `providers/yourator.mjs`, merged 2026-08-19

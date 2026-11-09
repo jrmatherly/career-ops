@@ -154,7 +154,8 @@ modules.
 ## Evaluated, not supported
 
 These boards were evaluated and found NOT eligible for the zero-auth/no-browser
-provider contract. Recorded here so a future evaluation doesn't repeat the same investigation from scratch.
+provider contract, or eligible but not built. Recorded here so a future
+evaluation doesn't repeat the same investigation from scratch.
 
 | Board | Reason | Evaluated |
 | --- | --- | --- |
@@ -166,6 +167,32 @@ provider contract. Recorded here so a future evaluation doesn't repeat the same 
 | Glassdoor (global, not VN-specific) | A reference scraper implementation for this board (goodjobs, a sibling project) requires Playwright **plus `playwright-stealth`** (active bot-detection evasion) to get any content — out of scope on both technical and ethical grounds, independent of `robots.txt`. | 2026-08-26 |
 | Dice (global, not VN-specific) | Same failure mode as Glassdoor: the same reference implementation needs stealth-mode browser automation despite Dice's own docs describing it as static HTML. | 2026-08-26 |
 | TurboHire (`*.turbohire.co`, global, not VN-specific) | Boards load in a browser without a login, but `robots.txt` on the tenant hosts checked (`flipkart`, `jswgroup`, `tatamotors`) and on `app.turbohire.co` has `Disallow: /` under `User-agent: *`, and also names `anthropic-ai` and `Claude-Web`. The listings API sits on another host with no `robots.txt` (`thapi.azurewebsites.net`), but its anonymous token endpoint answers a plain request with HTTP 403 `"Invalid request."`, and the project did not route around the stated restriction. A browser scanner would have to load the disallowed pages. Since 2026-11-08 `robots.txt` is not a stop under rule 6; the listings API still answers an anonymous request with HTTP 403, so a plain-HTTP provider cannot read it, and a browser-based path is open for re-evaluation. | 2026-11-03 |
+| ClearanceJobs (clearancejobs.com) | `/jobs` is server-rendered (22 job links, "85,212 Jobs"), but `robots.txt` has `Disallow: /jobs?` under `User-agent: *`, which covers query-string pagination and filters, and no path-based pagination was found. robots.txt disallows the listing paths; eligible under rule 6 as of 2026-11-08, not built (not on this round's shortlist). | 2026-11-08 |
+| UNjobs (unjobs.org) | `robots.txt` is `Disallow: /` under `User-agent: *`, and the site aggregates UN-system postings. robots.txt disallows the listing paths; eligible under rule 6 as of 2026-11-08, not built (an aggregator, and not US-focused). | 2026-11-08 |
+| RemoteLeaf (remoteleaf.com) | `robots.txt` disallows `/*?*page=`, its filter parameters and `/api/` under `User-agent: *`, and it aggregates other boards. robots.txt disallows the listing paths; eligible under rule 6 as of 2026-11-08, not built (an aggregator). | 2026-11-08 |
+| Authentic Jobs (authenticjobs.com) | `robots.txt` disallows `/feed/` and `/*?` under `User-agent: *`, and the home page carried no `/job/` links in its server-rendered HTML. robots.txt disallows the listing paths; eligible under rule 6 as of 2026-11-08, not built (no readable listing found). | 2026-11-08 |
+| PracticeLink (jobs.practicelink.com) | HTTP 403 "Just a moment..." Cloudflare managed challenge on every path probed, `/robots.txt` included. No zero-auth path without solving the challenge. | 2026-11-08 |
+| TeamWork Online (teamworkonline.com) | HTTP 403 with `cf-mitigated: challenge` on `/` and `/jobs-in-sports`. | 2026-11-08 |
+| Climatebase (climatebase.org) | HTTP 403 Cloudflare challenge ("Just a moment") on `/jobs` and `/robots.txt`. | 2026-11-08 |
+| Ruby on Remote (rubyonremote.com) | HTTP 403 Cloudflare challenge on `/` and on its RSS feeds, although `/robots.txt` answered 200. | 2026-11-08 |
+| golang.cafe | HTTP 429 with the Vercel Security Checkpoint page, on `/robots.txt` too. | 2026-11-08 |
+| Nurse.com | HTTP 403 from Akamai on `/robots.txt` and `/jobs`. | 2026-11-08 |
+| Devex (devex.com) | HTTP 403 on `/robots.txt` and `/jobs/search`. Also global rather than US. | 2026-11-08 |
+| HERC (main.hercjobs.org) | `/jobs` answers 200, but the body is a "confirm you are not a robot" interstitial; `robots.txt` itself permits `/jobs`. | 2026-11-08 |
+| DevITjobs (devitjobs.com) | A meta-aggregator (rule 5): of 2,742 rows in `/api/jobsLight`, `partnerName` was jobg8 1,480, Indeed 345, Adzuna 63 and other feeds, with 10 direct posts, and `redirectJobUrl` points at Indeed and similar. | 2026-11-08 |
+| Levels.fyi jobs | A meta-aggregator (rule 5): `__NEXT_DATA__` reports 235,119 matching jobs, and a sampled `applicationUrl` was a LinkedIn job page. | 2026-11-08 |
+| Arc.dev | Mostly aggregated (rule 5): `__NEXT_DATA__` holds 30 Arc jobs beside 30 of 6,874 `externalJobs`. | 2026-11-08 |
+| Remote Rocketship (remoterocketship.com) | Paywall (rule 1): the home page exposes a sample of 5 jobs and the board is sold as a $29/month plan; `robots.txt` disallows `/api`. Also an aggregator. | 2026-11-08 |
+| YC Work at a Startup (ycombinator.com/jobs) | Incomplete inventory and registration to apply: `/jobs` and each role page return one reshuffled set (20 or 36) whatever `?page=` says, and `applyUrl` goes to `account.ycombinator.com/authenticate`. The companies' own ATS boards are the better route. | 2026-11-08 |
+| Wellfound (ex-AngelList Talent) | Listings load without a challenge, but applying needs a Wellfound account (rule 1, not verified by curl), and the `autoPosted` and `atsSource` fields suggest mirrored ATS postings (rule 5). | 2026-11-08 |
+| ReliefWeb (reliefweb.int) | Key required: the v1 API answers 410 and v2 answers 403 "You are not using an approved appname", so a registered appname is needed. A plugin-layer candidate, and global humanitarian work rather than US. | 2026-11-08 |
+| web3.career | Key required: `/api/v1` redirects to `/web3-jobs-api`, which describes an API behind an email and website signup form. A plugin-layer candidate. | 2026-11-08 |
+| USAJOBS documented API (data.usajobs.gov) | Key required: `GET /api/search` answers 401 without the free `Authorization-Key`, and that host's `robots.txt` is `Disallow: /`. Planned for the plugin layer on the keyed API. The site's own front-end search endpoint works without a key but is undocumented, so core does not use it; see the [indexing log](SOURCE_INDEXING_LOG.md#usajobs-front-end-search-not-used). | 2026-11-08 |
+| Idealist (idealist.org) | Evaluated, not built. The English jobs sitemap lists 2,252 postings and `robots.txt` blocks nothing relevant, but the sitemap route costs one detail fetch per posting per scan, and the faster route is its Algolia index. See the [indexing log](SOURCE_INDEXING_LOG.md#idealistorg-evaluated-not-built). | 2026-11-08 |
+| Dribbble Jobs (dribbble.com/jobs) | Evaluated, not built. `jobs.rss` carries 46 items, some posted in 2022 to 2024, and HTML pagination past page 1 is client-side, so the feed is small and partly stale for a design-only niche. See the [indexing log](SOURCE_INDEXING_LOG.md#dribbble-jobs-evaluated-not-built). | 2026-11-08 |
+| Loxo (app.loxo.co) | Evaluated, not built. Agency boards are server-rendered and `robots.txt` is `Allow: /`, but detail pages carry no JSON-LD and no posting date, and pagination on large boards is unconfirmed. See the [indexing log](SOURCE_INDEXING_LOG.md#loxo-evaluated-not-built). | 2026-11-08 |
+| Jobgether (jobgether.com) | Evaluated, not built. Its documented public `/astroapi/ai/jobs.json` needs no key, but one query stops at page 10 (250 rows), links go to jobgether.com rather than the employer, and it may republish other boards (rule 5). Needs a source proposal. See the [indexing log](SOURCE_INDEXING_LOG.md#jobgether-evaluated-not-built). | 2026-11-08 |
+| Harri (harri.com) | Evaluated, not built. A no-auth search reports 57,089 hourly hospitality listings, but offsets from 10,000 answer HTTP 400 and no filter partition was found, so the full inventory (rule 3) is out of reach; many rows are UK. See the [indexing log](SOURCE_INDEXING_LOG.md#harri-evaluated-not-built). | 2026-11-08 |
 
 TopDev and CareerLink were the interesting case: both are technically
 scrapable, and until 2026-11-08 this project read a `robots.txt` entry
