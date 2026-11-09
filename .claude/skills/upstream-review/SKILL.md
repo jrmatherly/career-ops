@@ -103,6 +103,9 @@ The last line lists fork-local files the batch touched. It should be empty excep
 - **Scan automation and platform** (`docs/superpowers/plans/2026-11-08-scan-automation-and-platform.md`; its rows sit under the sub-heading of the same name in "Deviations decided"):
   - Upstream files this program edits, for example the scheduled-scan runner, `web/src/lib/scheduled-jobs.ts`, the Scheduled scans components, the Explore schedule action, the Inbox parser and components, and their tests. The row names the hunks we own; an upstream hunk elsewhere in the file is ADOPT, one that overlaps ours is ADAPT, and the pinning test decides.
   - New files the program adds under `web/`, `tests/` or `docs/` get a row too, since upstream could ship a file at the same path; such a file is KEEP and shows `~` at merge.
+- **Providers program** (`docs/superpowers/plans/2026-11-08-providers.md`; its rows sit under the sub-heading "Providers program (2026-11-08)" in "Deviations decided"):
+  - New provider files, their tests and the docs rows the program adds are KEEP: fork-only files at paths upstream does not ship. An upstream provider arriving at the same path is ADAPT (compare, keep the better one, record why).
+  - Shared append-only docs (`docs/SUPPORTED_JOB_BOARDS.md`, `templates/portals.example.yml`, `docs/SOURCE_INDEXING_LOG.md`, the deviations table): program PRs add rows and stanzas and never reorder; upstream hunks are ADOPT and a conflict keeps both.
 
 ## Deleted or moved paths
 
@@ -301,6 +304,16 @@ Rows added by the program's PRs, in PR order; the Rules entry of the same name p
 | no `tests/rank-pipeline-urls-file.test.mjs` | runs `rank-pipeline.mjs` with `CAREER_OPS_RANK_CLI` set to a fake ranker: `--dry-run` ranks only the listed URLs (two spellings join) and leaves a backlog row alone, a live run writes the listed row only, a missing file exits 1 with the usage text | in this PR (PR-R1) | KEEP (fork-only file in a shipped directory; an upstream file at this path is ADAPT). Pinned by the suite itself, run by `node test-all.mjs`. |
 | no `web/src/lib/core/evaluate-candidates.mjs` | `hostLocalDate(epochMs)` (the host-local day, `lib/local-today.mjs`'s arithmetic, which the scanners stamp `first_seen` with), `pendingRows(text)` (the `- [ ]` rows read the way `rank-pipeline.mjs` reads them: ranked when the row holds `\| rank: `, with the score and reason when they parse), `candidateSince({ job, runs, excludeRunId })` (the later of `evaluate.enabledAt` and the host-local date of its newest other successful run; host-local, not the job's timezone, so a job east of the host ranks its own rows) and `candidatesFor({ pendingRows, scanHistoryRows, since })` (a pending row whose URL's latest `added` scan-history row has `first_seen` on or after `since`, joined by `normalizeUrl` from `web/src/lib/core/url-key.mjs`) | in this PR (PR-R1) | KEEP; fork-only file, `~` at merge. Pinned by `web/tests/lib/evaluate-candidates.test.mjs`. |
 | no `web/tests/lib/evaluate-candidates.test.mjs` | the candidate rule's suite: the latest added row decides, a hand-added row is never a candidate, a blank status is added, the `since` day is inclusive, `since` is the host-local day whatever the job's timezone, `hostLocalDate` matches `localToday` from `lib/local-today.mjs`, a job east of the host ranks the rows its own run added, two URL spellings join, ranked rows carry their score and done rows are not pending, and `pendingRows` reads unranked rows as `parsePendingEntries` in `rank-pipeline.mjs` does | in this PR (PR-R1) | KEEP (fork-only file in a shipped directory; an upstream file at this path is ADAPT). Pinned by the suite itself, run by `npm test` in `web/`. |
+
+### Providers program (2026-11-08)
+
+Rows added by the program's PRs, in PR order; the Rules entry of the same name points at the plan. Each Notes cell opens with the hunk rule for the path (ADOPT, ADAPT, KEEP or SKIP) and names the fork test that pins the behaviour.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| no `providers/healthecareers.mjs` | the Health eCareers provider: explicit-only `detect`, `/search-jobs` (page one bare, `?pg=N` after) on `www.healthecareers.com`, a bot-challenge throw before the empty-vs-broken check, optional JSON-LD detail enrichment; exports `findJobPosting`, the JSON-LD JobPosting finder | in this PR (PR F, F1) | KEEP (fork-only file). Pinned by `tests/providers/healthecareers.test.mjs`. |
+| no `tests/providers/healthecareers.test.mjs` | the provider's offline suite (fictional fixtures) | in this PR (PR F, F1) | KEEP (fork-only file in a shipped directory). |
+| `docs/SUPPORTED_JOB_BOARDS.md`, `templates/portals.example.yml`, `docs/SOURCE_INDEXING_LOG.md` | PR F adds the Health eCareers catalog row, its commented `Example Health eCareers Co` stanza and its indexing-log entry | in this PR (PR F, F1) | ADOPT upstream hunks, ours stay, a conflict keeps both (append-only shared files). |
 
 ## Decision log template
 

@@ -1898,6 +1898,14 @@ search_queries:
 #   max_pages: 5                          # optional page cap (50 jobs/page, default 25, max 100)
 #   enabled: true                         # 250ms pacing between pages
 #
+# - name: Example Health eCareers Co      # US healthcare board, many employers
+#   provider: healthecareers              # no URL detection; only reachable via provider:
+#   max_pages: 10                         # optional page cap (25 jobs/page, default 10, max 500)
+#   healthecareers:
+#     fetchDetails: false                 # optional; true fills date, employer and JD from each detail page
+#     detailLimit: 25                     # 1..100, default 25
+#   enabled: true                         # 250ms pacing between pages
+#
 # - name: The Hub                         # Nordic/EU startup board
 #   provider: thehub
 #   max_pages: 3          # optional page cap (15 jobs/page, default 3, max 67; applies to each pass below)

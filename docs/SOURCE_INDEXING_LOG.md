@@ -226,3 +226,29 @@ Re-read against rule 6 after a contributor checked the live `robots.txt` in [#57
 **Rule 6 (the source's own `robots.txt`).** Checked on 2026-10-23 and again on 2026-11-05: one GET of `https://jobspresso.co/robots.txt`, HTTP 200. Under `User-agent: *` it disallows `/*?` and sets `Crawl-delay: 3`; its only `Allow` lines are `/*.css` and `/*.js`. No group names career-ops. `/*?` covered the URL the provider originally fetched, `/?feed=job_feed`, the same shape as Lagou in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. Unlike Lagou, a usable request without a query string exists: WordPress serves the same feed at `https://jobspresso.co/feed/job_feed/`, which is the URL the feed's own `<atom:link rel="self">` names. On 2026-11-05 it answered HTTP 200 `application/rss+xml` with no redirect, and returned the same 10 items as the query-string URL. `/*?` does not cover it, so the provider now reads that path, once per scan.
 
 **Rules 1 to 5.** Not re-verified here.
+
+---
+
+## Health eCareers
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F1); no affiliation with the source |
+| **Provider** | `providers/healthecareers.mjs` |
+| **PR** | the providers program PR in `jrmatherly/career-ops` (branch `claude/providers-new-html`) |
+| **Merged** | not yet |
+| **Status** | Provider listed; no live `job_boards:` entry ships, only the commented example stanza. |
+
+A US healthcare board: physicians, nurses, advanced practice and allied health. Measured with curl on 2026-11-08, no key, cookie or session: `https://www.healthecareers.com/search-jobs` answered HTTP 200 with 25 server-rendered cards, `?pg=2` the next 25, and `?pg=1` a 301 to `/search-jobs/?` (so the provider requests page one at the bare path). Page 883 was the last page with cards and page 1000 a well-formed empty results page, so the board held about 22,000 postings. No bot challenge on any page sampled.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Employer attribution, measured: all 125 cards on pages 1, 2, 100, 400 and 401 name an employer (hospital systems, medical groups, the Department of Veterans Affairs, and some staffing firms such as AMN Healthcare and CompHealth), each with a `data-clientid`. Free for candidates: listings and detail pages read without an account. Applying was not walked through. **Backfill:** none observed. Every sampled card carries an employer contract type (`VALUE_BASED`, `NURSING_ALLIED`, `PPA`, `SLOTPlus`, `PROMO`), an apply type of `Resume` (apply on the board) or `ATS` (apply at the employer), and no card links off the board or through the robots-disallowed `/JobDetailsRedirect/` route. Whether a deeper page carries feed backfill: unverified beyond those five pages.
+
+**Rule 2 (canonical URL is the employer's).** The card carries only the board's own `/job/{slug}/{id}` page, so `url` is that page. The detail page's JSON-LD names the employer but not an ATS link.
+
+**Rule 3 (complete inventory, no paid placement).** Partly met. `PROMO` and `SLOTPlus` are paid placements interleaved in the default order; the provider keeps every card it reads and ranks nothing. It reads up to `max_pages` (default 10, so the newest 250), not the whole board, and the catalog row says so. Card order changed between two requests a minute apart on 2026-11-08, so a walk over many pages can skip or repeat a posting at a page boundary.
+
+**Rule 4 (operator declared).** Operator not declared; unverified.
+
+**Rule 5 (aggregation stays in core).** Verified in code: the provider reads `/search-jobs` (and, under `fetchDetails`, `/job/{slug}/{id}`) on `www.healthecareers.com` only.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of `https://www.healthecareers.com/robots.txt` on 2026-11-08. Under `User-agent: *` it has `Disallow: /searchjobs/`, `Disallow: /new-search-jobs/` and `Disallow: /JobDetailsRedirect/` among others, none covering `/search-jobs` or `/job/`. A second group naming AI crawlers (`ClaudeBot`, `GPTBot`, `PerplexityBot` and others) carries `Allow: /`, `Allow: /career-resources/` and `Allow: /search-jobs/`. The provider never requests a disallowed path, and its test pins the `/search-jobs` path literal.
