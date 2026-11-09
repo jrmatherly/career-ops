@@ -38,12 +38,12 @@ import { join } from 'path';
 import { ROOT } from './helpers.mjs';
 
 const mode = readFileSync(join(ROOT, 'modes', 'update.md'), 'utf-8');
-if (!/career-ops-v\{remote\}/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/heads\/main/.test(mode)) pass('modes/update.md fetches the fork\'s refs/heads/main, not a release tag');
-else fail('modes/update.md still fetches a career-ops-v{remote} tag (the fork has none)');
-if (/check --channel main --force/.test(mode) && /apply --channel main --confirm/.test(mode)) pass('modes/update.md checks and applies on --channel main');
-else fail('modes/update.md check/apply commands do not name --channel main');
+if (!/career-ops-hq/.test(mode) && /git fetch https:\/\/github\.com\/jrmatherly\/career-ops\.git refs\/tags\/career-ops-v\{remote\}/.test(mode)) pass('modes/update.md fetches the fork\'s own release tag');
+else fail('modes/update.md does not fetch career-ops-v{remote} from jrmatherly/career-ops (the fork cuts its own releases since 2026-11-09)');
+if (/check --force/.test(mode) && /apply --confirm/.test(mode) && !/--channel main --confirm/.test(mode)) pass('modes/update.md checks and applies on the default release channel');
+else fail('modes/update.md check/apply commands are not on the default release channel');
 
 const agents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf-8');
 const section = agents.slice(agents.indexOf('## Update Check'), agents.indexOf('\n## ', agents.indexOf('## Update Check') + 1));
-if (/If yes → `node update-system\.mjs apply --channel main --confirm`/.test(section)) pass('AGENTS.md Update Check applies on --channel main');
-else fail('AGENTS.md Update Check "If yes" line does not apply on --channel main');
+if (/If yes → `node update-system\.mjs apply --confirm`/.test(section)) pass('AGENTS.md Update Check applies on the default release channel');
+else fail('AGENTS.md Update Check "If yes" line does not apply on the default release channel');

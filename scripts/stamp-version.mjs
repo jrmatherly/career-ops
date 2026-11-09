@@ -86,10 +86,21 @@ export function stampVersions(root, { check = false } = {}) {
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
+  const USAGE = [
+    'Usage: node scripts/stamp-version.mjs [--check] [--root DIR]',
+    '  Writes the versions in .release-please-manifest.json into every token file',
+    '  release-please-config.json names (run after an upstream merge).',
+    '  --check   report drift and exit 1 instead of writing',
+    '  --root    another checkout (default: this repository)',
+  ].join('\n');
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(USAGE);
+    process.exit(0);
+  }
   const check = args.includes('--check');
   const rootArg = args.indexOf('--root');
   if (rootArg !== -1 && !args[rootArg + 1]) {
-    console.error('usage: node scripts/stamp-version.mjs [--check] [--root DIR]');
+    console.error(USAGE);
     process.exit(2);
   }
   const root = rootArg === -1 ? join(dirname(fileURLToPath(import.meta.url)), '..') : args[rootArg + 1];
