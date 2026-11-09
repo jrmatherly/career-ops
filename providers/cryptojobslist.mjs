@@ -14,8 +14,8 @@ import { htmlToText } from './_html-to-text.mjs';
 // catalog row says so; the items carry no date, so whether they are the
 // newest 100 is unconfirmed. `/rss` answers 403 and is not used. Items carry
 // <title> (the role alone), <dc:creator> (the employer), <media:location>
-// (96 of 100) and a CDATA HTML <description>; CDATA text is literal (14 of
-// 201 title/creator fields hold a bare "&", none an entity). A title
+// (96 of 100) and a CDATA HTML <description>; CDATA text is literal (about
+// 14 of the 200 item title/creator fields held a bare "&", none an entity). A title
 // "Role at Company" split is the fallback only when <dc:creator> is absent.
 
 const FEED_URL = 'https://api.cryptojobslist.com/jobs.rss';

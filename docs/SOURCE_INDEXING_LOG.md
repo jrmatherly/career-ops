@@ -275,7 +275,7 @@ Found by a live probe of every provider on 2026-11-08: the scanner read The Muse
 
 **What was checked.** On 2026-11-08 the providers assessment fetched the feed from two networks under the scanner's User-Agent and a desktop browser User-Agent, and the same day `curl -sI` re-checked these paths. `https://www.themuse.com/api/public/jobs` (bare, with `page=0`, with an `api_key` parameter, and under a browser User-Agent), `https://www.themuse.com/` and `https://www.themuse.com/jobs` each answered HTTP 403 with `cf-mitigated: challenge`, a Cloudflare managed challenge. `https://www.themuse.com/robots.txt` answered HTTP 200; under `User-agent: *` it disallows only `/apply/`. The feed is not closed by `robots.txt`; it is closed by bot protection, which career-ops does not work around.
 
-**Alternative.** A user with an Apify token can read the board through the keyed `provider: apify` plugin and the public actor `bibian/themuse-jobs-scraper` (`https://apify.com/bibian/themuse-jobs-scraper` answered HTTP 200 on 2026-11-08). That route is outside the zero-key core and is the user's own choice.
+**Alternative.** With an Apify token, an Apify actor such as `bibian/themuse-jobs-scraper` may read the board through the keyed `provider: apify` plugin (its page `https://apify.com/bibian/themuse-jobs-scraper` answered HTTP 200 on 2026-11-08; the actor itself was not run here). That route is outside the zero-key core and is the user's own choice.
 
 **Rules 1 to 6.** Not re-verified: the source is unreachable, which decides on its own.
 
@@ -283,7 +283,7 @@ Found by a live probe of every provider on 2026-11-08: the scanner read The Muse
 
 ## Loxo (evaluated, not built)
 
-Evaluated on 2026-11-08 in the providers program, with no proposal issue; not listed, recorded in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. `GET https://app.loxo.co/{agency}` serves server-rendered job cards (`app.loxo.co/loxo`: HTTP 200, 7 cards) and `robots.txt` is `Allow: /` under `User-agent: *`. Detail pages carry no JSON-LD and no posting date, `/{agency}.rss` answers 404, and pagination on a large board was not observed. Tenants are recruiting agencies, which rule 2 accepts with the agency as the company (decision D4), but the date gap and the unconfirmed pagination kept it out of this round.
+Evaluated on 2026-11-08 in the providers program, with no proposal issue; not listed, recorded in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table. `GET https://app.loxo.co/{agency}` serves server-rendered job cards (`app.loxo.co/loxo`: HTTP 200, 7 cards) and `robots.txt` is `Allow: /` under `User-agent: *`. Detail pages carry no JSON-LD and no posting date, `/{agency}.rss` answers 404, and pagination on a large board was not observed. Tenants are recruiting agencies, which rule 2 accepts with the agency as the company, but the date gap and the unconfirmed pagination kept it out of this round.
 
 ## Harri (evaluated, not built)
 
@@ -295,7 +295,7 @@ Evaluated on 2026-11-08 in the providers program; not listed and needs a [source
 
 ## idealist.org (evaluated, not built)
 
-Evaluated on 2026-11-08 in the providers program; not listed. `https://www.idealist.org/sitemap-jobs-en-1.xml` listed 2,252 `/en/nonprofit-job/{id}-{slug}` URLs, newest `lastmod` that day, and `robots.txt` blocks only a third-party-login path for `User-agent: *`. The sitemap route costs one detail fetch per posting per scan, and a JSON-LD parse of the detail page was not confirmed. The search page reads an Algolia index through a public search key; under decision D2 such a key counts as zero-auth when discovered at runtime, so that route stays open for a later round.
+Evaluated on 2026-11-08 in the providers program; not listed. `https://www.idealist.org/sitemap-jobs-en-1.xml` listed 2,252 `/en/nonprofit-job/{id}-{slug}` URLs, newest `lastmod` that day, and `robots.txt` blocks only a third-party-login path for `User-agent: *`. The sitemap route costs one detail fetch per posting per scan, and a JSON-LD parse of the detail page was not confirmed. The search page reads an Algolia index through a public search key; such a key counts as zero-auth when it is read from the page at runtime and never stored, so that route stays open for a later round.
 
 ## Dribbble Jobs (evaluated, not built)
 
@@ -303,7 +303,7 @@ Evaluated on 2026-11-08 in the providers program; not listed. `https://dribbble.
 
 ## USAJOBS front-end search (not used)
 
-Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Decision D3: core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API.
+Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/Search/ExecuteSearch` with a JSON body answered 200 with no key, 25 jobs a page and a `Pager.HasNextPage` flag, and `www.usajobs.gov/robots.txt` allows `/Search/`. It is the site's own front-end call and is undocumented. Core does not use an undocumented endpoint when a documented one exists, and the documented `data.usajobs.gov/api/search` needs a free key (401 without it; that host's `robots.txt` is `Disallow: /`), so USAJOBS is planned for the plugin layer on the keyed API.
 
 ---
 
@@ -313,8 +313,8 @@ Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/
 |---|---|
 | **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E1); not affiliated with any of the three boards |
 | **Provider** | `providers/madgex.mjs` |
-| **PR** | fork branch `claude/providers-new-api` |
-| **Merged** | pending |
+| **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
+| **Merged** | lands with PR #43 |
 | **Status** | Listed in the fork |
 
 Three employer job boards, one per host, on the same vendor (Madgex) and the same feed: `jobs.chronicle.com` (The Chronicle of Higher Education), `careers.insidehighered.com` (Inside Higher Ed) and `jobs.sciencecareers.org` (Science Careers). Each host is its own source; one provider reads whichever host the entry names, and never mixes them.
@@ -323,7 +323,7 @@ Three employer job boards, one per host, on the same vendor (Madgex) and the sam
 
 **Rule 2 (canonical URL is the employer's).** The feed carries one link per posting, the board's own posting page; no upstream employer URL is in the payload, so that page is the canonical URL. The provider strips the `TrackID` and `utm_*` click-tracking params from it.
 
-**Rule 3 (complete inventory, no paid placement).** `<opensearch:totalResults>` read 28,734 (Chronicle), 23,398 (Inside Higher Ed) and 531 (Science Careers) on 2026-11-08, at 20 items a page, and a page past the end (`page=99999`) answers a well-formed feed with zero items. Each keyword pass asks for `sort=Date` (without it a keyword search comes back ranked by relevance, measured on all three hosts) and walks to that empty page; `max_pages` (default 25, cap 1500) bounds it, and the cap covers Chronicle's 1,437 unfiltered pages, so raising `max_pages` on the entry reaches the full result set. The feed carries no featured, sponsored or premium field.
+**Rule 3 (complete inventory, no paid placement).** `<opensearch:totalResults>` read 28,734 (Chronicle), 23,398 (Inside Higher Ed) and 531 (Science Careers) on 2026-11-08, at 20 items a page, and a page past the end (`page=99999`) answers a well-formed feed with zero items. Each keyword pass asks for `sort=Date` (without it a keyword search comes back ranked by relevance, measured on all three hosts) and stops on a short page (under 20 items) or once it has read `totalResults`, so it never requests that empty page; `max_pages` (default 25, cap 1500) bounds it, and the cap covers Chronicle's 1,437 unfiltered pages, so raising `max_pages` on the entry reaches the full result set. The feed carries no featured, sponsored or premium field.
 
 **Rule 4 (operator declared).** Not an operator proposal.
 
@@ -339,13 +339,13 @@ Three employer job boards, one per host, on the same vendor (Madgex) and the sam
 |---|---|
 | **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E3); not affiliated with 80,000 Hours |
 | **Provider** | `providers/eightythousandhours.mjs` |
-| **PR** | fork branch `claude/providers-new-api` |
-| **Merged** | pending |
+| **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
+| **Merged** | lands with PR #43 |
 | **Status** | Listed in the fork |
 
 A curated board of roles at named employers, run by the 80,000 Hours nonprofit. The board's UI reads a public Algolia index; the provider reads the same index.
 
-**Embedded search key (decision D2).** The Algolia app id, the search-only key and the index name sit in the board page's public `window.__NUXT__.config` block, which every visitor's browser receives. The provider reads them from that page on every run and never stores them, the precedent `providers/techinasia.mjs` set. The key is referer-gated, so each query sends the board's own Referer.
+**Embedded search key.** The Algolia app id, the search-only key and the index name sit in the board page's public `window.__NUXT__.config` block, which every visitor's browser receives. The provider reads them from that page on every run and never stores them, the precedent `providers/techinasia.mjs` set. The key is referer-gated, so each query sends the board's own Referer.
 
 **Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08: all 1,019 hits carry a `company_name`, and the board and its postings need no login or payment.
 
@@ -367,8 +367,8 @@ A curated board of roles at named employers, run by the 80,000 Hours nonprofit. 
 |---|---|
 | **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E5); not affiliated with the board |
 | **Provider** | `providers/cryptojobslist.mjs` |
-| **PR** | fork branch `claude/providers-new-api` |
-| **Merged** | pending |
+| **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
+| **Merged** | lands with PR #43 |
 | **Status** | Listed in the fork, newest-feed coverage only (see rule 3) |
 
 A Web3 and crypto job board. The provider reads its public RSS feed at `https://api.cryptojobslist.com/jobs.rss`, the URL the feed's own `<atom:link rel="self">` names; the older `/rss` path answered 403 on 2026-11-08 and is not used.
@@ -393,8 +393,8 @@ A Web3 and crypto job board. The provider reads its public RSS feed at `https://
 |---|---|
 | **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F1); no affiliation with the source |
 | **Provider** | `providers/healthecareers.mjs` |
-| **PR** | the providers program PR in `jrmatherly/career-ops` (branch `claude/providers-new-html`) |
-| **Merged** | not yet |
+| **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
+| **Merged** | lands with PR #43 |
 | **Status** | Provider listed; no live `job_boards:` entry ships, only the commented example stanza. |
 
 A US healthcare board: physicians, nurses, advanced practice and allied health. Measured with curl on 2026-11-08, no key, cookie or session: `https://www.healthecareers.com/search-jobs` answered HTTP 200 with 25 server-rendered cards, `?pg=2` the next 25, and `?pg=1` a 301 to `/search-jobs/?` (so the provider requests page one at the bare path). Page 883 was the last page with cards and page 1000 a well-formed empty results page, so the board held about 22,000 postings. No bot challenge on any page sampled.
@@ -413,7 +413,7 @@ A US healthcare board: physicians, nurses, advanced practice and allied health. 
 
 ## Tech Jobs for Good (not listed)
 
-Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F2) and stopped at the endpoint check on 2026-11-08, before any code. Checked with curl, no key, cookie or session: `https://techjobsforgood.com/jobs/?page=N` served 30, 30 and 24 server-rendered cards on pages 1 to 3 and HTTP 404 on page 4, and `robots.txt` is `User-agent: *` / `Allow: /`. The same page reads "84 jobs found" next to "Upgrade to see 890 additional jobs", and `https://techjobsforgood.com/upgrade-to-premium/` sells candidates a Premium Membership at $19 a month to "see 11.6x more jobs" (the coordinator's re-read at 19:13 EST showed 83 and 886). Rule 1 bars a source that paywalls listings for candidates, and the free rows are not the complete inventory rule 3 asks for, so the board is not listed. It is in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table.
+Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F2) and stopped at the endpoint check on 2026-11-08, before any code. Checked with curl, no key, cookie or session: `https://techjobsforgood.com/jobs/?page=N` served 30, 30 and 24 server-rendered cards on pages 1 to 3 and HTTP 404 on page 4, and `robots.txt` is `User-agent: *` / `Allow: /`. The same page reads "84 jobs found" next to "Upgrade to see 890 additional jobs", and `https://techjobsforgood.com/upgrade-to-premium/` sells candidates a Premium Membership at $19 a month to "see 11.6x more jobs" (a second read the same day, during the PR #43 review, showed 83 and 886). Rule 1 bars a source that paywalls listings for candidates, and the free rows are not the complete inventory rule 3 asks for, so the board is not listed. It is in the [Evaluated, not supported](SUPPORTED_JOB_BOARDS.md#evaluated-not-supported) table.
 
 ---
 
@@ -423,8 +423,8 @@ Planned in the fork's providers program (`docs/superpowers/plans/2026-11-08-prov
 |---|---|
 | **Proposed by** | the fork's providers program (`docs/superpowers/plans/2026-11-08-providers.md`, Task F3); no affiliation with the source |
 | **Provider** | `providers/dynamitejobs.mjs` |
-| **PR** | the providers program PR in `jrmatherly/career-ops` (branch `claude/providers-new-html`) |
-| **Merged** | not yet |
+| **PR** | [#43](https://github.com/jrmatherly/career-ops/pull/43) |
+| **Merged** | lands with PR #43 |
 | **Status** | Provider listed; no live `job_boards:` entry ships, only the commented example stanza. |
 
 A remote-only board, many small employers. Measured with curl and the provider's own fetch on 2026-11-08, no key, cookie or session: `https://dynamitejobs.com/sitemap/jobs-of-company.xml` answered HTTP 200 (`application/xml`, about 480 KB) with 3,441 `<loc>` entries, 500 of them posting URLs of the form `/company/{company}/remote-job/{slug}`. Each posting page carries a JSON-LD `JobPosting` with `title`, `hiringOrganization`, `datePosted`, `validThrough`, `jobLocationType: TELECOMMUTE` and `applicantLocationRequirements`. No bot challenge on any page read. A `HEAD` of the sitemap answers 404 while `GET` answers 200; the provider only sends `GET`.
