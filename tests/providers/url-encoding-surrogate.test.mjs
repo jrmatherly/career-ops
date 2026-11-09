@@ -415,6 +415,18 @@ try {
     ]),
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.80000hours.org/?jobPk=101',
   );
+
+  // manatal.parseManatalJobs — for…of over results[]; hash feeds the /{slug}/job/{hash} URL.
+  const { parseManatalJobs } = await load('manatal.mjs');
+  check(
+    'manatal.parseManatalJobs',
+    () => parseManatalJobs(
+      [{ hash: `${LONE}x`, position_name: 'Bad Hash' }, { hash: 'GOOD1', position_name: 'Good Hash' }],
+      'acme',
+      'Acme',
+    ),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://www.careers-page.com/acme/job/GOOD1',
+  );
 } catch (e) {
   fail(`per-provider surrogate tests crashed: ${e.message}`);
 }
@@ -460,6 +472,7 @@ try {
     'jibeapply.mjs',
     'kalibrr.mjs',
     'keka.mjs',
+    'manatal.mjs',
     'manfred.mjs',
     'meituan.mjs',
     'mokahr.mjs',
