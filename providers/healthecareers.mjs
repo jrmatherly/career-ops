@@ -39,7 +39,7 @@ const DETAIL_PACE_MS = 250;
 
 // The same bot-wall signature `providers/computrabajo.mjs` reads. A challenge
 // page carries no job hrefs, so without this check it would parse as an empty board.
-const CHALLENGE_RE = /<title[^>]*>[^<]*(?:just a moment|attention required|access denied)|cf-(?:challenge|browser-verification|error-details)|cf-mitigated/i;
+export const CHALLENGE_RE = /<title[^>]*>[^<]*(?:just a moment|attention required|access denied)|cf-(?:challenge|browser-verification|error-details)|cf-mitigated/i;
 
 const CARD_SPLIT_RE = /<div\b[^>]*\bid=["']job-results-card["'][^>]*>/gi;
 const CARD_URL_RE = /\bdata-url=["']([^"']+)["']/i;
@@ -172,7 +172,7 @@ function text(value) {
 }
 
 /** @param {unknown} value */
-function toEpochMs(value) {
+export function toEpochMs(value) {
   if (!value) return undefined;
   const parsed = Date.parse(String(value));
   return Number.isNaN(parsed) ? undefined : parsed;

@@ -2094,6 +2094,12 @@ search_queries:
 #
 # - name: Himalayas
 #   provider: himalayas
+# - name: Example Dynamite Jobs Co        # remote-only board, many employers
+#   provider: dynamitejobs                # no URL detection; only reachable via provider:
+#   dynamitejobs:
+#     detailLimit: 200                    # 1..1000; posting pages read for title-filter survivors
+#   enabled: true                         # 250ms pacing between posting-page batches
+#
 # - name: Landing.jobs                    # tech board, Europe-focused
 #   provider: landingjobs
 #   enabled: true
