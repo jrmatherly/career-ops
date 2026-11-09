@@ -81,7 +81,7 @@ candidatesFor({ pendingRows, scanHistoryRows, since }): Array<{ url: string; ran
 url	at	jobId	runId	rank	reason	state	source
 ```
 
-`at` is ISO 8601 UTC. `source` is `rank-pass` or `drain`. States are `queued`, `running`, `evaluated`, `failed`, `gated` and `skipped`. `skipped` is terminal and carries a reason (`below-threshold`, `unranked`, `already-evaluated`, `not-pending`, `report-exists`, `no-api-text`). A `running` row older than 860 seconds is read as `failed`. A URL with three `failed` rows is final. The daily cap counts URLs whose `running` row carries today's UTC date, whatever came after. The CLI is `node evaluate-queue.mjs dump --json`, `add --url <u> --state <s> --job <id> --run <id> [--rank N] [--reason R] [--source S]` and `drain-plan --json`, and the web reads it through `runCoreCli`, never the file.
+`at` is ISO 8601 UTC. `source` is `rank-pass` or `drain`. States are `queued`, `running`, `evaluated`, `failed`, `gated` and `skipped`. `skipped` is terminal and carries a reason (`below-threshold`, `unranked`, `already-evaluated`, `not-pending`, `report-exists`, `no-api-text`). A `running` row older than 860 seconds is read as `failed`. A URL with three `failed` rows is final. The daily cap counts running rows dated today (UTC), whatever came after (amended in PR-A2 fix round 1: evaluations started, so a URL retried twice counts twice). The CLI is `node evaluate-queue.mjs dump --json`, `add --url <u> --state <s> --job <id> --run <id> [--rank N] [--reason R] [--source S]` and `drain-plan --json`, and the web reads it through `runCoreCli`, never the file.
 
 **Profile keys** (`config/profile.yml`, documented in `config/profile.example.yml`).
 

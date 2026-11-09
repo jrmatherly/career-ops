@@ -30,3 +30,6 @@ offer-terms.mjs
 followup-pin.mjs
 # Reactive Resume convergence, PR-09: the Reactive Resume application export importer.
 lib/import-rr-applications.mjs
+# Scan automation and platform, PR-A2: the auto-mode evaluation ledger and its CLI.
+lib/evaluate-queue.mjs
+evaluate-queue.mjs

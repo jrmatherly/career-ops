@@ -243,6 +243,41 @@ removing any.
 That keeps the expensive step — token-spending evaluation — pointed only at postings
 that already cleared a free title/location filter.
 
+### Let a scheduled scan evaluate its best rows (auto mode)
+
+A dashboard scheduled scan can do the triage and the evaluation for you. The
+Scheduled scans page gets the control for this in the next release; until then, set
+the job's `evaluate` object in `data/scheduled-jobs.json` (under the data root) by
+hand, for example `"evaluate": { "mode": "auto", "enabledAt": "2026-11-09",
+"rankThreshold": 3.5, "maxPerRun": 5 }`, with the dashboard stopped. Set the
+job's evaluate mode to **review** and the runner ranks the rows that job's scans
+added, through `rank-pipeline.mjs`. Set it to **auto** and the runner also queues
+the rows ranked at or above the job's rank threshold (at most its evaluations per
+run) in `data/evaluate-queue.tsv`, and evaluates them. Each evaluation is an
+`evaluate-text` run on the dashboard: the runner fetches the posting text from the
+board's public API and POSTs it to `/api/run`, where Claude scores it with Read,
+Glob and Grep only. No network tool, no write tool, no apply, no submit.
+
+- **The dashboard must be running.** The runner calls it at `CAREER_OPS_WEB_URL`
+  (default `http://127.0.0.1:3000`). When it does not answer, the rows stay
+  queued, marked `dashboard-offline`, and the next tick tries again.
+- **Pod only, unless you opt in.** Auto mode evaluates only inside a Kubernetes pod,
+  where `KUBERNETES_SERVICE_HOST` is set. On a laptop or any other host the runner
+  refuses and writes one stderr line, because an unattended run reads posting text
+  with your own files in reach. Set `CAREER_OPS_AUTO_EVALUATE_LOCAL=1` in the
+  runner's environment to accept that on this host.
+- **A daily cap.** `pipeline.auto_evaluate_daily_cap` in `config/profile.yml` (default
+  10) caps the evaluations started (running rows) per UTC day across every job. When it
+  is reached, the runner says so on stderr and the rows wait for the next UTC day.
+- **Boards with a public API only.** A row on a board whose posting text the
+  runner cannot read through an API is skipped as `no-api-text`; evaluate it
+  from the Inbox.
+- **Never twice.** A row you already evaluated from the Inbox, or one with a
+  report or tracker row, is skipped, and a usage-limit error stops the batch with
+  the rest still queued.
+
+Check the queue with `node evaluate-queue.mjs dump --json`.
+
 ---
 
 ## 3. Automate the follow-up sweep

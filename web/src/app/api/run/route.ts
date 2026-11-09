@@ -11,6 +11,7 @@ import { accumulateTokens, createAgentTextJoiner, isFatalGenericStderr, killMsFo
 import { spawnHeadlessCli } from "@/lib/spawn-cli.mjs";
 import { careerOpsRoot, readMemory, findReportFile, readInbox, readScanDates, readLanguageConfig } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
+import { normalizeUrl } from "@/lib/core/url-key.mjs";
 import { resolvePdfPaths, type PdfPaths } from "@/lib/pdf-paths.mjs";
 import { renderAndMarkPdf, writeCvHtml, pdfRunOutcome } from "@/lib/pdf-render.mjs";
 import { createCvEnvelopeFilter, type CvEnvelope } from "@/lib/cv-envelope.mjs";
@@ -35,11 +36,14 @@ export const maxDuration = 800; // a real oferta evaluation / pdf-mode CV tailor
 // fetchJdViaKnownApi caps the text it returns at 12,000 characters; this leaves
 // headroom. Characters, not bytes, so a CJK posting at that cap still fits.
 const JD_TEXT_MAX_CHARS = 16 * 1024;
-// The data root is spelled into evaluate-text's Read denies, inside the
-// comma-separated --disallowedTools value: a comma would split a rule and a glob
-// character would widen one. So letters, digits, . _ - and / only. Checked after
-// the CLI rules, so a refused CLI is named first on any platform.
+// The data root and the code checkout are spelled into evaluate-text's Read
+// denies, inside the comma-separated --disallowedTools value: a comma would
+// split a rule and a glob character would widen one. So letters, digits, . _ -
+// and / only. Checked after the CLI rules, so a refused CLI is named first on
+// any platform.
 const DENY_SAFE_ROOT = /^\/[A-Za-z0-9._\/-]*$/;
+// Normalised posting URLs with an evaluation running in this process.
+const EVALUATIONS_IN_FLIGHT = new Set<string>();
 // The input each evaluate kind takes. The inbox also queues local:jds/ rows for
 // evaluate, so that kind keeps them, and scan mode names those files with the
 // company unslugged, so a local: path may hold an interior space. \s misses
@@ -110,21 +114,30 @@ export async function POST(req: Request) {
   if (kind === "evaluate-text" && cliId !== "claude") {
     return Response.json({ error: "evaluate-text runs on Claude only, and Claude is not available." }, { status: 400 });
   }
-  let denyRoot: string | undefined;
+  // Scripts and system modes live in the code checkout, which on a split-layout
+  // install is not the data root (cv.md, reports/ and output stay under that).
+  const codeRoot = resolveCodeRoot(process.cwd(), process.env);
+  const denyRoots: { dataRoot?: string; codeRoot?: string } = {};
   if (kind === "evaluate-text") {
-    // The denies name the real path, so a symlinked data root still covers the files.
-    const root = careerOpsRoot();
-    try {
-      denyRoot = fs.realpathSync(root);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
-      console.error(`/api/run: evaluate-text realpath of the data root failed: ${code}`);
-      return Response.json({ error: `evaluate-text could not resolve the data root ${root} (${code}).` }, { status: 400 });
-    }
-    if (!DENY_SAFE_ROOT.test(denyRoot)) {
-      return Response.json({
-        error: `evaluate-text needs a data root of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${denyRoot}). Point CAREER_OPS_ROOT at such a path.`,
-      }, { status: 400 });
+    // The denies name the real paths, so a symlinked root still covers the files.
+    for (const [key, label, root, envName] of [
+      ["dataRoot", "data root", careerOpsRoot(), "CAREER_OPS_ROOT"],
+      ["codeRoot", "code checkout", codeRoot, "CAREER_OPS_CODE_ROOT"],
+    ] as const) {
+      let real: string;
+      try {
+        real = fs.realpathSync(root);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
+        console.error(`/api/run: evaluate-text realpath of the ${label} failed: ${code}`);
+        return Response.json({ error: `evaluate-text could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
+      }
+      if (!DENY_SAFE_ROOT.test(real)) {
+        return Response.json({
+          error: `evaluate-text needs a ${label} of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${real}). Point ${envName} at such a path.`,
+        }, { status: 400 });
+      }
+      denyRoots[key] = real;
     }
   }
   const substitution = cliSubstitutionNotice(resolved);
@@ -144,9 +157,6 @@ export async function POST(req: Request) {
   const lang = readLanguageConfig();
   const needsScript: Record<string, string> = { evaluate: lang.evalModeFile, "evaluate-text": lang.evalModeFile, "fix-portal": "verify-portals.mjs", pdf: "generate-pdf.mjs", cover: "modes/cover.md" };
   const required = needsScript[kind];
-  // Scripts and system modes live in the code checkout, which on a split-layout
-  // install is not the data root (cv.md, reports/ and output stay under that).
-  const codeRoot = resolveCodeRoot(process.cwd(), process.env);
   // CAREER_OPS_ROOT is runtime user data, not a build input. Tracing this
   // dynamic path would copy the whole web project into every server bundle.
   const requiredPath = required
@@ -292,7 +302,16 @@ export async function POST(req: Request) {
   // A CLI with its own structured stream gets the argv that turns it on, so its
   // stdout matches spec.parseEvent below; spec.args stays the plain-text argv the
   // envelope-parsing routes rely on.
-  const args = isClaude ? claudeCliArgs({ kind, prompt, dataRoot: denyRoot }) : (spec.streamArgs ?? spec.args)(prompt);
+  const args = isClaude ? claudeCliArgs({ kind, prompt, ...denyRoots }) : (spec.streamArgs ?? spec.args)(prompt);
+
+  // The Inbox and the scheduled drain can both start an evaluation of one
+  // posting; a second would reserve a second report number for it.
+  const flightKey = isEvaluateKind(kind) ? normalizeUrl(input) || input : null;
+  if (flightKey !== null && EVALUATIONS_IN_FLIGHT.has(flightKey)) {
+    return Response.json({ error: "This posting is already being evaluated." }, { status: 409 });
+  }
+  if (flightKey !== null) EVALUATIONS_IN_FLIGHT.add(flightKey);
+  const endFlight = () => { if (flightKey !== null) EVALUATIONS_IN_FLIGHT.delete(flightKey); };
 
   // Tracker-mutating runs hold a write token so a row delete can't race their
   // merge (tracker.mjs delete doesn't yet share a lock with merge-tracker,
@@ -323,6 +342,7 @@ export async function POST(req: Request) {
     // of the process and acquireTrackerWrite blocks every later evaluate/pdf run:
     // a refused argv would take the tracker down with it.
     if (writeToken !== null) releaseTrackerWrite(writeToken);
+    endFlight();
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "failed to start the CLI" }),
       { status: 500, headers: { "Content-Type": "application/json" } },
@@ -353,6 +373,7 @@ export async function POST(req: Request) {
   // actually closes and any render or persist work has finished.
   const finishRun = createRunFinalizer(child, () => {
     if (writeToken !== null) releaseTrackerWrite(writeToken);
+    endFlight();
   });
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
