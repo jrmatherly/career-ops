@@ -167,8 +167,16 @@ wrote (`io.career-ops.scheduled-scan`). It runs as the
 current user (never as root), and Windows and macOS need a logged-in session. The task runs
 `web/scripts/scheduled-jobs-runner.mjs`, which starts the scanner and, for a job
 in review or auto mode, ranks the rows that job's scans added through
-`rank-pipeline.mjs`, which calls your agent CLI. It never evaluates roles,
-applies, or submits anything. Job definitions and run history stay in the gitignored `data/`
+`rank-pipeline.mjs`, which calls your agent CLI. It never evaluates roles
+unless a job's evaluate mode is auto, and auto mode needs the dashboard
+running: the runner queues the job's rows ranked at or above its threshold in
+`data/evaluate-queue.tsv`, then evaluates them one at a time by POSTing
+`evaluate-text` runs to the dashboard at `CAREER_OPS_WEB_URL` (default
+`http://127.0.0.1:3000`), at most `pipeline.auto_evaluate_daily_cap` a day.
+Auto mode evaluates only inside a Kubernetes pod (`KUBERNETES_SERVICE_HOST` is
+set); on any other host the runner refuses with one stderr line until you set
+`CAREER_OPS_AUTO_EVALUATE_LOCAL=1`, because an unattended run reads posting text
+with your own files in reach. It never applies or submits anything. Job definitions and run history stay in the gitignored `data/`
 directory. The definitions live in `data/scheduled-jobs.json` under the data
 root; `CAREER_OPS_SCHEDULED_JOBS_PATH` moves that file, and a relative value
 resolves against the data root.

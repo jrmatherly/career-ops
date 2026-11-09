@@ -423,10 +423,16 @@ cover_letter:
 #   triage_min_urls   — batches with fewer surviving URLs than this skip triage
 #                       and go straight to full evaluation (triage overhead
 #                       isn't worth it on a handful of roles). Default: 5.
+#   auto_evaluate_daily_cap — not the triage gate: a scheduled scan whose
+#                       evaluate mode is "auto" queues its best-ranked new rows,
+#                       and the runner evaluates them through the dashboard.
+#                       This caps the evaluations it starts per UTC day, across
+#                       every job. Default (key absent): 10.
 #
 # pipeline:
 #   triage_threshold: 3.5
 #   triage_min_urls: 5
+#   auto_evaluate_daily_cap: 10
 
 # ── Re-apply Cooldown Windows ──────────────────────────────────────────────
 #

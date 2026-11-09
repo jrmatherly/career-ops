@@ -72,7 +72,7 @@ const FATAL_AUTH_STDERR_RE =
  * flagging a self-retrying 429 fatal re-creates the false-red #2085 exists to
  * remove (sawError fails the honesty gate even on exit 0 with a written
  * report). Auth gets no such carve-out: it never heals by retrying. */
-const FATAL_QUOTA_STDERR_RE = /quota|rate limit/i;
+export const FATAL_QUOTA_STDERR_RE = /quota|rate limit/i;
 // Only a retry the CLI ANNOUNCES AS IN PROGRESS ("retrying", "retry in 5s",
 // "will retry") — a bare /retry/ would also match terminal wording like
 // "do not retry" or "retry limit exhausted" and silence a genuine failure.
@@ -80,7 +80,7 @@ const RETRYING_STDERR_RE = /retrying|retry\s+in\b|will\s+retry/i;
 const isFatalQuotaStderr = (line) => FATAL_QUOTA_STDERR_RE.test(line) && !RETRYING_STDERR_RE.test(line);
 
 /** Claude Code's own wording for the same class of failure. */
-const CLAUDE_FATAL_STDERR_RE = /invalid api key|please run \/login|credit balance|usage limit reached/i;
+export const CLAUDE_FATAL_STDERR_RE = /invalid api key|please run \/login|credit balance|usage limit reached/i;
 
 /** Codex `error` events that it recovers from on its own (see parseCodexEvent). */
 const CODEX_TRANSIENT_ERROR_RE = /reconnect/i;

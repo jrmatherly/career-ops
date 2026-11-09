@@ -236,7 +236,7 @@ test("claudeCliArgs: MCP is locked for non-writing kinds, kept for writing ones"
 
   for (const kind of nonWriting) {
     assert.ok(
-      claudeCliArgs({ kind, prompt: "x", dataRoot: "/data" }).includes("--strict-mcp-config"),
+      claudeCliArgs({ kind, prompt: "x", dataRoot: "/data", codeRoot: "/app" }).includes("--strict-mcp-config"),
       `${kind} declares writes:false, so its tool list must describe everything it can reach`,
     );
   }
@@ -279,7 +279,7 @@ test("claudeCliArgs: evaluate command line grants no write-capable tool", () => 
 
 test("claudeCliArgs: evaluate-text reaches no network tool and keeps MCP locked", () => {
   // Given the unattended kind, which reads posting text from the request
-  const args = claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data" });
+  const args = claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data", codeRoot: "/app" });
   const allowed = toolNames(argValue(args, "--allowedTools"));
   const denied = toolNames(argValue(args, "--disallowedTools"));
 
@@ -296,18 +296,24 @@ test("claudeCliArgs: evaluate-text reaches no network tool and keeps MCP locked"
 });
 
 test("claudeCliArgs: evaluate-text denies Read on secrets and PII by absolute path", () => {
-  // Given a data root, with a trailing slash to prove it is normalised
-  const deny = argValue(claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data/" }), "--disallowedTools").split(",");
+  // Given a data root and a code checkout, with trailing slashes to prove they are normalised
+  const deny = argValue(claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data/", codeRoot: "/app/" }), "--disallowedTools").split(",");
 
-  // Then all seven rules ship in Claude Code's `//` absolute form
+  // Then every rule ships, the paths in Claude Code's `//` absolute form
   for (const rule of [
     "Read(//proc/**)",
     "Read(//var/run/secrets/**)",
     "Read(~/.claude/**)",
     "Read(~/.claude.json)",
+    "Read(~/.ssh/**)",
+    "Read(~/.aws/**)",
+    "Read(~/.config/gh/**)",
+    "Read(~/.gnupg/**)",
     "Read(//data/.env)",
     "Read(//data/data/contacts.tsv)",
     "Read(//data/data/Connections.csv)",
+    "Read(//app/.env*)",
+    "Read(//app/web/.env*)",
   ]) {
     assert.ok(deny.includes(rule), `missing deny ${rule} in ${deny.join(",")}`);
   }
@@ -323,8 +329,14 @@ test("claudeCliArgs: the Read denies are evaluate-text's alone", () => {
 
 test("claudeCliArgs: evaluate-text refuses to build without an absolute data root", () => {
   // A missing root would silently drop the .env and PII denies
-  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x" }), /absolute dataRoot/);
-  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "data" }), /absolute dataRoot/);
+  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x", codeRoot: "/app" }), /absolute dataRoot/);
+  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "data", codeRoot: "/app" }), /absolute dataRoot/);
+});
+
+test("claudeCliArgs: evaluate-text refuses to build without an absolute code root", () => {
+  // A missing checkout would silently drop the env-file denies
+  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data" }), /absolute codeRoot/);
+  assert.throws(() => claudeCliArgs({ kind: "evaluate-text", prompt: "x", dataRoot: "/data", codeRoot: "app" }), /absolute codeRoot/);
 });
 
 test("argValue: absent or dangling flags yield an empty string, not a crash", () => {

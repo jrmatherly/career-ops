@@ -354,7 +354,7 @@ export async function recordStepCounts(storePath, runId, counts) {
   });
 }
 
-function readText(file) {
+export function readText(file) {
   try {
     return fs.readFileSync(file, "utf8");
   } catch (error) {
@@ -483,7 +483,19 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     }
   }
   process.stderr.write(`rank: job ${job.id} since ${since}: ${ranked} ranked, ${unranked.length} sent${evalMessage ? `; ${evalMessage}` : ""}\n`);
-  if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage) await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage });
+  let autoQueued = lastRun.autoQueued;
+  if (job.evaluate.mode === "auto") {
+    // The rows still waiting for a later rank pass are left for that pass to queue.
+    const passed = new Set(candidates.map((candidate) => candidate.url));
+    for (const candidate of waiting.slice(unranked.length)) passed.delete(candidate.url);
+    // Loaded here, not at the top, so a job outside auto mode never loads the ledger module.
+    const { queueCandidates } = await import("../../lib/evaluate-queue.mjs");
+    const rows = pendingRows(readText(pipelinePath)).filter((row) => passed.has(row.url));
+    autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold }, rows);
+  }
+  if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage || lastRun.autoQueued !== autoQueued) {
+    await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage, autoQueued });
+  }
 }
 
 async function takeDueJob(storePath) {
@@ -498,8 +510,31 @@ function requestedJobId(args) {
   return index >= 0 ? args[index + 1] || null : null;
 }
 
-/** One runner tick. `root` and `spawnFn` are seams for tests; the CLI passes neither. */
-export async function main(args = process.argv.slice(2), { root = getCareerOpsRoot(), spawnFn = spawnSync } = {}) {
+// A live holder's pid keeps the lock however long its drain runs; this only frees one left by a dead runner.
+const DRAIN_LOCK = { timeoutMs: 1_000, staleMs: 6 * 60 * 60 * 1_000 };
+
+async function defaultDrain(options) {
+  const { runDrain } = await import("./evaluate-drain.mjs");
+  return runDrain(options);
+}
+
+/*
+ * Drain the auto jobs' queue after the rank pass, under its own lock, so a
+ * tick that fires while a long drain runs still scans and ranks. The drain
+ * module loads only when an auto job exists, which keeps an idle tick cheap.
+ */
+async function drainPass(root, storePath, drainFn) {
+  if (!readScheduledStore(storePath).jobs.some((job) => job.status === "active" && job.evaluate?.mode === "auto")) return;
+  try {
+    await withResourceLock(`${storePath}.drain`, () => drainFn({ root, storePath }), DRAIN_LOCK);
+  } catch (error) {
+    if (error?.code !== "LOCK_TIMEOUT") throw error;
+    process.stderr.write("drain: another runner is draining; this tick leaves the queue to it\n");
+  }
+}
+
+/** One runner tick. `root`, `spawnFn` and `drainFn` are seams for tests; the CLI passes none. */
+export async function main(args = process.argv.slice(2), { root = getCareerOpsRoot(), spawnFn = spawnSync, drainFn = defaultDrain } = {}) {
   const storePath = scheduledStorePath(root);
   const runnerResource = runnerResourcePath(storePath);
   const manualJobId = requestedJobId(args);
@@ -537,6 +572,7 @@ export async function main(args = process.argv.slice(2), { root = getCareerOpsRo
     // The manual route returns when its scan finishes; the next tick ranks what it found.
     if (!manualJobId) {
       await rankPass(root, storePath, { spawnFn }).catch((error) => process.stderr.write(`rank pass failed: ${error instanceof Error ? error.message : String(error)}\n`));
+      await drainPass(root, storePath, drainFn).catch((error) => process.stderr.write(`drain failed: ${error instanceof Error ? error.message : String(error)}\n`));
     }
   }
 }

@@ -37,6 +37,7 @@ import {
 import { assertScheduledJobBody, scheduledEvaluate, scheduledFiltersFrom } from "../../src/lib/scheduled-job-input.mjs";
 import { hostLocalDate } from "../../src/lib/core/evaluate-candidates.mjs";
 import { scanFailureMessage, stderrCause } from "../../src/lib/scheduled-scan-error.mjs";
+import { readLedger } from "../../../lib/evaluate-queue.mjs";
 
 const WEB_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -1200,6 +1201,41 @@ test("rankPass runs only for mode review or auto", async () => {
   }
 });
 
+const ledgerOf = (root) => readLedger(root).map((entry) => [entry.url, entry.state, entry.reason, entry.rank, entry.runId]);
+
+test("rankPass in auto mode queues the rows at or above the threshold and skips the rest", async () => {
+  for (const [rankThreshold, state, reason, autoQueued] of [[3.5, "queued", "", 2], [4.5, "skipped", "below-threshold", 0]]) {
+    await withRankRoot({ ...REVIEW, mode: "auto", rankThreshold }, async ({ root, storePath }) => {
+      await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+      assert.deepEqual(ledgerOf(root), SCANNED.map((url) => [url, state, reason, 4, RANK_RUN]), `threshold ${rankThreshold}`);
+      assert.equal(runRecord(storePath).autoQueued, autoQueued);
+      await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+      assert.equal(readLedger(root).flatMap((entry) => entry.rows).length, 2, "a second pass appends nothing");
+    });
+  }
+});
+
+test("rankPass in review mode writes no ledger", async () => {
+  await withRankRoot(REVIEW, async ({ root, storePath }) => {
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+    assert.equal(fs.existsSync(path.join(root, "data", "evaluate-queue.tsv")), false);
+    assert.equal(runRecord(storePath).autoQueued, undefined);
+  });
+});
+
+test("an auto row the ranker missed is skipped as unranked, then queued once a later run ranks it", async () => {
+  await withRankRoot({ ...REVIEW, mode: "auto" }, async ({ root, storePath }) => {
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([], 0, 1) }));
+    assert.deepEqual(ledgerOf(root).map(([url, state, reason]) => [url, state, reason]), [[SCANNED[0], "queued", ""], [SCANNED[1], "skipped", "unranked"]]);
+    assert.equal(runRecord(storePath).autoQueued, 1);
+    const nextRun = "66666666-6666-4666-8666-666666666666";
+    await withScheduledStore(storePath, (store) => { store.runs.unshift({ id: nextRun, jobId: RANK_JOB, at: "2026-11-08T16:00:00.000Z", state: "success", attempt: 1, rolesFound: 0 }); });
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+    assert.deepEqual(ledgerOf(root).map(([url, state]) => [url, state]), [[SCANNED[0], "queued"], [SCANNED[1], "queued"]]);
+    assert.equal(readScheduledStore(storePath).runs.find((run) => run.id === nextRun).autoQueued, 1);
+  });
+});
+
 test("rankPass skips the spawn with no candidates", async () => {
   await withRankRoot({ ...REVIEW, enabledAt: "2026-11-10" }, async ({ root, storePath, pipeline }) => {
     const before = fs.readFileSync(pipeline, "utf8");
@@ -1442,5 +1478,35 @@ test("runner --job leaves ranking to the next tick", async () => {
     assert.notEqual(newest.id, RANK_RUN, "the manual scan's run is the one ranked");
     assert.ok(newest.ranked >= 1);
     assert.match(fs.readFileSync(pipeline, "utf8"), /acme\/new \| Acme \| Engineer New \| rank: /);
+  });
+});
+
+test("the drain runs after the rank pass only on a tick without --job, and only with an auto job", async () => {
+  await withTickRoot(async ({ root, storePath, spawnWith }) => {
+    const drains = [];
+    const drainFn = async (options) => { drains.push(options); };
+    const spawnFn = spawnWith(() => ({ status: 0, stdout: "{}", stderr: "" }));
+    await quietly(() => runnerTick([], { root, spawnFn, drainFn }));
+    assert.equal(drains.length, 0, "a review job has nothing to drain");
+    await withScheduledStore(storePath, (store) => { store.jobs[0].evaluate.mode = "auto"; });
+    await quietly(() => runnerTick(["--job", RANK_JOB], { root, spawnFn, drainFn }));
+    assert.equal(drains.length, 0, "no drain under --job");
+    const { value } = await quietly(() => runnerTick([], { root, spawnFn, drainFn }));
+    assert.deepEqual(drains, [{ root, storePath }]);
+    assert.equal(value.status, "idle", "the tick result is unchanged");
+  });
+});
+
+test("a failing drain or a drain lock held elsewhere goes to stderr and the tick still returns", async () => {
+  await withTickRoot(async ({ root, storePath, spawnWith }) => {
+    await withScheduledStore(storePath, (store) => { store.jobs[0].evaluate.mode = "auto"; });
+    const spawnFn = spawnWith(() => ({ status: 0, stdout: "{}", stderr: "" }));
+    const failing = await quietly(() => runnerTick([], { root, spawnFn, drainFn: async () => { throw new Error("ledger unreadable"); } }));
+    assert.equal(failing.value.status, "idle");
+    assert.match(failing.stderr, /drain failed: ledger unreadable/);
+    let ran = false;
+    const held = await quietly(() => withResourceLock(`${storePath}.drain`, () => runnerTick([], { root, spawnFn, drainFn: async () => { ran = true; } })));
+    assert.equal(ran, false);
+    assert.match(held.stderr, /another runner is draining/);
   });
 });

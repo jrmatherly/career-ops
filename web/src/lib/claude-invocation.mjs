@@ -154,16 +154,17 @@ export function grantsWriteCapability(scope) {
  *
  * evaluate-text runs unattended on untrusted posting text, so it also denies
  * Read on what a hostile posting would aim at: the process environment, the
- * service-account token, the CLI's own home and credentials, the data root's
- * .env and the two third-party PII files.
+ * service-account token, the CLI's own home and credentials, the host's SSH,
+ * AWS, GitHub CLI and GPG credentials, the data root's .env, the two third-party
+ * PII files, and the checkout's env files.
  *
- * @param {{kind: string, prompt: string, dataRoot?: string}} args
+ * @param {{kind: string, prompt: string, dataRoot?: string, codeRoot?: string}} args
  * @returns {string[]}
  */
-export function claudeCliArgs({ kind, prompt, dataRoot }) {
+export function claudeCliArgs({ kind, prompt, dataRoot, codeRoot }) {
   const scope = toolScopeFor(kind);
   const disallowed = kind === "evaluate-text"
-    ? [scope.disallowed, ...evaluateTextReadDenies(dataRoot)].join(",")
+    ? [scope.disallowed, ...evaluateTextReadDenies(dataRoot, codeRoot)].join(",")
     : scope.disallowed;
   return [
     "-p", prompt,
@@ -184,19 +185,29 @@ export function claudeCliArgs({ kind, prompt, dataRoot }) {
 
 // `//` is Claude Code's absolute-path prefix; a single slash anchors at the
 // settings source, so `Read(/proc/**)` would not cover /proc.
-function evaluateTextReadDenies(dataRoot) {
-  if (!dataRoot?.startsWith("/")) {
-    throw new Error("claudeCliArgs: evaluate-text needs an absolute dataRoot for its Read denies");
+function evaluateTextReadDenies(dataRoot, codeRoot) {
+  for (const [name, value] of [["dataRoot", dataRoot], ["codeRoot", codeRoot]]) {
+    if (!value?.startsWith("/")) {
+      throw new Error(`claudeCliArgs: evaluate-text needs an absolute ${name} for its Read denies`);
+    }
   }
-  const root = `/${dataRoot.replace(/\/+$/, "")}`;
+  const absolute = (dir) => `/${dir.replace(/\/+$/, "")}`;
+  const root = absolute(dataRoot);
+  const code = absolute(codeRoot);
   return [
     "Read(//proc/**)",
     "Read(//var/run/secrets/**)",
     "Read(~/.claude/**)",
     "Read(~/.claude.json)",
+    "Read(~/.ssh/**)",
+    "Read(~/.aws/**)",
+    "Read(~/.config/gh/**)",
+    "Read(~/.gnupg/**)",
     `Read(${root}/.env)`,
     `Read(${root}/data/contacts.tsv)`,
     `Read(${root}/data/Connections.csv)`,
+    `Read(${code}/.env*)`,
+    `Read(${code}/web/.env*)`,
   ];
 }
 

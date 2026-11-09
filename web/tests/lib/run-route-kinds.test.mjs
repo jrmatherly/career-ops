@@ -302,10 +302,38 @@ test("evaluate-text spawns with its Read denies and no network tool", POSIX_ROOT
   await events(await run({ jdText: "界".repeat(16 * 1024) }));
 
   const deny = argValue(args, "--disallowedTools").split(",");
-  for (const rule of ["WebFetch", "WebSearch", "Read(//proc/**)", `Read(/${root}/.env)`]) {
+  // The fixture's code checkout is its data root, so both sets of path rules name it.
+  for (const rule of ["WebFetch", "WebSearch", "Read(//proc/**)", `Read(/${root}/.env)`, `Read(/${root}/.env*)`, `Read(/${root}/web/.env*)`]) {
     assert.ok(deny.includes(rule), `missing ${rule}`);
   }
   assert.ok(!argValue(args, "--allowedTools").includes("WebFetch"));
+});
+
+test("evaluate-text refuses a code checkout it cannot resolve", async (t) => {
+  const root = fixtureRoot(t);
+  process.env.CAREER_OPS_CODE_ROOT = path.join(root, "missing-checkout");
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  t.mock.method(console, "error", () => {});
+  assert.match(await refusal(await run({ jdText: "Role." })), /could not resolve the code checkout .*missing-checkout \(ENOENT\)/);
+});
+
+test("a second evaluation of a posting already in flight answers 409 before any spawn", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
+  let spawns = 0;
+  globalThis.__onSpawn = () => { spawns += 1; };
+  globalThis.__fakeStdout = GATE_STDOUT;
+  const first = await run({ jdText: "Role." });
+  // Another spelling of the same posting, and the other evaluate kind.
+  for (const body of [{ input: "https://jobs.example.test/1/", jdText: "Role." }, { kind: "evaluate", jdText: undefined }]) {
+    const second = await run(body);
+    assert.equal(second.status, 409, JSON.stringify(body));
+    assert.match((await second.json()).error, /already being evaluated/);
+  }
+  assert.equal(spawns, 1, "the refused requests started no CLI");
+  await events(first);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await events(await run({ jdText: "Role." }));
+  assert.equal(spawns, 2, "the posting is free again once its run ends");
 });
 
 test("evaluate-text denies the real path behind a symlinked data root", POSIX_ROOT, async (t) => {
