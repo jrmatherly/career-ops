@@ -7,6 +7,7 @@ import path from "node:path";
 
 import { runDrain } from "../../scripts/evaluate-drain.mjs";
 import { readScheduledStore } from "../../src/lib/scheduled-jobs-store.mjs";
+import { checkRequest } from "../../src/lib/origin-guard.mjs";
 import { appendRow, readLedger } from "../../../lib/evaluate-queue.mjs";
 
 const JOB = "11111111-1111-4111-8111-111111111111";
@@ -23,8 +24,8 @@ const done = (n) => [{ type: "status", label: "Saving report…" }, { type: "don
 /**
  * A data root with one auto job whose run queued `urls` (best rank first), all
  * pending in pipeline.md, and a stand-in dashboard. `answer(body, root)` returns
- * the NDJSON events for one /api/run POST, a status number, or "drop" to cut
- * the connection.
+ * the NDJSON events for one /api/run POST, a status number, "drop" to cut the
+ * connection, or "hang" to send keepalives and never end.
  */
 async function withDrainRoot(t, { urls, answer = () => done(1), healthy = true, evaluate = AUTO }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-drain-"));
@@ -53,6 +54,12 @@ async function withDrainRoot(t, { urls, answer = () => done(1), healthy = true, 
       posts.push({ headers: req.headers, body, stateAtPost: ledger?.state });
       const reply = answer(body, root);
       if (reply === "drop") return req.socket.destroy();
+      if (reply === "hang") {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        const beat = setInterval(() => res.write(`${JSON.stringify({ type: "keepalive" })}\n`), 20);
+        req.socket.on("close", () => clearInterval(beat));
+        return;
+      }
       if (typeof reply === "number") return res.writeHead(reply, { "Content-Type": "application/json" }).end(JSON.stringify({ error: `refused ${reply}` }));
       res.writeHead(200, { "Content-Type": "text/plain" });
       res.end(reply.map((event) => `${JSON.stringify(event)}\n`).join(""));
@@ -129,15 +136,70 @@ test("each skip reason is recorded and none of them POSTs", async (t) => {
   assert.equal(state(urls[4]).rows.length, 2, "a skipped row is not touched again");
 });
 
-test("a null or thrown posting-text fetch leaves the row queued with no new row", async (t) => {
-  for (const fetchJd of [async () => null, async () => { throw new Error("socket hang up"); }, async () => ({ text: "  " })]) {
+test("a null or thrown posting-text fetch leaves the row queued with its reason, written once", async (t) => {
+  for (const [fetchJd, reason] of [
+    [async () => null, "no-text: the ATS API returned no text"],
+    [async () => { throw new Error("socket hang up"); }, "no-text: socket hang up"],
+    [async () => ({ text: " \0 " }), "no-text: the ATS API returned no text"],
+  ]) {
     const { drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1)] });
     await drain({ fetchJd });
+    await drain({ fetchJd });
     assert.equal(posts.length, 0);
-    assert.equal(state(url(1)).state, "queued");
-    assert.equal(state(url(1)).rows.length, 1);
+    assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).failures], ["queued", reason, 0]);
+    assert.equal(state(url(1)).rows.length, 2, "the second tick with the same reason appends nothing");
     assert.match(stderr.join(""), /it stays queued/);
   }
+});
+
+test("a NUL in the posting text is stripped before the POST", async (t) => {
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1)] });
+  await drain({ fetchJd: async () => ({ text: "Posting\0 text." }) });
+  assert.equal(posts[0].body.jdText, "Posting text.");
+  assert.equal(state(url(1)).state, "evaluated");
+});
+
+test("a run that keeps sending keepalives past the deadline is cut off as dashboard-offline", async (t) => {
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => "hang" });
+  const started = Date.now();
+  const result = await drain({ runTimeoutMs: 300 });
+  assert.ok(Date.now() - started < 5_000, "the wall-clock deadline ended the request");
+  assert.equal(result.status, "offline");
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["queued", "dashboard-offline"]);
+  assert.equal(posts.length, 1);
+});
+
+test("an offline tick after a stale running row keeps the failure it charged", async (t) => {
+  const { root, drain, state } = await withDrainRoot(t, { urls: [url(1)], healthy: false });
+  await appendRow(root, { url: url(1), at: new Date(T0 - 900_000).toISOString(), jobId: JOB, runId: RUN, state: "running", source: "drain" });
+  assert.equal(state(url(1)).failures, 1);
+  await drain();
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).failures], ["queued", "dashboard-offline", 1]);
+});
+
+test("a full daily cap with rows still queued answers capped and says so", async (t) => {
+  const { root, drain, posts, stderr } = await withDrainRoot(t, { urls: [url(1), url(2)] });
+  fs.mkdirSync(path.join(root, "config"));
+  fs.writeFileSync(path.join(root, "config", "profile.yml"), "pipeline:\n  auto_evaluate_daily_cap: 1\n");
+  const saved = process.env.CAREER_OPS_PROFILE;
+  delete process.env.CAREER_OPS_PROFILE;
+  t.after(() => { if (saved !== undefined) process.env.CAREER_OPS_PROFILE = saved; });
+  assert.equal((await drain()).status, "drained");
+  assert.equal((await drain()).status, "capped");
+  assert.equal(posts.length, 1);
+  assert.match(stderr.join(""), /daily cap 1 reached, 1 started today; queued rows wait for the next UTC day/);
+});
+
+test("malformed ledger rows are named on stderr", async (t) => {
+  const { root, drain, stderr } = await withDrainRoot(t, { urls: [url(1)] });
+  fs.appendFileSync(path.join(root, "data", "evaluate-queue.tsv"), "not a ledger row\n");
+  await drain();
+  assert.match(stderr.join(""), /1 malformed row\(s\) in data\/evaluate-queue\.tsv skipped/);
+});
+
+test("the dashboard's guard lets the drain's POST through: Host localhost, no Origin", () => {
+  const decision = checkRequest({ secFetchSite: null, origin: null, host: "localhost", allowedHosts: new Set(), allowedOrigins: new Set(), method: "POST", secFetchMode: null, secFetchDest: null, pathname: "/api/run" });
+  assert.deepEqual(decision, { ok: true });
 });
 
 test("a gated run records gated with its reason", async (t) => {

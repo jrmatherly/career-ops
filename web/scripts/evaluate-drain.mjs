@@ -15,7 +15,7 @@ import { pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
-import { appendRow, drainPlan, readDailyCap, readLedger } from "../../lib/evaluate-queue.mjs";
+import { appendRow, drainPlan, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
 import { JD_TEXT_API_ATS, resolveAtsApi } from "../../liveness-api.mjs";
 import { fetchJdViaKnownApi } from "../../browser-extract.mjs";
 import { resolveTrackerPath } from "../../path-resolver.mjs";
@@ -23,7 +23,10 @@ import { parseTrackerRow, resolveColumns } from "../../tracker-parse.mjs";
 import { reportUrlToken } from "../../tracker-utils.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
-// The route kills an evaluation at 740 s and persists within 60 s more.
+// A wall-clock deadline on one evaluation: the route's 740 s kill, 60 s of
+// persist and 100 s of slack. It outlasts RUNNING_STALE_MS (860 s), so in the
+// last 40 s a concurrent `evaluate-queue.mjs dump` reads the live row as stale; the
+// drain lock keeps a second drain from acting on that.
 const RUN_TIMEOUT_MS = 900_000;
 const HEALTH_TIMEOUT_MS = 5_000;
 const TERMINAL = new Set(["done", "gated", "error"]);
@@ -68,14 +71,17 @@ function skipReason(root, key, persisted) {
 function request(baseUrl, pathname, { body, timeoutMs }) {
   return new Promise((resolve) => {
     let settled = false;
+    let deadline;
     const settle = (value) => {
       if (!settled) {
         settled = true;
+        clearTimeout(deadline);
         resolve(value);
       }
     };
     const payload = body === undefined ? undefined : JSON.stringify(body);
-    // The dashboard's guard serves loopback hosts only; 127.0.0.1 in the URL is for the socket.
+    // CAREER_OPS_WEB_URL may name a non-loopback host, which the dashboard's
+    // loopback-only Host guard would refuse; the URL is only where the socket goes.
     const headers = { Host: "localhost", ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}) };
     const req = http.request(new URL(pathname, baseUrl), { method: payload ? "POST" : "GET", headers }, (res) => {
       let text = "";
@@ -85,7 +91,12 @@ function request(baseUrl, pathname, { body, timeoutMs }) {
       res.on("error", (error) => settle({ transport: error }));
       res.on("close", () => settle({ transport: new Error("the response closed before it ended") }));
     });
-    req.setTimeout(timeoutMs, () => req.destroy(new Error(`no answer in ${timeoutMs / 1000} s`)));
+    // Wall clock, not socket idle: the route's 10 s keepalive would reset an idle timer forever.
+    deadline = setTimeout(() => {
+      const error = new Error(`no answer within ${timeoutMs / 1000} s`);
+      settle({ transport: error });
+      req.destroy(error);
+    }, timeoutMs);
     req.on("error", (error) => settle({ transport: error }));
     req.end(payload);
   });
@@ -128,7 +139,7 @@ function outcomeOf(response) {
  * Kubernetes pod, or on a host that opts in with CAREER_OPS_AUTO_EVALUATE_LOCAL=1:
  * an unattended run reads the posting text with the host's own files in reach.
  *
- * @returns {Promise<{ status: "idle"|"refused"|"offline"|"stopped"|"drained", reason?: string, evaluated: number, gated: number, failed: number, skipped: number, queued: number }>}
+ * @returns {Promise<{ status: "idle"|"refused"|"capped"|"offline"|"stopped"|"drained", reason?: string, evaluated: number, gated: number, failed: number, skipped: number, queued: number }>}
  */
 export async function runDrain({
   root,
@@ -137,6 +148,7 @@ export async function runDrain({
   fetchJd = fetchJdViaKnownApi,
   now = Date.now,
   env = process.env,
+  runTimeoutMs = RUN_TIMEOUT_MS,
 }) {
   const counts = { evaluated: 0, gated: 0, failed: 0, skipped: 0, queued: 0 };
   const jobs = autoJobs(readScheduledStore(storePath));
@@ -146,13 +158,20 @@ export async function runDrain({
     return { status: "refused", reason: `not a pod and ${LOCAL_OPT_IN} is not 1`, ...counts };
   }
 
+  const skippedRows = [];
+  const ledger = readLedger(root, { now: now(), skipped: skippedRows });
+  if (skippedRows.length) log(`${skippedRows.length} malformed row(s) in data/evaluate-queue.tsv skipped, first at line ${skippedRows[0].line}`);
   const dailyCap = readDailyCap(getProfilePath(root));
   // Re-planned before each row, so the cap counts what this drain started and a
   // row tried this tick (a posting with no text yet, say) does not hold a slot.
-  const planFor = (job, tried = new Set(), started = 0) => drainPlan(root, {
-    jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun - started, dailyCap, now: now(), exclude: tried,
+  const planFor = (job, tried = new Set(), started = 0, cap = dailyCap) => drainPlan(root, {
+    jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun - started, dailyCap: cap, now: now(), exclude: tried,
   });
-  if (!jobs.some((job) => planFor(job).length)) return { status: "idle", ...counts };
+  if (!jobs.some((job) => planFor(job).length)) {
+    if (!jobs.some((job) => planFor(job, undefined, 0, Infinity).length)) return { status: "idle", ...counts };
+    log(`daily cap ${dailyCap} reached, ${startedToday(ledger, now())} started today; queued rows wait for the next UTC day`);
+    return { status: "capped", ...counts };
+  }
   const health = await request(baseUrl, "/api/healthz", { timeoutMs: HEALTH_TIMEOUT_MS });
   const online = health.status === 200;
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
@@ -193,16 +212,20 @@ export async function runDrain({
       } catch (error) {
         why = error instanceof Error ? error.message : String(error);
       }
-      if (!jd?.text?.trim()) {
+      // The route refuses a NUL, which argv cannot carry; with it in, the same row would be refused every tick.
+      const jdText = jd?.text?.replaceAll("\0", "");
+      if (!jdText?.trim()) {
         log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
+        // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
+        if (entry.reason !== `no-text: ${why}`) await append("queued", `no-text: ${why}`);
         continue;
       }
 
       await append("running");
       started += 1;
       const outcome = outcomeOf(await request(baseUrl, "/api/run", {
-        body: { kind: "evaluate-text", input: url, cliId: "claude", jdText: jd.text },
-        timeoutMs: RUN_TIMEOUT_MS,
+        body: { kind: "evaluate-text", input: url, cliId: "claude", jdText },
+        timeoutMs: runTimeoutMs,
       }));
       await append(outcome.state, outcome.reason);
       if (outcome.stop) {

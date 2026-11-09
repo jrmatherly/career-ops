@@ -1215,6 +1215,19 @@ test("rankPass in auto mode queues the rows at or above the threshold and skips 
   }
 });
 
+test("autoQueued adds up across the passes one run takes", async () => {
+  await withRankRoot({ ...REVIEW, mode: "auto" }, async ({ root, storePath, pipeline }) => {
+    const extra = Array.from({ length: 49 }, (_, i) => `https://boards.test/bulk/${i}`);
+    fs.appendFileSync(pipeline, extra.map((url) => `- [ ] ${url} | Bulk | Role\n`).join(""));
+    fs.appendFileSync(path.join(root, "data", "scan-history.tsv"), extra.map((url) => `${url}\t${SCANNED_DAY}\tboards\tRole\tBulk\tadded\n`).join(""));
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+    assert.equal(runRecord(storePath).autoQueued, 50, "the first pass queues the 50 it sent");
+    await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));
+    assert.equal(runRecord(storePath).autoQueued, 51, "the second pass adds the one left");
+    assert.equal(readLedger(root).length, 51);
+  });
+});
+
 test("rankPass in review mode writes no ledger", async () => {
   await withRankRoot(REVIEW, async ({ root, storePath }) => {
     await quietly(() => rankPass(root, storePath, { spawnFn: fakeRanker([]) }));

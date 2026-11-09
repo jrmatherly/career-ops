@@ -172,7 +172,7 @@ unless a job's evaluate mode is auto, and auto mode needs the dashboard
 running: the runner queues the job's rows ranked at or above its threshold in
 `data/evaluate-queue.tsv`, then evaluates them one at a time by POSTing
 `evaluate-text` runs to the dashboard at `CAREER_OPS_WEB_URL` (default
-`http://127.0.0.1:3000`), at most `pipeline.auto_evaluate_daily_cap` a day.
+`http://127.0.0.1:3000`), at most `pipeline.auto_evaluate_daily_cap` evaluations started per UTC day.
 Auto mode evaluates only inside a Kubernetes pod (`KUBERNETES_SERVICE_HOST` is
 set); on any other host the runner refuses with one stderr line until you set
 `CAREER_OPS_AUTO_EVALUATE_LOCAL=1`, because an unattended run reads posting text

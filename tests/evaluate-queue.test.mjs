@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, run, NODE, ROOT, rmSync } from './helpers.mjs';
-import { appendRow, drainPlan, ledgerPath, readDailyCap, readLedger } from '../lib/evaluate-queue.mjs';
+import { appendRow, drainPlan, ledgerPath, readDailyCap, readLedger, startedToday } from '../lib/evaluate-queue.mjs';
 
 console.log('\nevaluate-queue ledger — appendRow/readLedger/drainPlan and evaluate-queue.mjs');
 
@@ -45,6 +45,15 @@ try {
     for (let i = 0; i < 3; i += 1) await appendRow(deaths, { ...base, url: B, at: at(i), state: 'running', source: 'drain' });
     const dead = readLedger(deaths, { now: T0 + 900_000 })[0];
     check(dead.failures === 3 && dead.final, 'every running row a later running row follows counts as a failure, so a drain that keeps dying ends final', JSON.stringify(dead));
+    check(startedToday(readLedger(deaths), T0) === 3, 'the daily cap counts running rows, three for one URL started three times', '');
+    const G = 'https://jobs.example.test/g';
+    await appendRow(deaths, { ...base, url: G, at: at(0), state: 'running', source: 'drain' });
+    await appendRow(deaths, { ...base, url: G, at: at(1), state: 'queued', reason: 'in-flight', source: 'drain' });
+    check(readLedger(deaths, { now: T0 + 900_000 }).find((e) => e.url === G).failures === 0, 'a queued row soon after a running row spends no retry', '');
+    await appendRow(deaths, { ...base, url: G, at: at(10), state: 'running', source: 'drain' });
+    await appendRow(deaths, { ...base, url: G, at: at(900), state: 'queued', reason: 'dashboard-offline', source: 'drain' });
+    const late = readLedger(deaths, { now: T0 + 1_000_000 }).find((e) => e.url === G);
+    check(late.failures === 1 && late.state === 'queued', 'a row written after a running row went stale keeps the failure it charged', JSON.stringify(late));
     writeFileSync(ledgerPath(deaths), `${B}\t${at(0)}\tjob-1\trun-1\thigh\t\tqueued\trank-pass\n`, { flag: 'a' });
     const bad = [];
     readLedger(deaths, { skipped: bad });
@@ -73,7 +82,7 @@ try {
   const now = T0 + 900_000;
   check(JSON.stringify(drainPlan(tmp, { dailyCap: 10, now }).map((e) => e.url)) === JSON.stringify([D.replace('/d', '/e'), B, D]),
     'the plan holds queued and retryable rows, best rank first', JSON.stringify(drainPlan(tmp, { dailyCap: 10, now }).map((e) => e.url)));
-  check(drainPlan(tmp, { dailyCap: 3, now }).length === 1, 'the daily cap counts every URL with a running row today, whatever followed', JSON.stringify(drainPlan(tmp, { dailyCap: 3, now }).map((e) => e.url)));
+  check(drainPlan(tmp, { dailyCap: 3, now }).length === 1, 'the daily cap counts every running row dated today, whatever followed', JSON.stringify(drainPlan(tmp, { dailyCap: 3, now }).map((e) => e.url)));
   check(drainPlan(tmp, { dailyCap: 10, now: T0 + 86_400_000 }).length === 3, 'yesterday\'s running rows do not count against today\'s cap', '');
   check(JSON.stringify(drainPlan(tmp, { dailyCap: 10, rankThreshold: 3.95, now }).map((e) => e.url)) === JSON.stringify(['https://jobs.example.test/e']),
     'the plan drops rows below the job\'s current threshold', '');
@@ -98,7 +107,18 @@ try {
   writeFileSync(profile, 'pipeline:\n  auto_evaluate_daily_cap: 2\n');
   check(readDailyCap(profile) === 2, 'the daily cap reads pipeline.auto_evaluate_daily_cap', '');
   writeFileSync(profile, 'pipeline:\n  auto_evaluate_daily_cap: lots\n');
-  check(readDailyCap(profile) === 10, 'a non-integer cap falls back to 10', '');
+  const write = process.stderr.write;
+  const warned = [];
+  process.stderr.write = (chunk) => { warned.push(String(chunk)); return true; };
+  let fellBack;
+  try { fellBack = readDailyCap(profile); } finally { process.stderr.write = write; }
+  check(fellBack === 10 && /auto_evaluate_daily_cap is "lots", not a whole number of 0 or more; using 10/.test(warned.join('')),
+    'a non-integer cap falls back to 10 and says so on stderr', warned.join(''));
+  writeFileSync(profile, 'pipeline:\n  triage_threshold: 3.5\n');
+  warned.length = 0;
+  process.stderr.write = (chunk) => { warned.push(String(chunk)); return true; };
+  try { readDailyCap(profile); } finally { process.stderr.write = write; }
+  check(warned.length === 0, 'a missing cap key falls back in silence', warned.join(''));
 
   const opts = { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: tmp, CAREER_OPS_PROFILE: '' } };
   const cli = (...args) => run(NODE, [join(ROOT, 'evaluate-queue.mjs'), ...args], opts);

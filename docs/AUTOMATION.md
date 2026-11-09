@@ -263,7 +263,8 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
   with your own files in reach. Set `CAREER_OPS_AUTO_EVALUATE_LOCAL=1` in the
   runner's environment to accept that on this host.
 - **A daily cap.** `pipeline.auto_evaluate_daily_cap` in `config/profile.yml` (default
-  10) caps the evaluations started per UTC day across every job.
+  10) caps the evaluations started (running rows) per UTC day across every job. When it
+  is reached, the runner says so on stderr and the rows wait for the next UTC day.
 - **Boards with a public API only.** A row on a board whose posting text the
   runner cannot read through an API is skipped as `no-api-text`; evaluate it
   from the Inbox.
