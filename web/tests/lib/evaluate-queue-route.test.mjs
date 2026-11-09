@@ -89,7 +89,7 @@ test("the real evaluate-queue.mjs: a row added through the CLI comes back from t
   process.env.CAREER_OPS_CODE_ROOT = repoRoot;
   try {
     const url = "https://jobs.example.com/real-1";
-    execFileSync(process.execPath, [join(repoRoot, "evaluate-queue.mjs"), "add", "--url", url, "--state", "queued", "--job", "job-1", "--run", "run-1", "--rank", "4.2"], { env: { ...process.env, CAREER_OPS_ROOT: dataRoot }, stdio: ["ignore", "ignore", "pipe"] });
+    execFileSync(process.execPath, [join(repoRoot, "evaluate-queue.mjs"), "add", "--url", url, "--state", "queued", "--job", "job-1", "--run", "run-1", "--rank", "4.2"], { env: { ...process.env, CAREER_OPS_ROOT: dataRoot }, stdio: ["ignore", "ignore", "inherit"] });
     const r = await get();
     assert.equal(r.status, 200);
     assert.equal(r.launches[0].args[0], join(repoRoot, "evaluate-queue.mjs"));
@@ -117,6 +117,7 @@ test("503 without the CLI's stderr when it exits non-zero, fails to spawn, times
   const cases = {
     "non-zero exit": { error: Object.assign(new Error("exit 1"), { code: 1 }), stdout: "[]", stderr: `Error: EISDIR ${SECRET_PATH}`, logged: /exited 1/ },
     "spawn failure": { error: Object.assign(new Error("spawn"), { code: "ENOENT" }), stdout: "[]", stderr: SECRET_PATH, logged: /failed to run/ },
+    "output past maxBuffer": { error: Object.assign(new Error("stdout maxBuffer length exceeded"), { code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" }), stdout: "[", stderr: "", logged: /exceeded runCoreCli's maxBuffer/ },
     timeout: { error: Object.assign(new Error("killed"), { killed: true, signal: "SIGTERM" }), stdout: "[]", stderr: SECRET_PATH },
     "unparseable stdout": { error: null, stdout: `not json ${SECRET_PATH}`, logged: /not JSON: / },
     "JSON that is not an array": { error: null, stdout: '{"path":"x"}', logged: /not a JSON array/ },

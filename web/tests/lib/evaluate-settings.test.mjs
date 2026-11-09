@@ -6,6 +6,7 @@ import {
   evaluateBody,
   evaluateFieldsVisible,
   evaluateForm,
+  evaluateCaveat,
   evaluateModeLabel,
   groupLedger,
   postingHref,
@@ -55,6 +56,14 @@ test("the card label names the mode and, for Auto, its numbers", () => {
   assert.equal(evaluateModeLabel({ mode: "review", rankThreshold: 3.5, maxPerRun: 5 }), "Review, rank only");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5 }), "Auto, settings unreadable; open Edit and save", "a hand-edited store missing a field never shows NaN");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: "high", maxPerRun: 5 }), "Auto, settings unreadable; open Edit and save");
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: null, maxPerRun: 5 }), "Auto, settings unreadable; open Edit and save", "null is not a rank of 0.0");
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: "Infinity" }), "Auto, settings unreadable; open Edit and save");
+});
+
+test("the rank caveat shows for Review and Auto, and Auto alone adds its API-text limit", () => {
+  assert.equal(evaluateCaveat("off"), null);
+  assert.equal(evaluateCaveat("review"), "Rank is a guess from the title and URL.");
+  assert.match(evaluateCaveat("auto"), /^Rank is a guess from the title and URL\. Auto evaluates only postings whose board exposes the job text/);
   assert.equal(evaluateModeLabel({ mode: "off" }), null);
   assert.equal(evaluateModeLabel(undefined), null);
 });

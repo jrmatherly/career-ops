@@ -26,7 +26,7 @@ function boundedLockWait(): Record<string, string> {
   return { CAREER_OPS_TRACKER_LOCK_TIMEOUT_MS: wait, CAREER_OPS_FOLLOWUPS_LOCK_TIMEOUT_MS: wait };
 }
 
-export type CliResult = { code: number; stdout: string; stderr: string; spawnFailed: boolean; timedOut: boolean };
+export type CliResult = { code: number; stdout: string; stderr: string; spawnFailed: boolean; timedOut: boolean; overflow: boolean };
 
 export function runCoreCli(script: string, args: string[]): Promise<CliResult> {
   return new Promise((resolve) => {
@@ -51,13 +51,16 @@ export function runCoreCli(script: string, args: string[]): Promise<CliResult> {
         // `killed` is checked first.
         const e = err as (NodeJS.ErrnoException & { killed?: boolean }) | null;
         const timedOut = e?.killed === true;
+        // Output past maxBuffer also arrives as a string code with no stderr; without this flag it reads as a spawn failure.
+        const overflow = e?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
         const code = typeof e?.code === "number" ? e.code : e ? -1 : 0;
         resolve({
           code,
           stdout: stdout || "",
           stderr: stderr || "",
-          spawnFailed: !timedOut && code === -1,
+          spawnFailed: !timedOut && !overflow && code === -1,
           timedOut,
+          overflow,
         });
       },
     );
