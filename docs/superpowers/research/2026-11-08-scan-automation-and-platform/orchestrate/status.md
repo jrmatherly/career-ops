@@ -1,4 +1,4 @@
-# Status (derived 2026-11-09T16:45:43Z from units.tsv and ledger.tsv)
+# Status (derived 2026-11-09T17:09:01Z from units.tsv and ledger.tsv)
 
 ## Units
 id	track	state	branch	pr	sha	brief
@@ -9,7 +9,7 @@ P1	build	merged	claude/p1-doctor-gateway	37	66f0cb7a2d8bfa6c61ee35cfcc813c225dd4
 K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad93311c	briefs/K1-fix4.md
 A2	build	merged	claude/a2-evaluate-queue	45	20a53283	briefs/A2.md
 A3	build	merged	claude/a3-evaluate-ui	46	8a9dcc76	briefs/A3.md
-P2	operator	pending				
+P2	operator	building	claude/p2-career-ops-proxy			briefs/P2.md
 R1	build	merged	claude/r1-rank-pass	42	5505a546	briefs/R1-r2-verify.md
 
 ## Latest ledger row per PR
