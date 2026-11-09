@@ -4,3 +4,5 @@ none	7beee0cb4906c3114b611eee703af2347795edae	unit-test-verified	receipts/D-r1/v
 none	7d42a097a8fe9c2a52ecc557d6cacdcc48694929	unit-test-verified	receipts/C-r1/verify-C.md	verify-C (sonnet)	2026-11-09T00:22:26Z
 none	d76339bc5323b87d268608f71d0ce216a44f375a	unit-test-verified	receipts/F-r1/verify-F.md	verify-F (sonnet)	2026-11-09T00:52:18Z
 none	11027b1db2bd749ac9ec6defa9c3415a75a5e4b5	unit-test-verified	receipts/E-r1/verify-E.md	verify-E (sonnet)	2026-11-09T01:25:26Z
+43	ab8d1e70b67e146d62fbe33d22ac14eaa6f0fd04	live-ui-verified	receipts/I-r1/verify-PR43.md	verify-PR43 (sonnet; live smoke sitemap+themuse, full gate, merge audit)	2026-11-09T02:05:22Z
+43	d3315f6aca40aa38ab242a88217f6a6739430be2	live-ui-verified	receipts/I-r2/verify-PR43-r2.md	verify-PR43-r2 (sonnet; reproductions rerun, full gate)	2026-11-09T02:37:58Z

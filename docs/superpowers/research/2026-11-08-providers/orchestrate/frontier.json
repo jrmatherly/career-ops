@@ -1,1 +1,1 @@
-{"generation":0,"prs":[],"lowestUnmerged":null}
+{"generation": 3, "prs": [{"pr": 43, "branch": "claude/providers-program", "head": "d3315f6aca40aa38ab242a88217f6a6739430be2", "base": "main", "state": "open"}], "lowestUnmerged": 43}

@@ -16,3 +16,15 @@ bullhorn, eightythousandhours, manatal copy the same page loop (probe handling, 
 eightythousandhours partition is one fixed two-way split on tags_location_type (756 in the larger half); growth past 1000 there brings back an unreachable remainder, warned only; a split driven by facet counts is the general fix. A posting's URL can flip between employer link and board page as link sharing changes (techinasia precedent)
 bullhorn deep-offset limit unmeasured (no tenant over 500); manatal slug pattern checked on one tenant only
 test-all.mjs section 13 (batch-runner --status empty output) also flakes under load alongside split-root (owner-E, load average ~14)
+.githooks/commit-msg.mjs rejects a `merge` type, so program merge commits use chore(providers); either allow `merge` or change the brief template (integrate-I)
+indexing-log-coverage has no stale-waiver check: a waiver line for a provider that already has a log entry passes silently (integrate-I)
+Tech Jobs for Good counts drift across sources (84/890 in F's docs, 83/886 coordinator curl, 83/885 integrator curl); the plan says "about" and points at the log
+PR 43 body test counts are stale after the fix commit (21695 -> 21697, providers 5566 -> 5568); update with gh pr edit before merge (verify-PR43)
+bullhorn careersOrigin keeps only https://hostname, so a subpath-deployed portal with the tuple override builds wrong job URLs; CORP_TOKEN_RE casing rests on one tenant (code-reviewer; needs a second tenant's app.json)
+catalog-and-template-coverage template check accepts a commented stanza anywhere; indexing-log-coverage accepts the provider token in another entry's prose and exempts boards whose header omits job_boards; provider-policy-docs-agree ROBOTS_GATE is a narrow phrase regex (test-analyzer)
+madgex: no tests for an encoded keyword, ctx.maxPages: 2, max_pages above cap, 19-item short page; bullhorn: page-1 failure on the non-probe path, isGone eviction, empty page with total > start, non-numeric dateLastPublished; healthecareers challenge on page 2 and on the detail path; dynamitejobs 503 retry vs not, challenge on the sitemap request (test-analyzer suggestions)
+templates/portals.example.yml: ServiceNow stanza external claims undated; the upstream sitemap block says the sitemap is announced by a robots Sitemap: line while the provider requires sitemap.url (upstream text, raise upstream); Dynamite stanza lacks a separator and enabled line
+docs/SUPPORTED_JOB_BOARDS.md TurboHire row says a browser path is open for re-evaluation inside the NOT-eligible table (reads contradictory)
+eightythousandhours can warn twice when a partition page 1 has hits that all fail to parse (none parsed, then not reachable); harmless (fix-I2)
+healthecareers later-page with cards but nothing parsed still breaks silently (only page one throws) (fix-I2)
+Dynamite Jobs catalog row omits that the fetch throws when every detail page fails (header says it) (verify-PR43-r2)
