@@ -1,0 +1,6 @@
+pr	sha	verdict	evidence	verifier	ts
+none	e3cc37e10b21f4db22082e9bb1b92dfd5f463b49	unit-test-verified	receipts/B-r1/verify-B.md	verify-B (sonnet)	2026-11-08T23:46:40Z
+none	7beee0cb4906c3114b611eee703af2347795edae	unit-test-verified	receipts/D-r1/verify-D.md	verify-D (sonnet)	2026-11-09T00:11:27Z
+none	7d42a097a8fe9c2a52ecc557d6cacdcc48694929	unit-test-verified	receipts/C-r1/verify-C.md	verify-C (sonnet)	2026-11-09T00:22:26Z
+none	d76339bc5323b87d268608f71d0ce216a44f375a	unit-test-verified	receipts/F-r1/verify-F.md	verify-F (sonnet)	2026-11-09T00:52:18Z
+none	11027b1db2bd749ac9ec6defa9c3415a75a5e4b5	unit-test-verified	receipts/E-r1/verify-E.md	verify-E (sonnet)	2026-11-09T01:25:26Z

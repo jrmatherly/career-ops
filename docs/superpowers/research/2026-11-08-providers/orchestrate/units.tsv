@@ -1,0 +1,7 @@
+id	track	state	branch	pr	sha	brief
+B	build	verified	claude/providers-upstream-sync		e3cc37e1	briefs/B.md
+C	build	verified	claude/providers-retire-themuse		7d42a097	briefs/C.md
+D	build	verified	claude/providers-drift-gates		7beee0cb	briefs/D.md
+E	build	verified	claude/providers-new-api		11027b1d	briefs/E.md
+F	build	verified	claude/providers-new-html		d76339bc	briefs/F.md
+I	landing	running	claude/providers-program			briefs/I.md
