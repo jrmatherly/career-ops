@@ -64,6 +64,7 @@ const rss = (title, link) =>
 
 const rssProviders = [
   ['jobspresso.mjs', 'parseJobspressoFeed', 'https://jobspresso.co/job/x/'],
+  ['cryptojobslist.mjs', 'parseCryptoJobsListFeed', 'https://cryptojobslist.com/jobs/x'],
   ['higheredjobs.mjs', 'parseHigherEdJobsFeed', 'https://www.higheredjobs.com/details.cfm?JobCode=1'],
   ['nodesk.mjs', 'parseNodeskFeed', 'https://nodesk.co/remote-jobs/x/'],
   ['larajobs.mjs', 'parseLarajobsFeed', 'https://larajobs.com/job/1'],

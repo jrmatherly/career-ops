@@ -2165,8 +2165,12 @@ search_queries:
 #   enabled: true
 #
 # - name: Example 80,000 Hours Co         # 80,000 Hours job board (public Algolia index; keys read from the page)
-#   provider: eightythousandhours         # no detect(): explicit provider: only
+#   provider: eightythousandhours         # explicit provider: only (no URL-pattern detect)
 #   max_pages: 3                          # optional page cap per query (1000 hits/page, default 3, max 20)
+#   enabled: true
+#
+# - name: Example Crypto Jobs List Co     # Web3 / crypto jobs (public RSS feed, 100 postings in one request)
+#   provider: cryptojobslist              # explicit provider: only (no URL-pattern detect)
 #   enabled: true
 #
 # - name: Example Madgex Co               # Madgex employer board (public RSS), higher-ed / science
