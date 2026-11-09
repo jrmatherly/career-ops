@@ -307,6 +307,86 @@ Evaluated on 2026-11-08 in the providers program. `POST https://www.usajobs.gov/
 
 ---
 
+## Madgex boards (Chronicle, Inside Higher Ed, Science Careers)
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E1); not affiliated with any of the three boards |
+| **Provider** | `providers/madgex.mjs` |
+| **PR** | fork branch `claude/providers-new-api` |
+| **Merged** | pending |
+| **Status** | Listed in the fork |
+
+Three employer job boards, one per host, on the same vendor (Madgex) and the same feed: `jobs.chronicle.com` (The Chronicle of Higher Education), `careers.insidehighered.com` (Inside Higher Ed) and `jobs.sciencecareers.org` (Science Careers). Each host is its own source; one provider reads whichever host the entry names, and never mixes them.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08 with a plain `curl` of `/jobsrss/?page=1` on each host: every `<title>` is "Employer: Job title" naming a college, university or research employer, and a posting page (`/job/{id}/{slug}/`) answers 200 with no login. Applying needs no payment.
+
+**Rule 2 (canonical URL is the employer's).** The feed carries one link per posting, the board's own posting page; no upstream employer URL is in the payload, so that page is the canonical URL. The provider strips the `TrackID` and `utm_*` click-tracking params from it.
+
+**Rule 3 (complete inventory, no paid placement).** `<opensearch:totalResults>` read 28,734 (Chronicle), 23,398 (Inside Higher Ed) and 531 (Science Careers) on 2026-11-08, at 20 items a page, and a page past the end (`page=99999`) answers a well-formed feed with zero items. Each keyword pass asks for `sort=Date` (without it a keyword search comes back ranked by relevance, measured on all three hosts) and walks to that empty page; `max_pages` (default 25, cap 1500) bounds it, and the cap covers Chronicle's 1,437 unfiltered pages, so raising `max_pages` on the entry reaches the full result set. The feed carries no featured, sponsored or premium field.
+
+**Rule 4 (operator declared).** Not an operator proposal.
+
+**Rule 5 (aggregation stays in core).** The provider reads one host per entry, the employers' own postings on that board.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of each host's `/robots.txt` on 2026-11-08. Under `User-agent: *` all three disallow only `/invalid-request/`, `/analytics/`, `*/emailjob/*` and `*/previewjob/*` (Science Careers adds `/apply-profile/`). None covers `/jobsrss/`, the only path the provider requests. No group names career-ops, and no `Crawl-delay` is set; the provider paces pages at 250 ms.
+
+---
+
+## 80,000 Hours (jobs.80000hours.org)
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E3); not affiliated with 80,000 Hours |
+| **Provider** | `providers/eightythousandhours.mjs` |
+| **PR** | fork branch `claude/providers-new-api` |
+| **Merged** | pending |
+| **Status** | Listed in the fork |
+
+A curated board of roles at named employers, run by the 80,000 Hours nonprofit. The board's UI reads a public Algolia index; the provider reads the same index.
+
+**Embedded search key (decision D2).** The Algolia app id, the search-only key and the index name sit in the board page's public `window.__NUXT__.config` block, which every visitor's browser receives. The provider reads them from that page on every run and never stores them, the precedent `providers/techinasia.mjs` set. The key is referer-gated, so each query sends the board's own Referer.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08: all 1,019 hits carry a `company_name`, and the board and its postings need no login or payment.
+
+**Rule 2 (canonical URL is the employer's).** A hit carries the employer's application link in `url_external`. The provider uses it when it is https and no other posting shares it; otherwise the board's own `?jobPk={post_pk}` page (the URL the board's UI sets for a posting). Measured: one hit had a non-https link, and nine links were shared by 23 postings, which as a shared dedup key would have merged 23 real postings into nine. 24 of the 1,019 rows take the board page.
+
+**Rule 3 (complete inventory, no paid placement).** The index held 1,019 hits on 2026-11-08 and serves at most 1,000 for one query: `page=1` answers HTTP 200 with zero hits and the message "you can only fetch the 1000 hits for this query". The provider then partitions on the `tags_location_type` facet, `tags_location_type:Remote` (263) and `NOT tags_location_type:Remote` (756), which together returned all 1,019 distinct postings in a live run. A partition still over 1,000 is reported as a warning, never as a complete board. The payload's ranking fields (`highlighted`, `super_ranked_score`, `daily_ranking`) are not used as filters, so no ranking decides what is read.
+
+**Rule 4 (operator declared).** Not an operator proposal.
+
+**Rule 5 (aggregation stays in core).** One source, the board's own index.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of `https://jobs.80000hours.org/robots.txt` on 2026-11-08 returned `User-agent: *` with an empty `Disallow:`, which allows every path. The Algolia host is the board's search backend, not a page a crawler reads. No `Crawl-delay`; queries are paced at 250 ms.
+
+---
+
+## Crypto Jobs List
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E5); not affiliated with the board |
+| **Provider** | `providers/cryptojobslist.mjs` |
+| **PR** | fork branch `claude/providers-new-api` |
+| **Merged** | pending |
+| **Status** | Listed in the fork, newest-feed coverage only (see rule 3) |
+
+A Web3 and crypto job board. The provider reads its public RSS feed at `https://api.cryptojobslist.com/jobs.rss`, the URL the feed's own `<atom:link rel="self">` names; the older `/rss` path answered 403 on 2026-11-08 and is not used.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08: every one of the 100 items names its employer in `<dc:creator>`, and each `<link>` is a public posting page on `cryptojobslist.com` that needs no login.
+
+**Rule 2 (canonical URL is the employer's).** The feed carries one link per posting, the board's own page; no employer application URL is in the payload, so that page is the canonical URL.
+
+**Rule 3 (complete inventory, no paid placement).** Not met in full, and said so in the catalog row: one request returns 100 postings, while the board's `sitemap-jobs.xml` listed 658 posting URLs the same day. The provider does not walk the sitemap, so it covers the feed's 100 only. The items carry no date, so whether those are the newest 100 could not be confirmed from the feed. The feed has no featured, sponsored or premium field (the only "Featured" text is an image class name on every item), so nothing reads as paid placement.
+
+**Rule 4 (operator declared).** Not an operator proposal.
+
+**Rule 5 (aggregation stays in core).** One source, the board's own feed.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of `https://api.cryptojobslist.com/robots.txt` and of `https://cryptojobslist.com/robots.txt` on 2026-11-08; both hosts serve the same file. Under `User-agent: *` it allows `/` and `/jobs/` and disallows `/api/`, the apply paths, dashboards and forms; none covers `/jobs.rss` on the API host, the only path the provider requests. A separate group reads `User-agent: ClaudeBot` with `Allow: /`. A trailing `Crawl-delay: 1` sits after the SEO-scraper group; the provider makes one feed request per scan, retried only on a transient failure.
+
+---
+
 ## Backfill waiver (2026-11-08)
 
 These board providers merged without an entry in this log: most before the log existed on 2026-08-07, the rest after it without one. Each line names the provider and the author date of the commit that added its file (`git log --diff-filter=A --format=%as -- providers/{id}.mjs`). A line here records the gap; it is not a verification. A full entry for a provider replaces its line. `tests/providers/indexing-log-coverage.test.mjs` fails when a board provider has neither.

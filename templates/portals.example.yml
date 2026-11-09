@@ -1307,6 +1307,7 @@ search_queries:
 #   gupy            portal.gupy.io       (pt-BR board-wide Gupy search; each gupy.keywords entry swept separately, results
 #                   deduped. A single tenant's <slug>.gupy.io career page is NOT claimed)
 #   feishu-jobs     jobs.bytedance.com or <tenant>.jobs.feishu.cn
+#   manatal         www.careers-page.com/<slug>  (Manatal-hosted careers page; the API has no posting date)
 #   mokahr          (app|hire-r1).mokahr.com/(social-recruitment|campus-recruitment|apply)/<org>/<siteId>
 #   workday         <tenant>.wd<N>.myworkdayjobs.com[/<locale>]/<board>
 #   avature         <tenant>.avature.net  (branded host → provider: avature + api: the /careers/SearchJobs URL)
@@ -1451,6 +1452,18 @@ search_queries:
 #
 # - name: Example Breezy Co
 #   careers_url: https://exampleco.breezy.hr              # any *.breezy.hr host
+#   enabled: true
+#
+# - name: Example Bullhorn Co              # a staffing agency's Bullhorn career portal
+#   provider: bullhorn                    # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.exampleco.com/   # the portal host serving /app.json
+#   # bullhorn: { swimlane: "31", corpToken: "AB12CD" }  # optional; skips the app.json lookup
+#   max_pages: 20                         # optional page cap (500 postings/page, default 20, max 200)
+#   enabled: true
+#
+# - name: Example Manatal Co
+#   careers_url: https://www.careers-page.com/exampleco   # Manatal-hosted careers page
+#   max_pages: 20                         # optional page cap (20 postings/page, default 20, max 200)
 #   enabled: true
 #
 # - name: Example Deel Board Co
@@ -2224,6 +2237,23 @@ search_queries:
 #
 # - name: Jobspresso                      # curated remote roles (public WordPress feed)
 #   provider: jobspresso
+#   enabled: true
+#
+# - name: Example 80,000 Hours Co         # 80,000 Hours job board (public Algolia index; keys read from the page)
+#   provider: eightythousandhours         # explicit provider: only (no URL-pattern detect)
+#   max_pages: 3                          # optional page cap per query (1000 hits/page, default 3, max 20)
+#   enabled: true
+#
+# - name: Example Crypto Jobs List Co     # Web3 / crypto jobs (public RSS feed, 100 postings in one request)
+#   provider: cryptojobslist              # explicit provider: only (no URL-pattern detect)
+#   enabled: true
+#
+# - name: Example Madgex Co               # Madgex employer board (public RSS), higher-ed / science
+#   provider: madgex                      # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.chronicle.com/   # or careers.insidehighered.com / jobs.sciencecareers.org
+#   madgex:
+#     keywords: ["data analyst"]          # optional; one search pass each, else profile.yml target_roles
+#   max_pages: 25                         # optional page cap per keyword (20 items/page, default 25, max 1500)
 #   enabled: true
 #
 # - name: LaraJobs                        # Laravel / PHP jobs (public RSS feed)
