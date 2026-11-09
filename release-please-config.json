@@ -5,8 +5,11 @@
     ".": {
       "release-type": "simple",
       "package-name": "career-ops",
+      "release-as": "2.0.0",
       "changelog-path": "CHANGELOG.fork.md",
-      "exclude-paths": ["web"],
+      "exclude-paths": [
+        "web"
+      ],
       "extra-files": [
         {
           "type": "generic",
@@ -44,6 +47,7 @@
       "package-name": "career-ops-web",
       "component": "web",
       "include-component-in-tag": true,
+      "release-as": "1.0.0",
       "changelog-path": "CHANGELOG.fork.md"
     }
   }
