@@ -41,3 +41,9 @@ plugins:
   # (an HTTP endpoint you name yourself; it is never picked for you).
   h1b-sponsor:
     enabled: false
+
+  # ── usajobs (provider) ── keyed job source: US federal openings from the USAJOBS Search API.
+  # Needs USAJOBS_API_KEY + USAJOBS_USER_AGENT (the email you registered with) in .env; free key at developer.usajobs.gov.
+  # Fires only on a portals.yml entry with `provider: usajobs` (keywords + location live on that entry, not here).
+  usajobs:
+    enabled: false

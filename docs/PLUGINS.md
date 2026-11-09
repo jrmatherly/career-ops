@@ -125,6 +125,7 @@ and stable on purpose, **not** a home for ongoing feature work.
 | `gmail` | `ingest` | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Pulls job leads from a Gmail label into the pipeline (read-only, your OAuth token) |
 | `h1b-sponsor` | `ingest` | optional `H1B_API_TOKEN`, `H1B_API_BASE`, `H1B_INDEX_PATH` | US DOL H-1B/PERM sponsorship history per employer from a local index, or an HTTP endpoint when `H1B_API_BASE` is set |
 | `notion` | `export`, `search` | `NOTION_ACCESS_TOKEN`, `NOTION_PARENT_PAGE_ID` | Mirrors the tracker to a Notion database and reads records back as job leads |
+| `usajobs` | `provider` | `USAJOBS_API_KEY`, `USAJOBS_USER_AGENT` | Keyed job source: US federal openings from the USAJOBS Search API (free key at developer.usajobs.gov) |
 
 ### Improving a bundled plugin → publish a maintained successor
 
