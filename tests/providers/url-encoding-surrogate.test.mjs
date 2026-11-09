@@ -404,6 +404,17 @@ try {
     ),
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.example.com/#/jobs/101',
   );
+
+  // eightythousandhours.parseAlgoliaHits — for…of over Algolia hits; post_pk feeds the board-page URL.
+  const { parseAlgoliaHits } = await load('eightythousandhours.mjs');
+  check(
+    'eightythousandhours.parseAlgoliaHits',
+    () => parseAlgoliaHits([
+      { post_pk: `${LONE}1`, title: 'Bad Id' },
+      { post_pk: 101, title: 'Good Id' },
+    ]),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.80000hours.org/?jobPk=101',
+  );
 } catch (e) {
   fail(`per-provider surrogate tests crashed: ${e.message}`);
 }
@@ -442,6 +453,7 @@ try {
     'darwinbox.mjs',
     'deel.mjs',
     'dover.mjs',
+    'eightythousandhours.mjs',
     'feishu-jobs.mjs',
     'garena.mjs',
     'hibob.mjs',

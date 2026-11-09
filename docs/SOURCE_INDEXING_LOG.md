@@ -252,3 +252,31 @@ Three employer job boards, one per host, on the same vendor (Madgex) and the sam
 **Rule 5 (aggregation stays in core).** The provider reads one host per entry, the employers' own postings on that board.
 
 **Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of each host's `/robots.txt` on 2026-11-08. Under `User-agent: *` all three disallow only `/invalid-request/`, `/analytics/`, `*/emailjob/*` and `*/previewjob/*` (Science Careers adds `/apply-profile/`). None covers `/jobsrss/`, the only path the provider requests. No group names career-ops, and no `Crawl-delay` is set; the provider paces pages at 250 ms.
+
+---
+
+## 80,000 Hours (jobs.80000hours.org)
+
+| | |
+|---|---|
+| **Proposed by** | the fork's providers program (plan `docs/superpowers/plans/2026-11-08-providers.md`, Task E3); not affiliated with 80,000 Hours |
+| **Provider** | `providers/eightythousandhours.mjs` |
+| **PR** | fork branch `claude/providers-new-api` |
+| **Merged** | pending |
+| **Status** | Listed in the fork |
+
+A curated board of roles at named employers, run by the 80,000 Hours nonprofit. The board's UI reads a public Algolia index; the provider reads the same index.
+
+**Embedded search key (decision D2).** The Algolia app id, the search-only key and the index name sit in the board page's public `window.__NUXT__.config` block, which every visitor's browser receives. The provider reads them from that page on every run and never stores them, the precedent `providers/techinasia.mjs` set. The key is referer-gated, so each query sends the board's own Referer.
+
+**Rule 1 (real listings, identifiable employer, free for candidates).** Verified on 2026-11-08: all 1,019 hits carry a `company_name`, and the board and its postings need no login or payment.
+
+**Rule 2 (canonical URL is the employer's).** A hit carries the employer's application link in `url_external`. The provider uses it when it is https and no other posting shares it; otherwise the board's own `?jobPk={post_pk}` page (the URL the board's UI sets for a posting). Measured: one hit had a non-https link, and nine links were shared by 23 postings, which as a shared dedup key would have merged 23 real postings into nine. 24 of the 1,019 rows take the board page.
+
+**Rule 3 (complete inventory, no paid placement).** The index held 1,019 hits on 2026-11-08 and serves at most 1,000 for one query: `page=1` answers HTTP 200 with zero hits and the message "you can only fetch the 1000 hits for this query". The provider then partitions on the `tags_location_type` facet, `tags_location_type:Remote` (263) and `NOT tags_location_type:Remote` (756), which together returned all 1,019 distinct postings in a live run. A partition still over 1,000 is reported as a warning, never as a complete board. The payload's ranking fields (`highlighted`, `super_ranked_score`, `daily_ranking`) are not used as filters, so no ranking decides what is read.
+
+**Rule 4 (operator declared).** Not an operator proposal.
+
+**Rule 5 (aggregation stays in core).** One source, the board's own index.
+
+**Rule 6 (the source's own `robots.txt`).** Read like a visitor: one GET of `https://jobs.80000hours.org/robots.txt` on 2026-11-08 returned `User-agent: *` with an empty `Disallow:`, which allows every path. The Algolia host is the board's search backend, not a page a crawler reads. No `Crawl-delay`; queries are paced at 250 ms.
