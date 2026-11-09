@@ -392,6 +392,18 @@ try {
     ).jobs,
     (jobs) => jobs.length === 1 && jobs[0].url === 'https://www.aldi-nord.de/karriere/detail/good-id-101.html',
   );
+
+  // bullhorn.parseBullhornJobs — for…of over a JobOrder page; id feeds the #/jobs/{id} URL.
+  const { parseBullhornJobs } = await load('bullhorn.mjs');
+  check(
+    'bullhorn.parseBullhornJobs',
+    () => parseBullhornJobs(
+      [{ id: `${LONE}1`, title: 'Bad Id' }, { id: 101, title: 'Good Id' }],
+      'https://jobs.example.com',
+      'Acme',
+    ),
+    (jobs) => jobs.length === 1 && jobs[0].url === 'https://jobs.example.com/#/jobs/101',
+  );
 } catch (e) {
   fail(`per-provider surrogate tests crashed: ${e.message}`);
 }
@@ -426,6 +438,7 @@ try {
     'arbeitsagentur.mjs',
     'bamboohr.mjs',
     'bulldogjob.mjs',
+    'bullhorn.mjs',
     'darwinbox.mjs',
     'deel.mjs',
     'dover.mjs',

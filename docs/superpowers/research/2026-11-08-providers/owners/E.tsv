@@ -1,3 +1,5 @@
 time	step	decision	evidence
 2026-11-08T18:30	E1 measure	Madgex feed pinned: RSS 2.0, 20 items/page, page past end returns 0 items	curl jobs.chronicle.com/jobsrss/?page=99999 -> totalResults 28734, 0 items; IHE 23398; Science 531
 2026-11-08T18:35	order 16	No PR, no merge-main, no babysit; push branch and report code-ready head	coordinator message 18:26 + preferences.md order 16
+2026-11-08T19:20	E2 measure	Bullhorn tuple lives under app.json service.{swimlane,corpToken}; address/publishedCategory need sub-field syntax; start past total -> data []	curl jobs.csicompanies.com/app.json + public-rest31 JobOrder total 29
+2026-11-08T19:25	E1 review	code-review found keyword passes are relevance-ranked; added sort=Date (verified newest-first on all 3 hosts), per-keyword page-1 warning, employer-line split, htmlToText description	curl jobsrss keywords=data with and without sort=Date

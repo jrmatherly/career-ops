@@ -1445,6 +1445,13 @@ search_queries:
 #   careers_url: https://exampleco.breezy.hr              # any *.breezy.hr host
 #   enabled: true
 #
+# - name: Example Bullhorn Co              # a staffing agency's Bullhorn career portal
+#   provider: bullhorn                    # no URL-pattern detect(): explicit provider: only
+#   careers_url: https://jobs.exampleco.com/   # the portal host serving /app.json
+#   # bullhorn: { swimlane: "31", corpToken: "AB12CD" }  # optional; skips the app.json lookup
+#   max_pages: 20                         # optional page cap (500 postings/page, default 20, max 200)
+#   enabled: true
+#
 # - name: Example Deel Board Co
 #   careers_url: https://jobs.deel.com/exampleco          # the tenant slug is the first path segment
 #   enabled: true
