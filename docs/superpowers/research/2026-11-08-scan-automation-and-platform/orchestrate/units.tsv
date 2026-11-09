@@ -6,5 +6,5 @@ P1	build	merged	claude/p1-doctor-gateway	37	66f0cb7a2d8bfa6c61ee35cfcc813c225dd4
 K1	build	merged	claude/k1-publish-key-link	38	b19a810bdcc512e1d672a1848e5c4dd6ad93311c	briefs/K1-fix4.md
 A2	build	merged	claude/a2-evaluate-queue	45	20a53283	briefs/A2.md
 A3	build	merged	claude/a3-evaluate-ui	46	8a9dcc76	briefs/A3.md
-P2	operator	building	claude/p2-career-ops-proxy		eb089b8	briefs/P2.md
+P2	operator	merged	claude/p2-career-ops-proxy	direct	bc8030f	briefs/P2.md
 R1	build	merged	claude/r1-rank-pass	42	5505a546	briefs/R1-r2-verify.md
