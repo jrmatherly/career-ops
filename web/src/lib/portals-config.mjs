@@ -113,12 +113,13 @@ const indentOf = (line) => line.length - line.trimStart().length;
  * @param {string[]} items
  * @returns {string[] | null}
  */
-function setListInText(lines, section, key, items) {
+export function setListInText(lines, section, key, items) {
+  const keyLine = (indent) => `${indent}${key}:${items.length ? "" : " []"}`;
   const head = lines.findIndex((l) => new RegExp(`^${section}:\\s*(#.*)?$`).test(l));
   if (head < 0) {
     if (lines.some((l) => l.startsWith(`${section}:`))) return null; // flow style or a value on the same line
     while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-    lines.push(`${section}:`, `  ${key}:`, ...items.map((i) => `    - ${JSON.stringify(i)}`), "");
+    lines.push(`${section}:`, keyLine("  "), ...items.map((i) => `    - ${JSON.stringify(i)}`), "");
     return lines;
   }
   let end = head + 1;
@@ -127,7 +128,7 @@ function setListInText(lines, section, key, items) {
   const childIndent = child ? " ".repeat(indentOf(child)) : "  ";
   const at = lines.findIndex((l, i) => i > head && i < end && l.startsWith(`${childIndent}${key}:`));
   if (at < 0) {
-    lines.splice(head + 1, 0, `${childIndent}${key}:`, ...items.map((i) => `${childIndent}  - ${JSON.stringify(i)}`));
+    lines.splice(head + 1, 0, keyLine(childIndent), ...items.map((i) => `${childIndent}  - ${JSON.stringify(i)}`));
     return lines;
   }
   const value = lines[at].slice(childIndent.length + key.length + 1).replace(/\s+#.*$/, "").trim();
@@ -145,7 +146,7 @@ function setListInText(lines, section, key, items) {
   const body = lines.slice(at + 1, last + 1);
   const firstItem = body.find((l) => !isNote(l));
   const itemIndent = firstItem ? " ".repeat(indentOf(firstItem)) : `${childIndent}  `;
-  lines.splice(at, last - at + 1, `${childIndent}${key}:`, ...body.filter(isNote), ...items.map((i) => `${itemIndent}- ${JSON.stringify(i)}`));
+  lines.splice(at, last - at + 1, keyLine(childIndent), ...body.filter(isNote), ...items.map((i) => `${itemIndent}- ${JSON.stringify(i)}`));
   return lines;
 }
 

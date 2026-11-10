@@ -185,33 +185,79 @@ function setSection(lines, section, values) {
   return true;
 }
 
+const RESERVED = /^(true|false|null|yes|no|on|off|~)$/i;
+
 /**
- * Set `section.key` values in profile.yml text, keeping every other line.
+ * A top-level value. A string stays bare when it can, because readers such as
+ * batch-evaluate-gemini.mjs take the text after `spend_tier:` verbatim.
+ * @param {ProfileValue} value
+ */
+function topLevelValue(value) {
+  if (Array.isArray(value)) return `[${value.map(q).join(", ")}]`;
+  if (typeof value !== "string") return String(value);
+  const bare = /^[A-Za-z0-9_./-]+$/.test(value) && !RESERVED.test(value) && yaml.load(value) === value;
+  return bare ? value : q(value);
+}
+
+/**
+ * @param {string[]} lines
+ * @param {string} key
+ * @param {ProfileValue} value
+ * @param {boolean} besideComment whether a `# key:` line at column 0 may place it
+ */
+function setTopLevel(lines, key, value, besideComment) {
+  const at = lines.findIndex((line) => line.startsWith(`${key}:`));
+  if (at !== -1) {
+    lines[at] = `${key}: ${topLevelValue(value)}${trailingComment(lines[at].slice(key.length + 1))}`;
+    return;
+  }
+  const twin = besideComment ? lines.findIndex((line) => line.startsWith("#") && line.slice(1).trimStart().startsWith(`${key}:`)) : -1;
+  let insert = twin + 1;
+  if (twin === -1) {
+    insert = lines.length;
+    while (insert > 0 && lines[insert - 1].trim() === "") insert--;
+  }
+  lines.splice(insert, 0, `${key}: ${topLevelValue(value)}`);
+}
+
+/** @param {unknown} value */
+const isSection = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Set top-level keys and `section.key` values in profile.yml text, keeping
+ * every other line.
  *
  * The edited text must parse to exactly `expected`, the document the route's
  * own merge produced. When it does not, or the file uses a shape the line edit
- * does not place (a flow `section: { … }`, a block scalar, an anchor), this
- * returns null and the caller writes `yaml.dump(expected)` as before, so no
- * input writes a different document than the merge did.
+ * does not place (a flow `section: { … }`, a block scalar, an anchor, a block
+ * value under a top-level key), this returns null and the caller writes
+ * `yaml.dump(expected)` as before, so no input writes a different document
+ * than the merge did.
  *
  * @param {string} source the profile text the route parsed
- * @param {Record<string, Record<string, ProfileValue>>} patch section → key → value
+ * @param {Record<string, ProfileValue | Record<string, ProfileValue>>} patch top-level key → value, or section → key → value
  * @param {unknown} expected
  * @returns {string | null}
  */
 export function patchProfileText(source, patch, expected) {
   const eol = source.includes("\r\n") ? "\r\n" : "\n";
-  const lines = source.split(/\r?\n/);
-  for (const [section, values] of Object.entries(patch)) {
-    if (!setSection(lines, section, values)) return null;
-  }
-  if (lines[lines.length - 1] !== "") lines.push("");
-  const text = lines.join(eol);
-  try {
-    return isDeepStrictEqual(yaml.load(text), expected) ? text : null;
-  } catch {
-    return null;
-  }
+  /** @param {boolean} besideComment */
+  const attempt = (besideComment) => {
+    const lines = source.split(/\r?\n/);
+    for (const [key, value] of Object.entries(patch)) {
+      if (!isSection(value)) setTopLevel(lines, key, /** @type {ProfileValue} */ (value), besideComment);
+      else if (!setSection(lines, key, /** @type {Record<string, ProfileValue>} */ (value))) return null;
+    }
+    if (lines[lines.length - 1] !== "") lines.push("");
+    const text = lines.join(eol);
+    try {
+      return isDeepStrictEqual(yaml.load(text), expected) ? text : null;
+    } catch {
+      return null;
+    }
+  };
+  // A commented twin can sit inside another block, where the new line breaks it.
+  return attempt(true) ?? attempt(false);
 }
 
 // What config/profile.example.yml says about the person it describes, by section.

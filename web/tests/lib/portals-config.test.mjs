@@ -10,6 +10,7 @@ import {
   mergePortalFilters,
   patchPortalFiltersText,
   PortalsConfigError,
+  setListInText,
   watchedCompanies,
 } from "../../src/lib/portals-config.mjs";
 
@@ -187,4 +188,21 @@ test("CRLF line endings are kept", () => {
 test("shapes the line edit cannot place return null so the route falls back", () => {
   assert.equal(patchPortalFiltersText("title_filter: { positive: [A] }\n", ["B"], undefined), null);
   assert.equal(patchPortalFiltersText("title_filter:\n  positive: A\n", ["B"], undefined), null);
+});
+
+test("setListInText writes an empty list as [] and keeps the comments outside it", () => {
+  const source = "# top\ntitle_filter:\n  # about positive\n  positive:\n    - A\n    - B\n  negative: [X]  # keep\n# end\n";
+  const text = setListInText(source.split("\n"), "title_filter", "positive", []).join("\n");
+  assert.deepEqual(yaml.load(text).title_filter, { positive: [], negative: ["X"] });
+  for (const line of ["# top", "  # about positive", "  negative: [X]  # keep", "# end"]) assert.ok(text.split("\n").includes(line), line);
+  assert.deepEqual(yaml.load(setListInText(["other: 1"], "title_filter", "positive", []).join("\n")).title_filter, { positive: [] });
+  assert.deepEqual(yaml.load(setListInText(["title_filter:", "  negative: [X]"], "title_filter", "positive", []).join("\n")).title_filter, { positive: [], negative: ["X"] });
+});
+
+test("a shorter title_filter.negative on the template keeps the comment lines inside the list", () => {
+  const source = readFileSync(TEMPLATE, "utf8");
+  const text = setListInText(source.split("\n"), "title_filter", "negative", ["Intern", "Junior"]).join("\n");
+  assert.deepEqual(yaml.load(text).title_filter.negative, ["Intern", "Junior"]);
+  assert.ok(yaml.load(source).title_filter.negative.length > 2, "fixture list is longer than the new one");
+  assert.equal(commentLines(text).length, commentLines(source).length);
 });

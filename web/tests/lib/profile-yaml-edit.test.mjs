@@ -153,3 +153,39 @@ test("a result that does not parse to the expected document is never returned", 
   const source = "candidate:\n  full_name: A\n";
   assert.equal(patchProfileText(source, { candidate: { full_name: "B" } }, { candidate: { full_name: "C" } }), null);
 });
+
+const comments = (text) => commentLines(text).length;
+
+test("top-level keys are written in place, after their commented twin, or at the end, keeping every comment", () => {
+  const src = template;
+  const base = yaml.load(src);
+  const out1 = patchProfileText(src, { spend_tier: "premium" }, { ...base, spend_tier: "premium" });
+  assert.equal(comments(out1), comments(src));
+  assert.match(out1, /^spend_tier: premium\b/m);
+  // batch-evaluate-gemini.mjs:91-93 reads exactly this and maps it to a model; a quoted value silently becomes standard
+  assert.equal(out1.match(/^[ \t]*spend_tier[ \t]*:[ \t]*(.+)$/m)[1].trim(), "premium");
+  assert.equal(patchProfileText("a: 1\n", { session_title: "my title" }, { a: 1, session_title: "my title" }), 'a: 1\nsession_title: "my title"\n');
+  assert.equal(patchProfileText("a: 1\n", { x: "yes" }, { a: 1, x: "yes" }), 'a: 1\nx: "yes"\n');
+  const out2 = patchProfileText(src, { auto_pdf_score_threshold: 4.2 }, { ...base, auto_pdf_score_threshold: 4.2 });
+  assert.equal(comments(out2), comments(src));
+  const lines2 = out2.split("\n");
+  assert.equal(lines2[lines2.findIndex((l) => /^#\s*auto_pdf_score_threshold:/.test(l)) + 1], "auto_pdf_score_threshold: 4.2");
+  // trailing comment survives
+  assert.equal(patchProfileText("spend_tier: standard  # cheap\n", { spend_tier: "economy" }, { spend_tier: "economy" }), "spend_tier: economy  # cheap\n");
+  // absent everywhere → appended
+  assert.equal(patchProfileText("a: 1\n", { page_format: "a4" }, { a: 1, page_format: "a4" }), "a: 1\npage_format: a4\n");
+  // CRLF kept
+  assert.equal(patchProfileText("a: 1\r\nspend_tier: standard\r\n", { spend_tier: "premium" }, { a: 1, spend_tier: "premium" }), "a: 1\r\nspend_tier: premium\r\n");
+  // top-level list, flow style
+  assert.equal(patchProfileText("a: 1\n", { skip_tiers: ["intern", "entry"] }, { a: 1, skip_tiers: ["intern", "entry"] }), 'a: 1\nskip_tiers: ["intern", "entry"]\n');
+  // a block value under the key is not handled
+  assert.equal(patchProfileText("skip_tiers:\n  - intern\n", { skip_tiers: ["mid"] }, { skip_tiers: ["mid"] }), null);
+  // a commented twin inside another block falls back to appending
+  assert.equal(
+    patchProfileText("a:\n  b: 1\n# page_format: a4\n  c: 2\n", { page_format: "a4" }, { a: { b: 1, c: 2 }, page_format: "a4" }),
+    "a:\n  b: 1\n# page_format: a4\n  c: 2\npage_format: a4\n",
+  );
+  // mixed: a top-level key and a section key in one patch
+  const out3 = patchProfileText(src, { spend_tier: "economy", cv: { max_pages: 1 } }, { ...base, spend_tier: "economy", cv: { ...base.cv, max_pages: 1 } });
+  assert.equal(comments(out3), comments(src));
+});
