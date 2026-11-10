@@ -26,7 +26,7 @@ writeFileSync(join(dataRoot, '.env'), [
   'GEMINI_API_KEY=dotenv-gemini-key',
   'GEMINI_MODEL=dotenv-gemini-model',
   'OPENROUTER_API_KEY=dotenv-openrouter-key',
-  'CAREER_OPS_MODEL=dotenv-openrouter-model',
+  'CAREER_OPS_MODEL=dotenv-openrouter-model # an inline comment is not part of the value',
   'OPENROUTER_TIMEOUT_MS=1000',
   '',
 ].join('\n'));
@@ -131,9 +131,9 @@ try {
     pass('batch-evaluate-gemini.mjs finds GEMINI_API_KEY in the data root .env');
   } else fail(`batch-evaluate-gemini.mjs did not find GEMINI_API_KEY. tail: ${batch.trim().split('\n').slice(-2).join(' | ')}`);
   check('openrouter-runner.mjs', ['eval', 'Some job description.'],
-    /MODEL_REQUEST \S+ dotenv-openrouter-model/, 'sends CAREER_OPS_MODEL with the key from the data root .env');
+    /MODEL_REQUEST \S+ dotenv-openrouter-model$/m, 'sends CAREER_OPS_MODEL with the key from the data root .env');
   check('openrouter-runner.mjs', ['eval', 'Some job description.'],
-    /dotenv-openrouter-model[\s\S]*timed out after 1s/,
+    /dotenv-openrouter-model \(pinned\)[\s\S]*timed out after 1s/,
     'without dotenv, still takes CAREER_OPS_MODEL and OPENROUTER_TIMEOUT_MS from the data root .env', {}, [noDotenv, hangStub]);
 
   ignoresCwd('ollama-eval.mjs', ['--no-save', 'Some job description.'], 'MODEL_REQUEST');

@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
+import { parseEnv } from 'node:util';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { outputLanguageInstruction, parseOutputLanguage } from './profile-language.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
@@ -69,12 +70,9 @@ let activeModel = null;
 function loadEnvFile() {
   const envPath = path.join(getCareerOpsRoot(), '.env');
   if (!fs.existsSync(envPath)) return;
-  for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
-    const m = line.trim().match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m && process.env[m[1]] === undefined) {
-      process.env[m[1]] = m[2].trim().replace(/^(['"])(.*?)\1$/, '$2');
-    }
-  }
+  // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+  const parsed = parseEnv(`${fs.readFileSync(envPath, 'utf-8')}\n`);
+  for (const [key, value] of Object.entries(parsed)) process.env[key] ??= value;
 }
 
 // ---------------------------------------------------------------------------
