@@ -23,7 +23,9 @@ npm start
 Open http://localhost:3000. The app reads the career-ops checkout it lives in
 (the parent directory) — your existing CV, pipeline and reports appear as-is.
 `CAREER_OPS_ROOT`, `CAREER_OPS_DATA_DIR` and a `.career-ops-data` marker file
-move the data root, in that order, the same way the CLI resolves it.
+move the data root, in that order, the same way the CLI resolves it. From a
+Claude Code plugin install copy the default is `~/career-ops-data` instead, and
+an override pointing inside such a copy is refused with an error.
 
 `npm start` serves the production build, which is the one to use day to day.
 Run `npm run build` again after updating career-ops so the app picks up the new

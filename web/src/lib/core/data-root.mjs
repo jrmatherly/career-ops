@@ -61,6 +61,8 @@ function explicitRoot(root, source, env) {
   );
   err.name = "UnsafeDataRootError";
   err.code = "CAREER_OPS_UNSAFE_DATA_ROOT";
+  err.root = root;
+  err.source = source;
   throw err;
 }
 
@@ -96,10 +98,13 @@ function explicitRoot(root, source, env) {
  * import would look more DRY and be silently wrong. `tests/lib/data-root.test.mjs`
  * pins the two implementations together instead.
  *
- * Absolute env values and marker contents are unaffected — `path.resolve` returns
- * an absolute input unchanged — so every existing install keeps its current root.
+ * Absolute env values and marker contents are unaffected by the base —
+ * `path.resolve` returns an absolute input unchanged. The plugin branches are
+ * the exception to "nothing moves": an override that lands inside a plugin
+ * install copy throws, and a code root that is one defaults to
+ * `~/career-ops-data`.
  *
- * @param {string} coreRoot Absolute path to the career-ops checkout (path-resolver's `__dirname`).
+ * @param {string} coreRoot Absolute path to the career-ops code root: the checkout, or a plugin install copy (path-resolver's `__dirname`).
  * @param {(p: string) => string | null} readMarker Reads a file, or null when absent/unreadable.
  * @param {NodeJS.ProcessEnv} env
  * @param {(...parts: string[]) => string} resolve `path.resolve`

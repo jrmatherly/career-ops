@@ -31,9 +31,11 @@ import { normalizeMemoryFact } from "@/lib/memory-fact.mjs";
 /**
  * Resolve the career-ops DATA root — the directory holding the user's files
  * (cv.md, data/, reports/). Same precedence as the core: CAREER_OPS_ROOT →
- * CAREER_OPS_DATA_DIR → `.career-ops-data` marker → `~/career-ops-data` on a plugin
- * install → the checkout itself. For
- * scripts, system modes and templates use resolveCodeRoot() (core/code-root.mjs).
+ * CAREER_OPS_DATA_DIR → `.career-ops-data` marker → `~/career-ops-data` on a
+ * plugin install → the checkout itself. Throws (code
+ * `CAREER_OPS_UNSAFE_DATA_ROOT`) when an env value or the marker points inside
+ * a plugin install copy. For scripts, system modes and templates use
+ * resolveCodeRoot() (core/code-root.mjs).
  */
 export function careerOpsRoot(): string {
   // `process.cwd()` is `<core>/web` for `next dev`/`next start`, so its parent is

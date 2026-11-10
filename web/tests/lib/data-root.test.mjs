@@ -124,12 +124,20 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     { name: "plugin copy, relative marker stays inside it", plugin: true, marker: "./data", env: {}, expect: UNSAFE },
     { name: "checkout, env inside a plugin copy", marker: null, env: { CAREER_OPS_DATA_DIR: "IN_PLUGIN" }, expect: UNSAFE },
     { name: "checkout, marker inside a plugin copy", marker: "IN_PLUGIN", env: {}, expect: UNSAFE },
+    { name: "CAREER_OPS_ROOT named when both point inside", marker: null, env: { CAREER_OPS_ROOT: "IN_PLUGIN", CAREER_OPS_DATA_DIR: "IN_PLUGIN" }, expect: UNSAFE },
+    { name: "env under marketplaces/", marker: null, env: { CAREER_OPS_ROOT: "IN_MARKETPLACES" }, expect: UNSAFE },
+    { name: "env under synced/", marker: null, env: { CAREER_OPS_ROOT: "IN_SYNCED" }, expect: UNSAFE },
+    { name: "env under CLAUDE_CODE_PLUGIN_CACHE_DIR", marker: null, env: { CLAUDE_CODE_PLUGIN_CACHE_DIR: "ABS", CAREER_OPS_ROOT: "IN_ABS_CACHE" }, expect: UNSAFE },
+    { name: "config-dir copy still counts with CLAUDE_CODE_PLUGIN_CACHE_DIR set", marker: null, env: { CLAUDE_CODE_PLUGIN_CACHE_DIR: "ABS", CAREER_OPS_ROOT: "IN_PLUGIN" }, expect: UNSAFE },
+    { name: "the cache dir itself is not a copy", marker: null, env: { CAREER_OPS_ROOT: "COPIES" }, expect: "COPIES" },
+    { name: "a sibling under plugins/ is not a copy", marker: null, env: { CAREER_OPS_ROOT: "PLUGINS_SIBLING" }, expect: "PLUGINS_SIBLING" },
+    { name: "marker is a symlink into a plugin copy", marker: "LINK", env: {}, expect: UNSAFE },
   ];
   const answer = (fn) => {
     try {
       return fn();
     } catch (err) {
-      return `throws ${err.code}`;
+      return `throws ${err.code} | ${err.name} | ${err.message}`;
     }
   };
 
@@ -139,7 +147,19 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     const core = c.plugin ? path.join(copies, "career-ops", "2.0.0") : tmpdir();
     fs.mkdirSync(core, { recursive: true });
     const abs = tmpdir();
-    const subst = (v) => (v === "ABS" ? abs : v === "IN_PLUGIN" ? path.join(copies, "other") : v);
+    fs.mkdirSync(path.join(copies, "other"), { recursive: true });
+    fs.symlinkSync(path.join(copies, "other"), path.join(abs, "link"));
+    const named = {
+      ABS: abs,
+      IN_PLUGIN: path.join(copies, "other"),
+      IN_MARKETPLACES: path.join(config, "plugins", "marketplaces", "m"),
+      IN_SYNCED: path.join(config, "plugins", "synced", "s"),
+      IN_ABS_CACHE: path.join(abs, "cache", "x"),
+      COPIES: copies,
+      PLUGINS_SIBLING: path.join(config, "plugins", "data"),
+      LINK: path.join(abs, "link"),
+    };
+    const subst = (v) => named[v] ?? v;
 
     fs.copyFileSync(src, path.join(core, "path-resolver.mjs"));
     if (c.marker !== null) fs.writeFileSync(path.join(core, ".career-ops-data"), subst(c.marker));
@@ -164,6 +184,7 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
 
     const web_answer = answer(() => resolve(core, env));
     assert.equal(web_answer, core_answer, `disagreement on: ${c.name}`);
-    if (c.expect) assert.equal(web_answer, c.expect, c.name);
+    if (c.expect === UNSAFE) assert.ok(web_answer.startsWith(UNSAFE), `${c.name}: ${web_answer}`);
+    else if (c.expect) assert.equal(web_answer, subst(c.expect), c.name);
   }
 });
