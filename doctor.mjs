@@ -123,6 +123,10 @@ CLIs: ${AGENT_CLIS.join(', ')}`;
 validateFlags(argv, KNOWN_FLAGS, USAGE, { valueFlags: VALUE_FLAGS, requireOperand: true });
 
 const explicitTarget = flagValue(argv, '--target') || null;
+const ROOT_VARS = ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR'];
+// Read before any .env load. A .env load never replaces a variable the shell
+// already has, set to an empty value included.
+const shellRootEnv = Object.fromEntries(ROOT_VARS.filter((name) => name in process.env).map((name) => [name, process.env[name]]));
 const projectRoot = explicitTarget || getCareerOpsRoot();
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
@@ -1317,6 +1321,32 @@ function checkEnvFileProfile(root) {
   };
 }
 
+// The root's own .env names a data root. Only the commands that load a .env see
+// it, and only after the load, so one run can read part of its input from each
+// root. The check works out which variable names the root once the file is
+// loaded: CAREER_OPS_ROOT outranks CAREER_OPS_DATA_DIR, so a shell
+// CAREER_OPS_DATA_DIR does not shadow a CAREER_OPS_ROOT line.
+function checkEnvFileRoot(root) {
+  if (explicitTarget) return null;
+  let fileEnv;
+  try {
+    fileEnv = dotenv.parse(readFileSync(join(root, '.env')));
+  } catch {
+    return null; // no .env, or unreadable
+  }
+  const loaded = { ...fileEnv, ...shellRootEnv };
+  const name = ROOT_VARS.find((n) => loaded[n]?.trim());
+  if (!name || name in shellRootEnv) return null;
+  const value = loaded[name].trim();
+  // path-resolver.mjs resolves the value against the code folder.
+  if (resolve(__dirname, value) === resolve(root)) return null;
+  return {
+    warn: true,
+    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use the other folder from then on`,
+    fix: [`Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
+  };
+}
+
 function checkPrereq(prereq) {
   const { path, fix } = prereq;
   if (emptyYamlPrereqs(projectRoot).includes(prereq)) {
@@ -1711,6 +1741,7 @@ async function main() {
     { pass: true, label: LINKEDIN_DOCTOR_LABEL },
     // checkPrereq already explains the .env case when the profile is missing.
     prereqPresent(projectRoot, { path: 'config/profile.yml' }) ? checkEnvFileProfile(projectRoot) : null,
+    checkEnvFileRoot(projectRoot),
   ].filter(Boolean);
 
   // Network-bound portals.yml reachability probe — only under --strict.
@@ -1984,6 +2015,7 @@ function onboardingState(root) {
   const resumeSidecar = checkResumeSidecar(root);
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
+  const envFileRoot = checkEnvFileRoot(root);
   const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
@@ -1995,6 +2027,7 @@ function onboardingState(root) {
     ...(resumeSidecar?.warn ? [`${resumeSidecar.label}\n→ ${resumeSidecar.fix.join('\n  ')}`] : []),
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
+    ...(envFileRoot ? [`${envFileRoot.label}\n→ ${envFileRoot.fix.join('\n  ')}`] : []),
     ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];
