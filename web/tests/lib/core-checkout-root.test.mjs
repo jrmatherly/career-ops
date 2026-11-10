@@ -6,7 +6,8 @@ import { test } from "node:test";
 import { listTree } from "../../../lib/walk-tree.mjs";
 
 // careerOpsRoot() is the DATA root. Since #4064 it honors CAREER_OPS_ROOT,
-// CAREER_OPS_DATA_DIR and the `.career-ops-data` marker, so in a split layout it
+// CAREER_OPS_DATA_DIR and the `.career-ops-data` marker (and defaults to
+// `~/career-ops-data` from a plugin install copy), so in a split layout it
 // points at a directory holding cv.md / data/ / reports/ — and no scripts, system
 // modes, templates or lib/. Anything that RUNS or READS system files must resolve
 // against resolveCodeRoot() (core/code-root.mjs) instead. When they were conflated, a split-layout

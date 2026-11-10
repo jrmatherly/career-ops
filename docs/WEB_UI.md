@@ -48,7 +48,7 @@ npm run ui -- --no-open
 
 ## Process Lifecycle & Architecture
 
-- **Canonical Data Root Resolution**: The launcher resolves the user data directory using `path-resolver.mjs` (`CAREER_OPS_ROOT` / `CAREER_OPS_DATA_DIR` / `.career-ops-data`), ensuring the web application reads and writes user-layer files according to the Data Contract.
+- **Canonical Data Root Resolution**: The launcher resolves the user data directory using `path-resolver.mjs` (`CAREER_OPS_ROOT` / `CAREER_OPS_DATA_DIR` / `.career-ops-data`, then `~/career-ops-data` for a plugin install), ensuring the web application reads and writes user-layer files according to the Data Contract.
 - **Readiness Polling**: Polls the server until it responds before launching the browser, draining responses properly via `res.resume()`.
 - **Graceful Shutdown**: Handles `SIGINT` (Ctrl+C) and `SIGTERM` in the launcher (`scripts/ui-server.mjs`) across Linux, macOS, and Windows (terminating the launched child process and waiting for shutdown before exiting). `node web/server.mjs start`, the production entry, has no handler.
 
