@@ -63,13 +63,11 @@ let activeModel = null;
 // ---------------------------------------------------------------------------
 // .env loader
 // ---------------------------------------------------------------------------
-// Lazy: only runs when this file is the CLI entry point (`node
-// openrouter-runner.mjs ...`). Importing the module (e.g. for buildSystemPrompt
-// in test-all.mjs) must NOT mutate process.env — a module-level loader here
-// leaked every .env key (including CAREER_OPS_CLI) into the importing process
-// and broke later CLI-resolution tests.
+// The scan.mjs import already loads the data root .env through dotenv. This
+// covers an install without dotenv, and reads the same file so the Settings
+// page and the runner agree. CLI entry point only.
 function loadEnvFile() {
-  const envPath = path.join(__dirname, '.env');
+  const envPath = path.join(getCareerOpsRoot(), '.env');
   if (!fs.existsSync(envPath)) return;
   for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
     const m = line.trim().match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
