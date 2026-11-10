@@ -20,7 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/cv", label: "CV", icon: FileText },
   { href: "/documents", label: "Documents", icon: Files },
-  { href: "/config", label: "Config", icon: Settings },
+  { href: "/config", label: "Settings", icon: Settings },
   { href: "/resume", label: "Resume", icon: IdCard },
   { href: "/board", label: "Board", icon: SquareKanban },
   { href: "/shares", label: "Shares", icon: Share2 },

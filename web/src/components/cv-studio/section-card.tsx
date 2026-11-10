@@ -233,7 +233,7 @@ function RewritePanel({ n, bullet, current, onUse }: { n: string; bullet: Studio
   const run = async (text: string) => {
     if (proposal.kind === "running") return;
     const cliId = readSavedCliId();
-    if (!cliId) return setProposal({ kind: "failed", error: "No AI CLI is set up. Choose one in Config, or edit the wording by hand." });
+    if (!cliId) return setProposal({ kind: "failed", error: "No AI CLI is set up. Choose one in Settings, or edit the wording by hand." });
     setProposal({ kind: "running" });
     try {
       const r = await fetch(`/api/cv-studio/${encodeURIComponent(n)}/rewrite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bulletId: bullet.id, instruction: text, cliId }) });

@@ -38,6 +38,6 @@ function dotenv(dataRoot) {
     if (code !== "ENOENT") console.error(`shares: ${file} could not be read: ${code}`);
     return {};
   }
-  // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+  // Node 22.13's parseEnv keeps an inline comment on a last line with no newline. Not needed once the Node floor (engines) leaves 22.
   return parseEnv(`${text}\n`);
 }

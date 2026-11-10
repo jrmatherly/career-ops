@@ -41,12 +41,12 @@ function isCliEntry(c: unknown): c is { id: string; installed?: boolean } {
 /**
  * Saved Config cliId if it is still installed, otherwise the only installed CLI
  * (and persist that pick). Returns null when neither resolves — the caller then
- * shows the "open Config" message rather than launching a run that 404s.
+ * shows the "open Settings" message rather than launching a run that 404s.
  *
  * The saved id is validated against /api/clis, not trusted blind: an install
  * swapped from one CLI to another leaves a stale id in localStorage, and
  * `resolveCli()` on the server returns null for it, so every run fails with
- * `CLI '<id>' not found` until Config is reopened (#4012).
+ * `CLI '<id>' not found` until Settings is reopened (#4012).
  *
  * `onStale` fires when a saved id is dropped for not being installed, with the
  * id that replaced it (or null). The replacement is persisted, so the old value

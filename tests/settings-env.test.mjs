@@ -83,8 +83,26 @@ try {
     const fresh = {};
     console.log(JSON.stringify([applySettings(fresh, ${JSON.stringify(root)}), fresh, process.env.CAREER_OPS_SCAN_CONCURRENCY]));
   `, { CAREER_OPS_SETTINGS: 'off' });
-  deepEqual(JSON.parse(direct.out[0] ?? 'null'), [{ applied: ['CAREER_OPS_SCAN_CONCURRENCY'], skipped: [] }, { CAREER_OPS_SCAN_CONCURRENCY: '4' }, '9'],
+  deepEqual(JSON.parse(direct.out[0] ?? 'null'), [{ applied: ['CAREER_OPS_SCAN_CONCURRENCY'], skipped: [] }, { CAREER_OPS_SETTINGS_APPLIED: '{"CAREER_OPS_SCAN_CONCURRENCY":["4",null]}', CAREER_OPS_SCAN_CONCURRENCY: '4' }, '9'],
     'applySettings writes onto the env it is given and nothing else');
+
+  // A long-running parent (the dashboard) passes its overlaid environment to every child.
+  const mark = (pairs) => ({ CAREER_OPS_SETTINGS_APPLIED: JSON.stringify(pairs) });
+  deepEqual(child(dataRoot(four), `${PRINT} console.log(process.env.CAREER_OPS_SETTINGS_APPLIED);`).out, ['4', '{"CAREER_OPS_SCAN_CONCURRENCY":["4","9"]}'],
+    'the overlay records what it replaced');
+  deepEqual(child(dataRoot(four), `${PRINT} console.log(process.env.CAREER_OPS_SETTINGS_APPLIED);`, { CAREER_OPS_SCAN_CONCURRENCY: '4', ...mark({ CAREER_OPS_SCAN_CONCURRENCY: ['4', '9'] }) }).out,
+    ['4', '{"CAREER_OPS_SCAN_CONCURRENCY":["4","9"]}'], 'a child that inherits the overlay keeps the value from before it, not the overlaid one');
+  deepEqual(child(dataRoot(), PRINT, mark({ CAREER_OPS_SCAN_CONCURRENCY: ['9', null] })).out, ['undefined'],
+    'a value an earlier overlay applied is gone once the setting is reset');
+  deepEqual(child(dataRoot(), PRINT, mark({ CAREER_OPS_SCAN_CONCURRENCY: ['9', '3'] })).out, ['3'],
+    'a reset setting goes back to what the environment held before the overlay');
+  deepEqual(child(dataRoot(), PRINT, mark({ CAREER_OPS_SCAN_CONCURRENCY: ['4', null] })).out, ['9'],
+    'a variable changed since the overlay is left alone');
+  deepEqual(child(dataRoot(four), PRINT, { ...mark({ CAREER_OPS_SCAN_CONCURRENCY: ['9', null] }), CAREER_OPS_SETTINGS: 'off' }).out, ['undefined'],
+    'with saved settings off, an inherited overlay is still undone');
+  deepEqual(child(dataRoot(), "await import('./lib/settings-env.mjs'); console.log(typeof process.env.PATH, process.env.CAREER_OPS_SETTINGS_APPLIED);",
+    mark({ PATH: [process.env.PATH, null] })).out, ['string undefined'], 'an inherited mark cannot touch a variable that is not a setting');
+  deepEqual(child(dataRoot(), PRINT, { CAREER_OPS_SETTINGS_APPLIED: '{not json' }), { status: 0, out: ['9'], err: [] }, 'a mark that does not parse is ignored');
 
   const inherited = spawnSync(NODE, ['--input-type=module', '-e', PRINT], {
     cwd: ROOT, encoding: 'utf8', env: { ...process.env, CAREER_OPS_ROOT: dataRoot(four), CAREER_OPS_SCAN_CONCURRENCY: '9' },

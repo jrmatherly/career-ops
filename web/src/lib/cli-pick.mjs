@@ -9,7 +9,7 @@ export function pickSoleInstalled(clis) {
 }
 
 /**
- * The CLI the Config page should start on: the remembered one (CAREER_OPS_CLI)
+ * The CLI the Settings page should start on: the remembered one (CAREER_OPS_CLI)
  * while it is installed, otherwise the first installed one, whatever the count.
  *
  * Config renders this as the active choice, so it must also be the value that

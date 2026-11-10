@@ -29,8 +29,8 @@ export function OnboardingBanner() {
     // Whether the assistant has a CLI it can run, by the same check a Run makes:
     // a saved id counts only while it is installed (#4012). Reading the saved
     // id alone kept "Set me up with the assistant" on screen for a stale id, so
-    // the kickoff hit the "choose one in Config" error instead of this banner
-    // sending the user to Config.
+    // the kickoff hit the "choose one in Settings" error instead of this banner
+    // sending the user to Settings.
     let live = true;
     // The assistant sends with the saved id, so a pick that could not be
     // saved (blocked storage) does not count either.

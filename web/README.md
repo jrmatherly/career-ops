@@ -46,7 +46,7 @@ The server binds IPv4 loopback, so reach it as `localhost` or `127.0.0.1`;
   jobs through an optional worker on Windows, macOS or Linux.
 - **Apply** — assisted form prefill with a hard rule inherited from the core:
   **it never submits for you** — you always press the button.
-- **Today / Analytics / CV / Config** — action queue, funnel + pipeline Sankey,
+- **Today / Analytics / CV / Settings** — action queue, funnel + pipeline Sankey,
   CV editing with preview, settings. In **CV**, use **Upload PDF / TeX** to
   import a replacement, review the converted Markdown, then select **Update cv.md**.
   Conversion uses your configured AI CLI; saving backs up the previous CV.
@@ -344,6 +344,34 @@ name in `CAREER_OPS_WEB_ALLOWED_HOSTS`.
 Use it on a network you trust, and prefer an SSH tunnel
 (`ssh -L 3000:127.0.0.1:3000 you@box`) where you can — that needs no env var at
 all and keeps the bind on loopback.
+
+### Settings
+
+The **Settings** page (`/config`) shows the settings an ordinary user changes,
+each with the value in effect and where that value comes from.
+
+- **What is saved where.** A setting that is an environment variable is saved in
+  `config/settings.json` under your data folder. The AI engine choice is also
+  kept in this browser, and saving it stores `CAREER_OPS_CLI` in that file, so
+  scheduled and terminal runs use the same CLI.
+- **Which value wins.** A value saved here, then the environment, then the data
+  folder's `.env` (only for variables whose script reads that file), then the
+  built-in default. The label under each value names the one in effect, and a
+  key shows it in its status. Every script that reads one of these settings
+  applies the saved values when it starts, so a terminal or scheduled run uses
+  them too. **Reset** deletes the saved value and the next one in that order
+  shows through.
+- **Turning saved values off.** Export `CAREER_OPS_SETTINGS=off` in the shell
+  that starts the dashboard or a script. The page then shows the environment's
+  values and refuses to save. Setting it in `.env` does nothing, because saved
+  values are applied before `.env` is read.
+- **Keys and tokens.** The page shows only whether each one is set and where. It
+  never reads a key's value into the page, and you cannot enter one here. Set
+  keys in the environment or in `.env`.
+- **Deployment rows** are read-only. They describe how this server was started.
+- **A broken file.** If `config/settings.json` cannot be read or is not a valid
+  settings file, scripts run on the environment's values, the page shows the
+  error, and nothing is saved until you fix or delete the file. It is never overwritten.
 
 ### Tests
 

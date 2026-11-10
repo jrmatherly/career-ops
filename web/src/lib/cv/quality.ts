@@ -6,8 +6,8 @@ export type CvIngestResult = { markdown: string; seed: CvSeed | null; error: str
 
 export function cvStreamErrorMessage(reason: string): string {
   if (reason === "unreadable") return "I couldn't read text from that file (it may be a scanned image). Upload the TeX source or paste the text instead.";
-  if (reason === "timeout") return "CV conversion timed out. Try again or check your AI CLI in Config.";
-  if (["cli-failed", "launch-failed", "no-output"].includes(reason)) return "Your AI CLI couldn't finish converting the CV. Check its sign-in and connection in Config, then try again.";
+  if (reason === "timeout") return "CV conversion timed out. Try again or check your AI CLI in Settings.";
+  if (["cli-failed", "launch-failed", "no-output"].includes(reason)) return "Your AI CLI couldn't finish converting the CV. Check its sign-in and connection in Settings, then try again.";
   return "Couldn't finish converting the CV. Try again or paste the text instead.";
 }
 

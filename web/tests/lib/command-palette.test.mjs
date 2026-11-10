@@ -6,7 +6,7 @@ const pages = [
   { href: "/", label: "Today" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/analytics", label: "Analytics" },
-  { href: "/config", label: "Config" },
+  { href: "/config", label: "Settings" },
 ];
 
 const app = (n, company, role, status, score = "4.0/5") => ({ n, company, via: "", role, status, score });
@@ -36,8 +36,13 @@ test("pages come first, then one item per application linking to its detail rout
 });
 
 test("an empty query returns only the pages", () => {
-  assert.deepEqual(labels(""), ["Today", "Pipeline", "Analytics", "Config"]);
-  assert.deepEqual(labels("   "), ["Today", "Pipeline", "Analytics", "Config"]);
+  assert.deepEqual(labels(""), ["Today", "Pipeline", "Analytics", "Settings"]);
+  assert.deepEqual(labels("   "), ["Today", "Pipeline", "Analytics", "Settings"]);
+});
+
+test("a page is found by its label or by its path, so /config still answers to config", () => {
+  assert.deepEqual(labels("settings"), ["Settings"]);
+  assert.deepEqual(labels("config"), ["Settings"]);
 });
 
 test("a label starting with the whole query outranks a label word matching the first token", () => {

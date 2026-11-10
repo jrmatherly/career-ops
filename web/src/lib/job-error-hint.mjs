@@ -8,7 +8,7 @@
 //
 // Terminal labels this classifies against (see job-store.tsx / api/run/route.ts):
 //   Real not-configured / auth failure -> "auth":
-//     "No CLI configured — open Config"                                   (job-store.tsx, no cliId)
+//     "No CLI configured — open Settings"                                   (job-store.tsx, no cliId)
 //     raw CLI stderr matched for auth keywords                            (api/run/route.ts stderr handler)
 //     "The CLI exited with an error — is it installed and authenticated?"
 //     "The CLI produced no output — is it installed and authenticated? (...)"
@@ -28,7 +28,7 @@ const AUTH_PATTERN =
   /authenticat\w*|login|sign[ -]?in|credential|api[ -]?key|unauthorized|no cli configured/i;
 
 const HINTS = {
-  auth: { kind: "auth", text: "Sign your CLI in from Config, then re-run." },
+  auth: { kind: "auth", text: "Sign your CLI in from Settings, then re-run." },
   connection: { kind: "connection", text: "Lost connection to the local server — re-run." },
   interrupted: { kind: "interrupted", text: "The run was interrupted — re-run it." },
 };

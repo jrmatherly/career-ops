@@ -6,11 +6,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pickDefaultInstalled, pickUsableCli } from "../../src/lib/cli-pick.mjs";
 import { readRememberedCli } from "../../src/lib/remembered-cli.mjs";
+import { parseSettings, settingsOff } from "../../../lib/settings-store.mjs";
 
 const { resolveCliId } = await import("../../src/lib/saved-cli.ts");
 
@@ -27,6 +28,55 @@ function root(t, envFile) {
   return dir;
 }
 
+test("readRememberedCli puts the CLI saved from the Settings page ahead of the shell", (t) => {
+  const saved = (text) => {
+    const dir = root(t, "CAREER_OPS_CLI=grok\n");
+    mkdirSync(join(dir, "config"));
+    writeFileSync(join(dir, "config", "settings.json"), text);
+    return dir;
+  };
+  const codex = JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: "codex" } });
+  assert.equal(readRememberedCli(saved(codex), {}), "codex");
+  assert.equal(readRememberedCli(saved(codex), { CAREER_OPS_CLI: "claude" }), "codex");
+  assert.equal(readRememberedCli(saved(codex), { CAREER_OPS_SETTINGS: "OFF", CAREER_OPS_CLI: "claude" }), "claude");
+  assert.equal(readRememberedCli(saved("{not json"), { CAREER_OPS_CLI: "claude" }), "claude");
+  assert.equal(readRememberedCli(saved("{not json"), {}), "grok");
+  assert.equal(readRememberedCli(saved(JSON.stringify({ version: 2, values: { CAREER_OPS_CLI: "codex" } })), {}), "grok");
+  assert.equal(readRememberedCli(saved(JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: 7 } })), {}), "grok");
+});
+
+test("the saved-CLI read agrees with lib/settings-store.mjs, whose file rules it copies", (t) => {
+  const texts = [
+    JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: "codex" } }),
+    JSON.stringify({ values: { CAREER_OPS_CLI: "codex" } }),
+    JSON.stringify({ version: 2, values: { CAREER_OPS_CLI: "codex" } }),
+    JSON.stringify({ version: "1", values: { CAREER_OPS_CLI: "codex" } }),
+    JSON.stringify({ version: 1, values: ["codex"] }),
+    JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: "" } }),
+    JSON.stringify({ version: 1 }),
+    "null", "[]", "{not json", "",
+  ];
+  const envs = [{}, { CAREER_OPS_SETTINGS: "off" }, { CAREER_OPS_SETTINGS: " Off " }, { CAREER_OPS_SETTINGS: "0" }, { CAREER_OPS_SETTINGS: "" }];
+  for (const text of texts) {
+    for (const env of envs) {
+      const dir = root(t);
+      mkdirSync(join(dir, "config"));
+      writeFileSync(join(dir, "config", "settings.json"), text);
+      const stored = settingsOff(env) ? undefined : parseSettings(text).values.CAREER_OPS_CLI;
+      const expected = typeof stored === "string" && stored ? stored : null;
+      assert.equal(readRememberedCli(dir, env), expected, `${text} with ${JSON.stringify(env)}`);
+    }
+  }
+});
+
+test("a saved CLI the overlay put in this process's environment does not outlive its reset", (t) => {
+  const mark = (pair) => ({ CAREER_OPS_CLI: "codex", CAREER_OPS_SETTINGS_APPLIED: JSON.stringify({ CAREER_OPS_CLI: pair }) });
+  assert.equal(readRememberedCli(root(t, "CAREER_OPS_CLI=grok\n"), mark(["codex", null])), "grok");
+  assert.equal(readRememberedCli(root(t), mark(["codex", "claude"])), "claude");
+  assert.equal(readRememberedCli(root(t), mark(["kimi", null])), "codex", "the variable changed since the overlay");
+  assert.equal(readRememberedCli(root(t), { CAREER_OPS_CLI: "codex", CAREER_OPS_SETTINGS_APPLIED: "{not json" }), "codex");
+});
+
 test("readRememberedCli reads CAREER_OPS_CLI from the shell, then the data root .env", (t) => {
   assert.equal(readRememberedCli(root(t, "CAREER_OPS_CLI=grok\n"), {}), "grok");
   assert.equal(readRememberedCli(root(t, 'export CAREER_OPS_CLI="codex"\n'), {}), "codex");
@@ -38,7 +88,7 @@ test("readRememberedCli reads CAREER_OPS_CLI from the shell, then the data root 
   assert.equal(readRememberedCli(root(t), {}), null);
 });
 
-test("the Config default is the remembered CLI while it is installed", () => {
+test("the Settings default is the remembered CLI while it is installed", () => {
   assert.equal(pickDefaultInstalled(TWO, "grok"), "grok");
   assert.equal(pickDefaultInstalled(TWO, "codex"), "claude");
   assert.equal(pickDefaultInstalled(TWO, null), "claude");

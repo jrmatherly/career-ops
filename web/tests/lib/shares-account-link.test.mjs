@@ -6,8 +6,8 @@ import { test } from "node:test";
 
 const src = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../src", rel), "utf8");
 
-test("the Shares page passes the account URL from the environment and the data root", () => {
-  assert.match(src("app/shares/page.tsx"), /accountUrl=\{publishAccountUrl\(\{ env: process\.env, dataRoot: careerOpsRoot\(\) \}\)\}/);
+test("the Shares page passes the account URL from the saved settings, the environment and the data root", () => {
+  assert.match(src("app/shares/page.tsx"), /accountUrl=\{publishAccountUrl\(\{ env: await effectiveEnv\(\), dataRoot: careerOpsRoot\(\) \}\)\}/);
 });
 
 test("Manage publish keys renders only with a URL, as a new-tab link with rel noopener", () => {

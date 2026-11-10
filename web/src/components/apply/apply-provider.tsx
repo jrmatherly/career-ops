@@ -224,7 +224,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     if (!sessionId.current) return;
     const gen = generation.current;
     if (!cliId()) {
-      setError("Configure a CLI in Config first, then pre-fill from your CV.");
+      setError("Configure a CLI in Settings first, then pre-fill from your CV.");
       return;
     }
     setStatus("prefilling");

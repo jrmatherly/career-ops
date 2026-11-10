@@ -92,7 +92,7 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
         </button>
       ) : (
         <p className="mt-4 text-xs text-muted">
-          Connect your AI CLI in <a href="/config" className="text-foreground underline-offset-2 hover:underline">Config</a> and the assistant fills this in with you.
+          Connect your AI CLI in <a href="/config" className="text-foreground underline-offset-2 hover:underline">Settings</a> and the assistant fills this in with you.
         </p>
       )}
     </aside>

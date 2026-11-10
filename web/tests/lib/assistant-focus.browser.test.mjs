@@ -135,7 +135,7 @@ test("Assistant keyboard continuation, semantic context and modeless behavior", 
   const noCli = await pageFor(false);
   await noCli.goto(`${origin.origin}/pipeline?tab=ALL`);
   await openWithKeyboard(noCli);
-  const config = noCli.getByRole("link", { name: /Pick a CLI in Config/ });
+  const config = noCli.getByRole("link", { name: /Pick a CLI in Settings/ });
   assert.equal(await composer(noCli).isDisabled(), true);
   assert.equal(await focused(config), true);
   await noCli.keyboard.press("Escape");

@@ -12,8 +12,9 @@ console.log('\nsettings overlay: every reader imports it first');
 
 // A reader listed here is not wired, for the reason given.
 const EXEMPT = {
-  'web/src/lib/publish-account-url.mjs': 'runs in the dashboard, which takes its environment as a parameter; no caller passes saved values yet (plan Task 5)',
-  'web/src/lib/remembered-cli.mjs': 'runs in the dashboard, which takes its environment as a parameter; it does not read the saved CLI yet (plan Task 5)',
+  'web/src/lib/publish-account-url.mjs': 'runs in the dashboard, which passes it the saved values over the environment (effectiveEnv)',
+  'web/src/lib/remembered-cli.mjs': 'runs in the dashboard and reads the saved CLI from config/settings.json itself',
+  'web/src/components/config-form.tsx': 'browser code: it names the id to save it through /api/settings and reads no environment',
   'remember-cli.mjs': 'writes .env; it reads the saved CLI only to print a note',
   'plugins/usajobs/index.mjs': 'loaded by plugins/_engine.mjs, which imports the overlay first',
   'plugins/notion/index.mjs': 'loaded by plugins/_engine.mjs, which imports the overlay first',
