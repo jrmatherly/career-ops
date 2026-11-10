@@ -12,9 +12,8 @@ export async function coreSettings(): Promise<{ registry: Registry; store: Store
 }
 
 /**
- * The environment as it was before any overlay ran in this process. A core
- * module imported in-process (liveness-browser.mjs, for one) applies saved
- * values to process.env, and those outlive a later Reset.
+ * `env` with any recorded overlay undone. Core modules imported in-process
+ * apply saved values to process.env, which would outlive a later Reset.
  */
 export function envBeforeOverlay(store: Store, env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   return store.undoOverlay({ ...env }) as NodeJS.ProcessEnv;

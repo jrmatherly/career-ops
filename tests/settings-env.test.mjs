@@ -90,6 +90,8 @@ try {
   const mark = (pairs) => ({ CAREER_OPS_SETTINGS_APPLIED: JSON.stringify(pairs) });
   deepEqual(child(dataRoot(four), `${PRINT} console.log(process.env.CAREER_OPS_SETTINGS_APPLIED);`).out, ['4', '{"CAREER_OPS_SCAN_CONCURRENCY":["4","9"]}'],
     'the overlay records what it replaced');
+  deepEqual(child(dataRoot(four), `${PRINT} console.log(process.env.CAREER_OPS_SETTINGS_APPLIED);`, { CAREER_OPS_SCAN_CONCURRENCY: '4', ...mark({ CAREER_OPS_SCAN_CONCURRENCY: ['4', '9'] }) }).out,
+    ['4', '{"CAREER_OPS_SCAN_CONCURRENCY":["4","9"]}'], 'a child that inherits the overlay keeps the value from before it, not the overlaid one');
   deepEqual(child(dataRoot(), PRINT, mark({ CAREER_OPS_SCAN_CONCURRENCY: ['9', null] })).out, ['undefined'],
     'a value an earlier overlay applied is gone once the setting is reset');
   deepEqual(child(dataRoot(), PRINT, mark({ CAREER_OPS_SCAN_CONCURRENCY: ['9', '3'] })).out, ['3'],

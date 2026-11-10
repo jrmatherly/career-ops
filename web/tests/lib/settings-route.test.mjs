@@ -4,7 +4,7 @@
 // checkout's registry and store.
 import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -112,6 +112,16 @@ test("POST saves a value, a stale revision is refused, and null resets", async (
   assert.deepEqual([rowOf(reset.body, ID).value, rowOf(reset.body, ID).source], [7, "environment"]);
 });
 
+test("two saves sent with one revision: one is written and the other is refused", async () => {
+  const { body: loaded } = await get();
+  const results = await Promise.all([
+    post({ revision: loaded.revision, changes: { [ID]: 4 } }),
+    post({ revision: loaded.revision, changes: { CAREER_OPS_RANK_TIMEOUT_MS: 20000 } }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  assert.equal(Object.keys(JSON.parse(onDisk()).values).length, 1);
+});
+
 test("a bad change set writes nothing and names every id", async () => {
   save({ [ID]: 4 });
   const before = onDisk();
@@ -154,6 +164,24 @@ test("with CAREER_OPS_SETTINGS=off the page shows the environment and refuses a 
   assert.equal(onDisk(), before);
 });
 
+test("a failed write or an unreadable .env is reported, not hidden", { skip: process.platform === "win32" || process.getuid?.() === 0 }, async (t) => {
+  const { body: loaded } = await get();
+  assert.equal(loaded.envFileError, null);
+  mkdirSync(dirname(file), { recursive: true });
+  chmodSync(dirname(file), 0o500);
+  t.after(() => chmodSync(dirname(file), 0o700));
+  const res = await post({ revision: loaded.revision, changes: { [ID]: 4 } });
+  assert.equal(res.status, 500);
+  assert.match(res.body.error, /^The settings could not be saved \(/);
+  assert.equal(onDisk(), null);
+
+  writeFileSync(join(dataRoot, ".env"), `${ID}=8\n`);
+  chmodSync(join(dataRoot, ".env"), 0o000);
+  const { body } = await get();
+  assert.equal(body.envFileError, ".env cannot be read (EACCES)");
+  assert.equal(rowOf(body, ID).source, "default");
+});
+
 test("a value the overlay put in the server's environment does not outlive its reset", async () => {
   // url-guard.mjs imports liveness-browser.mjs in-process, which applies the overlay to this process.
   save({ CAREER_OPS_RANK_TIMEOUT_MS: 12345, [ID]: 4 });
@@ -173,6 +201,11 @@ test("a value the overlay put in the server's environment does not outlive its r
   assert.deepEqual([env.CAREER_OPS_RANK_TIMEOUT_MS, env[ID]], [undefined, "7"], "what a caller passes on is the environment from before the overlay");
   save({ [ID]: 4 });
   assert.equal((await effectiveEnv())[ID], "4");
+  for (const unusable of ["{not json", JSON.stringify({ version: 2, values: { [ID]: 4 } })]) {
+    save(unusable);
+    assert.equal((await effectiveEnv())[ID], "7", "an unusable file applies nothing and does not throw");
+  }
+  save({ [ID]: 4 });
   process.env.CAREER_OPS_SETTINGS = "off";
   assert.equal((await effectiveEnv())[ID], "7");
 });

@@ -4,7 +4,7 @@
  *   type?: 'int'|'number'|'bool'|'enum'|'string'|'url'|'list', min?: number, max?: number, step?: number, values?: string[],
  *   display?: 'value'|'set'|'origin', value: unknown, source: SettingSource, editable: boolean, error?: string }} SettingState
  * @typedef {{ id: string, label: string, settings: SettingState[] }} SettingsGroup
- * @typedef {{ revision: { settings: string, profile: string, portals: string }, groups: SettingsGroup[], fileError: string|null, overlayDisabled: boolean }} SettingsResponse
+ * @typedef {{ revision: { settings: string, profile: string, portals: string }, groups: SettingsGroup[], fileError: string|null, envFileError: string|null, overlayDisabled: boolean }} SettingsResponse
  */
 
 /** Fired on window after a save from outside the settings sections, so they reload before their next save. */

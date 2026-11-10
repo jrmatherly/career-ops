@@ -25,8 +25,9 @@ export function SettingsView() {
   const load = useCallback(async (keepEdits = false) => {
     try {
       const res = await fetch("/api/settings", { cache: "no-store" });
-      if (!res.ok) throw new Error(`The server answered ${res.status}.`);
-      setData(await res.json());
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `The server answered ${res.status}.`);
+      setData(body);
       setLoadError(null);
       if (!keepEdits) {
         setForm({});
@@ -52,7 +53,7 @@ export function SettingsView() {
     setNotice(null);
     try {
       const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: data.revision, changes }) });
-      const body = await res.json();
+      const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setData(body);
         setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !Object.hasOwn(changes, id))));
@@ -99,6 +100,12 @@ export function SettingsView() {
       {data.fileError && (
         <p role="alert" className={BANNER}>
           {data.fileError}. Saved settings are not applied and cannot be changed until the file is fixed or deleted.
+        </p>
+      )}
+
+      {data.envFileError && (
+        <p role="alert" className={BANNER}>
+          {data.envFileError}. A setting or key set only in that file shows as not set.
         </p>
       )}
 

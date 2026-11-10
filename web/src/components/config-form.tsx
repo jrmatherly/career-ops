@@ -43,7 +43,8 @@ async function saveCliForScripts(cliId: string): Promise<void> {
   if (!loaded.ok) throw new Error(`the server answered ${loaded.status}`);
   const current: SettingsResponse = await loaded.json();
   const row = current.groups.flatMap((g) => g.settings).find((s) => s.id === "CAREER_OPS_CLI");
-  if (!row?.editable || (row.source === "saved" && row.value === cliId)) return;
+  if (row?.source === "saved" && row.value === cliId) return;
+  if (!row?.editable) throw new Error(current.fileError ?? (current.overlayDisabled ? "saved settings are turned off for this server (CAREER_OPS_SETTINGS=off)" : "the server does not list that setting"));
   const res = await fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -14,8 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Saved settings live in {DATA_ROOT}/config/settings.json. This route is the
-// only writer; every core script reads the file through lib/settings-env.mjs.
-// Nothing here writes process.env, and no secret value is read into a response.
+// only writer. Nothing here writes process.env, and no secret value is read into a response.
 
 const readText = (file: string): string | null => {
   try {
@@ -24,6 +23,17 @@ const readText = (file: string): string | null => {
     return null;
   }
 };
+
+/** The data root .env, and why it could not be read when it exists: its keys would otherwise read as not set. */
+function readDotenv(root: string): { dotenv: Record<string, string>; envFileError: string | null } {
+  try {
+    // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+    return { dotenv: parseEnv(`${fs.readFileSync(path.join(root, ".env"), "utf8")}\n`) as Record<string, string>, envFileError: null };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return { dotenv: {}, envFileError: code === "ENOENT" ? null : `.env cannot be read (${code ?? "unknown error"})` };
+  }
+}
 
 function parseYaml(text: string | null): unknown {
   if (text === null) return null;
@@ -55,24 +65,38 @@ function load({ registry, store }: Core) {
   const fileError = saved.error ? `${store.SETTINGS_FILE} ${saved.error}` : null;
   const profileText = readText(getProfilePath(root));
   const portalsText = readText(portalsConfigPath(root));
-  // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
-  const dotenv = parseEnv(`${readText(path.join(root, ".env")) ?? ""}\n`) as Record<string, string>;
+  const { dotenv, envFileError } = readDotenv(root);
   const { groups } = buildSettingsState({
     groups: registry.GROUPS, settings: registry.SETTINGS, validateSetting: registry.validateSetting,
     stored: saved.values, fileError, overlayDisabled, env, dotenv,
     profile: parseYaml(profileText), portals: parseYaml(portalsText), modesDirs: modesDirs(), dataRoot: root,
   });
   const revision = { settings: revisionOf(saved.text), profile: revisionOf(profileText), portals: revisionOf(portalsText) };
-  return { root, saved, state: { revision, groups, fileError, overlayDisabled } };
+  return { root, saved, state: { revision, groups, fileError, envFileError, overlayDisabled } };
 }
 
 const conflict = (error: string) => Response.json({ error }, { status: 409 });
 
+// The message names a path and an errno, never a setting's value.
+const failed = (what: string, e: unknown) => Response.json({ error: `${what} (${e instanceof Error ? e.message : String(e)})` }, { status: 500 });
+
 export async function GET() {
-  return Response.json(load(await coreSettings()).state);
+  try {
+    return Response.json(load(await coreSettings()).state);
+  } catch (e) {
+    return failed("The settings could not be read", e);
+  }
 }
 
 export async function POST(req: Request) {
+  try {
+    return await save(req);
+  } catch (e) {
+    return failed("The settings could not be saved", e);
+  }
+}
+
+async function save(req: Request): Promise<Response> {
   const body = await readJsonObject<{ revision?: { settings?: unknown }; changes?: unknown }>(req);
   if (!body) return Response.json({ error: "bad json" }, { status: 400 });
   const changes = body.changes;
@@ -102,5 +126,9 @@ export async function POST(req: Request) {
   }
   if (Object.keys(errors).length > 0 || next === null) return Response.json({ errors }, { status: 400 });
   atomicWrite(store.settingsPath(root), next);
-  return Response.json(load(core).state);
+  try {
+    return Response.json(load(core).state);
+  } catch (e) {
+    return failed("The settings were saved, but could not be read back. Reload the page", e);
+  }
 }

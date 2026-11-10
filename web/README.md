@@ -356,8 +356,9 @@ each with the value in effect and where that value comes from.
   scheduled and terminal runs use the same CLI.
 - **Which value wins.** A value saved here, then the environment, then the data
   folder's `.env` (only for variables whose script reads that file), then the
-  built-in default. The badge on each row names the one in effect. Every script
-  reads the saved values when it starts, so a terminal or scheduled run uses
+  built-in default. The label under each value names the one in effect, and a
+  key shows it in its status. Every script that reads one of these settings
+  applies the saved values when it starts, so a terminal or scheduled run uses
   them too. **Reset** deletes the saved value and the next one in that order
   shows through.
 - **Turning saved values off.** Export `CAREER_OPS_SETTINGS=off` in the shell
@@ -368,9 +369,9 @@ each with the value in effect and where that value comes from.
   never reads a key's value into the page, and you cannot enter one here. Set
   keys in the environment or in `.env`.
 - **Deployment rows** are read-only. They describe how this server was started.
-- **A broken file.** If `config/settings.json` is not valid JSON, scripts run on
-  the environment's values, the page shows the error, and nothing is saved until
-  you fix or delete the file. It is never overwritten.
+- **A broken file.** If `config/settings.json` cannot be read or is not a valid
+  settings file, scripts run on the environment's values, the page shows the
+  error, and nothing is saved until you fix or delete the file. It is never overwritten.
 
 ### Tests
 

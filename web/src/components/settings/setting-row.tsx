@@ -61,7 +61,7 @@ function Control({ state, current, labelId, helpId, invalid, busy, onChange }: {
   busy: boolean;
   onChange: (value: string | boolean) => void;
 }) {
-  // A key or token is never typed or shown here, and a row this page cannot change is plain text.
+  // A key or token is never typed or shown here; a row this page cannot change, or a list, is plain text.
   if (state.kind === "secret" || state.editable === false || state.type === "list") {
     return <div role="group" aria-labelledby={labelId} className="break-all text-sm text-foreground">{shown(state)}</div>;
   }
@@ -85,16 +85,14 @@ function Control({ state, current, labelId, helpId, invalid, busy, onChange }: {
       </select>
     );
   }
-  const numeric = state.type === "int" || state.type === "number";
   return (
     <input
       name={state.id}
-      type={numeric ? "number" : state.type === "url" ? "url" : "text"}
+      // Not a number input: that reports text it cannot parse as empty, which a saved row would send as a reset.
+      type={state.type === "url" ? "url" : "text"}
+      inputMode={state.type === "int" ? "numeric" : state.type === "number" ? "decimal" : undefined}
       value={String(current)}
       onChange={(e) => onChange(e.target.value)}
-      min={numeric ? state.min : undefined}
-      max={numeric ? state.max : undefined}
-      step={numeric ? (state.step ?? 1) : undefined}
       autoComplete="off"
       spellCheck={false}
       {...described}

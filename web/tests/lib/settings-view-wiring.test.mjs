@@ -45,6 +45,11 @@ test("a secret or a row that cannot be changed gets no control", () => {
   }
 });
 
+test("a number is typed into a text field, so text that is not a number reaches the server as typed", () => {
+  assert.doesNotMatch(row, /type="number"|"number" :/);
+  assert.match(row, /inputMode=\{state\.type === "int" \? "numeric"/);
+});
+
 test("every control is labelled, and a per-setting error is announced", () => {
   assert.match(row, /"aria-labelledby": labelId/);
   assert.match(row, /role="alert"/);
