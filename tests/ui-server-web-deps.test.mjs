@@ -102,3 +102,19 @@ test('a data root inside a plugin install copy is refused in one line, with no s
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('any other data-root failure keeps its stack trace', async () => {
+  const dir = launcherTree();
+  try {
+    const nextDir = join(dir, 'web', 'node_modules', 'next');
+    mkdirSync(nextDir, { recursive: true });
+    writeFileSync(join(nextDir, 'package.json'), JSON.stringify({ name: 'next', version: '15.0.0', bin: { next: 'cli.js' } }));
+    writeFileSync(join(dir, 'path-resolver.mjs'), "export class UnsafeDataRootError extends Error {}\nexport function getCareerOpsRoot() { throw new TypeError('boom'); }\n");
+    const run = await launch(dir);
+    assert.notEqual(run.status, 0, describeSpawn(run));
+    assert.match(run.stderr, /TypeError: boom/);
+    assert.match(run.stderr, /^\s+at /m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

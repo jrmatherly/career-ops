@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <RouteProgressHost />
         <ThemeProvider>
           {refusal ? (
-            <DataRootRefused source={refusal.source} root={refusal.root} />
+            <DataRootRefused message={refusal.message} source={refusal.source} />
           ) : (
             <AppShell followupsEnabled={readFollowupsEnabled()}>{children}</AppShell>
           )}

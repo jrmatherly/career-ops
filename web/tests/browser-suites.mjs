@@ -66,6 +66,7 @@ const SUITES = {
   "cv-studio-keep": { url: "CV_STUDIO_KEEP_TEST_URL", root: "CV_STUDIO_KEEP_TEST_ROOT", fixture: "cv-studio" },
   "cv-studio-preview": { url: "CV_STUDIO_PREVIEW_TEST_URL", fixture: "cv-studio-preview" },
   "cv-studio-undo": { url: "CV_STUDIO_UNDO_TEST_URL", root: "CV_STUDIO_UNDO_TEST_ROOT", fixture: "cv-studio" },
+  "data-root-refused": { url: "DATA_ROOT_REFUSED_TEST_URL", root: "DATA_ROOT_REFUSED_TEST_ROOT", fixture: "data-root-refused", claudeConfig: (root) => path.resolve(root, "../../../..") },
   "cv-upload": { url: "CV_UPLOAD_TEST_URL", root: "CV_UPLOAD_TEST_ROOT", fixture: "cv-upload" },
   "dialog-focus": { url: "DIALOG_FOCUS_TEST_URL", fixture: "pipeline-status" },
   "employer-preset": { url: "EXPLORE_EMPLOYER_TEST_URL", fixture: "blank" },
@@ -111,8 +112,8 @@ function makeRoot(fixture) {
 
 // detached, so the server and the next process server.mjs spawns share a
 // process group that stop() can signal in one call.
-function startServer(root, port, log) {
-  const env = { ...process.env, CAREER_OPS_ROOT: root, NEXT_TELEMETRY_DISABLED: "1" };
+function startServer(root, port, log, extraEnv = {}) {
+  const env = { ...process.env, CAREER_OPS_ROOT: root, NEXT_TELEMETRY_DISABLED: "1", ...extraEnv };
   for (const name of ["CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER", "CAREER_OPS_WEB_ALLOWED_HOSTS", ...SUITE_VARS]) delete env[name];
   const child = spawn(process.execPath, ["server.mjs", "start", "-p", String(port)], {
     cwd: WEB, env, detached: true, stdio: ["ignore", log, log],
@@ -202,14 +203,18 @@ async function attempt(name) {
   let server;
   let proxy;
   let logPath;
+  let claudeConfig;
   let problem = null;
   try {
     root = makeRoot(suite.fixture);
+    // A suite whose data root must be refused names the Claude Code config
+    // directory that makes the root a plugin install copy.
+    claudeConfig = suite.claudeConfig?.(root);
     const port = await freePort();
     let url = `http://127.0.0.1:${port}`;
     logPath = path.join(root, "..", `${path.basename(root)}-server.log`);
     const log = fs.openSync(logPath, "w");
-    server = startServer(root, port, log);
+    server = startServer(root, port, log, claudeConfig ? { CLAUDE_CONFIG_DIR: claudeConfig } : {});
     fs.closeSync(log);
     await waitReady(url, server);
     if (SEGMENT_DELAY_MS) {
@@ -243,6 +248,7 @@ async function attempt(name) {
     }
     if (logPath) fs.rmSync(logPath, { force: true });
     if (root) fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+    if (claudeConfig) fs.rmSync(claudeConfig, { recursive: true, force: true, maxRetries: 5 });
   }
   return problem;
 }

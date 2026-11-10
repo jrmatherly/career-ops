@@ -197,13 +197,13 @@ test("dataRootRefusal: null when the root resolves", () => {
   assert.equal(dataRootRefusal(() => "/some/root"), null);
 });
 
-test("dataRootRefusal: an override inside a plugin copy comes back as its message, source and root", () => {
+test("dataRootRefusal: an override inside a plugin copy comes back as its message and source", () => {
   const config = tmpdir();
   const inside = path.join(config, "plugins", "cache", "career-ops", "data");
   const refusal = dataRootRefusal(() => resolve(tmpdir(), { CLAUDE_CONFIG_DIR: config, CAREER_OPS_DATA_DIR: inside }));
   assert.equal(refusal.source, "CAREER_OPS_DATA_DIR");
-  assert.equal(refusal.root, inside);
-  assert.match(refusal.message, /points inside a Claude Code plugin install/);
+  assert.ok(refusal.message.includes(inside));
+  assert.match(refusal.message, /remove it to use the default data folder\.$/);
 });
 
 test("dataRootRefusal: any other failure is rethrown, never shown as a refusal", () => {
