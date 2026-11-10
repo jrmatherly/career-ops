@@ -6,7 +6,7 @@ import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import "../helpers/web-ts-alias-loader.mjs";
 
@@ -45,7 +45,7 @@ const seed = ({ profile = EXAMPLE_PROFILE, portals = EXAMPLE_PORTALS } = {}) => 
   if (profile !== null) writeFileSync(profileFile, profile);
   if (portals !== null) writeFileSync(portalsFile, portals);
 };
-const backups = (target) => readdirSync(dirname(target)).filter((f) => f.startsWith(`${target.split("/").pop()}.bak-`));
+const backups = (target) => readdirSync(dirname(target)).filter((f) => f.startsWith(`${basename(target)}.bak-`));
 
 before(async () => {
   for (const k of ENV_KEYS) delete process.env[k];
