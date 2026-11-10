@@ -138,7 +138,7 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     try {
       return fn();
     } catch (err) {
-      return `throws ${err.code} | ${err.name} | ${err.message}`;
+      return `throws ${err.code} | ${err.name} | ${err.source} | ${err.root} | ${err.message}`;
     }
   };
 
