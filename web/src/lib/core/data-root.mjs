@@ -40,7 +40,7 @@ export function isPluginInstallCopy(dir, env) {
       spellings(path.join(root, sub)).some((parent) =>
         candidates.some((c) => {
           const rel = path.relative(parent, c);
-          return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+          return rel !== "" && rel !== ".." && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
         }),
       ),
     ),

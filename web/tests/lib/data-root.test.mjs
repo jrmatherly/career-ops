@@ -131,6 +131,7 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     { name: "config-dir copy still counts with CLAUDE_CODE_PLUGIN_CACHE_DIR set", marker: null, env: { CLAUDE_CODE_PLUGIN_CACHE_DIR: "ABS", CAREER_OPS_ROOT: "IN_PLUGIN" }, expect: UNSAFE },
     { name: "the cache dir itself is not a copy", marker: null, env: { CAREER_OPS_ROOT: "COPIES" }, expect: "COPIES" },
     { name: "a sibling under plugins/ is not a copy", marker: null, env: { CAREER_OPS_ROOT: "PLUGINS_SIBLING" }, expect: "PLUGINS_SIBLING" },
+    { name: "a copy folder whose name starts with two dots", marker: null, env: { CAREER_OPS_ROOT: "IN_DOTDOT" }, expect: UNSAFE },
     { name: "marker is a symlink into a plugin copy", marker: "LINK", env: {}, expect: UNSAFE },
   ];
   const answer = (fn) => {
@@ -155,6 +156,7 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
       IN_MARKETPLACES: path.join(config, "plugins", "marketplaces", "m"),
       IN_SYNCED: path.join(config, "plugins", "synced", "s"),
       IN_ABS_CACHE: path.join(abs, "cache", "x"),
+      IN_DOTDOT: path.join(copies, "..foo", "x"),
       COPIES: copies,
       PLUGINS_SIBLING: path.join(config, "plugins", "data"),
       LINK: path.join(abs, "link"),
