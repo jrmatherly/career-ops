@@ -103,3 +103,51 @@ ok(envString(conc, 4) === '4', 'an int is written as its digits');
 ok(settingById('CAREER_OPS_HTTP_CACHE').on === 'nonzero' && settingById('CAREER_OPS_BROWSER_AUTODETECT').on === 'words', 'each bool names how its reader parses it');
 deepEqual(settingPath(conc), [], 'an env row has no path');
 deepEqual(settingPath({ kind: 'profile', id: 'profile:cv.max_pages' }), ['cv', 'max_pages'], 'a profile row has its key path');
+
+// The profile.yml and portals.yml rows, verbatim from the spec's two file-backed tables.
+const MAX = Number.MAX_SAFE_INTEGER;
+const FILE_SPEC = [
+  ['profile:spend_tier', 'profile', 'enum', undefined, undefined, 'standard'],
+  ['profile:auto_pdf_score_threshold', 'profile', 'number', 0, 5, 3],
+  ['profile:pipeline.auto_evaluate_daily_cap', 'profile', 'int', 0, 500, 10],
+  ['profile:language.output', 'profile', 'string', 2, 64, 'en'],
+  ['profile:language.modes_dir', 'profile', 'string', 5, 64, 'modes'],
+  ['profile:page_format', 'profile', 'enum', undefined, undefined, 'letter'],
+  ['profile:cv.output_format', 'profile', 'enum', undefined, undefined, 'html'],
+  ['profile:cv.template', 'profile', 'string', 1, 64, undefined],
+  ['profile:cv.max_pages', 'profile', 'int', 1, 10, 2],
+  ['profile:cv.strict_pages', 'profile', 'bool', undefined, undefined, false],
+  ['portals:max_posting_age_days', 'scanner', 'int', 0, 3650, 0],
+  ['portals:scan_history.recheck_after_days', 'scanner', 'int', 0, 3650, undefined],
+  ['portals:skip_tiers', 'scanner', 'list', undefined, undefined, undefined],
+  ['portals:title_filter.negative', 'scanner', 'list', 1, 80, undefined],
+  ['portals:location_filter.block', 'scanner', 'list', 1, 80, undefined],
+  ['portals:salary_filter.min', 'scanner', 'number', 0, MAX, undefined],
+  ['portals:salary_filter.max', 'scanner', 'number', 0, MAX, undefined],
+  ['portals:salary_filter.currency', 'scanner', 'string', 3, 3, undefined],
+  ['portals:visa_filter.enabled', 'scanner', 'bool', undefined, undefined, false],
+  ['portals:experience_filter.enabled', 'scanner', 'bool', undefined, undefined, false],
+];
+const fileRows = SETTINGS.filter(s => s.kind === 'profile' || s.kind === 'portals');
+deepEqual(fileRows.map(s => [s.id, s.group, s.type, s.min, s.max, s.default]), FILE_SPEC, 'every profile and portals row has the spec table\'s group, type, bounds and default');
+ok(fileRows.every(s => s.kind === s.id.slice(0, s.id.indexOf(':'))), 'a file row\'s kind is its id prefix');
+deepEqual(settingById('profile:auto_pdf_score_threshold').step, 0.1, 'the PDF threshold steps by 0.1');
+deepEqual(settingById('profile:spend_tier').values, ['economy', 'standard', 'premium'], 'spend tiers');
+deepEqual(settingById('profile:page_format').values, ['letter', 'a4', 'auto'], 'page formats');
+deepEqual(settingById('profile:cv.output_format').values, ['html', 'latex', 'text'], 'CV output formats');
+deepEqual([settingById('portals:skip_tiers').values, settingById('portals:skip_tiers').maxItems], [['intern', 'entry', 'mid', 'senior'], 4], 'skip tiers');
+ok(['portals:title_filter.negative', 'portals:location_filter.block'].every(id => settingById(id).maxItems === 200), 'keyword lists hold at most 200 entries');
+
+deepEqual(settingPath(settingById('profile:pipeline.auto_evaluate_daily_cap')), ['pipeline', 'auto_evaluate_daily_cap'], 'a profile id\'s path');
+deepEqual(validateSetting(settingById('profile:spend_tier'), 'cheap'), { ok: false, error: 'must be one of: economy, standard, premium' }, 'an unknown spend tier');
+deepEqual(validateSetting(settingById('portals:skip_tiers'), ['intern']), { ok: true, value: ['intern'] }, 'a known tier');
+deepEqual(validateSetting(settingById('portals:skip_tiers'), ['boss']).ok, false, 'an unknown tier');
+deepEqual(validateSetting(settingById('portals:salary_filter.currency'), 'USD'), { ok: true, value: 'USD' }, 'a currency code');
+deepEqual(validateSetting(settingById('portals:salary_filter.currency'), 'usd').ok, false, 'a lowercase currency code');
+deepEqual(validateSetting(settingById('portals:salary_filter.currency'), 'DOLLARS').ok, false, 'a currency name');
+deepEqual(validateSetting(settingById('portals:salary_filter.min'), 12000000), { ok: true, value: 12000000 }, 'a salary in a currency with large figures');
+deepEqual(validateSetting(settingById('profile:cv.template'), 'two-column'), { ok: true, value: 'two-column' }, 'a kebab-case template name');
+deepEqual(validateSetting(settingById('profile:cv.template'), 'Two Column').ok, false, 'a template name that is not kebab-case');
+deepEqual(validateSetting(settingById('profile:language.modes_dir'), 'modes/de'), { ok: true, value: 'modes/de' }, 'a market modes dir');
+deepEqual(validateSetting(settingById('profile:language.modes_dir'), '../etc').ok, false, 'a modes dir outside modes/');
+deepEqual(validateSetting(settingById('profile:language.output'), 'ja'), { ok: true, value: 'ja' }, 'an output language');

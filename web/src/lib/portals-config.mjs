@@ -113,12 +113,13 @@ const indentOf = (line) => line.length - line.trimStart().length;
  * @param {string[]} items
  * @returns {string[] | null}
  */
-function setListInText(lines, section, key, items) {
+export function setListInText(lines, section, key, items) {
+  const keyLine = (indent) => `${indent}${key}:${items.length ? "" : " []"}`;
   const head = lines.findIndex((l) => new RegExp(`^${section}:\\s*(#.*)?$`).test(l));
   if (head < 0) {
     if (lines.some((l) => l.startsWith(`${section}:`))) return null; // flow style or a value on the same line
     while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-    lines.push(`${section}:`, `  ${key}:`, ...items.map((i) => `    - ${JSON.stringify(i)}`), "");
+    lines.push(`${section}:`, keyLine("  "), ...items.map((i) => `    - ${JSON.stringify(i)}`), "");
     return lines;
   }
   let end = head + 1;
@@ -127,14 +128,13 @@ function setListInText(lines, section, key, items) {
   const childIndent = child ? " ".repeat(indentOf(child)) : "  ";
   const at = lines.findIndex((l, i) => i > head && i < end && l.startsWith(`${childIndent}${key}:`));
   if (at < 0) {
-    lines.splice(head + 1, 0, `${childIndent}${key}:`, ...items.map((i) => `${childIndent}  - ${JSON.stringify(i)}`));
+    lines.splice(head + 1, 0, keyLine(childIndent), ...items.map((i) => `${childIndent}  - ${JSON.stringify(i)}`));
     return lines;
   }
   const value = lines[at].slice(childIndent.length + key.length + 1).replace(/\s+#.*$/, "").trim();
   if (value !== "" && !/^\[.*\]$/.test(value)) return null;
   // The list's own lines: everything more indented than the key, up to its last
-  // item. Notes between items stay (ahead of the new items, as onboard-write.mjs
-  // keeps them); notes after the last item are left where they are.
+  // item. Notes after the last item are left where they are.
   let last = at;
   for (let i = at + 1; i < end; i++) {
     if (isNote(lines[i])) continue;
@@ -145,7 +145,52 @@ function setListInText(lines, section, key, items) {
   const body = lines.slice(at + 1, last + 1);
   const firstItem = body.find((l) => !isNote(l));
   const itemIndent = firstItem ? " ".repeat(indentOf(firstItem)) : `${childIndent}  `;
-  lines.splice(at, last - at + 1, `${childIndent}${key}:`, ...body.filter(isNote), ...items.map((i) => `${itemIndent}- ${JSON.stringify(i)}`));
+  const itemOf = (line) => {
+    if (!line.trimStart().startsWith("- ")) return undefined;
+    try {
+      const item = yaml.load(line.trimStart().slice(2));
+      return typeof item === "string" ? item : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const fresh = (item) => `${itemIndent}- ${JSON.stringify(item)}`;
+  // Every line that stays keeps its place and its text, so a note stays beside the
+  // items it describes and a comment after an item survives. A new item goes
+  // after the item it follows in `items`.
+  const stays = new Map();
+  const kept = body.filter((line) => {
+    if (isNote(line)) return true;
+    const item = itemOf(line);
+    if (item === undefined || !items.includes(item) || stays.has(item)) return false;
+    stays.set(item, line);
+    return true;
+  });
+  const wanted = items.filter((item) => stays.has(item));
+  const inOrder = wanted.length === stays.size && [...stays.keys()].every((item, n) => item === wanted[n]);
+  let next;
+  if (inOrder) {
+    next = [];
+    let n = 0;
+    const addNew = () => {
+      while (n < items.length && !stays.has(items[n])) next.push(fresh(items[n++]));
+    };
+    for (const line of kept) {
+      if (isNote(line)) next.push(line);
+      else {
+        addNew();
+        next.push(line);
+        n++;
+        addNew();
+      }
+    }
+    addNew();
+  } else {
+    // A reordered list cannot keep its lines in place: its notes then go ahead of the items.
+    next = [...body.filter(isNote), ...items.map((item) => stays.get(item) ?? fresh(item))];
+  }
+  const keyComment = (lines[at].match(/\s+#.*$/) ?? [""])[0];
+  lines.splice(at, last - at + 1, keyLine(childIndent) + keyComment, ...next);
   return lines;
 }
 

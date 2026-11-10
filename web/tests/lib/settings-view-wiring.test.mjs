@@ -36,7 +36,7 @@ test("a conflict offers Reload, and the off banner reads as specified", () => {
 test("a secret or a row that cannot be changed gets no control", () => {
   const guard = row.indexOf('if (state.kind === "secret" || state.editable === false');
   assert.notEqual(guard, -1);
-  for (const control of ["<input", "<select", 'role="switch"']) {
+  for (const control of ["<input", "<select", 'role="switch"', "<textarea", 'type="checkbox"']) {
     assert.ok(row.indexOf(control) > guard, `${control} is rendered only after the read-only return`);
   }
   assert.match(row, /if \(state\.kind === "secret"\) return secretStatus\(state\)/);
@@ -70,4 +70,30 @@ test("the page renders both parts and the nav calls it Settings", () => {
   assert.match(page, /<ConfigForm \/>\s*<SettingsView \/>/);
   assert.match(src("lib/nav-items.ts"), /href: "\/config", label: "Settings"/);
   assert.match(form, />Settings<\/h1>/);
+});
+
+test("a free list is a textarea with its entry count, and a list of choices is checkboxes", () => {
+  const values = row.indexOf('state.type === "list" && state.values');
+  assert.notEqual(values, -1);
+  assert.ok(row.indexOf('type="checkbox"', values) > values, "checkboxes for a list with values");
+  assert.ok(row.indexOf("<textarea", values) > values, "a textarea for a free list");
+  assert.match(row, /entries/);
+  assert.match(row, /<label[^>]*>\s*<input[^>]*type="checkbox"/, "each checkbox is named by its label");
+});
+
+test("a row this page cannot change shows its error, and file rows have no Reset", () => {
+  assert.match(row, /\{message && <p role="alert"[^\n]*\{state\.label\} \{message\}/);
+  assert.match(row, /state\.source === "saved" && state\.editable/, "only a saved value is reset, and a file row is never saved here");
+});
+
+test("Profile preferences names its file and the scanner's file rows sit under their own heading", () => {
+  assert.ok(view.includes("Saved to config/profile.yml. Comments in the file are kept."));
+  assert.ok(view.includes("Filters (portals.yml)"));
+});
+
+test("a save sends every file's revision and keeps the new ones", () => {
+  assert.match(src("lib/settings-form.mjs"), /revision: \{ settings: string, profile: string, portals: string \}/);
+  assert.match(view, /if \(res\.ok\) \{\s*setData\(body\);/);
+  assert.match(view, /body: JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
+  assert.match(view, /Already saved: \$\{body\.written\.join\(", "\)\}/, "a partial save names the file that was written");
 });

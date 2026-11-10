@@ -354,6 +354,13 @@ each with the value in effect and where that value comes from.
   `config/settings.json` under your data folder. The AI engine choice is also
   kept in this browser, and saving it stores `CAREER_OPS_CLI` in that file, so
   scheduled and terminal runs use the same CLI.
+- **Profile preferences and scan filters** are written straight to
+  `config/profile.yml` and `portals.yml`. Only the changed keys are rewritten,
+  comments are kept, and the previous copy is left beside the file as
+  `<file>.bak-<timestamp>`. A list takes one entry per line. These rows have no
+  **Reset**, because the file is where the value lives. If a file is missing or
+  does not parse, its rows show why and cannot be changed, and the file is never
+  overwritten.
 - **Which value wins.** A value saved here, then the environment, then the data
   folder's `.env` (only for variables whose script reads that file), then the
   built-in default. The label under each value names the one in effect, and a
