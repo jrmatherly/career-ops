@@ -86,3 +86,10 @@ test("the revision the Portals page computes is the one the route accepts", asyn
   const { source } = loadPortalsDocument(portalsFile, join(codeRoot, "templates", "portals.example.yml"));
   assert.equal((await post({ company: "Acme", enabled: false, revision: revisionOf(source) })).status, 200);
 });
+
+test("a missing portals.yml is 409 and no file is created", async () => {
+  rmSync(portalsFile);
+  const { status } = await post({ company: "Acme", enabled: false, revision: revisionOf(SOURCE) });
+  assert.equal(status, 409);
+  assert.deepEqual(readdirSync(dataRoot), []);
+});

@@ -172,6 +172,7 @@ function WatchedList({ watched, revision: loaded }: { watched: WatchedCompany[];
   const scanned = enabled.filter(Boolean).length;
 
   async function toggle(i: number) {
+    if (pending) return;
     const next = !enabled[i];
     const set = (value: boolean) => setEnabled((all) => all.map((v, n) => (n === i ? value : v)));
     set(next);
@@ -219,9 +220,10 @@ function WatchedList({ watched, revision: loaded }: { watched: WatchedCompany[];
               role="switch"
               aria-checked={enabled[i]}
               aria-label={`Scan ${c.name}`}
-              disabled={pending}
+              // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
+              aria-disabled={pending}
               onClick={() => toggle(i)}
-              className={cn("relative ml-auto h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60", enabled[i] ? "bg-brand" : "bg-surface-hover")}
+              className={cn("relative ml-auto h-6 w-11 shrink-0 rounded-full transition-colors aria-disabled:opacity-60", enabled[i] ? "bg-brand" : "bg-surface-hover")}
             >
               <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", enabled[i] ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
             </button>

@@ -122,5 +122,7 @@ test("a company switch sends the exact name with the page's revision, keeps the 
   assert.match(portals, /body: JSON\.stringify\(\{ company: watched\[i\]\.name, enabled: next, revision \}\)/);
   assert.match(portals, /setRevision\(body\.revision\)/);
   assert.match(portals, /catch \(e\) \{\s+set\(!next\);/);
-  assert.match(portals, /disabled=\{pending\}/);
+  assert.match(portals, /if \(pending\) return;/);
+  assert.match(portals, /aria-disabled=\{pending\}/);
+  assert.ok(!/\sdisabled=\{pending\}/.test(portals), "a pending switch keeps keyboard focus");
 });
