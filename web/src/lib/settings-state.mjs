@@ -50,7 +50,7 @@ function readonlyRow(setting, input) {
 function fileRow(setting, input) {
   const doc = input[setting.kind];
   const fallback = setting.default === undefined ? { value: null, source: "unset" } : { value: setting.default, source: "default" };
-  if (!isMapping(doc)) return { ...fallback, editable: false, error: `${FILES[setting.kind]} is missing or unreadable` };
+  if (!isMapping(doc)) return { ...fallback, editable: false, error: input.fileErrors?.[setting.kind] ?? `${FILES[setting.kind]} is missing or unreadable` };
   const path = setting.id.slice(setting.id.indexOf(":") + 1).split(".");
   const filterEnabled = FILTER_ENABLED[setting.id];
   if (filterEnabled) {
@@ -70,7 +70,8 @@ function fileRow(setting, input) {
  * @param {{ groups: { id: string, label: string }[], settings: object[], validateSetting: Function,
  *   stored: Record<string, unknown>, fileError: string|null, overlayDisabled: boolean,
  *   env: Record<string, string|undefined>, dotenv: Record<string, string>, profile: unknown, portals: unknown,
- *   modesDirs: string[], dataRoot: string }} input
+ *   modesDirs: string[], dataRoot: string, fileErrors?: { profile?: string|null, portals?: string|null } }} input
+ *   `fileErrors` says why `profile` or `portals` is not a mapping: missing, unreadable, or not valid YAML.
  */
 export function buildSettingsState(input) {
   const savedOn = !input.fileError && !input.overlayDisabled;

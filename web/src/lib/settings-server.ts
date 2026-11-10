@@ -3,12 +3,25 @@ import { careerOpsRoot, rootScript } from "@/lib/career-ops";
 
 type Registry = typeof import("../../../lib/settings-registry.mjs");
 type Store = typeof import("../../../lib/settings-store.mjs");
+// Written out, not `typeof import(...)`: the validators' imports would pull providers/ and plugins/ into this type check.
+export type Finding = { level?: string; message: string; key?: string; path?: string };
+type Validators = {
+  validateProfile: (profileText: string, exampleText: string, label?: string) => { findings: Finding[] };
+  validatePortalsConfig: (config: unknown, options: { providerIds: Set<string> }) => Promise<{ errors: Finding[] }>;
+};
+
+const load = (name: string) => import(/* webpackIgnore: true */ pathToFileURL(rootScript(name)).href);
 
 /** The settings registry and store from the engine checkout, which is chosen at runtime and never bundled. */
 export async function coreSettings(): Promise<{ registry: Registry; store: Store }> {
-  const load = (name: string) => import(/* webpackIgnore: true */ pathToFileURL(rootScript(name)).href);
   const [registry, store] = await Promise.all([load("lib/settings-registry"), load("lib/settings-store")]);
   return { registry, store };
+}
+
+/** The profile and portals validators from the engine checkout, loaded only when a save edits one of those files. */
+export async function coreValidators(): Promise<Validators> {
+  const [profile, portals] = await Promise.all([load("validate-profile"), load("validate-portals")]);
+  return { validateProfile: profile.validateProfile, validatePortalsConfig: portals.validatePortalsConfig };
 }
 
 /**
