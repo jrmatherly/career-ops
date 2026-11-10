@@ -32,7 +32,7 @@ writeFileSync(join(other, 'cv.md'), '# CV\n');
 // CAREER_OPS_CLI is cleared so the human run reaches doctor's own .env load.
 function doctor(args, extra = {}) {
   const env = { ...process.env, HOME: base, USERPROFILE: base, ...extra };
-  for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_CLI']) {
+  for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_CLI', 'DOTENV_OVERRIDE', 'DOTENV_CONFIG_OVERRIDE']) {
     if (!(name in extra)) delete env[name];
   }
   const r = spawnSync(process.execPath, [join(copy, 'doctor.mjs'), ...args], { cwd: copy, env, encoding: 'utf-8', timeout: 60000 });
@@ -59,7 +59,7 @@ for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
     assert.ok(warning, 'doctor --json carries no warning for a root set only in .env');
     assert.ok(warning.includes(other), warning);
     assert.ok(warning.includes(copy), warning);
-    assert.match(warning, /shell/);
+    assert.match(warning, /Export .* in your shell/);
 
     const human = doctor([]);
     assert.match(human, new RegExp(`\\.env sets ${name}=`));
@@ -107,4 +107,39 @@ test('doctor says nothing when the .env names no root, or the root it is in', (t
 test('doctor --target says nothing about the target\'s .env', (t) => {
   if (depsReason) return t.skip(depsReason);
   silent(`CAREER_OPS_ROOT=${other}\n`, ['--target', copy]);
+});
+
+for (const flag of ['DOTENV_OVERRIDE', 'DOTENV_CONFIG_OVERRIDE']) {
+  test(`doctor warns when ${flag} lets the .env replace a root the shell names`, (t) => {
+    if (depsReason) return t.skip(depsReason);
+    writeFileSync(join(copy, '.env'), `CAREER_OPS_ROOT=${other}\n`);
+    const [warning] = rootWarnings(doctor(['--json'], { CAREER_OPS_ROOT: copy, [flag]: 'true' }));
+    assert.ok(warning?.includes(other), String(warning));
+    assert.match(warning, /Remove it from \.env/);
+    assert.doesNotMatch(warning, /in your shell/);
+  });
+}
+
+test('doctor treats dotenv\'s off values as off', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  for (const off of ['false', 'OFF', '0', '']) {
+    silent(`CAREER_OPS_ROOT=${other}\n`, [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: off });
+  }
+});
+
+test('doctor warns when an override lets an empty line clear the root the shell names', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  const shellRoot = join(base, 'shell-root');
+  mkdirSync(shellRoot, { recursive: true });
+  writeFileSync(join(shellRoot, '.env'), 'CAREER_OPS_ROOT=\n');
+  const [warning] = rootWarnings(doctor(['--json'], { CAREER_OPS_ROOT: shellRoot, DOTENV_OVERRIDE: 'true' }));
+  assert.ok(warning, 'no warning for a root the .env clears');
+  // With the shell value cleared, the root falls back to the code folder.
+  assert.ok(warning.includes(`use ${copy} from then on`), warning);
+  assert.match(warning, /Remove it from \.env/);
+});
+
+test('doctor says nothing when the cleared root falls back to the same folder', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  silent('CAREER_OPS_ROOT=\n', [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: 'true' });
 });

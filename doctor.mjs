@@ -127,6 +127,12 @@ const ROOT_VARS = ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR'];
 // Read before any .env load. A .env load never replaces a variable the shell
 // already has, set to an empty value included.
 const shellRootEnv = Object.fromEntries(ROOT_VARS.filter((name) => name in process.env).map((name) => [name, process.env[name]]));
+// Unless dotenv is told to override: then a line in the file replaces the shell
+// value. The names and the off values are dotenv's own (optionsFromEnv).
+const dotenvOverride = (() => {
+  const value = process.env.DOTENV_OVERRIDE ?? process.env.DOTENV_CONFIG_OVERRIDE;
+  return value != null && !['false', '0', 'no', 'off', ''].includes(value.toLowerCase());
+})();
 const projectRoot = explicitTarget || getCareerOpsRoot();
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
@@ -1321,11 +1327,10 @@ function checkEnvFileProfile(root) {
   };
 }
 
-// The root's own .env names a data root. Only the commands that load a .env see
-// it, and only after the load, so one run can read part of its input from each
-// root. The check works out which variable names the root once the file is
-// loaded: CAREER_OPS_ROOT outranks CAREER_OPS_DATA_DIR, so a shell
-// CAREER_OPS_DATA_DIR does not shadow a CAREER_OPS_ROOT line.
+// The root's own .env names a data root or, under a dotenv override, clears the
+// one the shell names. Only the commands that load a .env see that, and only
+// after the load, so one run can read part of its input from each root. The
+// check asks path-resolver.mjs for the root as it will be once the file is loaded.
 function checkEnvFileRoot(root) {
   if (explicitTarget) return null;
   let fileEnv;
@@ -1334,16 +1339,34 @@ function checkEnvFileRoot(root) {
   } catch {
     return null; // no .env, or unreadable
   }
-  const loaded = { ...fileEnv, ...shellRootEnv };
-  const name = ROOT_VARS.find((n) => loaded[n]?.trim());
-  if (!name || name in shellRootEnv) return null;
-  const value = loaded[name].trim();
-  // path-resolver.mjs resolves the value against the code folder.
-  if (resolve(__dirname, value) === resolve(root)) return null;
+  // The lines a load applies: all of them under an override, else those the shell leaves unset.
+  const applied = ROOT_VARS.filter((n) => n in fileEnv && (dotenvOverride || !(n in shellRootEnv)));
+  if (!applied.length) return null;
+  const current = ROOT_VARS.map((n) => [n, process.env[n]]);
+  const setRootVars = (pairs) => {
+    for (const [n, value] of pairs) {
+      if (value === undefined) delete process.env[n];
+      else process.env[n] = value;
+    }
+  };
+  let after = null;
+  try {
+    setRootVars(ROOT_VARS.map((n) => [n, applied.includes(n) ? fileEnv[n] : shellRootEnv[n]]));
+    after = getCareerOpsRoot();
+  } catch {
+    // path-resolver.mjs refuses the folder the line names: still not this root.
+  } finally {
+    setRootVars(current);
+  }
+  if (after && resolve(after) === resolve(root)) return null;
+  const name = applied.find((n) => fileEnv[n].trim()) ?? applied[0];
+  const value = fileEnv[name].trim();
   return {
     warn: true,
-    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use the other folder from then on`,
-    fix: [`Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
+    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use ${after ?? 'the folder it names'} from then on`,
+    fix: [dotenvOverride
+      ? `Remove it from .env: with DOTENV_OVERRIDE or DOTENV_CONFIG_OVERRIDE on, the line replaces a value exported in the shell`
+      : `Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
   };
 }
 
