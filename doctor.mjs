@@ -1350,6 +1350,7 @@ function checkEnvFileRoot(root) {
     }
   };
   let after = null;
+  // No await between here and the finally: nothing else may see these values.
   try {
     setRootVars(ROOT_VARS.map((n) => [n, applied.includes(n) ? fileEnv[n] : shellRootEnv[n]]));
     after = getCareerOpsRoot();
