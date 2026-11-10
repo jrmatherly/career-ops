@@ -73,7 +73,7 @@ try {
 for (const name of ['settings-registry', 'settings-store', 'settings-env']) {
   const file = join(ROOT, 'lib', `${name}.mjs`);
   if (!existsSync(file)) continue;
-  const specifiers = [...readFileSync(file, 'utf8').matchAll(/^\s*(?:import|export)\b[^'"\n]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2]);
+  const specifiers = [...readFileSync(file, 'utf8').matchAll(/^\s*(?:import|export)\b[^'";]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2] ?? m[3]);
   const foreign = specifiers.filter(s => !(s.startsWith('node:') || s.startsWith('./settings-') || s === '../path-resolver.mjs'));
   deepEqual(foreign, [], `lib/${name}.mjs imports only node: builtins, its siblings and path-resolver`);
 }

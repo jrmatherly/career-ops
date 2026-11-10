@@ -84,7 +84,8 @@ for (const url of ['https://cv.example.com/#x', 'https://cv.example.com?a=1', 'h
   deepEqual(validateSetting(settingById('PUBLISH_URL'), url).ok, false, `a base URL a reader cannot append a path to: ${url}`);
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://localhost:8787/base'), { ok: true, value: 'http://localhost:8787/base' }, 'http on this machine, with a path');
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://127.0.0.1:8787').ok, true, 'http on the loopback address');
-for (const url of ['http://cv.example.com', 'http://localhost.example.com', 'http://192.168.1.5:8787'])
+deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://[::1]:8787').ok, true, 'http on the IPv6 loopback address');
+for (const url of ['http://cv.example.com', 'http://localhost.example.com', 'http://192.168.1.5:8787', 'http://app.localhost:8787'])
   deepEqual(validateSetting(settingById('PUBLISH_URL'), url).ok, false, `plain http that leaves this machine: ${url}`);
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), 'someone@例え.jp').ok, false, 'an env string a header cannot carry');
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), 'a\nb'), { ok: false, error: 'must be 3 to 200 characters on one line' }, 'a string with a newline');
