@@ -57,3 +57,9 @@ test("a list is typed one entry per line", () => {
   assert.deepEqual(dirtyChanges([list], { L: "a\nc" }), { L: ["a", "c"] });
   assert.deepEqual(dirtyChanges([list], { L: "" }), { L: [] }, "emptying a list sends an empty list");
 });
+
+test("an entry already in the file keeps a trailing space the textarea cannot show", () => {
+  const state = { id: "portals:title_filter.negative", type: "list", editable: true, source: "file", value: ["Java ", "PHP"] };
+  assert.deepEqual(parseFormValue(state, "Java\nPHP\n Staff "), ["Java ", "PHP", "Staff"]);
+  assert.deepEqual(dirtyChanges([state], { [state.id]: "Java\nPHP" }), {});
+});

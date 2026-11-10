@@ -134,8 +134,7 @@ export function setListInText(lines, section, key, items) {
   const value = lines[at].slice(childIndent.length + key.length + 1).replace(/\s+#.*$/, "").trim();
   if (value !== "" && !/^\[.*\]$/.test(value)) return null;
   // The list's own lines: everything more indented than the key, up to its last
-  // item. Notes between items stay (ahead of the new items, as onboard-write.mjs
-  // keeps them); notes after the last item are left where they are.
+  // item. Notes after the last item are left where they are.
   let last = at;
   for (let i = at + 1; i < end; i++) {
     if (isNote(lines[i])) continue;
@@ -146,7 +145,52 @@ export function setListInText(lines, section, key, items) {
   const body = lines.slice(at + 1, last + 1);
   const firstItem = body.find((l) => !isNote(l));
   const itemIndent = firstItem ? " ".repeat(indentOf(firstItem)) : `${childIndent}  `;
-  lines.splice(at, last - at + 1, keyLine(childIndent), ...body.filter(isNote), ...items.map((i) => `${itemIndent}- ${JSON.stringify(i)}`));
+  const itemOf = (line) => {
+    if (!line.trimStart().startsWith("- ")) return undefined;
+    try {
+      const item = yaml.load(line.trimStart().slice(2));
+      return typeof item === "string" ? item : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const fresh = (item) => `${itemIndent}- ${JSON.stringify(item)}`;
+  // Every line that stays keeps its place and its text, so a note stays beside the
+  // items it describes and a comment after an item survives. A new item goes
+  // after the item it follows in `items`.
+  const stays = new Map();
+  const kept = body.filter((line) => {
+    if (isNote(line)) return true;
+    const item = itemOf(line);
+    if (item === undefined || !items.includes(item) || stays.has(item)) return false;
+    stays.set(item, line);
+    return true;
+  });
+  const wanted = items.filter((item) => stays.has(item));
+  const inOrder = wanted.length === stays.size && [...stays.keys()].every((item, n) => item === wanted[n]);
+  let next;
+  if (inOrder) {
+    next = [];
+    let n = 0;
+    const addNew = () => {
+      while (n < items.length && !stays.has(items[n])) next.push(fresh(items[n++]));
+    };
+    for (const line of kept) {
+      if (isNote(line)) next.push(line);
+      else {
+        addNew();
+        next.push(line);
+        n++;
+        addNew();
+      }
+    }
+    addNew();
+  } else {
+    // A reordered list cannot keep its lines in place: its notes then go ahead of the items.
+    next = [...body.filter(isNote), ...items.map((item) => stays.get(item) ?? fresh(item))];
+  }
+  const keyComment = (lines[at].match(/\s+#.*$/) ?? [""])[0];
+  lines.splice(at, last - at + 1, keyLine(childIndent) + keyComment, ...next);
   return lines;
 }
 

@@ -63,7 +63,9 @@ export function SettingsView() {
         setErrors(body.errors);
         setNotice({ group: group.id, kind: "error", text: "Nothing was saved. Fix the marked settings and save again." });
       } else {
-        setNotice({ group: group.id, kind: res.status === 409 ? "conflict" : "error", text: body.error ?? `The server answered ${res.status}.` });
+        // A later file failed after an earlier one was written: say which, since "not saved" would be false for it.
+        const written = Array.isArray(body.written) && body.written.length ? ` Already saved: ${body.written.join(", ")}. Reload the page before saving again.` : "";
+        setNotice({ group: group.id, kind: res.status === 409 ? "conflict" : "error", text: (body.error ?? `The server answered ${res.status}.`) + written });
       }
     } catch {
       setNotice({ group: group.id, kind: "error", text: "The server could not be reached. Nothing was saved." });

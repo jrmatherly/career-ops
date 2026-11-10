@@ -186,7 +186,15 @@ async function save(req: Request): Promise<Response> {
         errors[id] = `must be one of: ${row.values.join(", ")}`;
         continue;
       }
-      fileChanges[kind].push({ id, path: registry.settingPath(setting), value: checked.value });
+      const keys = registry.settingPath(setting);
+      let value: unknown = checked.value;
+      if (Array.isArray(value)) {
+        // The validator trims. An entry already in the file keeps its exact text: "Java " ends in a space on purpose.
+        const current = keys.reduce<unknown>((doc, key) => (isMapping(doc) ? (doc as Record<string, unknown>)[key] : undefined), files[kind].doc);
+        const original = new Map((Array.isArray(current) ? current : []).filter((item) => typeof item === "string").map((item) => [item.trim(), item]));
+        value = value.map((item) => original.get(item) ?? item);
+      }
+      fileChanges[kind].push({ id, path: keys, value });
     }
   }
   const salary = (key: string) => {

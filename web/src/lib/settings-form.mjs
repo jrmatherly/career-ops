@@ -49,7 +49,11 @@ export function listText(items) {
  */
 export function parseFormValue(state, value) {
   if (typeof value !== "string") return value;
-  if (state.type === "list") return parseListText(value);
+  if (state.type === "list") {
+    // An entry already in the file keeps its exact spelling: "Java " ends in a space on purpose, so it does not match JavaScript.
+    const original = new Map((Array.isArray(state.value) ? state.value : []).map((item) => [String(item).trim(), item]));
+    return parseListText(value).map((item) => original.get(item) ?? item);
+  }
   const text = value.trim();
   if (text === "") return null;
   return (state.type === "int" || state.type === "number") && /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : text;

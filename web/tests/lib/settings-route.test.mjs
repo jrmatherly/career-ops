@@ -328,6 +328,14 @@ test("one save across settings.json and the profile writes both, and backs up on
   assert.deepEqual(backups(file), []);
 });
 
+test("adding a title to skip changes one line and keeps an entry's trailing space", async () => {
+  seed({ portals: 'title_filter:\n  negative:\n    # languages\n    - "Java "  # not JavaScript\n    - PHP\n' });
+  const { body: loaded } = await get();
+  const res = await post({ revision: loaded.revision, changes: { "portals:title_filter.negative": ["Java", "Staff", "PHP"] } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(readFileSync(portalsFile, "utf8"), 'title_filter:\n  negative:\n    # languages\n    - "Java "  # not JavaScript\n    - "Staff"\n    - PHP\n');
+});
+
 test("a filter block with no enabled key gets one", async () => {
   seed({ portals: "experience_filter:\n  stretch_years: 1\n" });
   const { body: loaded } = await get();
