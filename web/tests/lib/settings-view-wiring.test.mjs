@@ -97,3 +97,32 @@ test("a save sends every file's revision and keeps the new ones", () => {
   assert.match(view, /body: JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
   assert.match(view, /Already saved: \$\{body\.written\.join\(", "\)\}/, "a partial save names the file that was written");
 });
+
+test("plugin status is read from /api/doctor, only reported, and enabled from a terminal", () => {
+  const plugins = src("components/settings/plugin-status.tsx");
+  assert.match(plugins, /fetch\("\/api\/doctor"/);
+  for (const control of ["<input", "<select", "<textarea", "<button", 'role="switch"']) {
+    assert.ok(!plugins.includes(control), `plugin-status.tsx renders no ${control}`);
+  }
+  assert.ok(plugins.includes("node plugins.mjs enable <id> --confirm"));
+  assert.ok(plugins.includes("Plugin status is unavailable."));
+  assert.match(plugins, /pluginLine\(/);
+  assert.match(view, /group\.id === "integrations" && <PluginStatus \/>/);
+});
+
+test("plugin status says when config/plugins.yml did not parse and when no plugin was found", () => {
+  const plugins = src("components/settings/plugin-status.tsx");
+  assert.match(plugins, /body\.pluginConfigError/);
+  assert.ok(plugins.includes("config/plugins.yml could not be read"));
+  assert.ok(plugins.includes("No plugins were found."));
+});
+
+test("a company switch sends the exact name with the page's revision, keeps the new one and rolls back on failure", () => {
+  const portals = src("components/portals-view.tsx");
+  assert.match(portals, /body: JSON\.stringify\(\{ company: watched\[i\]\.name, enabled: next, revision \}\)/);
+  assert.match(portals, /setRevision\(body\.revision\)/);
+  assert.match(portals, /catch \(e\) \{\s+set\(!next\);/);
+  assert.match(portals, /if \(pending\) return;/);
+  assert.match(portals, /aria-disabled=\{pending\}/);
+  assert.ok(!/\sdisabled=\{pending\}/.test(portals), "a pending switch keeps keyboard focus");
+});

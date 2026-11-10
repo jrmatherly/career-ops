@@ -1,7 +1,7 @@
 // The Settings page's form logic: labels, and which rows a Save sends.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SOURCE_LABELS, dirtyChanges, formValue, listText, parseFormValue, parseListText, secretStatus, sourceLabel } from "../../src/lib/settings-form.mjs";
+import { SOURCE_LABELS, dirtyChanges, formValue, listText, parseFormValue, parseListText, pluginLine, secretStatus, sourceLabel } from "../../src/lib/settings-form.mjs";
 
 const row = (over) => ({ id: "A", kind: "env", label: "", help: "", type: "int", value: 10, source: "default", editable: true, ...over });
 
@@ -70,4 +70,10 @@ test("emptying a field whose value is in a file is sent, so the server can refus
   const state = { id: "profile:cv.template", kind: "profile", type: "string", editable: true, source: "file", value: "modern" };
   assert.deepEqual(dirtyChanges([state], { [state.id]: " " }), { [state.id]: null });
   assert.deepEqual(dirtyChanges([{ ...state, source: "default" }], { [state.id]: "" }), {});
+});
+
+test("a plugin reads On, Off, or Off with the keys it is missing", () => {
+  assert.equal(pluginLine({ enabled: true, missingEnv: ["A"] }), "On");
+  assert.equal(pluginLine({ enabled: false, missingEnv: ["A", "B"] }), "Off. Missing: A, B");
+  assert.equal(pluginLine({ enabled: false, missingEnv: [] }), "Off");
 });

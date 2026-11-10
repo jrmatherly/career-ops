@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 // Set Windows console to UTF-8 to prevent mojibake in terminal output
 if (process.platform === 'win32') {
   try {

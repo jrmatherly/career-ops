@@ -223,6 +223,83 @@ export function patchPortalFiltersText(source, roles, locations) {
 }
 
 /**
+ * The tracked_companies entries whose `name` is exactly `name`, untrimmed:
+ * zero means no such company, more than one means the edit cannot tell them apart.
+ *
+ * @param {Record<string, unknown>} doc
+ * @param {string} name
+ */
+export function companiesNamed(doc, name) {
+  return (Array.isArray(doc.tracked_companies) ? doc.tracked_companies : []).filter((c) => isMapping(c) && c.name === name);
+}
+
+/**
+ * portals.yml text with one tracked company's `enabled:` set, every other line
+ * and line ending byte for byte. Returns null when the file is not valid YAML,
+ * when the name matches zero or several entries, when the entry is flow style,
+ * or when the result does not parse to the intended document.
+ *
+ * @param {string} source
+ * @param {string} name
+ * @param {boolean} enabled
+ * @returns {string | null}
+ */
+export function setCompanyEnabledText(source, name, enabled) {
+  let doc;
+  try {
+    doc = yaml.load(source);
+  } catch {
+    return null;
+  }
+  if (!isMapping(doc) || companiesNamed(doc, name).length !== 1) return null;
+  // Lines and their endings apart, so a file with mixed endings keeps each one.
+  const parts = source.split(/(\r?\n)/);
+  const lines = parts.filter((_, i) => i % 2 === 0);
+  const eols = parts.filter((_, i) => i % 2 === 1);
+  const head = lines.findIndex((l) => /^tracked_companies:\s*(#.*)?$/.test(l));
+  if (head < 0) return null;
+  let end = head + 1;
+  while (end < lines.length && !isTopLevelKey(lines[end])) end++;
+  const valueOf = (rest) => {
+    try {
+      return yaml.load(rest);
+    } catch {
+      return undefined;
+    }
+  };
+  const hits = [];
+  for (let i = head + 1; i < end; i++) {
+    const m = lines[i].match(/^(\s*(?:- )?)name:\s(.*)$/);
+    if (m && valueOf(m[2]) === name) hits.push({ at: i, indent: " ".repeat(m[1].length) });
+  }
+  if (hits.length !== 1) return null;
+  const { at, indent } = hits[0];
+  // The entry runs from its dash line to the first line left of its keys' column.
+  const opensEntry = (line) => /^\s*-(\s|$)/.test(line) && indentOf(line) < indent.length;
+  let start = at;
+  while (start > head + 1 && !opensEntry(lines[start])) start--;
+  let stop = at + 1;
+  while (stop < end && (isNote(lines[stop]) || indentOf(lines[stop]) >= indent.length)) stop++;
+  let flag = -1;
+  let found = null;
+  for (let i = start; i < stop && flag < 0; i++) {
+    found = lines[i].match(/^(\s*(?:- )?)enabled:/);
+    if (found && found[1].length === indent.length) flag = i;
+  }
+  if (flag < 0) {
+    lines.splice(at + 1, 0, `${indent}enabled: ${enabled}`);
+    eols.splice(at, 0, eols[at] ?? eols[at - 1] ?? "\n");
+  } else lines[flag] = `${found[1]}enabled: ${enabled}${(lines[flag].match(/\s+#.*$/) ?? [""])[0]}`;
+  const text = lines.map((line, i) => line + (eols[i] ?? "")).join("");
+  companiesNamed(doc, name)[0].enabled = enabled;
+  try {
+    return isDeepStrictEqual(yaml.load(text), doc) ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @typedef {{ name: string, enabled: boolean, host: string }} WatchedCompany
  */
 
@@ -244,6 +321,7 @@ export function watchedCompanies(doc) {
   };
   return list
     .filter((c) => isMapping(c) && typeof c.name === "string" && c.name.trim())
-    .map((c) => ({ name: c.name.trim(), enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api) }))
+    // The exact name: the Portals switch sends it back, and "Acme " is not "Acme".
+    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api) }))
     .sort((a, b) => Number(b.enabled) - Number(a.enabled));
 }

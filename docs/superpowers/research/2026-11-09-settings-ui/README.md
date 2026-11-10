@@ -2,7 +2,7 @@
 
 Date: 2026-11-09. Question: which configuration does career-ops read, which of it should an ordinary user be able to change from the dashboard, and how can a saved value reach every reader?
 
-Spec: `docs/superpowers/specs/2026-11-09-settings-ui-design.md`. Plan: `docs/superpowers/plans/2026-11-09-settings-ui.md`.
+Spec: `docs/superpowers/specs/completed/2026-11-09-settings-ui-design.md`. Plan: `docs/superpowers/plans/completed/2026-11-09-settings-ui.md`.
 
 ## Files
 

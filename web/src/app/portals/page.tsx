@@ -4,23 +4,24 @@ import { PortalsView } from "@/components/portals-view";
 import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { loadPortalsDocument, watchedCompanies, type WatchedCompany } from "@/lib/portals-config.mjs";
+import { revisionOf } from "@/lib/settings-state.mjs";
 
 export const dynamic = "force-dynamic";
 
-function readWatched(): { watched: WatchedCompany[]; missing: boolean; error: string | null } {
+function readWatched(): { watched: WatchedCompany[]; missing: boolean; error: string | null; revision: string } {
   const root = careerOpsRoot();
   try {
     // The template ships with the code, which a data-only CAREER_OPS_ROOT does not hold.
     const template = path.join(resolveCodeRoot(process.cwd(), process.env), "templates", "portals.example.yml");
-    const { doc, seeded } = loadPortalsDocument(portalsConfigPath(root), template);
-    return { watched: seeded ? [] : watchedCompanies(doc), missing: seeded, error: null };
+    const { doc, seeded, source } = loadPortalsDocument(portalsConfigPath(root), template);
+    return { watched: seeded ? [] : watchedCompanies(doc), missing: seeded, error: null, revision: revisionOf(source) };
   } catch (e) {
-    return { watched: [], missing: false, error: e instanceof Error ? e.message : String(e) };
+    return { watched: [], missing: false, error: e instanceof Error ? e.message : String(e), revision: "" };
   }
 }
 
 export default function PortalsPage() {
-  const { watched, missing, error } = readWatched();
+  const { watched, missing, error, revision } = readWatched();
   // Name the file the page reads, which CAREER_OPS_PORTALS can move.
   const target = process.env.CAREER_OPS_PORTALS?.trim() ? portalsConfigPath(careerOpsRoot()) : "portals.yml";
   return (
@@ -42,7 +43,7 @@ export default function PortalsPage() {
         </p>
       )}
       <div className="mt-6">
-        <PortalsView watched={watched} missing={missing} target={target} />
+        <PortalsView watched={watched} missing={missing} target={target} revision={revision} />
       </div>
     </div>
   );

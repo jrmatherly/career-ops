@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 /**
  * career-ops OpenRouter Runner
  * No Claude Code CLI required — uses OpenRouter free models with automatic fallback.

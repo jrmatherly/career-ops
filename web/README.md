@@ -375,6 +375,13 @@ each with the value in effect and where that value comes from.
 - **Keys and tokens.** The page shows only whether each one is set and where. It
   never reads a key's value into the page, and you cannot enter one here. Set
   keys in the environment or in `.env`.
+- **Plugins** are listed at the end of **Integrations**, each as On or Off with
+  the keys it still needs. The page only reports them. Turning one on needs your
+  consent to what it can reach, so it is done from a terminal:
+  `node plugins.mjs enable <id>` shows the keys and hosts the plugin declares,
+  and adding `--confirm` turns it on. A plugin is not sandboxed, so turn on
+  only one you trust. A plugin you turned on stays Off
+  until every key it lists as missing is set in the environment or in `.env`.
 - **Deployment rows** are read-only. They describe how this server was started.
 - **A broken file.** If `config/settings.json` cannot be read or is not a valid
   settings file, scripts run on the environment's values, the page shows the

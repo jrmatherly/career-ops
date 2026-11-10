@@ -43,6 +43,7 @@ test("an empty query returns only the pages", () => {
 test("a page is found by its label or by its path, so /config still answers to config", () => {
   assert.deepEqual(labels("settings"), ["Settings"]);
   assert.deepEqual(labels("config"), ["Settings"]);
+  assert.deepEqual(labels("/config"), ["Settings"]);
 });
 
 test("a label starting with the whole query outranks a label word matching the first token", () => {

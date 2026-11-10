@@ -26,7 +26,7 @@ deepEqual(GROUPS.map(g => g.id).join(), 'scanner,automation,profile,integrations
 ok(new Set(SETTINGS.map(s => s.id)).size === SETTINGS.length, 'ids are unique');
 ok(SETTINGS.every(s => GROUPS.some(g => g.id === s.group) && s.label && s.help), 'every row has a group, label and help');
 ok(SETTINGS.filter(s => s.kind === 'env').every(s => s.type), 'env rows are typed');
-deepEqual(SETTINGS.filter(s => s.kind === 'env').length, 13, 'the 13 scanner, automation and integrations rows');
+deepEqual(SETTINGS.filter(s => s.kind === 'env').length, 23, 'the 23 scanner, automation, integrations and model rows');
 ok(SETTINGS.filter(s => s.kind === 'secret').every(s => !('default' in s)), 'secret rows carry no value');
 for (const id of SECRET_IDS) ok(settingById(id)?.kind === 'secret' && settingById(id).group === 'keys', `${id} is a secret row`);
 deepEqual(SETTINGS.filter(s => s.kind === 'secret').length, 14, 'exactly the 14 keys a dashboard user supplies');
@@ -59,8 +59,27 @@ const SPEC = [
   ['PUBLISH_URL', 'integrations', 'url', undefined, undefined, undefined],
   ['USAJOBS_USER_AGENT', 'integrations', 'string', 3, 200, undefined],
   ['NOTION_PARENT_PAGE_ID', 'integrations', 'string', 1, 100, undefined],
+  ['GEMINI_MODEL', 'models', 'string', 1, 100, 'gemini-3.6-flash'],
+  ['OPENAI_BASE_URL', 'models', 'url', undefined, undefined, 'https://api.openai.com/v1'],
+  ['OPENAI_MODEL', 'models', 'string', 1, 100, undefined],
+  ['OPENAI_TIMEOUT_MS', 'models', 'int', 1000, 3600000, 300000],
+  ['OLLAMA_MODEL', 'models', 'string', 1, 100, 'llama3.3'],
+  ['OLLAMA_BASE_URL', 'models', 'url', undefined, undefined, 'http://localhost:11434'],
+  ['OLLAMA_NUM_CTX', 'models', 'int', 512, 1048576, 32768],
+  ['OLLAMA_TIMEOUT_MS', 'models', 'int', 1000, 3600000, 300000],
+  ['CAREER_OPS_MODEL', 'models', 'string', 1, 100, undefined],
+  ['OPENROUTER_TIMEOUT_MS', 'models', 'int', 1000, 2147483647, 120000],
 ];
 deepEqual(SETTINGS.filter(s => s.kind === 'env').map(s => [s.id, s.group, s.type, s.min, s.max, s.default]), SPEC, 'every env row has the spec table\'s group, type, bounds and default');
+
+deepEqual(validateSetting(settingById('OLLAMA_BASE_URL'), 'http://user:pw@host:11434').ok, false, 'an Ollama URL with credentials');
+deepEqual(validateSetting(settingById('OLLAMA_BASE_URL'), 'http://localhost:11434'), { ok: true, value: 'http://localhost:11434' }, 'the default Ollama URL is valid');
+deepEqual(validateSetting(settingById('OLLAMA_NUM_CTX'), 0).ok, false, 'a zero Ollama context window');
+// The page shows a row's default as the value in effect, so it must be the literal the script falls back to.
+for (const [id, script] of [['GEMINI_MODEL', 'gemini-eval.mjs'], ['GEMINI_MODEL', 'scan-hn.mjs'], ['OPENAI_BASE_URL', 'openai-eval.mjs'], ['OPENAI_BASE_URL', 'openai-tailor.mjs'], ['OPENAI_TIMEOUT_MS', 'openai-eval.mjs'], ['OPENAI_TIMEOUT_MS', 'openai-tailor.mjs'], ['OLLAMA_MODEL', 'ollama-eval.mjs'], ['OLLAMA_BASE_URL', 'ollama-eval.mjs'], ['OLLAMA_NUM_CTX', 'ollama-eval.mjs'], ['OLLAMA_TIMEOUT_MS', 'ollama-eval.mjs'], ['OPENROUTER_TIMEOUT_MS', 'openrouter-runner.mjs']]) {
+  const line = readFileSync(join(ROOT, script), 'utf8').split('\n').find(l => l.includes(id === 'OPENROUTER_TIMEOUT_MS' ? 'DEFAULT_MODEL_TIMEOUT_MS =' : `process.env.${id} ||`)) ?? '';
+  ok(line.replaceAll('_', '').includes(String(settingById(id).default)), `${script} falls back to the ${id} default the registry shows`);
+}
 
 const RANGE = 'must be a whole number from 1 to 50';
 deepEqual(validateSetting(conc, '4'), { ok: true, value: 4 }, 'int from a digit string');
