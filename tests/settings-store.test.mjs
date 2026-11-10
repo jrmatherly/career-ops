@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { SETTINGS_FILE, SettingsError, nextSettingsText, overlayFor, parseSettings, readSettings, settingsPath } from '../lib/settings-store.mjs';
+import { SETTINGS_FILE, SettingsError, nextSettingsText, overlayFor, parseSettings, readSettings, settingsOff, settingsPath } from '../lib/settings-store.mjs';
 
 console.log('\nsettings-store.mjs: the saved settings file');
 
@@ -24,6 +24,10 @@ deepEqual(parseSettings('{not json').values, {}, 'invalid JSON yields no values'
 ok(parseSettings('[]').error.includes('must be an object with a "values" object'), 'an array is an error');
 ok(parseSettings('null').error.includes('must be an object with a "values" object'), 'null is an error');
 ok(parseSettings('{"version":1,"values":[]}').error.includes('must be an object with a "values" object'), 'a values array is an error');
+
+ok(parseSettings('{"version":2,"values":{"CAREER_OPS_SCAN_CONCURRENCY":4}}').error.includes('version 2'), 'a file from a later format is not applied');
+deepEqual(parseSettings('{"values":{"CAREER_OPS_SCAN_CONCURRENCY":4}}').values, { CAREER_OPS_SCAN_CONCURRENCY: 4 }, 'a hand-written file with no version reads as version 1');
+deepEqual(['off', 'OFF', ' Off ', '', '0', undefined].map((v) => settingsOff({ CAREER_OPS_SETTINGS: v })), [true, true, true, false, false, false], 'only the word off, in any case, turns saved settings off');
 
 const o = overlayFor({ CAREER_OPS_SCAN_CONCURRENCY: 4, CAREER_OPS_HTTP_CACHE: false, CAREER_OPS_HTTP_TIMEOUT_MS: 5, NOT_A_SETTING: 1, GEMINI_API_KEY: 'x', CAREER_OPS_AUTO_EVALUATE_LOCAL: '1' });
 deepEqual(o.env, { CAREER_OPS_SCAN_CONCURRENCY: '4', CAREER_OPS_HTTP_CACHE: '0' }, 'only valid env settings reach the overlay');

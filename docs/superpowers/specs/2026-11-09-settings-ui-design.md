@@ -75,6 +75,8 @@ Decided in design:
 | `CAREER_OPS_MODEL` | string, 1 to 100 chars | none | models |
 | `OPENROUTER_TIMEOUT_MS` | int 1000 to 2147483647 | 120000 | models |
 
+A saved URL is where a key or a CV is sent, so it must be https unless the host is this machine. A plain-http address on another host, such as an Ollama server on the LAN, cannot be saved: it stays an environment setting beside `OLLAMA_ALLOW_REMOTE`.
+
 The upper bounds on concurrency, timeouts and DNS pacing are this design's choice. The code accepts larger values. `CAREER_OPS_RANK_CLI` takes binary names, not CLI ids: the ranker matches a forced value against its candidates' `bin` and runs anything else with a bare `-p` and none of the tool-denial flags (`rank-pipeline.mjs:412`), so `antigravity`, `gemini` and `kimi` are not offered.
 
 ### Editable `profile` settings (`config/profile.yml`)

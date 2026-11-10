@@ -4,7 +4,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 `npm run <name>`; agent-invoked utilities (bottom section) run via
 `node <script>` directly.
 
-**Saved settings.** The dashboard's Settings page can save many of the environment variables these scripts read, in `config/settings.json` under the data root. A saved value wins over the environment and over `.env`, in terminal and scheduled runs too. Exporting `CAREER_OPS_SETTINGS=off` in the shell ignores saved values; setting it in `.env` does nothing, because saved values are applied before `.env` is read.
+**Saved settings.** Scripts also read `config/settings.json` under the data root, which holds saved scanner, automation and integration values and never keys or tokens (`lib/settings-registry.mjs` lists them). A saved value wins over the environment and over `.env`, in terminal and scheduled runs too. Exporting `CAREER_OPS_SETTINGS=off` in the shell ignores saved values; setting it in `.env` does nothing, because saved values are applied before `.env` is read.
 
 ## Quick Reference
 

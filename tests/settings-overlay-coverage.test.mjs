@@ -10,10 +10,10 @@ import { SETTINGS } from '../lib/settings-registry.mjs';
 
 console.log('\nsettings overlay: every reader imports it first');
 
-// A reader listed here gets its environment from a caller that applied the overlay.
+// A reader listed here is not wired, for the reason given.
 const EXEMPT = {
-  'web/src/lib/publish-account-url.mjs': 'takes env as a parameter; the Settings API PR makes its caller pass the saved values',
-  'web/src/lib/remembered-cli.mjs': 'takes env as a parameter; the Settings API PR makes it read the saved CLI',
+  'web/src/lib/publish-account-url.mjs': 'runs in the dashboard, which takes its environment as a parameter; no caller passes saved values yet (plan Task 5)',
+  'web/src/lib/remembered-cli.mjs': 'runs in the dashboard, which takes its environment as a parameter; it does not read the saved CLI yet (plan Task 5)',
   'remember-cli.mjs': 'writes .env; it reads the saved CLI only to print a note',
   'plugins/usajobs/index.mjs': 'loaded by plugins/_engine.mjs, which imports the overlay first',
   'plugins/notion/index.mjs': 'loaded by plugins/_engine.mjs, which imports the overlay first',

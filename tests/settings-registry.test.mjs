@@ -44,6 +44,24 @@ const rankBins = [...readFileSync(join(ROOT, 'rank-pipeline.mjs'), 'utf8').match
 deepEqual(settingById('CAREER_OPS_RANK_CLI').values, rankBins, 'CAREER_OPS_RANK_CLI offers the ranker\'s binaries');
 deepEqual(rankBins, ['claude', 'opencode', 'codex', 'copilot', 'qwen', 'agy', 'grok', 'pi', 'omp'], 'the ranker\'s binaries are the nine known');
 
+// Bounds and defaults come verbatim from the spec's "Editable env settings" table.
+const SPEC = [
+  ['CAREER_OPS_SCAN_CONCURRENCY', 'scanner', 'int', 1, 50, 10],
+  ['CAREER_OPS_SCAN_HOST_CONCURRENCY', 'scanner', 'int', 1, 50, 10],
+  ['CAREER_OPS_HTTP_TIMEOUT_MS', 'scanner', 'int', 1000, 120000, 10000],
+  ['CAREER_OPS_HTTP_CACHE', 'scanner', 'bool', undefined, undefined, true],
+  ['CAREER_OPS_HTTP_CACHE_TTL_MS', 'scanner', 'int', 0, 86400000, 900000],
+  ['CAREER_OPS_DNS_LOOKUPS_PER_MIN', 'scanner', 'int', 0, 10000, 400],
+  ['CAREER_OPS_BROWSER_AUTODETECT', 'scanner', 'bool', undefined, undefined, false],
+  ['CAREER_OPS_CLI', 'automation', 'enum', undefined, undefined, undefined],
+  ['CAREER_OPS_RANK_CLI', 'automation', 'enum', undefined, undefined, undefined],
+  ['CAREER_OPS_RANK_TIMEOUT_MS', 'automation', 'int', 10000, 1800000, 180000],
+  ['PUBLISH_URL', 'integrations', 'url', undefined, undefined, undefined],
+  ['USAJOBS_USER_AGENT', 'integrations', 'string', 3, 200, undefined],
+  ['NOTION_PARENT_PAGE_ID', 'integrations', 'string', 1, 100, undefined],
+];
+deepEqual(SETTINGS.filter(s => s.kind === 'env').map(s => [s.id, s.group, s.type, s.min, s.max, s.default]), SPEC, 'every env row has the spec table\'s group, type, bounds and default');
+
 const RANGE = 'must be a whole number from 1 to 50';
 deepEqual(validateSetting(conc, '4'), { ok: true, value: 4 }, 'int from a digit string');
 deepEqual(validateSetting(conc, 4), { ok: true, value: 4 }, 'int from a number');

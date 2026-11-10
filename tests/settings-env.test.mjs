@@ -46,12 +46,23 @@ try {
 
   const malformed = child(dataRoot('{not json'), PRINT);
   deepEqual([malformed.status, malformed.out, malformed.err.length], [0, ['9'], 1], 'a malformed file applies nothing and says so once');
-  deepEqual(malformed.err[0]?.startsWith('settings: config/settings.json ') && malformed.err[0].endsWith('; saved settings are not applied'), true, `the malformed-file line names the file: ${malformed.err[0]}`);
+  deepEqual(malformed.err[0]?.startsWith('settings: ') && malformed.err[0].includes(join('config', 'settings.json')) && malformed.err[0].endsWith('; saved settings are not applied'), true, `the malformed-file line names the file: ${malformed.err[0]}`);
 
   const mixed = child(dataRoot({ CAREER_OPS_SCAN_CONCURRENCY: 0, CAREER_OPS_HTTP_TIMEOUT_MS: 20000 }),
     `${PRINT} console.log(process.env.CAREER_OPS_HTTP_TIMEOUT_MS);`);
   deepEqual([mixed.status, mixed.out], [0, ['9', '20000']], 'one bad value is skipped and the rest apply');
   deepEqual(mixed.err, ['settings: CAREER_OPS_SCAN_CONCURRENCY must be a whole number from 1 to 50; using the environment value'], 'the skipped id is named once');
+
+  // What a reader computes, not only what the environment holds: saved beats the shell and the data root .env.
+  const withDotenv = dataRoot(four);
+  writeFileSync(join(withDotenv, '.env'), 'CAREER_OPS_SCAN_CONCURRENCY=7\n');
+  const SCAN = "const { SCAN_CONCURRENCY } = await import('./scan.mjs'); console.log(SCAN_CONCURRENCY);";
+  deepEqual(child(withDotenv, SCAN).out, ['4'], 'scan.mjs runs at the saved concurrency over the shell and .env');
+  deepEqual(child(withDotenv, SCAN, { CAREER_OPS_SETTINGS: 'OFF' }).out, ['9'], 'with saved settings off, scan.mjs is back on the shell value');
+
+  const frozen = dataRoot(four);
+  const bug = child(frozen, `const { applySettings } = await import('./lib/settings-env.mjs'); console.log(JSON.stringify(applySettings(Object.freeze({}), ${JSON.stringify(frozen)})));`, { CAREER_OPS_SETTINGS: 'off' });
+  deepEqual([bug.status, bug.out, bug.err.length, bug.err[0]?.startsWith('settings: saved settings could not be applied (')], [0, ['{"applied":[],"skipped":[]}'], 1, true], 'an unexpected failure applies nothing and says so once');
 
   const quoted = child(dataRoot(JSON.parse('{"BAD\\u001b[31m":1}')), PRINT);
   deepEqual(quoted.err.length === 1 && !quoted.err[0].includes('\u001b'), true, `an unknown id is quoted before it is printed: ${JSON.stringify(quoted.err)}`);

@@ -8,10 +8,12 @@ import { join } from "node:path";
 
 const dataRoot = mkdtempSync(join(tmpdir(), "co-settings-off-"));
 const savedRoot = process.env.CAREER_OPS_ROOT;
+const savedRankCli = process.env.CAREER_OPS_RANK_CLI;
 
 after(() => {
   if (savedRoot === undefined) delete process.env.CAREER_OPS_ROOT;
   else process.env.CAREER_OPS_ROOT = savedRoot;
+  if (savedRankCli !== undefined) process.env.CAREER_OPS_RANK_CLI = savedRankCli;
   rmSync(dataRoot, { recursive: true, force: true });
 });
 
@@ -20,7 +22,8 @@ test("saved settings are off under the web test script", async () => {
   mkdirSync(join(dataRoot, "config"));
   writeFileSync(join(dataRoot, "config", "settings.json"), JSON.stringify({ version: 1, values: { CAREER_OPS_RANK_CLI: "codex" } }));
   process.env.CAREER_OPS_ROOT = dataRoot;
-  const before = process.env.CAREER_OPS_RANK_CLI;
+  // Cleared first, so a value exported in the shell cannot make this pass.
+  delete process.env.CAREER_OPS_RANK_CLI;
   await import("../../scripts/scheduled-jobs-runner.mjs");
-  assert.equal(process.env.CAREER_OPS_RANK_CLI, before);
+  assert.equal(process.env.CAREER_OPS_RANK_CLI, undefined);
 });
