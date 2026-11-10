@@ -1,6 +1,6 @@
 # Settings UI: design
 
-Date: 2026-11-09. Research: `docs/superpowers/research/2026-11-09-settings-ui/`. Plan: `docs/superpowers/plans/2026-11-09-settings-ui.md`.
+Date: 2026-11-09. Research: `docs/superpowers/research/2026-11-09-settings-ui/`. Plan: `docs/superpowers/plans/completed/2026-11-09-settings-ui.md`.
 
 ## Goal
 

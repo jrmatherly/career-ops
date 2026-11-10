@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24 ESM (`.mjs`), Next.js 16.4 App Router, React 19, `js-yaml` (already a dependency), `node:test` for web tests, the repo's `tests/helpers.mjs` harness for root tests.
 
-**Spec:** `docs/superpowers/specs/2026-11-09-settings-ui-design.md`. Its tables are the source for every id, bound and default below. Research with file:line evidence: `docs/superpowers/research/2026-11-09-settings-ui/`.
+**Spec:** `docs/superpowers/specs/completed/2026-11-09-settings-ui-design.md`. Its tables are the source for every id, bound and default below. Research with file:line evidence: `docs/superpowers/research/2026-11-09-settings-ui/`.
 
 ## Global Constraints
 
