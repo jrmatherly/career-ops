@@ -90,6 +90,25 @@ export function SettingsView() {
     );
   }
 
+  const rows = (group: SettingsGroup, states: SettingsGroup["settings"]) => {
+    if (states.length === 0) return null;
+    return (
+      <div className="rounded-xl border border-border bg-surface/50 px-4">
+        {states.map((state) => (
+          <SettingRow
+            key={state.id}
+            state={state}
+            value={form[state.id]}
+            error={errors[state.id]}
+            busy={busy !== null}
+            onChange={(value) => setForm((f) => ({ ...f, [state.id]: value }))}
+            onReset={() => void send(group, { [state.id]: null }, `${state.label} was reset.`)}
+          />
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-6 pb-16">
       {data.overlayDisabled && (
@@ -119,22 +138,18 @@ export function SettingsView() {
         const changes = dirtyChanges(group.settings, form);
         const canSave = group.settings.some((s) => s.editable);
         const note = notice?.group === group.id ? notice : null;
+        const fileRows = group.settings.filter((s) => s.kind === "portals");
         return (
           <section key={group.id} id={`settings-${group.id}`} aria-labelledby={`settings-${group.id}-heading`} className="mt-8 scroll-mt-6">
             <h2 id={`settings-${group.id}-heading`} className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">{group.label}</h2>
-            <div className="rounded-xl border border-border bg-surface/50 px-4">
-              {group.settings.map((state) => (
-                <SettingRow
-                  key={state.id}
-                  state={state}
-                  value={form[state.id]}
-                  error={errors[state.id]}
-                  busy={busy !== null}
-                  onChange={(value) => setForm((f) => ({ ...f, [state.id]: value }))}
-                  onReset={() => void send(group, { [state.id]: null }, `${state.label} was reset.`)}
-                />
-              ))}
-            </div>
+            {group.id === "profile" && <p className="mb-2 text-xs text-faint">Saved to config/profile.yml. Comments in the file are kept.</p>}
+            {rows(group, group.settings.filter((s) => s.kind !== "portals"))}
+            {fileRows.length > 0 && (
+              <>
+                <h3 className="mb-2 mt-6 text-xs font-semibold text-muted">Filters (portals.yml)</h3>
+                {rows(group, fileRows)}
+              </>
+            )}
             {canSave && (
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button type="button" onClick={() => void send(group, changes, "Saved.")} disabled={busy !== null || Object.keys(changes).length === 0} className={BUTTON}>

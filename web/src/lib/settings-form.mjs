@@ -30,6 +30,16 @@ export function formValue(state) {
   return state.value === null || state.value === undefined ? "" : String(state.value);
 }
 
+/** One entry per line, trimmed, with blanks and repeats dropped. @param {string} text @returns {string[]} */
+export function parseListText(text) {
+  return [...new Set(text.split("\n").map((line) => line.trim()).filter(Boolean))];
+}
+
+/** @param {string[]} items */
+export function listText(items) {
+  return items.join("\n");
+}
+
 /**
  * What a control's value means as a change. An empty field is null, a reset.
  * Text that is not a number is sent as typed, so the server says what is wrong with it.
@@ -39,6 +49,7 @@ export function formValue(state) {
  */
 export function parseFormValue(state, value) {
   if (typeof value !== "string") return value;
+  if (state.type === "list") return parseListText(value);
   const text = value.trim();
   if (text === "") return null;
   return (state.type === "int" || state.type === "number") && /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : text;

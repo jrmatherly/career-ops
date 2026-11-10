@@ -1,7 +1,7 @@
 // The Settings page's form logic: labels, and which rows a Save sends.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SOURCE_LABELS, dirtyChanges, formValue, parseFormValue, secretStatus, sourceLabel } from "../../src/lib/settings-form.mjs";
+import { SOURCE_LABELS, dirtyChanges, formValue, listText, parseFormValue, parseListText, secretStatus, sourceLabel } from "../../src/lib/settings-form.mjs";
 
 const row = (over) => ({ id: "A", kind: "env", label: "", help: "", type: "int", value: 10, source: "default", editable: true, ...over });
 
@@ -46,4 +46,14 @@ test("dirtyChanges sends only rows whose control differs from the loaded value",
   assert.deepEqual(dirtyChanges(states, { N: "12", SAVED: "", B: true, L: ["a"] }), { N: 12, SAVED: null, B: true, L: ["a"] });
   assert.deepEqual(dirtyChanges(states, { N: "" }), {}, "emptying a row with nothing saved is not a reset");
   assert.deepEqual(dirtyChanges(states, { N: "abc" }), { N: "abc" }, "the server explains a value it cannot take");
+});
+
+test("a list is typed one entry per line", () => {
+  assert.deepEqual(parseListText(" a \n\nb\na\n"), ["a", "b"]);
+  assert.deepEqual(parseListText(""), []);
+  assert.equal(listText(["a", "b"]), "a\nb");
+  const list = row({ id: "L", type: "list", value: ["a", "b"], kind: "portals", source: "file" });
+  assert.deepEqual(dirtyChanges([list], { L: "a\nb\n" }), {}, "a list edited and restored is clean");
+  assert.deepEqual(dirtyChanges([list], { L: "a\nc" }), { L: ["a", "c"] });
+  assert.deepEqual(dirtyChanges([list], { L: "" }), { L: [] }, "emptying a list sends an empty list");
 });

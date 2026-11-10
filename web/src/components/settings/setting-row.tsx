@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
-import { formValue, secretStatus, sourceLabel } from "@/lib/settings-form.mjs";
+import { formValue, listText, parseListText, secretStatus, sourceLabel } from "@/lib/settings-form.mjs";
 import type { SettingState } from "@/lib/settings-form.mjs";
 
 const FIELD = "w-full rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm outline-none transition-colors placeholder:text-faint focus:border-brand/50 disabled:opacity-60 sm:w-56";
@@ -19,7 +19,7 @@ export function SettingRow({ state, value, error, busy, onChange, onReset }: {
   value: string | boolean | string[] | undefined;
   error?: string;
   busy: boolean;
-  onChange: (value: string | boolean) => void;
+  onChange: (value: string | boolean | string[]) => void;
   onReset: () => void;
 }) {
   const labelId = `setting-${state.id}-label`;
@@ -59,10 +59,10 @@ function Control({ state, current, labelId, helpId, invalid, busy, onChange }: {
   helpId: string;
   invalid: boolean;
   busy: boolean;
-  onChange: (value: string | boolean) => void;
+  onChange: (value: string | boolean | string[]) => void;
 }) {
-  // A key or token is never typed or shown here; a row this page cannot change, or a list, is plain text.
-  if (state.kind === "secret" || state.editable === false || state.type === "list") {
+  // A key or token is never typed or shown here; a row this page cannot change is plain text.
+  if (state.kind === "secret" || state.editable === false) {
     return <div role="group" aria-labelledby={labelId} className="break-all text-sm text-foreground">{shown(state)}</div>;
   }
   const described = { "aria-labelledby": labelId, "aria-describedby": helpId, "aria-invalid": invalid || undefined, disabled: busy };
@@ -74,6 +74,30 @@ function Control({ state, current, labelId, helpId, invalid, busy, onChange }: {
         className={cn("relative h-6 w-11 rounded-full transition-colors disabled:opacity-60", on ? "bg-brand" : "bg-surface-hover")}>
         <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
       </button>
+    );
+  }
+  if (state.type === "list" && state.values) {
+    const picked = Array.isArray(current) ? current : [];
+    return (
+      <div role="group" aria-labelledby={labelId} aria-describedby={helpId} className="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end">
+        {state.values.map((v) => (
+          <label key={v} className="inline-flex items-center gap-1.5 text-sm text-foreground max-sm:min-h-[44px]">
+            <input type="checkbox" name={state.id} value={v} checked={picked.includes(v)} disabled={busy}
+              onChange={(e) => onChange((state.values ?? []).filter((x) => (x === v ? e.target.checked : picked.includes(x))))} />
+            {v}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (state.type === "list") {
+    const text = Array.isArray(current) ? listText(current) : String(current);
+    const count = parseListText(text).length;
+    return (
+      <div>
+        <textarea name={state.id} rows={6} value={text} onChange={(e) => onChange(e.target.value)} spellCheck={false} {...described} className={FIELD} />
+        <p className="mt-1 text-xs text-faint">{count} {count === 1 ? "entry" : "entries"}</p>
+      </div>
     );
   }
   if (state.type === "enum") {
