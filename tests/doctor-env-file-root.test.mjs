@@ -29,6 +29,7 @@ const depsReason = linkNodeModules(copy);
 mkdirSync(other);
 writeFileSync(join(other, 'cv.md'), '# CV\n');
 
+// CAREER_OPS_CLI is cleared so the human run reaches doctor's own .env load.
 function doctor(args, extra = {}) {
   const env = { ...process.env, HOME: base, USERPROFILE: base, ...extra };
   for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_CLI']) {
@@ -36,9 +37,18 @@ function doctor(args, extra = {}) {
   }
   const r = spawnSync(process.execPath, [join(copy, 'doctor.mjs'), ...args], { cwd: copy, env, encoding: 'utf-8', timeout: 60000 });
   if (r.error) throw r.error;
-  return args.includes('--json') ? JSON.parse(r.stdout) : `${r.stdout}${r.stderr}`;
+  if (!args.includes('--json')) return `${r.stdout}${r.stderr}`;
+  try {
+    return JSON.parse(r.stdout);
+  } catch {
+    throw new Error(`doctor --json printed no JSON (exit ${r.status}):\n${r.stderr}`);
+  }
 }
 const rootWarnings = (json) => json.warnings.filter((w) => /\.env sets CAREER_OPS_(ROOT|DATA_DIR)/.test(w));
+const silent = (envFile, args = [], extra = {}) => {
+  writeFileSync(join(copy, '.env'), envFile);
+  assert.deepEqual(rootWarnings(doctor(['--json', ...args], extra)), []);
+};
 
 for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
   test(`doctor warns that the data root's .env sets ${name}, and stays on its own root`, (t) => {
@@ -47,23 +57,54 @@ for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
 
     const [warning] = rootWarnings(doctor(['--json']));
     assert.ok(warning, 'doctor --json carries no warning for a root set only in .env');
-    assert.ok(warning.includes(other) && warning.includes(copy) && /shell/.test(warning), warning);
+    assert.ok(warning.includes(other), warning);
+    assert.ok(warning.includes(copy), warning);
+    assert.match(warning, /shell/);
 
     const human = doctor([]);
     assert.match(human, new RegExp(`\\.env sets ${name}=`));
-    // The human run loads the whole .env; only the other root has a cv.md.
+    // The load puts the variable into process.env. The checks must keep using
+    // the root resolved before it: only the other root has a cv.md.
     assert.match(human, /cv\.md not found/, 'doctor moved to the root the .env names');
   });
 }
 
-test('doctor says nothing when the shell already names the root', (t) => {
+test('doctor warns when the shell sets CAREER_OPS_DATA_DIR and the .env sets CAREER_OPS_ROOT, which outranks it', (t) => {
   if (depsReason) return t.skip(depsReason);
   writeFileSync(join(copy, '.env'), `CAREER_OPS_ROOT=${other}\n`);
-  assert.deepEqual(rootWarnings(doctor(['--json'], { CAREER_OPS_ROOT: copy })), []);
+  const [warning] = rootWarnings(doctor(['--json'], { CAREER_OPS_DATA_DIR: copy }));
+  assert.ok(warning?.includes('CAREER_OPS_ROOT'), String(warning));
 });
 
-test('doctor says nothing when the .env names no root', (t) => {
+test('doctor reads the .env of a root the marker names, not the one beside the code', (t) => {
   if (depsReason) return t.skip(depsReason);
-  writeFileSync(join(copy, '.env'), 'CAREER_OPS_ROOT=\nGEMINI_MODEL=x\n');
-  assert.deepEqual(rootWarnings(doctor(['--json'])), []);
+  const marked = join(base, 'marked-root');
+  mkdirSync(marked, { recursive: true });
+  writeFileSync(join(marked, '.env'), `CAREER_OPS_DATA_DIR=${other}\n`);
+  writeFileSync(join(copy, '.env'), '');
+  writeFileSync(join(copy, '.career-ops-data'), `${marked}\n`);
+  try {
+    const [warning] = rootWarnings(doctor(['--json']));
+    assert.ok(warning?.includes(marked), String(warning));
+  } finally {
+    rmSync(join(copy, '.career-ops-data'));
+  }
+});
+
+test('doctor says nothing when the shell variable that names the root shadows the line', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  silent(`CAREER_OPS_ROOT=${other}\n`, [], { CAREER_OPS_ROOT: copy });
+  silent(`CAREER_OPS_DATA_DIR=${other}\n`, [], { CAREER_OPS_ROOT: copy });
+  silent(`CAREER_OPS_DATA_DIR=${other}\n`, [], { CAREER_OPS_DATA_DIR: copy });
+});
+
+test('doctor says nothing when the .env names no root, or the root it is in', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  silent('CAREER_OPS_ROOT=\nGEMINI_MODEL=x\n');
+  silent(`CAREER_OPS_ROOT=${copy}\n`);
+});
+
+test('doctor --target says nothing about the target\'s .env', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  silent(`CAREER_OPS_ROOT=${other}\n`, ['--target', copy]);
 });
