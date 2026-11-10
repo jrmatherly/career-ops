@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { AGENT_CLIS } from './lib/agent-cli.mjs';
+import { overlayFor, readSettings } from './lib/settings-store.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { writeFileAtomic } from './tracker-utils.mjs';
@@ -41,11 +42,17 @@ export function main(argv = process.argv.slice(2)) {
     console.log(USAGE);
     return argv.length === 1 ? 0 : 1;
   }
+  let saved;
   try {
-    rememberCli(getCareerOpsRoot(), argv[0]);
+    const root = getCareerOpsRoot();
+    rememberCli(root, argv[0]);
+    if (process.env.CAREER_OPS_SETTINGS !== 'off') saved = overlayFor(readSettings(root).values).env.CAREER_OPS_CLI;
   } catch (err) {
     console.error(err.message);
     return 1;
+  }
+  if (saved) {
+    console.error(`note: the dashboard has a saved CLI (${saved}) that overrides this one; change it on the Settings page`);
   }
   console.log(`Remembered ${argv[0]} as your agent CLI in .env.`);
   return 0;

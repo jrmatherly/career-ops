@@ -7,6 +7,7 @@
  * root's .env, never from argv. Records live in data/shares.json; comments are
  * written to data/share-feedback/<slug>.md.
  */
+import '../lib/settings-env.mjs'; // saved settings; must stay the first import
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

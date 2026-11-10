@@ -1019,6 +1019,10 @@ ${sections.join('\n')}</div>
     // module scope, so the copy needs it for the same reason.
     copyFileSync(join(ROOT, 'lib', 'page-format.mjs'), join(sandbox, 'lib', 'page-format.mjs'));
     copyFileSync(join(ROOT, 'lib', 'browser-launch.mjs'), join(sandbox, 'lib', 'browser-launch.mjs'));
+    // browser-launch.mjs imports the saved-settings overlay first.
+    copyFileSync(join(ROOT, 'lib', 'settings-env.mjs'), join(sandbox, 'lib', 'settings-env.mjs'));
+    copyFileSync(join(ROOT, 'lib', 'settings-store.mjs'), join(sandbox, 'lib', 'settings-store.mjs'));
+    copyFileSync(join(ROOT, 'lib', 'settings-registry.mjs'), join(sandbox, 'lib', 'settings-registry.mjs'));
     // pipeline-lock.mjs runs the shared lock protocol from lib/dir-lock.mjs (#5358).
     copyFileSync(join(ROOT, 'lib', 'dir-lock.mjs'), join(sandbox, 'lib', 'dir-lock.mjs'));
     copyFileSync(join(ROOT, 'lib', 'yaml-document.mjs'), join(sandbox, 'lib', 'yaml-document.mjs'));
@@ -1169,6 +1173,10 @@ export const chromium = {
     // module scope, so the copy needs it for the same reason.
     copyFileSync(join(ROOT, 'lib', 'page-format.mjs'), join(sandbox, 'lib', 'page-format.mjs'));
     copyFileSync(join(ROOT, 'lib', 'browser-launch.mjs'), join(sandbox, 'lib', 'browser-launch.mjs'));
+    // browser-launch.mjs imports the saved-settings overlay first.
+    copyFileSync(join(ROOT, 'lib', 'settings-env.mjs'), join(sandbox, 'lib', 'settings-env.mjs'));
+    copyFileSync(join(ROOT, 'lib', 'settings-store.mjs'), join(sandbox, 'lib', 'settings-store.mjs'));
+    copyFileSync(join(ROOT, 'lib', 'settings-registry.mjs'), join(sandbox, 'lib', 'settings-registry.mjs'));
     // pipeline-lock.mjs runs the shared lock protocol from lib/dir-lock.mjs (#5358).
     copyFileSync(join(ROOT, 'lib', 'dir-lock.mjs'), join(sandbox, 'lib', 'dir-lock.mjs'));
     copyFileSync(join(ROOT, 'lib', 'yaml-document.mjs'), join(sandbox, 'lib', 'yaml-document.mjs'));

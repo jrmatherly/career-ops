@@ -336,6 +336,7 @@ export const USER_PATHS = [
   '.career-ops-web/',
   'cv.md',
   'config/profile.yml',
+  'config/settings.json',
   'modes/_profile.md',
   'modes/_custom.md',
   'modes/_brief.md',

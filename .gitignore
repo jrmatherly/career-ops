@@ -116,6 +116,7 @@ writing-samples/*
 
 # User config and customization (never auto-updated)
 config/profile.yml
+config/settings.json
 config/cv-facts.json
 config/benchmarks.yml
 # Privacy guard configuration and token map — both hold real personal values.

@@ -5,6 +5,7 @@
  * Checks all prerequisites and prints a pass/fail checklist.
  */
 
+import './lib/settings-env.mjs'; // saved settings; must stay the first import
 import { accessSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';

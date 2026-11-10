@@ -48,6 +48,12 @@ process.env.CAREER_OPS_BROWSER_AUTODETECT = '';
 // the tracker override above. A test that wants the painter sets it itself.
 process.env.CAREER_OPS_PDF_SHARED = '';
 
+// Settings saved from the dashboard (lib/settings-env.mjs) are off for the
+// suite, so a developer's config/settings.json never changes what a reader
+// module sees here. A test of saved settings passes CAREER_OPS_SETTINGS: '' to
+// its child.
+process.env.CAREER_OPS_SETTINGS = 'off';
+
 // The same rule for the data root itself, which is where everything else a
 // script reads and writes is resolved from (#5113). Left alone, the suite ran
 // against whatever the shell pointed at: with CAREER_OPS_ROOT exported the way

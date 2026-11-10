@@ -37,6 +37,7 @@
  *   node scan.mjs --help                       # print this usage block and exit
  */
 
+import './lib/settings-env.mjs'; // saved settings; must stay the first import
 import { buildWorkplacePolicy, isCountryKeyword } from './providers/_country.mjs';
 import {
   closeSync,

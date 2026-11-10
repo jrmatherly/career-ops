@@ -7,9 +7,10 @@
  * EXTERNAL service. The zero-key providers/ dir is untouched and stays pure.
  *
  * Design invariants (every one is asserted by test-all.mjs section 49):
- *  - ZERO module-level side effects. Importing this file reads no config, loads
- *    no dotenv, and mutates no process.env. scan.mjs imports `mergeProviderPlugins`
- *    on every run, and that import must be free — so a plain `node scan.mjs` with
+ *  - ZERO module-level side effects of its own. Importing this file reads no
+ *    plugin config and loads no dotenv. Its one side-effect import is the
+ *    saved-settings overlay (lib/settings-env.mjs), a no-op when nothing is
+ *    saved. scan.mjs imports `mergeProviderPlugins` on every run, and that import must be free — so a plain `node scan.mjs` with
  *    no config/plugins.yml behaves byte-identically to before this feature.
  *  - Fail-open everywhere. A malformed manifest, a throwing import, a missing
  *    key, or a hung hook logs a `⚠️` and is SKIPPED — never crashes the core.
@@ -24,6 +25,7 @@
  * all reuse it with no prod-vs-test drift.
  */
 
+import '../lib/settings-env.mjs'; // saved settings; must stay the first import
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';

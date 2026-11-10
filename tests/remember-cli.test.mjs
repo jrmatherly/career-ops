@@ -33,6 +33,18 @@ function node(dir, args, extra) {
   return result;
 }
 
+test('remember-cli says when a saved dashboard CLI overrides the one it wrote', (t) => {
+  const dir = sandbox(t);
+  mkdirSync(join(dir, 'config'));
+  const save = (cli) => writeFileSync(join(dir, 'config', 'settings.json'), JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: cli } }));
+  const run = (extra) => node(dir, [join(ROOT, 'remember-cli.mjs'), 'grok'], { CAREER_OPS_SETTINGS: '', ...extra });
+  save('codex');
+  assert.match(run().stderr, /saved CLI \(codex\) that overrides this one/);
+  assert.equal(run({ CAREER_OPS_SETTINGS: 'off' }).stderr, '', 'no note when saved settings are off');
+  save('bogus');
+  assert.doesNotMatch(run().stderr, /overrides this one/, 'no note for a saved value the overlay skips');
+});
+
 test('remember-cli writes CAREER_OPS_CLI to the data root .env and keeps other lines', (t) => {
   const dir = sandbox(t);
   writeFileSync(join(dir, '.env'), 'OPENROUTER_MODEL=example/model\nCAREER_OPS_CLI=claude\n');

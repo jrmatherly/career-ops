@@ -33,6 +33,7 @@ export const GUARDED_PATHS = [
   'voice-dna.md',
   'portals.yml',
   'config/profile.yml',
+  'config/settings.json',
   'config/plugins.yml',
   'config/privacy.yml',
   'config/cv-facts.json',
