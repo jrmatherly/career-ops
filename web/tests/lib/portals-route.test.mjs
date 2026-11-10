@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "../helpers/web-ts-alias-loader.mjs";
+import { loadPortalsDocument } from "../../src/lib/portals-config.mjs";
 import { revisionOf } from "../../src/lib/settings-state.mjs";
 
 const codeRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -72,4 +73,16 @@ test("a company listed twice is 409", async () => {
   const { status } = await post({ company: "Acme", enabled: false, revision: revisionOf(twice) });
   assert.equal(status, 409);
   assert.equal(readFileSync(portalsFile, "utf8"), twice);
+});
+
+test("a non-boolean enabled is 400 and the file is untouched", async () => {
+  const { status } = await post({ company: "Acme", enabled: "false", revision: revisionOf(SOURCE) });
+  assert.equal(status, 400);
+  assert.equal(readFileSync(portalsFile, "utf8"), SOURCE);
+  assert.equal(backups().length, 0);
+});
+
+test("the revision the Portals page computes is the one the route accepts", async () => {
+  const { source } = loadPortalsDocument(portalsFile, join(codeRoot, "templates", "portals.example.yml"));
+  assert.equal((await post({ company: "Acme", enabled: false, revision: revisionOf(source) })).status, 200);
 });

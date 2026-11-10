@@ -273,3 +273,27 @@ test("setCompanyEnabledText keeps CRLF line endings and a comment after the valu
   const source = "tracked_companies:\r\n  - name: Acme\r\n    enabled: true  # main board\r\n";
   assert.equal(setCompanyEnabledText(source, "Acme", false), "tracked_companies:\r\n  - name: Acme\r\n    enabled: false  # main board\r\n");
 });
+
+test("an enabled line written before the name is the one that changes", () => {
+  const source = "tracked_companies:\n  - enabled: false  # paused\n    name: Acme\n  - name: Other\n    enabled: false\n";
+  assert.equal(setCompanyEnabledText(source, "Acme", true), source.replace("- enabled: false  # paused", "- enabled: true  # paused"));
+});
+
+test("an edit that would not parse to the intended document returns null", () => {
+  assert.equal(setCompanyEnabledText('tracked_companies:\n  - name: Acme\n    "enabled": true\n', "Acme", false), null);
+});
+
+test("a file with mixed line endings keeps every line's own ending", () => {
+  const source = "title_filter:\n  positive:\n    - a\ntracked_companies:\r\n  - name: Acme\r\n    enabled: true\r\n  - name: Other\n";
+  assert.equal(setCompanyEnabledText(source, "Acme", false), source.replace("enabled: true", "enabled: false"));
+  assert.equal(setCompanyEnabledText(source, "Other", false), `${source}    enabled: false\n`);
+});
+
+test("a comment after the value survives ragged spacing", () => {
+  const source = "tracked_companies:\n  - name: Acme\n    enabled:   true   # c\n";
+  assert.equal(setCompanyEnabledText(source, "Acme", false), "tracked_companies:\n  - name: Acme\n    enabled: false   # c\n");
+});
+
+test("watchedCompanies returns the exact name, which the switch sends back", () => {
+  assert.equal(watchedCompanies({ tracked_companies: [{ name: "Acme " }] })[0].name, "Acme ");
+});

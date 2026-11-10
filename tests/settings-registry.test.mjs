@@ -75,6 +75,11 @@ deepEqual(SETTINGS.filter(s => s.kind === 'env').map(s => [s.id, s.group, s.type
 deepEqual(validateSetting(settingById('OLLAMA_BASE_URL'), 'http://user:pw@host:11434').ok, false, 'an Ollama URL with credentials');
 deepEqual(validateSetting(settingById('OLLAMA_BASE_URL'), 'http://localhost:11434'), { ok: true, value: 'http://localhost:11434' }, 'the default Ollama URL is valid');
 deepEqual(validateSetting(settingById('OLLAMA_NUM_CTX'), 0).ok, false, 'a zero Ollama context window');
+// The page shows a row's default as the value in effect, so it must be the literal the script falls back to.
+for (const [id, script] of [['GEMINI_MODEL', 'gemini-eval.mjs'], ['GEMINI_MODEL', 'scan-hn.mjs'], ['OPENAI_BASE_URL', 'openai-eval.mjs'], ['OPENAI_BASE_URL', 'openai-tailor.mjs'], ['OPENAI_TIMEOUT_MS', 'openai-eval.mjs'], ['OPENAI_TIMEOUT_MS', 'openai-tailor.mjs'], ['OLLAMA_MODEL', 'ollama-eval.mjs'], ['OLLAMA_BASE_URL', 'ollama-eval.mjs'], ['OLLAMA_NUM_CTX', 'ollama-eval.mjs'], ['OLLAMA_TIMEOUT_MS', 'ollama-eval.mjs'], ['OPENROUTER_TIMEOUT_MS', 'openrouter-runner.mjs']]) {
+  const line = readFileSync(join(ROOT, script), 'utf8').split('\n').find(l => l.includes(id === 'OPENROUTER_TIMEOUT_MS' ? 'DEFAULT_MODEL_TIMEOUT_MS =' : `process.env.${id} ||`)) ?? '';
+  ok(line.replaceAll('_', '').includes(String(settingById(id).default)), `${script} falls back to the ${id} default the registry shows`);
+}
 
 const RANGE = 'must be a whole number from 1 to 50';
 deepEqual(validateSetting(conc, '4'), { ok: true, value: 4 }, 'int from a digit string');

@@ -109,3 +109,18 @@ test("plugin status is read from /api/doctor, only reported, and enabled from a 
   assert.match(plugins, /pluginLine\(/);
   assert.match(view, /group\.id === "integrations" && <PluginStatus \/>/);
 });
+
+test("plugin status says when config/plugins.yml did not parse and when no plugin was found", () => {
+  const plugins = src("components/settings/plugin-status.tsx");
+  assert.match(plugins, /body\.pluginConfigError/);
+  assert.ok(plugins.includes("config/plugins.yml could not be read"));
+  assert.ok(plugins.includes("No plugins were found."));
+});
+
+test("a company switch sends the exact name with the page's revision, keeps the new one and rolls back on failure", () => {
+  const portals = src("components/portals-view.tsx");
+  assert.match(portals, /body: JSON\.stringify\(\{ company: watched\[i\]\.name, enabled: next, revision \}\)/);
+  assert.match(portals, /setRevision\(body\.revision\)/);
+  assert.match(portals, /catch \(e\) \{\s+set\(!next\);/);
+  assert.match(portals, /disabled=\{pending\}/);
+});

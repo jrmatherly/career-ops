@@ -221,7 +221,7 @@ test("doctor still relays a real verdict, including that onboarding is needed", 
   standIn(
     "doctor",
     'console.log("banner");' +
-      'console.log(JSON.stringify({ onboardingNeeded: true, missing: ["cv.md"], warnings: ["w"], plugins: [{ id: "p", hooks: ["ingest"], enabled: false, missingEnv: ["K"] }] }));',
+      'console.log(JSON.stringify({ onboardingNeeded: true, missing: ["cv.md"], warnings: ["w"], plugins: [{ id: "p", hooks: ["ingest"], enabled: false, missingEnv: ["K"] }], pluginConfigError: "bad indentation" }));',
   );
   const { GET } = await route("doctor");
   assert.deepEqual((await call(GET)).body, {
@@ -230,6 +230,7 @@ test("doctor still relays a real verdict, including that onboarding is needed", 
     missing: ["cv.md"],
     warnings: ["w"],
     plugins: [{ id: "p", hooks: ["ingest"], enabled: false, missingEnv: ["K"] }],
+    pluginConfigError: "bad indentation",
   });
 });
 

@@ -19,6 +19,10 @@ export const dynamic = "force-dynamic";
 // The two lists are edited in the file's text so its comments and commented-out
 // companies survive; yaml.dump is only the fallback for a shape the text edit
 // cannot place.
+//
+// POST also takes { company, enabled, revision }, the Portals page's switch for
+// one tracked company. That write is not confirm-gated, so it carries the
+// revision of the file the page showed and is refused when the file has changed.
 
 export async function POST(req: Request) {
   const body = await readJsonObject<{ roles?: string[]; location?: string[]; company?: unknown; enabled?: unknown; revision?: unknown }>(req);
@@ -55,8 +59,8 @@ export async function POST(req: Request) {
   return Response.json({ ok: true, roles: roles.length });
 }
 
-// The Portals page's per-company switch. Synchronous from the read to the write,
-// so no other save can land between the revision check and the write.
+// Synchronous from the read to the write, so no other request to this server can
+// land between the revision check and the write. A writer outside it still can.
 function setCompanyEnabled(company: unknown, enabled: unknown, revision: unknown) {
   if (typeof company !== "string" || typeof enabled !== "boolean" || typeof revision !== "string") {
     return Response.json({ error: "expected { company: string, enabled: boolean, revision: string }" }, { status: 400 });
