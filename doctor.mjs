@@ -1342,7 +1342,7 @@ function checkEnvFileRoot(root) {
   if (resolve(__dirname, value) === resolve(root)) return null;
   return {
     warn: true,
-    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; scan.mjs, the evaluators and the other commands that load it switch to the other folder partway through a run`,
+    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use the other folder from then on`,
     fix: [`Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
   };
 }
