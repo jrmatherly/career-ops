@@ -19,7 +19,7 @@ export function paletteItems(pages, applications) {
       tag: "Page",
       href,
       // The path too: a page keeps its address when its label changes (/config is "Settings").
-      search: `${label} ${href.slice(1)}`.toLowerCase(),
+      search: `${label} ${href}`.toLowerCase(),
     })),
     ...applications.map((app) => ({
       id: `application:${app.n}`,
