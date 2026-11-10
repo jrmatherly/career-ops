@@ -47,6 +47,7 @@
  *     (default 400; `0` disables pacing but keeps the cache).
  */
 
+import '../lib/settings-env.mjs'; // saved settings; must stay the first import
 import dns from 'node:dns';
 import { inProviderFetch, isTrustedProxyLookup, isBlockedAddress, blockedAddressError } from './_ip-guard.mjs';
 

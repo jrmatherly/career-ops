@@ -2,7 +2,7 @@
 
 Scope: keys the product reads from user-layer config files. Environment variables are covered elsewhere. Evidence is `git grep` plus reading the cited lines in this checkout. Anything marked **inferred** was not read directly. Only shipped examples were read, never a real user file.
 
-Column key: **Freq** is `often` (tuned during a search), `setup` (once at onboarding) or `rare`. **Writer** is the existing script or route that writes the key today. "hand edit" means none. All line numbers are in `/Users/jason/dev/career-ops`.
+Column key: **Freq** is `often` (tuned during a search), `setup` (once at onboarding) or `rare`. **Writer** is the existing script or route that writes the key today. "hand edit" means none. All line numbers are in the career-ops checkout at `6f10f523`.
 
 Legend for writers used below:
 - `OW` = `onboard-write.mjs` `buildProfile` (line 240) / `buildPortals` (line 280). Create-time only. Existing files are kept unless `--force`, and `--force` rebuilds the whole file from the template.

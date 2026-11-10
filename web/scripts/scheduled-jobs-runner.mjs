@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import "../../lib/settings-env.mjs"; // saved settings; must stay the first import
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";

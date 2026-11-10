@@ -61,19 +61,21 @@ Decided in design:
 | `CAREER_OPS_CLI` | enum, `AGENT_CLIS` in `lib/agent-cli.mjs` | none | automation |
 | `CAREER_OPS_RANK_CLI` | enum of the ranker's binaries: `claude`, `opencode`, `codex`, `copilot`, `qwen`, `agy`, `grok`, `pi`, `omp` | none | automation |
 | `CAREER_OPS_RANK_TIMEOUT_MS` | int 10000 to 1800000 | 180000 | automation |
-| `PUBLISH_URL` | http or https URL, no credentials | none | integrations |
+| `PUBLISH_URL` | https URL, no credentials, no query or fragment; http only for this machine | none | integrations |
 | `USAJOBS_USER_AGENT` | string, 3 to 200 chars | none | integrations |
 | `NOTION_PARENT_PAGE_ID` | string, 1 to 100 chars | none | integrations |
 | `GEMINI_MODEL` | string, 1 to 100 chars | `gemini-3.6-flash` | models |
-| `OPENAI_BASE_URL` | http or https URL, no credentials | `https://api.openai.com/v1` | models |
+| `OPENAI_BASE_URL` | https URL, no credentials, no query or fragment; http only for this machine | `https://api.openai.com/v1` | models |
 | `OPENAI_MODEL` | string, 1 to 100 chars | none | models |
 | `OPENAI_TIMEOUT_MS` | int 1000 to 3600000 | 300000 | models |
 | `OLLAMA_MODEL` | string, 1 to 100 chars | `llama3.3` | models |
-| `OLLAMA_BASE_URL` | http or https URL, no credentials | `http://localhost:11434` | models |
+| `OLLAMA_BASE_URL` | https URL, no credentials, no query or fragment; http only for this machine | `http://localhost:11434` | models |
 | `OLLAMA_NUM_CTX` | int 512 to 1048576 | 32768 | models |
 | `OLLAMA_TIMEOUT_MS` | int 1000 to 3600000 | 300000 | models |
 | `CAREER_OPS_MODEL` | string, 1 to 100 chars | none | models |
 | `OPENROUTER_TIMEOUT_MS` | int 1000 to 2147483647 | 120000 | models |
+
+A saved URL is where a key or a CV is sent, so it must be https unless the host is this machine. A plain-http address on another host, such as an Ollama server on the LAN, cannot be saved: it stays an environment setting beside `OLLAMA_ALLOW_REMOTE`.
 
 The upper bounds on concurrency, timeouts and DNS pacing are this design's choice. The code accepts larger values. `CAREER_OPS_RANK_CLI` takes binary names, not CLI ids: the ranker matches a forced value against its candidates' `bin` and runs anything else with a bare `-p` and none of the tool-denial flags (`rank-pipeline.mjs:412`), so `antigravity`, `gemini` and `kimi` are not offered.
 

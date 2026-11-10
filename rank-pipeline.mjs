@@ -30,6 +30,7 @@
  *   node rank-pipeline.mjs --self-test         # in-memory suite; spawns no subprocess
  */
 
+import './lib/settings-env.mjs'; // saved settings; must stay the first import
 import { readFileSync, existsSync, mkdtempSync, rmSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { tmpdir } from 'os';

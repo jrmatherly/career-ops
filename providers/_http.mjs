@@ -1,6 +1,7 @@
 // HTTP transport helpers shared across providers.
 // Files prefixed with _ are never loaded as providers by scan.mjs.
 
+import '../lib/settings-env.mjs'; // saved settings; must stay the first import
 import './_dns-cache.mjs'; // memoize dns.lookup process-wide (see that file)
 import { isIP } from 'node:net';
 import {
