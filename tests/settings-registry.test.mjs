@@ -59,12 +59,15 @@ deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'antigravity').ok,
 deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'gemini').ok, false, 'gemini is not a ranker binary');
 deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'agy'), { ok: true, value: 'agy' }, 'agy is');
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://cv.example.com/'), { ok: true, value: 'https://cv.example.com/' }, 'an https URL');
-deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://user:pw@cv.example.com'), { ok: false, error: 'must be an http or https URL without credentials' }, 'a URL with credentials');
+deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://user:pw@cv.example.com'), { ok: false, error: 'must be an https URL without credentials (http only for this machine)' }, 'a URL with credentials');
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'ftp://cv.example.com').ok, false, 'an ftp URL');
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'not a url').ok, false, 'not a URL');
 for (const url of ['https://cv.example.com/#x', 'https://cv.example.com?a=1', 'https://cv.example.com/a b', 'https://cv.example.com/?'])
   deepEqual(validateSetting(settingById('PUBLISH_URL'), url).ok, false, `a base URL a reader cannot append a path to: ${url}`);
-deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://localhost:8787/base'), { ok: true, value: 'http://localhost:8787/base' }, 'an http URL with a path');
+deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://localhost:8787/base'), { ok: true, value: 'http://localhost:8787/base' }, 'http on this machine, with a path');
+deepEqual(validateSetting(settingById('PUBLISH_URL'), 'http://127.0.0.1:8787').ok, true, 'http on the loopback address');
+for (const url of ['http://cv.example.com', 'http://localhost.example.com', 'http://192.168.1.5:8787'])
+  deepEqual(validateSetting(settingById('PUBLISH_URL'), url).ok, false, `plain http that leaves this machine: ${url}`);
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), 'someone@例え.jp').ok, false, 'an env string a header cannot carry');
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), 'a\nb'), { ok: false, error: 'must be 3 to 200 characters on one line' }, 'a string with a newline');
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), '  someone@example.com '), { ok: true, value: 'someone@example.com' }, 'a string is trimmed');

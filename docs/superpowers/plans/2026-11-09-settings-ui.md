@@ -113,7 +113,7 @@ deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'hermes').ok, fals
 deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'antigravity').ok, false); // its binary is agy
 deepEqual(validateSetting(settingById('CAREER_OPS_RANK_CLI'), 'gemini').ok, false);
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://cv.example.com/'), { ok: true, value: 'https://cv.example.com/' });
-deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://user:pw@cv.example.com'), { ok: false, error: 'must be an http or https URL without credentials' });
+deepEqual(validateSetting(settingById('PUBLISH_URL'), 'https://user:pw@cv.example.com'), { ok: false, error: 'must be an https URL without credentials (http only for this machine)' });
 deepEqual(validateSetting(settingById('PUBLISH_URL'), 'ftp://cv.example.com').ok, false);
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), 'a\nb'), { ok: false, error: 'must be 3 to 200 characters on one line' });
 deepEqual(validateSetting(settingById('USAJOBS_USER_AGENT'), '  someone@example.com '), { ok: true, value: 'someone@example.com' });
@@ -127,7 +127,7 @@ deepEqual(settingPath(conc), []);
 (Define `ok(cond, label)`, `deepEqual(a, b, label)` and `throwsWith(fn, predicate, label)` at the top of each root suite as thin wrappers over `pass`/`fail` from `tests/helpers.mjs` and `node:util`'s `isDeepStrictEqual`. No existing suite exports them.)
 
 - [ ] **Step 2: Run it.** `node test-all.mjs --quick --only settings-registry`. Expected: FAIL, module not found.
-- [ ] **Step 3: Implement `lib/settings-registry.mjs`.** Error strings, exactly: int `must be a whole number from {min} to {max}`; number `must be a number from {min} to {max}`; bool `must be on or off` (accepts only `true` and `false`); enum `must be one of: {values joined by ", "}`; string `must be {min} to {max} characters on one line` (trim first; reject any character below U+0020 or U+007F); url `must be an http or https URL without credentials` (use `URL.parse`); list `must be a list of up to {maxItems} entries`, with each entry checked as a string or against `values`. An int given as a string must match `/^\d+$/`.
+- [ ] **Step 3: Implement `lib/settings-registry.mjs`.** Error strings, exactly: int `must be a whole number from {min} to {max}`; number `must be a number from {min} to {max}`; bool `must be on or off` (accepts only `true` and `false`); enum `must be one of: {values joined by ", "}`; string `must be {min} to {max} characters on one line` (trim first; reject any character below U+0020 or U+007F); url `must be an https URL without credentials (http only for this machine)` (use `URL.parse`); list `must be a list of up to {maxItems} entries`, with each entry checked as a string or against `values`. An int given as a string must match `/^\d+$/`.
 - [ ] **Step 4: Run it.** Expected: PASS. Then `node validate-system-paths-coverage.mjs`, expected exit 0.
 - [ ] **Step 5: Commit.** `git commit -m "feat(settings): registry of user-adjustable settings"`
 
