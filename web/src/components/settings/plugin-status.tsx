@@ -45,7 +45,7 @@ export function PluginStatus() {
             ))}
           </ul>
           <p className="mt-2 text-xs text-faint">
-            Turning a plugin on needs your consent to what it can reach, so it is done from a terminal. <code className="whitespace-nowrap">{"node plugins.mjs enable <id>"}</code> shows what the plugin can reach, and <code className="whitespace-nowrap">{"node plugins.mjs enable <id> --confirm"}</code> turns it on. Its keys go in the environment or the data root&apos;s .env.
+            Turning a plugin on needs your consent to what it can reach, so it is done from a terminal. <code className="whitespace-nowrap">{"node plugins.mjs enable <id>"}</code> shows the keys and hosts the plugin declares, and <code className="whitespace-nowrap">{"node plugins.mjs enable <id> --confirm"}</code> turns it on. A plugin is not sandboxed, so turn on only one you trust. Its keys go in the environment or the data root&apos;s .env.
           </p>
         </>
       )}

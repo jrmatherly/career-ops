@@ -378,8 +378,9 @@ each with the value in effect and where that value comes from.
 - **Plugins** are listed at the end of **Integrations**, each as On or Off with
   the keys it still needs. The page only reports them. Turning one on needs your
   consent to what it can reach, so it is done from a terminal:
-  `node plugins.mjs enable <id>` shows what the plugin can reach, and adding
-  `--confirm` turns it on. A plugin you turned on stays Off
+  `node plugins.mjs enable <id>` shows the keys and hosts the plugin declares,
+  and adding `--confirm` turns it on. A plugin is not sandboxed, so turn on
+  only one you trust. A plugin you turned on stays Off
   until every key it lists as missing is set in the environment or in `.env`.
 - **Deployment rows** are read-only. They describe how this server was started.
 - **A broken file.** If `config/settings.json` cannot be read or is not a valid
