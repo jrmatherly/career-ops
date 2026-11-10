@@ -1303,8 +1303,8 @@ function emptyYamlPrereqs(root) {
 
 // The root's .env names a profile. scan.mjs, the evaluators, openai-tailor.mjs and
 // openrouter-runner.mjs load a .env, and all four follow CAREER_OPS_PROFILE once
-// it is loaded (scan.mjs from the data root, the evaluators and openai-tailor.mjs
-// from a working-directory config(), openrouter-runner.mjs from the code root).
+// it is loaded (scan.mjs, the evaluators and openai-tailor.mjs from the data root,
+// openrouter-runner.mjs from the code root).
 // The other readers load none. That is a split whether or not a data-root profile exists, so it is
 // reported either way. A shell value shadows the .env, so it is not a split then.
 function checkEnvFileProfile(root) {

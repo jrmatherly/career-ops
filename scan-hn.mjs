@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import './lib/settings-env.mjs';
+import { join } from 'path';
+import { getCareerOpsRoot } from './path-resolver.mjs';
 
 /**
  * scan-hn.mjs — Hacker News scanner with Optional AI Enhancement.
@@ -11,7 +13,7 @@ import './lib/settings-env.mjs';
 
 try {
   const { config } = await import('dotenv');
-  config(); 
+  config({ path: join(getCareerOpsRoot(), '.env'), quiet: true });
 } catch (e) {}
 
 import { readFileSync, existsSync } from 'fs';

@@ -198,19 +198,19 @@ try {
       : failOnce(`${group}: ${label} touched ${JSON.stringify(fallback.paths.map((p) => p.replace(scratch, '<scratch>')))} with the override unset; expected only <scratch>/data-root/config/profile.yml (exit ${fallback.code})`);
   }
 
-  // An override named only in a .env reaches the readers that load one: scan.mjs from
-  // the data root, the evaluators and openai-tailor.mjs from the working directory.
+  // An override named only in a .env reaches the readers that load one: scan.mjs, the
+  // evaluators and openai-tailor.mjs from the data root, never the working directory.
   // The cases above export the variable, so they cannot see a regression in that
   // loading order. (openrouter-runner.mjs loads the code root's .env, which a test
   // must not write to, so it is covered by the exported-variable case above.)
   const bySubject = new Map(SUBJECTS.map(([, label, argv]) => [label, argv]));
   for (const [label, dotEnvDir] of [
     ['scan.mjs (country, re-apply windows)', dataRoot],
-    ['gemini-eval.mjs', decoyCwd],
-    ['ollama-eval.mjs', decoyCwd],
-    ['openai-eval.mjs', decoyCwd],
-    ['openai-tailor.mjs', decoyCwd],
-    ['batch-evaluate-gemini.mjs', decoyCwd],
+    ['gemini-eval.mjs', dataRoot],
+    ['ollama-eval.mjs', dataRoot],
+    ['openai-eval.mjs', dataRoot],
+    ['openai-tailor.mjs', dataRoot],
+    ['batch-evaluate-gemini.mjs', dataRoot],
   ]) {
     const fromEnv = await touched(bySubject.get(label), { override: false, dotEnvDir });
     fromEnv.paths.length === 1 && fromEnv.paths[0] === profileB
@@ -360,7 +360,7 @@ try {
     : failOnce('updater: apply() no longer prints configuredSnapshot.warnings');
 
   // 4e. Doctor's .env warning has to be true at this change: the evaluators follow
-  // CAREER_OPS_PROFILE now, after their working-directory config(), so it names them
+  // CAREER_OPS_PROFILE now, after their data-root config(), so it names them
   // beside scan.mjs as the commands that load a .env for the profile.
   const envWarnRoot = join(scratch, 'env-warn-root');
   mkdirSync(join(envWarnRoot, 'config'), { recursive: true });

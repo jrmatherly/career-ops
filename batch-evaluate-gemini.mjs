@@ -34,7 +34,7 @@ const execFileAsync = promisify(execFile);
 const BROWSER_PROCESS_ENV = snapshotBrowserProcessEnv();
 try {
   const { config } = await import('dotenv');
-  config();
+  config({ path: join(getCareerOpsRoot(), '.env'), quiet: true });
 } catch {}
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -213,7 +213,7 @@ export function pendingOfferIndices(pipelineLines, limit) {
 function setupEnvironment(modelArg) {
   apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("❌ GEMINI_API_KEY not found in .env");
+    console.error(`❌ GEMINI_API_KEY not found in ${join(DATA_ROOT, '.env')} or the environment`);
     process.exit(1);
   }
 
