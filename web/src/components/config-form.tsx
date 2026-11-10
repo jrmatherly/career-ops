@@ -95,7 +95,7 @@ export function ConfigForm() {
         setCliId((prev) => {
           // A restored id whose CLI is no longer installed must not stick: it
           // would stay selected and save() would write it straight back, so
-          // "open Config and click Save config" could never clear it (#4012).
+          // "open Settings and click Save config" could never clear it (#4012).
           if (keepIfInstalled(prev, list)) return prev;
           return pickDefaultInstalled(list, typeof d.remembered === "string" ? d.remembered : null) ?? "";
         });

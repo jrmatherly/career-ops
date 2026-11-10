@@ -72,7 +72,7 @@ test("a saved id that is no longer installed, with no sole pick, resolves to nul
       { id: "opencode", installed: false },
     ],
   });
-  // null is what routes the caller to the existing "open Config" message
+  // null is what routes the caller to the existing "open Settings" message
   // instead of a 404 on every run.
   assert.equal(await resolveCliId(), null);
 });

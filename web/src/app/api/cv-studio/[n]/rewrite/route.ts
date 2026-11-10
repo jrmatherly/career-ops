@@ -11,8 +11,8 @@ export const maxDuration = 150;
 type RouteContext = { params: Promise<{ n: string }> };
 
 const MESSAGES = {
-  "no-cli": "No AI CLI is set up. Choose one in Config, or edit the wording by hand.",
-  unfenced: "This AI CLI cannot be limited to read-only access, so the rewrite did not run. Choose Claude, Codex or Grok in Config, or edit the wording by hand.",
+  "no-cli": "No AI CLI is set up. Choose one in Settings, or edit the wording by hand.",
+  unfenced: "This AI CLI cannot be limited to read-only access, so the rewrite did not run. Choose Claude, Codex or Grok in Settings, or edit the wording by hand.",
   refused: "The AI CLI could not be started with read-only access, so nothing ran.",
   failed: "The AI CLI did not finish. Check that it is signed in, then try again.",
   "no-answer": "The AI CLI replied without a usable bullet. Try a different instruction.",

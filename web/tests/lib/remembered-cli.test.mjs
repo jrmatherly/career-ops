@@ -63,7 +63,7 @@ test("readRememberedCli reads CAREER_OPS_CLI from the shell, then the data root 
   assert.equal(readRememberedCli(root(t), {}), null);
 });
 
-test("the Config default is the remembered CLI while it is installed", () => {
+test("the Settings default is the remembered CLI while it is installed", () => {
   assert.equal(pickDefaultInstalled(TWO, "grok"), "grok");
   assert.equal(pickDefaultInstalled(TWO, "codex"), "claude");
   assert.equal(pickDefaultInstalled(TWO, null), "claude");

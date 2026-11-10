@@ -21,9 +21,9 @@ function errorJob(label, text = "") {
 }
 
 test("no CLI configured -> auth hint", () => {
-  const hint = jobErrorHint(errorJob("No CLI configured — open Config"));
+  const hint = jobErrorHint(errorJob("No CLI configured — open Settings"));
   assert.equal(hint?.kind, "auth");
-  assert.equal(hint?.text, "Sign your CLI in from Config, then re-run.");
+  assert.equal(hint?.text, "Sign your CLI in from Settings, then re-run.");
 });
 
 test("raw CLI stderr mentioning auth -> auth hint", () => {

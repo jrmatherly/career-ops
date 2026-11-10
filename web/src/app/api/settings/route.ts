@@ -27,7 +27,7 @@ const readText = (file: string): string | null => {
 /** The data root .env, and why it could not be read when it exists: its keys would otherwise read as not set. */
 function readDotenv(root: string): { dotenv: Record<string, string>; envFileError: string | null } {
   try {
-    // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+    // Node 22.13's parseEnv keeps an inline comment on a last line with no newline. Not needed once the Node floor (engines) leaves 22.
     return { dotenv: parseEnv(`${fs.readFileSync(path.join(root, ".env"), "utf8")}\n`) as Record<string, string>, envFileError: null };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;

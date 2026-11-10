@@ -168,7 +168,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
             ...j,
             status: "error",
             endedAt: Date.now(),
-            steps: [...j.steps, { kind: "status", label: "No CLI configured — open Config and click Save config", ts: Date.now() }],
+            steps: [...j.steps, { kind: "status", label: "No CLI configured — open Settings and click Save config", ts: Date.now() }],
           }));
           return;
         }

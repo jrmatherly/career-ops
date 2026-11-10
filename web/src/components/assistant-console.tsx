@@ -129,7 +129,7 @@ function describePage(p: string): string {
     return `The user is viewing the EVALUATION REPORT for application #${m[1]}. If they say "this offer", "apply", "evaluate it", "draft a cover letter", they mean application #${m[1]} — read reports/${m[1]}-*.md or the matching data/applications.md row and act on THAT one.`;
   if (p === "/analytics") return "Analytics — pipeline Sankey, funnel, score distribution, top companies.";
   if (p === "/cv") return "CV editor (cv.md).";
-  if (p === "/config") return "Config — CLI / engine setup.";
+  if (p === "/config") return "Settings — CLI / engine setup.";
   if (p === "/apply") return "Apply — the form-proxy: the user is reviewing a job application re-rendered in plain language, pre-filled from their CV. You can write/revise answers via setApplyField.";
   if (p.startsWith("/jobs/")) return "Watching a running worker / evaluation in progress.";
   return `Route ${p}.`;
@@ -282,7 +282,7 @@ export function AssistantConsole() {
     }
   }, [open]);
 
-  // Selected CLI from Config, including saves in this tab.
+  // Selected CLI from Settings, including saves in this tab.
   useEffect(() => {
     function read() {
       try {
@@ -941,7 +941,7 @@ export function AssistantConsole() {
               onClick={() => setOpen(false)}
               className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface/50 px-3 py-2 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
             >
-              <Settings className="size-3.5" /> Pick a CLI in Config to enable the assistant →
+              <Settings className="size-3.5" /> Pick a CLI in Settings to enable the assistant →
             </Link>
           )}
 

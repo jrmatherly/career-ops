@@ -57,7 +57,7 @@ test("the persist call lives in an effect, ahead of save()", () => {
 
 // #4012: the restore effect puts the saved id into state before /api/clis
 // answers, so a bare `if (prev) return prev` kept a stale id selected and
-// save() wrote it straight back — "open Config and click Save config" was a
+// save() wrote it straight back — "open Settings and click Save config" was a
 // no-op on any machine with two or more CLIs installed.
 test("the detect effect only keeps the restored id while its CLI is installed", () => {
   const detect = src.slice(src.indexOf('fetch("/api/clis")'), src.indexOf("function save()"));
@@ -72,7 +72,7 @@ test("the detect effect only keeps the restored id while its CLI is installed", 
 // A setState updater runs while React renders ConfigForm. persistCliId fires
 // the config-changed event, AssistantConsole sets state from it, and React
 // logs "Cannot update a component while rendering a different component" on
-// every first visit to Config, which `npm run ui` shows as a red issue badge.
+// every first visit to Settings, which `npm run ui` shows as a red issue badge.
 test("the setCliId updater in the detect effect writes nothing", () => {
   const start = src.indexOf("setCliId((prev) =>");
   assert.notEqual(start, -1, "could not locate the setCliId updater");
