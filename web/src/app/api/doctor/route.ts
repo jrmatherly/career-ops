@@ -35,7 +35,7 @@ export async function GET() {
     // A payload without the verdict is not a verdict: `!!undefined` would read
     // it as "no onboarding needed", the same false all-clear by another road.
     if (typeof j?.onboardingNeeded !== "boolean") throw new Error("doctor --json without onboardingNeeded");
-    return Response.json({ available: true, onboardingNeeded: j.onboardingNeeded, missing: j.missing ?? [], warnings: j.warnings ?? [] });
+    return Response.json({ available: true, onboardingNeeded: j.onboardingNeeded, missing: j.missing ?? [], warnings: j.warnings ?? [], plugins: Array.isArray(j.plugins) ? j.plugins : undefined });
   } catch {
     return Response.json(UNAVAILABLE);
   }

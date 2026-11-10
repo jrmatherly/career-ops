@@ -4,6 +4,7 @@
  *   type?: 'int'|'number'|'bool'|'enum'|'string'|'url'|'list', min?: number, max?: number, step?: number, values?: string[],
  *   display?: 'value'|'set'|'origin', value: unknown, source: SettingSource, editable: boolean, error?: string }} SettingState
  * @typedef {{ id: string, label: string, settings: SettingState[] }} SettingsGroup
+ * @typedef {{ id: string, hooks: string[], enabled: boolean, missingEnv: string[] }} PluginInfo
  * @typedef {{ revision: { settings: string, profile: string, portals: string }, groups: SettingsGroup[], fileError: string|null, envFileError: string|null, overlayDisabled: boolean }} SettingsResponse
  */
 
@@ -78,4 +79,10 @@ export function dirtyChanges(states, form) {
     if (next === null ? state.source === "saved" || state.source === "file" : !same(next, parseFormValue(state, formValue(state)))) changes[state.id] = next;
   }
   return changes;
+}
+
+/** @param {{ enabled: boolean, missingEnv: string[] }} p */
+export function pluginLine(p) {
+  if (p.enabled) return "On";
+  return p.missingEnv.length ? `Off. Missing: ${p.missingEnv.join(", ")}` : "Off";
 }

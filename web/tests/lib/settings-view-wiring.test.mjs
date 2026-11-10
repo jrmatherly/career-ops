@@ -97,3 +97,15 @@ test("a save sends every file's revision and keeps the new ones", () => {
   assert.match(view, /body: JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
   assert.match(view, /Already saved: \$\{body\.written\.join\(", "\)\}/, "a partial save names the file that was written");
 });
+
+test("plugin status is read from /api/doctor, only reported, and enabled from a terminal", () => {
+  const plugins = src("components/settings/plugin-status.tsx");
+  assert.match(plugins, /fetch\("\/api\/doctor"/);
+  for (const control of ["<input", "<select", "<textarea", "<button", 'role="switch"']) {
+    assert.ok(!plugins.includes(control), `plugin-status.tsx renders no ${control}`);
+  }
+  assert.ok(plugins.includes("node plugins.mjs enable <id> --confirm"));
+  assert.ok(plugins.includes("Plugin status is unavailable."));
+  assert.match(plugins, /pluginLine\(/);
+  assert.match(view, /group\.id === "integrations" && <PluginStatus \/>/);
+});

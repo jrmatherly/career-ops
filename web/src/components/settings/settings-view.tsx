@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { SETTINGS_SAVED_EVENT, dirtyChanges } from "@/lib/settings-form.mjs";
 import type { SettingsGroup, SettingsResponse } from "@/lib/settings-form.mjs";
+import { PluginStatus } from "./plugin-status";
 import { SettingRow } from "./setting-row";
 
 type Form = Record<string, string | boolean | string[]>;
@@ -162,6 +163,7 @@ export function SettingsView() {
                 {note?.kind === "conflict" && <button type="button" onClick={() => void load()} className={QUIET}>Reload</button>}
               </div>
             )}
+            {group.id === "integrations" && <PluginStatus />}
           </section>
         );
       })}
