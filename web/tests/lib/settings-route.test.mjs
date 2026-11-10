@@ -57,6 +57,7 @@ before(async () => {
 });
 
 beforeEach(() => {
+  chmodSync(dataRoot, 0o700); // a test that failed while it held the root read-only
   rmSync(join(dataRoot, "config"), { recursive: true, force: true });
   rmSync(join(dataRoot, ".env"), { force: true });
   for (const f of readdirSync(dataRoot)) if (f.startsWith("portals.yml")) rmSync(join(dataRoot, f));
@@ -336,6 +337,34 @@ test("adding a title to skip changes one line and keeps an entry's trailing spac
   assert.equal(readFileSync(portalsFile, "utf8"), 'title_filter:\n  negative:\n    # languages\n    - "Java "  # not JavaScript\n    - "Staff"\n    - PHP\n');
 });
 
+test("a profile holding only comments is empty, not broken, and takes a save", async () => {
+  seed({ profile: "# nothing yet\n" });
+  const { body: loaded } = await get();
+  assert.equal(rowOf(loaded, "profile:spend_tier").error, undefined);
+  const res = await post({ revision: loaded.revision, changes: { "profile:spend_tier": "premium" } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(readFileSync(profileFile, "utf8"), "# nothing yet\nspend_tier: premium\n");
+});
+
+test("a value in a file cannot be cleared from the page, and the row says so", async () => {
+  seed();
+  const before = readFileSync(profileFile, "utf8");
+  const { body: loaded } = await get();
+  const res = await post({ revision: loaded.revision, changes: { "profile:spend_tier": null } });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.errors["profile:spend_tier"], "cannot be cleared here; remove the line in config/profile.yml");
+  assert.equal(readFileSync(profileFile, "utf8"), before);
+});
+
+test("a tier list holding a spelling the checkboxes do not offer is not replaced", async () => {
+  seed({ portals: "skip_tiers: [Intern, senior]\n" });
+  const { body: loaded } = await get();
+  assert.equal(rowOf(loaded, "portals:skip_tiers").editable, false);
+  const res = await post({ revision: loaded.revision, changes: { "portals:skip_tiers": ["entry"] } });
+  assert.equal(res.status, 400);
+  assert.equal(readFileSync(portalsFile, "utf8"), "skip_tiers: [Intern, senior]\n");
+});
+
 test("a filter block with no enabled key gets one", async () => {
   seed({ portals: "experience_filter:\n  stretch_years: 1\n" });
   const { body: loaded } = await get();
@@ -380,4 +409,90 @@ test("two portals saves sent with one revision: the one that finishes second is 
   ]);
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
   assert.equal(backups(portalsFile).length, 1);
+});
+
+const NO_CHMOD = process.platform === "win32" || process.getuid?.() === 0;
+
+test("every file-backed row saves against the shipped profile and portals templates", async () => {
+  seed();
+  const { body: loaded } = await get();
+  const changes = {
+    "profile:spend_tier": "economy", "profile:auto_pdf_score_threshold": 4.2, "profile:pipeline.auto_evaluate_daily_cap": 7,
+    "profile:language.output": "no", "profile:language.modes_dir": "modes/de", "profile:page_format": "a4",
+    "profile:cv.output_format": "latex", "profile:cv.template": "null", "profile:cv.max_pages": 1, "profile:cv.strict_pages": true,
+    "portals:max_posting_age_days": 30, "portals:scan_history.recheck_after_days": 14, "portals:skip_tiers": ["intern", "entry"],
+    "portals:title_filter.negative": ["Junior", "Staff"], "portals:location_filter.block": ["Mars"],
+    "portals:salary_filter.min": 100000, "portals:salary_filter.max": 0, "portals:salary_filter.currency": "USD",
+    "portals:visa_filter.enabled": true, "portals:experience_filter.enabled": true,
+  };
+  const res = await post({ revision: loaded.revision, changes });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  for (const [id, value] of Object.entries(changes)) assert.deepEqual(rowOf(res.body, id).value, value, id);
+  assert.equal(comments(readFileSync(profileFile, "utf8")), comments(EXAMPLE_PROFILE));
+  assert.equal(comments(readFileSync(portalsFile, "utf8")), comments(EXAMPLE_PORTALS));
+});
+
+test("one file that cannot be saved leaves every other file unwritten", async () => {
+  seed();
+  let { body: loaded } = await get();
+  let res = await post({ revision: loaded.revision, changes: { [ID]: 4, "profile:cv.max_pages": 0 } });
+  assert.equal(res.status, 400);
+  assert.equal(onDisk(), null);
+
+  seed({ portals: "title_filter: { negative: [a] }\n" });
+  ({ body: loaded } = await get());
+  res = await post({ revision: loaded.revision, changes: { [ID]: 4, "profile:cv.max_pages": 1, "portals:title_filter.negative": ["b"] } });
+  assert.equal(res.status, 422);
+  assert.equal(onDisk(), null);
+  assert.equal(readFileSync(profileFile, "utf8"), EXAMPLE_PROFILE);
+  assert.deepEqual(backups(profileFile), []);
+});
+
+test("a broken or changed file blocks only a save that touches it", async () => {
+  seed({ profile: "a: : :\n" });
+  const { body: loaded } = await get();
+  const res = await post({ revision: loaded.revision, changes: { [ID]: 4, "portals:max_posting_age_days": 30 } });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+
+  seed();
+  const { body: fresh } = await get();
+  writeFileSync(profileFile, `${EXAMPLE_PROFILE}# edited elsewhere\n`);
+  assert.equal((await post({ revision: fresh.revision, changes: { "portals:max_posting_age_days": 30 } })).status, 200);
+});
+
+test("a save to two files and a save to one of them, sent with one revision: one wins", async () => {
+  seed();
+  const { body: loaded } = await get();
+  const results = await Promise.all([
+    post({ revision: loaded.revision, changes: { [ID]: 4, "portals:max_posting_age_days": 30 } }),
+    post({ revision: loaded.revision, changes: { [ID]: 5 } }),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  const winner = results[0].status === 200 ? 4 : 5;
+  assert.deepEqual(JSON.parse(onDisk()).values, { [ID]: winner });
+});
+
+test("a save that wrote one file before another failed says which", { skip: NO_CHMOD }, async (t) => {
+  seed();
+  const { body: loaded } = await get();
+  chmodSync(dataRoot, 0o500);
+  t.after(() => chmodSync(dataRoot, 0o700));
+  const res = await post({ revision: loaded.revision, changes: { [ID]: 4, "portals:max_posting_age_days": 30 } });
+  assert.equal(res.status, 500);
+  assert.deepEqual(res.body.written, ["config/settings.json"]);
+  assert.deepEqual(JSON.parse(onDisk()).values, { [ID]: 4 });
+  assert.equal(readFileSync(portalsFile, "utf8"), EXAMPLE_PORTALS);
+});
+
+test("a profile that cannot be read says so and leaves the portals rows working", { skip: NO_CHMOD }, async (t) => {
+  seed();
+  chmodSync(profileFile, 0o000);
+  t.after(() => chmodSync(profileFile, 0o600));
+  const { status, body } = await get();
+  assert.equal(status, 200);
+  assert.equal(body.revision.profile, "unreadable");
+  assert.equal(rowOf(body, "profile:spend_tier").error, "config/profile.yml cannot be read (EACCES)");
+  assert.equal(rowOf(body, "portals:max_posting_age_days").editable, true);
+  const res = await post({ revision: body.revision, changes: { "profile:spend_tier": "premium" } });
+  assert.deepEqual([res.status, res.body.error], [409, "config/profile.yml cannot be read (EACCES). It was not changed."]);
 });

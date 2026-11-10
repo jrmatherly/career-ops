@@ -127,3 +127,15 @@ test("splitChanges sorts changes by where they are written and refuses the rest"
     errors: JSON.parse('{"A_SECRET":"cannot be changed here","A_URL":"cannot be changed here","NOPE":"is not a setting","__proto__":"is not a setting"}'),
   });
 });
+
+test("a list the control cannot show in full is left to the file", () => {
+  const tiers = [{ id: "portals:skip_tiers", kind: "portals", group: "a", label: "", help: "", type: "list", maxItems: 4, values: ["intern", "entry"] },
+    { id: "portals:title_filter.negative", kind: "portals", group: "a", label: "", help: "", type: "list", maxItems: 9, min: 1, max: 80 }];
+  const at = (portals, id) => rowOf({ settings: tiers, portals }, id);
+  assert.equal(at({ skip_tiers: ["intern"] }, tiers[0].id).editable, true);
+  assert.deepEqual(pick(at({ skip_tiers: ["Intern", "entry"] }, tiers[0].id)),
+    { value: ["Intern", "entry"], source: "file", editable: false, error: "holds Intern in portals.yml, which this page cannot show; edit it there" });
+  assert.deepEqual(pick(at({ title_filter: { negative: "intern" } }, tiers[1].id)),
+    { value: "intern", source: "file", editable: false, error: "is not a list in portals.yml; edit it there" });
+  assert.equal(at({}, tiers[0].id).editable, true);
+});

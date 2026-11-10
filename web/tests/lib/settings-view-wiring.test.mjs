@@ -94,4 +94,6 @@ test("Profile preferences names its file and the scanner's file rows sit under t
 test("a save sends every file's revision and keeps the new ones", () => {
   assert.match(src("lib/settings-form.mjs"), /revision: \{ settings: string, profile: string, portals: string \}/);
   assert.match(view, /if \(res\.ok\) \{\s*setData\(body\);/);
+  assert.match(view, /body: JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
+  assert.match(view, /Already saved: \$\{body\.written\.join\(", "\)\}/, "a partial save names the file that was written");
 });

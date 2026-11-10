@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseEnv } from "node:util";
-import * as yaml from "js-yaml";
 import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { getProfilePath } from "@/lib/core/profile-path.mjs";
@@ -9,7 +8,7 @@ import { atomicWrite, atomicWriteWithBackup } from "@/lib/core/safe-write";
 import { readJsonObject } from "@/lib/json-body";
 import { coreSettings, coreValidators, envBeforeOverlay, type Finding } from "@/lib/settings-server";
 import { buildSettingsState, revisionOf, splitChanges } from "@/lib/settings-state.mjs";
-import { applyYamlChanges } from "@/lib/settings-yaml.mjs";
+import { applyYamlChanges, loadYamlDoc } from "@/lib/settings-yaml.mjs";
 import { isMapping } from "@/lib/portals-config.mjs";
 
 export const runtime = "nodejs";
@@ -46,7 +45,7 @@ function readYamlFile(kind: FileKind, file: string): YamlFile {
   const base = { file, label, text, missing: false, revision: revisionOf(text) };
   let doc: unknown;
   try {
-    doc = yaml.load(text);
+    doc = loadYamlDoc(text);
   } catch (e) {
     // The first line only: later lines quote the file's text.
     return { ...base, doc: null, error: `${label} is not valid YAML: ${String((e as Error).message).split("\n")[0]}` };
@@ -123,10 +122,11 @@ const stale = (label: string) => conflict(`${label} changed since this page load
 
 /** Error findings in `after` that `before` did not have, each on the changed ids it names, or on all of them. */
 function newFindings(before: Finding[], after: Finding[], changes: Change[], errors: Record<string, string>) {
-  const known = new Set(before.map((f) => f.message));
-  for (const finding of after.filter((f) => !known.has(f.message))) {
-    const at = finding.key ?? finding.path ?? "";
-    const named = changes.filter((c) => { const p = c.path.join("."); return at === p || at.startsWith(`${p}.`) || p.startsWith(`${at}.`); });
+  const at = (f: Finding) => `${f.key ?? f.path ?? ""}\n${f.message}`;
+  const known = new Set(before.map(at));
+  for (const finding of after.filter((f) => !known.has(at(f)))) {
+    const where = finding.key ?? finding.path ?? "";
+    const named = changes.filter((c) => { const p = c.path.join("."); return where === p || where.startsWith(`${p}.`) || p.startsWith(`${where}.`); });
     const message = finding.path ? `${finding.path} ${finding.message}` : finding.message;
     for (const c of named.length ? named : changes) errors[c.id] ??= message;
   }
@@ -180,6 +180,7 @@ async function save(req: Request): Promise<Response> {
       const row = rows.get(id);
       // A modes_dir list cannot be shown as one value, so it is not replaced by one.
       if (row && !row.editable && row.error) { errors[id] = row.error; continue; }
+      if (raw === null) { errors[id] = `cannot be cleared here; remove the line in ${files[kind].label}`; continue; }
       const checked = registry.validateSetting(setting, raw);
       if (!checked.ok) { errors[id] = checked.error; continue; }
       if (row?.values && setting.type === "string" && !row.values.includes(checked.value as string)) {

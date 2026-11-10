@@ -2,6 +2,14 @@ import * as yaml from "js-yaml";
 import { isMapping, setListInText } from "./portals-config.mjs";
 import { patchProfileText } from "./profile-yaml-edit.mjs";
 
+/**
+ * Parse a user's YAML file. A file with nothing but comments and blank lines is
+ * an empty mapping: js-yaml throws on it, and it is how a profile starts out.
+ *
+ * @param {string} text
+ */
+export const loadYamlDoc = (text) => (text.split(/\r?\n/).every((line) => /^\s*(#.*)?$/.test(line)) ? {} : yaml.load(text));
+
 const UNEDITABLE = { error: "could not be edited without rewriting the file; edit it by hand" };
 
 /**
@@ -15,7 +23,7 @@ const UNEDITABLE = { error: "could not be edited without rewriting the file; edi
 export function applyYamlChanges(source, changes) {
   let doc;
   try {
-    doc = yaml.load(source);
+    doc = loadYamlDoc(source);
   } catch {
     return { error: "is not valid YAML" };
   }

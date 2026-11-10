@@ -59,6 +59,12 @@ function fileRow(setting, input) {
   }
   const value = path.reduce((at, key) => (isMapping(at) ? at[key] : undefined), doc);
   const row = value === undefined || value === null ? { ...fallback, editable: true } : { value, source: "file", editable: true };
+  if (setting.type === "list" && row.source === "file") {
+    // Saving sends the whole list, so an entry the control cannot show would be dropped.
+    const unshown = Array.isArray(value) ? (setting.values ? value.filter((item) => !setting.values.includes(item)) : []) : null;
+    if (unshown === null) return { ...row, editable: false, error: `is not a list in ${FILES[setting.kind]}; edit it there` };
+    if (unshown.length) return { ...row, editable: false, error: `holds ${unshown.map(String).join(", ")} in ${FILES[setting.kind]}, which this page cannot show; edit it there` };
+  }
   if (setting.id !== "profile:language.modes_dir") return row;
   if (Array.isArray(value)) return { ...row, editable: false, error: `set to a list in ${FILES.profile}; edit it there` };
   return { ...row, values: input.modesDirs };

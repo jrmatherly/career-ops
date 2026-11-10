@@ -62,4 +62,12 @@ test("an entry already in the file keeps a trailing space the textarea cannot sh
   const state = { id: "portals:title_filter.negative", type: "list", editable: true, source: "file", value: ["Java ", "PHP"] };
   assert.deepEqual(parseFormValue(state, "Java\nPHP\n Staff "), ["Java ", "PHP", "Staff"]);
   assert.deepEqual(dirtyChanges([state], { [state.id]: "Java\nPHP" }), {});
+  // a YAML number in the list is sent as the text the user sees, which the server accepts
+  assert.deepEqual(parseFormValue({ ...state, value: ["Java ", 2024] }, "Java\n2024"), ["Java ", "2024"]);
+});
+
+test("emptying a field whose value is in a file is sent, so the server can refuse it on the row", () => {
+  const state = { id: "profile:cv.template", kind: "profile", type: "string", editable: true, source: "file", value: "modern" };
+  assert.deepEqual(dirtyChanges([state], { [state.id]: " " }), { [state.id]: null });
+  assert.deepEqual(dirtyChanges([{ ...state, source: "default" }], { [state.id]: "" }), {});
 });

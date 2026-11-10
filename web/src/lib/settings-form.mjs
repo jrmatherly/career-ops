@@ -51,7 +51,7 @@ export function parseFormValue(state, value) {
   if (typeof value !== "string") return value;
   if (state.type === "list") {
     // An entry already in the file keeps its exact spelling: "Java " ends in a space on purpose, so it does not match JavaScript.
-    const original = new Map((Array.isArray(state.value) ? state.value : []).map((item) => [String(item).trim(), item]));
+    const original = new Map((Array.isArray(state.value) ? state.value : []).filter((item) => typeof item === "string").map((item) => [item.trim(), item]));
     return parseListText(value).map((item) => original.get(item) ?? item);
   }
   const text = value.trim();
@@ -74,7 +74,8 @@ export function dirtyChanges(states, form) {
     if (!state.editable || !Object.hasOwn(form, state.id)) continue;
     const next = parseFormValue(state, form[state.id]);
     // Emptying a field resets a saved value; on a row with nothing saved there is nothing to reset.
-    if (next === null ? state.source === "saved" : !same(next, parseFormValue(state, formValue(state)))) changes[state.id] = next;
+    // A value in a file cannot be reset from here, so it is sent for the server to say so on the row.
+    if (next === null ? state.source === "saved" || state.source === "file" : !same(next, parseFormValue(state, formValue(state)))) changes[state.id] = next;
   }
   return changes;
 }
