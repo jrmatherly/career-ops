@@ -127,6 +127,12 @@ const ROOT_VARS = ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR'];
 // Read before any .env load. A .env load never replaces a variable the shell
 // already has, set to an empty value included.
 const shellRootEnv = Object.fromEntries(ROOT_VARS.filter((name) => name in process.env).map((name) => [name, process.env[name]]));
+// Unless dotenv is told to override: then a line in the file replaces the shell
+// value. The names and the off values are dotenv's own (optionsFromEnv).
+const dotenvOverride = (() => {
+  const value = process.env.DOTENV_OVERRIDE ?? process.env.DOTENV_CONFIG_OVERRIDE;
+  return value != null && !['false', '0', 'no', 'off', ''].includes(value.toLowerCase());
+})();
 const projectRoot = explicitTarget || getCareerOpsRoot();
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
@@ -1334,16 +1340,19 @@ function checkEnvFileRoot(root) {
   } catch {
     return null; // no .env, or unreadable
   }
-  const loaded = { ...fileEnv, ...shellRootEnv };
+  const loaded = dotenvOverride ? { ...shellRootEnv, ...fileEnv } : { ...fileEnv, ...shellRootEnv };
   const name = ROOT_VARS.find((n) => loaded[n]?.trim());
-  if (!name || name in shellRootEnv) return null;
+  const fromFile = dotenvOverride ? name in fileEnv : !(name in shellRootEnv);
+  if (!name || !fromFile) return null;
   const value = loaded[name].trim();
   // path-resolver.mjs resolves the value against the code folder.
   if (resolve(__dirname, value) === resolve(root)) return null;
   return {
     warn: true,
     label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use the other folder from then on`,
-    fix: [`Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
+    fix: [dotenvOverride
+      ? `Remove it from .env: with DOTENV_OVERRIDE or DOTENV_CONFIG_OVERRIDE on, the line replaces a value exported in the shell`
+      : `Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],
   };
 }
 
