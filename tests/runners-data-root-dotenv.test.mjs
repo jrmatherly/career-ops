@@ -66,8 +66,10 @@ globalThis.fetch = async (input, init) => {
 };
 `);
 
-const env = { ...process.env, CAREER_OPS_ROOT: dataRoot };
-for (const id of ['CAREER_OPS_DATA_DIR', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OPENAI_BASE_URL', 'OPENAI_MODEL',
+// Seeded as if the developer had exported it, so dropping it below is tested on every run.
+const env = { ...process.env, CAREER_OPS_PROFILE: join(base, 'no-such-profile.yml'), CAREER_OPS_ROOT: dataRoot };
+for (const id of ['CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_PRIVACY', 'CAREER_OPS_PORTALS',
+  'CAREER_OPS_PIPELINE', 'CAREER_OPS_SCAN_HISTORY', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OPENAI_BASE_URL', 'OPENAI_MODEL',
   'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GEMINI_MODEL']) delete env[id];
 
 function run(script, args, overrides = {}) {
