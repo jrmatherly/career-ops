@@ -30,6 +30,25 @@ writeFileSync(join(dataRoot, '.env'), [
 mkdirSync(join(dataRoot, 'config'));
 writeFileSync(join(dataRoot, 'config', 'profile.yml'), 'candidate:\n  full_name: Test Candidate\n');
 writeFileSync(join(dataRoot, 'cv.md'), '# Test Candidate\n');
+// A .env in the working directory must never be read: every value in it is a decoy.
+writeFileSync(join(cwd, '.env'), [
+  'OLLAMA_MODEL=cwd-ollama-model',
+  'OPENAI_API_KEY=cwd-openai-key',
+  'OPENAI_MODEL=cwd-openai-model',
+  'GEMINI_API_KEY=cwd-gemini-key',
+  'GEMINI_MODEL=cwd-gemini-model',
+  '',
+].join('\n'));
+// A data root with no .env, and one whose saved setting must beat its .env.
+const bareRoot = join(base, 'bare');
+const savedRoot = join(base, 'saved');
+for (const root of [bareRoot, savedRoot]) {
+  mkdirSync(join(root, 'config'), { recursive: true });
+  writeFileSync(join(root, 'config', 'profile.yml'), 'candidate:\n  full_name: Test Candidate\n');
+  writeFileSync(join(root, 'cv.md'), '# Test Candidate\n');
+}
+writeFileSync(join(savedRoot, '.env'), 'OLLAMA_MODEL=dotenv-ollama-model\n');
+writeFileSync(join(savedRoot, 'config', 'settings.json'), JSON.stringify({ version: 1, values: { OLLAMA_MODEL: 'saved-ollama-model' } }));
 writeFileSync(join(cwd, 'jd.txt'), 'Some job description.\n');
 writeFileSync(join(cwd, 'report.md'), '# Report\n');
 
@@ -51,22 +70,31 @@ const env = { ...process.env, CAREER_OPS_ROOT: dataRoot };
 for (const id of ['CAREER_OPS_DATA_DIR', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OPENAI_BASE_URL', 'OPENAI_MODEL',
   'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GEMINI_MODEL']) delete env[id];
 
-function run(script, args) {
+function run(script, args, overrides = {}) {
   const r = spawnSync(NODE, ['--import', pathToFileURL(stub).href, join(ROOT, script), ...args], {
-    cwd, env, encoding: 'utf-8', timeout: 30000,
+    cwd, env: { ...env, ...overrides }, encoding: 'utf-8', timeout: 30000,
   });
   return `${r.stdout}${r.stderr}`;
 }
 
-function check(script, args, expected, label) {
-  const out = run(script, args);
-  if (out.includes(expected)) pass(`${script} ${label}`);
-  else fail(`${script} ${label}: expected ${JSON.stringify(expected)}. tail: ${out.trim().split('\n').slice(-3).join(' | ')}`);
+function check(script, args, expected, label, overrides) {
+  const out = run(script, args, overrides);
+  const found = expected instanceof RegExp ? expected.test(out) : out.includes(expected);
+  if (found) pass(`${script} ${label}`);
+  else fail(`${script} ${label}: expected ${expected}. tail: ${out.trim().split('\n').slice(-3).join(' | ')}`);
+}
+
+// With no .env in the data root, the runner must reach `marker` (its no-key or
+// default-model path) without any value from the working directory .env.
+function ignoresCwd(script, args, marker) {
+  const out = run(script, args, { CAREER_OPS_ROOT: bareRoot });
+  if (out.includes(marker) && !out.includes('cwd-')) pass(`${script} ignores a .env in the working directory`);
+  else fail(`${script} read the working directory .env, or never reached ${JSON.stringify(marker)}. tail: ${out.trim().split('\n').slice(-3).join(' | ')}`);
 }
 
 try {
   check('ollama-eval.mjs', ['--no-save', 'Some job description.'],
-    ' dotenv-ollama-model', 'sends OLLAMA_MODEL from the data root .env');
+    /MODEL_REQUEST \S+ dotenv-ollama-model/, 'sends OLLAMA_MODEL from the data root .env');
   check('openai-eval.mjs', ['--no-save', 'Some job description.'],
     'MODEL_REQUEST http://127.0.0.1:9/dotenv-openai/chat/completions dotenv-openai-model',
     'sends to OPENAI_BASE_URL with OPENAI_MODEL from the data root .env');
@@ -80,6 +108,17 @@ try {
   if (!batch.includes('GEMINI_API_KEY not found') && batch.includes('Required context file missing')) {
     pass('batch-evaluate-gemini.mjs finds GEMINI_API_KEY in the data root .env');
   } else fail(`batch-evaluate-gemini.mjs did not find GEMINI_API_KEY. tail: ${batch.trim().split('\n').slice(-2).join(' | ')}`);
+
+  ignoresCwd('ollama-eval.mjs', ['--no-save', 'Some job description.'], 'MODEL_REQUEST');
+  ignoresCwd('openai-eval.mjs', ['--no-save', 'Some job description.'], 'No API key');
+  ignoresCwd('openai-tailor.mjs', ['--jd', 'jd.txt', '--report', 'report.md'], 'No API key');
+  ignoresCwd('gemini-eval.mjs', ['--no-save', 'Some job description.'], 'GEMINI_API_KEY not found');
+  ignoresCwd('scan-hn.mjs', [], 'No AI key');
+  ignoresCwd('batch-evaluate-gemini.mjs', [], 'GEMINI_API_KEY not found');
+
+  check('ollama-eval.mjs', ['--no-save', 'Some job description.'],
+    /MODEL_REQUEST \S+ saved-ollama-model/, 'sends the saved OLLAMA_MODEL over the data root .env one',
+    { CAREER_OPS_ROOT: savedRoot, CAREER_OPS_SETTINGS: '' });
 } finally {
   rmSync(base, { recursive: true, force: true });
 }

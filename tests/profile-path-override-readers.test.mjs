@@ -360,7 +360,7 @@ try {
     : failOnce('updater: apply() no longer prints configuredSnapshot.warnings');
 
   // 4e. Doctor's .env warning has to be true at this change: the evaluators follow
-  // CAREER_OPS_PROFILE now, after their working-directory config(), so it names them
+  // CAREER_OPS_PROFILE now, after their data-root config(), so it names them
   // beside scan.mjs as the commands that load a .env for the profile.
   const envWarnRoot = join(scratch, 'env-warn-root');
   mkdirSync(join(envWarnRoot, 'config'), { recursive: true });

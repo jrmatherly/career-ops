@@ -291,7 +291,7 @@ if (!apiKey) {
 ❌  GEMINI_API_KEY not found.
 
    1. Get a free key at https://aistudio.google.com/apikey
-   2. Add it to .env:   GEMINI_API_KEY=your_key_here
+   2. Add it to ${join(DATA_ROOT, '.env')}:   GEMINI_API_KEY=your_key_here
    3. Or export it:     export GEMINI_API_KEY=your_key_here
 `);
   process.exit(1);

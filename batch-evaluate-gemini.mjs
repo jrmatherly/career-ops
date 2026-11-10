@@ -213,7 +213,7 @@ export function pendingOfferIndices(pipelineLines, limit) {
 function setupEnvironment(modelArg) {
   apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("❌ GEMINI_API_KEY not found in .env");
+    console.error(`❌ GEMINI_API_KEY not found in ${join(DATA_ROOT, '.env')} or the environment`);
     process.exit(1);
   }
 
