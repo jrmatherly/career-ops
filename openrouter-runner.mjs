@@ -14,8 +14,8 @@ import './lib/settings-env.mjs';
  *   node openrouter-runner.mjs help              → Show this help
  *
  * Setup:
- *   1. copy .env.example .env
- *   2. Add OPENROUTER_API_KEY=sk-or-v1-... to .env
+ *   1. copy .env.example to .env in the data root (the checkout, unless CAREER_OPS_ROOT or a marker moves it)
+ *   2. Add OPENROUTER_API_KEY=sk-or-v1-... to it
  *   3. Free API key: https://openrouter.ai
  */
 
@@ -314,7 +314,7 @@ async function loadFreeModels() {
     throw new Error(
       `[models] Failed to fetch free model list: ${reason}. ` +
       (hasKey ? 'Check that your API key is valid and that network access to OpenRouter is available.'
-        : 'OPENROUTER_API_KEY is not set — copy .env.example to .env and add your key.')
+        : `OPENROUTER_API_KEY is not set — add it to ${path.join(DATA_ROOT, '.env')}.`)
     );
   }
 
@@ -402,7 +402,7 @@ async function callOpenRouter(systemPrompt, userMessage) {
   if (!key) {
     throw new Error(
       'OPENROUTER_API_KEY not found.\n' +
-      'Copy .env.example to .env and add your API key.\n' +
+      `Add it to ${path.join(DATA_ROOT, '.env')}.\n` +
       'Free key: https://openrouter.ai'
     );
   }
@@ -1352,8 +1352,8 @@ COMMANDS:
   node openrouter-runner.mjs models            → List available free models from OpenRouter
 
 SETUP:
-  1. Copy .env.example to .env
-  2. Add your key: OPENROUTER_API_KEY=sk-or-v1-...
+  1. Copy .env.example to ${path.join(DATA_ROOT, '.env')}
+  2. Add your key there: OPENROUTER_API_KEY=sk-or-v1-...
   3. Free API key: https://openrouter.ai
 
 MODEL SELECTION:
