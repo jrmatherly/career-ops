@@ -25,6 +25,9 @@ writeFileSync(join(dataRoot, '.env'), [
   'OPENAI_MODEL=dotenv-openai-model',
   'GEMINI_API_KEY=dotenv-gemini-key',
   'GEMINI_MODEL=dotenv-gemini-model',
+  'OPENROUTER_API_KEY=dotenv-openrouter-key',
+  'CAREER_OPS_MODEL=dotenv-openrouter-model # an inline comment is not part of the value',
+  'OPENROUTER_TIMEOUT_MS=1000',
   '',
 ].join('\n'));
 mkdirSync(join(dataRoot, 'config'));
@@ -37,6 +40,8 @@ writeFileSync(join(cwd, '.env'), [
   'OPENAI_MODEL=cwd-openai-model',
   'GEMINI_API_KEY=cwd-gemini-key',
   'GEMINI_MODEL=cwd-gemini-model',
+  'OPENROUTER_API_KEY=cwd-openrouter-key',
+  'CAREER_OPS_MODEL=cwd-openrouter-model',
   '',
 ].join('\n'));
 // A data root with no .env, and one whose saved setting must beat its .env.
@@ -65,22 +70,37 @@ globalThis.fetch = async (input, init) => {
   throw new Error('fetch stubbed by the test');
 };
 `);
+// A fetch that never answers, so a model call ends only when the runner's own timeout aborts it.
+const hangStub = join(base, 'fetch-hang.mjs');
+writeFileSync(hangStub, `
+globalThis.fetch = (input, init) => new Promise((_, reject) =>
+  init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+`);
+// Makes dotenv unresolvable, as in an install without it: scan.mjs then loads no .env.
+const noDotenv = join(base, 'no-dotenv.mjs');
+writeFileSync(noDotenv, `
+import { register } from 'node:module';
+register('data:text/javascript,' + encodeURIComponent(\`export async function resolve(specifier, context, next) {
+  if (specifier === 'dotenv') throw Object.assign(new Error('no dotenv'), { code: 'ERR_MODULE_NOT_FOUND' });
+  return next(specifier, context);
+}\`));
+`);
 
 // Seeded as if the developer had exported it, so dropping it below is tested on every run.
 const env = { ...process.env, CAREER_OPS_PROFILE: join(base, 'no-such-profile.yml'), CAREER_OPS_ROOT: dataRoot };
 for (const id of ['CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_PRIVACY', 'CAREER_OPS_PORTALS',
   'CAREER_OPS_PIPELINE', 'CAREER_OPS_SCAN_HISTORY', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OPENAI_BASE_URL', 'OPENAI_MODEL',
-  'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GEMINI_MODEL']) delete env[id];
+  'OPENAI_API_KEY', 'GEMINI_API_KEY', 'GEMINI_MODEL', 'OPENROUTER_API_KEY', 'CAREER_OPS_MODEL', 'OPENROUTER_TIMEOUT_MS', 'CAREER_OPS_TIMEOUT_MS']) delete env[id];
 
-function run(script, args, overrides = {}) {
-  const r = spawnSync(NODE, ['--import', pathToFileURL(stub).href, join(ROOT, script), ...args], {
+function run(script, args, overrides = {}, imports = [stub]) {
+  const r = spawnSync(NODE, [...imports.flatMap((file) => ['--import', pathToFileURL(file).href]), join(ROOT, script), ...args], {
     cwd, env: { ...env, ...overrides }, encoding: 'utf-8', timeout: 30000,
   });
   return `${r.stdout}${r.stderr}`;
 }
 
-function check(script, args, expected, label, overrides) {
-  const out = run(script, args, overrides);
+function check(script, args, expected, label, overrides, imports) {
+  const out = run(script, args, overrides, imports);
   const found = expected instanceof RegExp ? expected.test(out) : out.includes(expected);
   if (found) pass(`${script} ${label}`);
   else fail(`${script} ${label}: expected ${expected}. tail: ${out.trim().split('\n').slice(-3).join(' | ')}`);
@@ -110,6 +130,11 @@ try {
   if (!batch.includes('GEMINI_API_KEY not found') && batch.includes('Required context file missing')) {
     pass('batch-evaluate-gemini.mjs finds GEMINI_API_KEY in the data root .env');
   } else fail(`batch-evaluate-gemini.mjs did not find GEMINI_API_KEY. tail: ${batch.trim().split('\n').slice(-2).join(' | ')}`);
+  check('openrouter-runner.mjs', ['eval', 'Some job description.'],
+    /MODEL_REQUEST \S+ dotenv-openrouter-model$/m, 'sends CAREER_OPS_MODEL with the key from the data root .env');
+  check('openrouter-runner.mjs', ['eval', 'Some job description.'],
+    /dotenv-openrouter-model \(pinned\)[\s\S]*timed out after 1s/,
+    'without dotenv, still takes CAREER_OPS_MODEL and OPENROUTER_TIMEOUT_MS from the data root .env', {}, [noDotenv, hangStub]);
 
   ignoresCwd('ollama-eval.mjs', ['--no-save', 'Some job description.'], 'MODEL_REQUEST');
   ignoresCwd('openai-eval.mjs', ['--no-save', 'Some job description.'], 'No API key');
@@ -117,6 +142,7 @@ try {
   ignoresCwd('gemini-eval.mjs', ['--no-save', 'Some job description.'], 'GEMINI_API_KEY not found');
   ignoresCwd('scan-hn.mjs', [], 'No AI key');
   ignoresCwd('batch-evaluate-gemini.mjs', [], 'GEMINI_API_KEY not found');
+  ignoresCwd('openrouter-runner.mjs', ['models'], 'OPENROUTER_API_KEY is not set');
 
   check('ollama-eval.mjs', ['--no-save', 'Some job description.'],
     /MODEL_REQUEST \S+ saved-ollama-model/, 'sends the saved OLLAMA_MODEL over the data root .env one',

@@ -1582,7 +1582,7 @@ If no `Subject:`/`From:` header lines are found, the whole file is treated as th
 ## or (OpenRouter runner)
 
 Runs the pipeline on OpenRouter free models with automatic fallback — no
-Claude Code CLI required. Needs `OPENROUTER_API_KEY` in `.env` (a free key from https://openrouter.ai).
+Claude Code CLI required. Needs `OPENROUTER_API_KEY` in the data root `.env` (a free key from https://openrouter.ai).
 
 ```bash
 npm run or:scan                 # scan configured companies for new listings

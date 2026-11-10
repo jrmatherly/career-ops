@@ -14,8 +14,8 @@ import './lib/settings-env.mjs';
  *   node openrouter-runner.mjs help              → Show this help
  *
  * Setup:
- *   1. copy .env.example .env
- *   2. Add OPENROUTER_API_KEY=sk-or-v1-... to .env
+ *   1. copy .env.example to .env in the data root (the checkout, unless CAREER_OPS_ROOT or a marker moves it)
+ *   2. Add OPENROUTER_API_KEY=sk-or-v1-... to it
  *   3. Free API key: https://openrouter.ai
  */
 
@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
+import { parseEnv } from 'node:util';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { outputLanguageInstruction, parseOutputLanguage } from './profile-language.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
@@ -63,20 +64,15 @@ let activeModel = null;
 // ---------------------------------------------------------------------------
 // .env loader
 // ---------------------------------------------------------------------------
-// Lazy: only runs when this file is the CLI entry point (`node
-// openrouter-runner.mjs ...`). Importing the module (e.g. for buildSystemPrompt
-// in test-all.mjs) must NOT mutate process.env — a module-level loader here
-// leaked every .env key (including CAREER_OPS_CLI) into the importing process
-// and broke later CLI-resolution tests.
+// The scan.mjs import already loads the data root .env through dotenv. This
+// covers an install without dotenv, and reads the same file so the Settings
+// page and the runner agree. CLI entry point only.
 function loadEnvFile() {
-  const envPath = path.join(__dirname, '.env');
+  const envPath = path.join(getCareerOpsRoot(), '.env');
   if (!fs.existsSync(envPath)) return;
-  for (const line of fs.readFileSync(envPath, 'utf-8').split('\n')) {
-    const m = line.trim().match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m && process.env[m[1]] === undefined) {
-      process.env[m[1]] = m[2].trim().replace(/^(['"])(.*?)\1$/, '$2');
-    }
-  }
+  // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+  const parsed = parseEnv(`${fs.readFileSync(envPath, 'utf-8')}\n`);
+  for (const [key, value] of Object.entries(parsed)) process.env[key] ??= value;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +312,7 @@ async function loadFreeModels() {
     throw new Error(
       `[models] Failed to fetch free model list: ${reason}. ` +
       (hasKey ? 'Check that your API key is valid and that network access to OpenRouter is available.'
-        : 'OPENROUTER_API_KEY is not set — copy .env.example to .env and add your key.')
+        : `OPENROUTER_API_KEY is not set — add it to ${path.join(DATA_ROOT, '.env')}.`)
     );
   }
 
@@ -404,7 +400,7 @@ async function callOpenRouter(systemPrompt, userMessage) {
   if (!key) {
     throw new Error(
       'OPENROUTER_API_KEY not found.\n' +
-      'Copy .env.example to .env and add your API key.\n' +
+      `Add it to ${path.join(DATA_ROOT, '.env')}.\n` +
       'Free key: https://openrouter.ai'
     );
   }
@@ -1354,8 +1350,8 @@ COMMANDS:
   node openrouter-runner.mjs models            → List available free models from OpenRouter
 
 SETUP:
-  1. Copy .env.example to .env
-  2. Add your key: OPENROUTER_API_KEY=sk-or-v1-...
+  1. Copy .env.example to ${path.join(DATA_ROOT, '.env')}
+  2. Add your key there: OPENROUTER_API_KEY=sk-or-v1-...
   3. Free API key: https://openrouter.ai
 
 MODEL SELECTION:
