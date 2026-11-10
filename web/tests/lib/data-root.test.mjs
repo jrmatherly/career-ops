@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { resolveDataRoot } from "../../src/lib/core/data-root.mjs";
 
 const CORE = path.resolve(import.meta.dirname, "../../..");
+const UNSAFE = "throws CAREER_OPS_UNSAFE_DATA_ROOT";
 
 /** resolveDataRoot wired to a real directory, like careerOpsRoot() wires it. */
 function resolve(coreRoot, env = {}) {
@@ -117,34 +118,52 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     { name: "CAREER_OPS_DATA_DIR relative", marker: null, env: { CAREER_OPS_DATA_DIR: "./from-data-dir" } },
     { name: "both env vars set", marker: null, env: { CAREER_OPS_ROOT: "./win", CAREER_OPS_DATA_DIR: "./lose" } },
     { name: "env overrides marker", marker: "./from-marker", env: { CAREER_OPS_ROOT: "./from-env" } },
+    { name: "plugin copy, no override", plugin: true, marker: null, env: {}, expect: path.join(os.homedir(), "career-ops-data") },
+    { name: "plugin copy, env outside it", plugin: true, marker: null, env: { CAREER_OPS_ROOT: "ABS" } },
+    { name: "plugin copy, relative env stays inside it", plugin: true, marker: null, env: { CAREER_OPS_ROOT: "./data" }, expect: UNSAFE },
+    { name: "plugin copy, relative marker stays inside it", plugin: true, marker: "./data", env: {}, expect: UNSAFE },
+    { name: "checkout, env inside a plugin copy", marker: null, env: { CAREER_OPS_DATA_DIR: "IN_PLUGIN" }, expect: UNSAFE },
+    { name: "checkout, marker inside a plugin copy", marker: "IN_PLUGIN", env: {}, expect: UNSAFE },
   ];
+  const answer = (fn) => {
+    try {
+      return fn();
+    } catch (err) {
+      return `throws ${err.code}`;
+    }
+  };
 
   for (const c of cases) {
-    const core = tmpdir();
+    const config = tmpdir();
+    const copies = path.join(config, "plugins", "cache");
+    const core = c.plugin ? path.join(copies, "career-ops", "2.0.0") : tmpdir();
+    fs.mkdirSync(core, { recursive: true });
     const abs = tmpdir();
-    const subst = (v) => (v === "ABS" ? abs : v);
+    const subst = (v) => (v === "ABS" ? abs : v === "IN_PLUGIN" ? path.join(copies, "other") : v);
 
     fs.copyFileSync(src, path.join(core, "path-resolver.mjs"));
     if (c.marker !== null) fs.writeFileSync(path.join(core, ".career-ops-data"), subst(c.marker));
 
-    const env = Object.fromEntries(Object.entries(c.env).map(([k, v]) => [k, subst(v)]));
+    const env = { CLAUDE_CONFIG_DIR: config, ...Object.fromEntries(Object.entries(c.env).map(([k, v]) => [k, subst(v)])) };
 
     const saved = { ...process.env };
     delete process.env.CAREER_OPS_ROOT;
     delete process.env.CAREER_OPS_DATA_DIR;
+    delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR;
     Object.assign(process.env, env);
 
     let core_answer;
     try {
       // cache-bust: each fixture is a distinct module instance
       const mod = await import(`${pathToFileURL(path.join(core, "path-resolver.mjs")).href}?c=${encodeURIComponent(c.name)}`);
-      core_answer = mod.getCareerOpsRoot();
+      core_answer = answer(() => mod.getCareerOpsRoot());
     } finally {
       for (const k of Object.keys(process.env)) delete process.env[k];
       Object.assign(process.env, saved);
     }
 
-    const web_answer = resolve(core, env);
+    const web_answer = answer(() => resolve(core, env));
     assert.equal(web_answer, core_answer, `disagreement on: ${c.name}`);
+    if (c.expect) assert.equal(web_answer, c.expect, c.name);
   }
 });
