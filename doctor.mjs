@@ -123,6 +123,9 @@ CLIs: ${AGENT_CLIS.join(', ')}`;
 validateFlags(argv, KNOWN_FLAGS, USAGE, { valueFlags: VALUE_FLAGS, requireOperand: true });
 
 const explicitTarget = flagValue(argv, '--target') || null;
+const ROOT_VARS = ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR'];
+// Read before any .env load: a shell value shadows the same line in the .env.
+const hadRootOverride = ROOT_VARS.some((name) => process.env[name]?.trim());
 const projectRoot = explicitTarget || getCareerOpsRoot();
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
@@ -1317,6 +1320,27 @@ function checkEnvFileProfile(root) {
   };
 }
 
+// The root's own .env names a data root. Only the commands that load a .env see
+// it, and only after the load, so one run can read part of its input from each
+// root. A shell value shadows the line, so there is no split then.
+function checkEnvFileRoot(root) {
+  if (explicitTarget || hadRootOverride) return null;
+  let fileEnv;
+  try {
+    fileEnv = dotenv.parse(readFileSync(join(root, '.env')));
+  } catch {
+    return null; // no .env, or unreadable
+  }
+  const name = ROOT_VARS.find((n) => fileEnv[n]?.trim());
+  if (!name) return null;
+  const value = fileEnv[name].trim();
+  return {
+    warn: true,
+    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; scan.mjs, the evaluators and the other commands that load it switch to the other folder partway through a run`,
+    fix: [`Export ${name}=${value} in your shell (or write it to the .career-ops-data marker) so every command uses one folder, or remove it from .env`],
+  };
+}
+
 function checkPrereq(prereq) {
   const { path, fix } = prereq;
   if (emptyYamlPrereqs(projectRoot).includes(prereq)) {
@@ -1711,6 +1735,7 @@ async function main() {
     { pass: true, label: LINKEDIN_DOCTOR_LABEL },
     // checkPrereq already explains the .env case when the profile is missing.
     prereqPresent(projectRoot, { path: 'config/profile.yml' }) ? checkEnvFileProfile(projectRoot) : null,
+    checkEnvFileRoot(projectRoot),
   ].filter(Boolean);
 
   // Network-bound portals.yml reachability probe — only under --strict.
@@ -1984,6 +2009,7 @@ function onboardingState(root) {
   const resumeSidecar = checkResumeSidecar(root);
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
+  const envFileRoot = checkEnvFileRoot(root);
   const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
@@ -1995,6 +2021,7 @@ function onboardingState(root) {
     ...(resumeSidecar?.warn ? [`${resumeSidecar.label}\n→ ${resumeSidecar.fix.join('\n  ')}`] : []),
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
+    ...(envFileRoot ? [`${envFileRoot.label}\n→ ${envFileRoot.fix.join('\n  ')}`] : []),
     ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];

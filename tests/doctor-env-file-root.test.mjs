@@ -1,0 +1,69 @@
+// tests/doctor-env-file-root.test.mjs — doctor warns when the data root's own
+// .env names another data root.
+//
+// Only the commands that load a .env see that line, and only after the load:
+// getCareerOpsRoot() answers one folder before `import('./scan.mjs')` and the
+// other after it. Doctor stays on the root it started from and says so.
+//
+// The root has to be picked by default, not by the environment, so doctor runs
+// from a copy of the tracked code files whose own folder is the data root.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { linkNodeModules, ROOT } from './helpers.mjs';
+
+const base = realpathSync(mkdtempSync(join(tmpdir(), 'career-ops-doctor-env-root-')));
+process.on('exit', () => rmSync(base, { recursive: true, force: true }));
+const copy = join(base, 'checkout');
+const other = join(base, 'other-root');
+const skip = /^(docs|tests|web|dashboard|fonts|examples)\/|^README\.|^CHANGELOG/;
+for (const file of execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf-8' }).split('\0')) {
+  if (!file || skip.test(file) || !existsSync(join(ROOT, file))) continue;
+  mkdirSync(dirname(join(copy, file)), { recursive: true });
+  cpSync(join(ROOT, file), join(copy, file), { verbatimSymlinks: true });
+}
+const depsReason = linkNodeModules(copy);
+mkdirSync(other);
+writeFileSync(join(other, 'cv.md'), '# CV\n');
+
+function doctor(args, extra = {}) {
+  const env = { ...process.env, HOME: base, USERPROFILE: base, ...extra };
+  for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR', 'CAREER_OPS_PROFILE', 'CAREER_OPS_CLI']) {
+    if (!(name in extra)) delete env[name];
+  }
+  const r = spawnSync(process.execPath, [join(copy, 'doctor.mjs'), ...args], { cwd: copy, env, encoding: 'utf-8', timeout: 60000 });
+  if (r.error) throw r.error;
+  return args.includes('--json') ? JSON.parse(r.stdout) : `${r.stdout}${r.stderr}`;
+}
+const rootWarnings = (json) => json.warnings.filter((w) => /\.env sets CAREER_OPS_(ROOT|DATA_DIR)/.test(w));
+
+for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
+  test(`doctor warns that the data root's .env sets ${name}, and stays on its own root`, (t) => {
+    if (depsReason) return t.skip(depsReason);
+    writeFileSync(join(copy, '.env'), `${name}=${other}\n`);
+
+    const [warning] = rootWarnings(doctor(['--json']));
+    assert.ok(warning, 'doctor --json carries no warning for a root set only in .env');
+    assert.ok(warning.includes(other) && warning.includes(copy) && /shell/.test(warning), warning);
+
+    const human = doctor([]);
+    assert.match(human, new RegExp(`\\.env sets ${name}=`));
+    // The human run loads the whole .env; only the other root has a cv.md.
+    assert.match(human, /cv\.md not found/, 'doctor moved to the root the .env names');
+  });
+}
+
+test('doctor says nothing when the shell already names the root', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  writeFileSync(join(copy, '.env'), `CAREER_OPS_ROOT=${other}\n`);
+  assert.deepEqual(rootWarnings(doctor(['--json'], { CAREER_OPS_ROOT: copy })), []);
+});
+
+test('doctor says nothing when the .env names no root', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  writeFileSync(join(copy, '.env'), 'CAREER_OPS_ROOT=\nGEMINI_MODEL=x\n');
+  assert.deepEqual(rootWarnings(doctor(['--json'])), []);
+});
