@@ -12,7 +12,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describeSpawn } from './helpers/describe-spawn.mjs';
+import { describeSpawn, exitedNonZero } from './helpers/describe-spawn.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const COPIED = [
@@ -111,7 +111,7 @@ test('any other data-root failure keeps its stack trace', async () => {
     writeFileSync(join(nextDir, 'package.json'), JSON.stringify({ name: 'next', version: '15.0.0', bin: { next: 'cli.js' } }));
     writeFileSync(join(dir, 'path-resolver.mjs'), "export class UnsafeDataRootError extends Error {}\nexport function getCareerOpsRoot() { throw new TypeError('boom'); }\n");
     const run = await launch(dir);
-    assert.notEqual(run.status, 0, describeSpawn(run));
+    assert.ok(exitedNonZero(run), describeSpawn(run, 'a resolver crash must exit non-zero'));
     assert.match(run.stderr, /TypeError: boom/);
     assert.match(run.stderr, /^\s+at /m);
   } finally {

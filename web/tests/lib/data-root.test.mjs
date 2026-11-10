@@ -203,7 +203,7 @@ test("dataRootRefusal: an override inside a plugin copy comes back as its messag
   const refusal = dataRootRefusal(() => resolve(tmpdir(), { CLAUDE_CONFIG_DIR: config, CAREER_OPS_DATA_DIR: inside }));
   assert.equal(refusal.source, "CAREER_OPS_DATA_DIR");
   assert.ok(refusal.message.includes(inside));
-  assert.match(refusal.message, /remove it to use the default data folder\.$/);
+  assert.match(refusal.message, /with no other override set, career-ops uses its own folder\.$/);
 });
 
 test("dataRootRefusal: any other failure is rethrown, never shown as a refusal", () => {

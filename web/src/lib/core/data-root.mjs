@@ -57,7 +57,7 @@ function explicitRoot(root, source, env, coreRoot) {
   if (!isPluginInstallCopy(root, env)) return root;
   const err = new Error(
     `${source} points inside a Claude Code plugin install (${root}), which Claude Code replaces on every plugin update. ` +
-      `Set it to a folder outside ~/.claude/plugins, or remove it to use ${isPluginInstallCopy(coreRoot, env) ? pluginDefaultDataRoot() : "the default data folder"}.`,
+      `Set it to a folder outside ~/.claude/plugins, or remove it: with no other override set, career-ops uses ${isPluginInstallCopy(coreRoot, env) ? pluginDefaultDataRoot() : "its own folder"}.`,
   );
   err.name = "UnsafeDataRootError";
   err.code = "CAREER_OPS_UNSAFE_DATA_ROOT";
