@@ -24,10 +24,12 @@ export function PortalsView({
   watched,
   missing = false,
   target = "portals.yml",
+  revision = "",
 }: {
   watched: WatchedCompany[];
   missing?: boolean;
   target?: string;
+  revision?: string;
 }) {
   const [res, setRes] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,7 +74,7 @@ export function PortalsView({
         {loading && <span className="text-xs text-faint">Probing each company&apos;s ATS… (~30–60s)</span>}
       </div>
 
-      {!res && watched.length > 0 && <WatchedList watched={watched} />}
+      {!res && watched.length > 0 && <WatchedList watched={watched} revision={revision} />}
 
       {res && !res.available && !res.error && (
         <p className="mt-4 rounded-xl border border-dashed border-border bg-surface/30 p-4 text-sm text-muted">
@@ -162,8 +164,36 @@ function FixAffordance({ company, job, onFix }: { company: string; job?: Job; on
   );
 }
 
-function WatchedList({ watched }: { watched: WatchedCompany[] }) {
-  const scanned = watched.filter((c) => c.enabled).length;
+function WatchedList({ watched, revision: loaded }: { watched: WatchedCompany[]; revision: string }) {
+  const [enabled, setEnabled] = useState(() => watched.map((c) => c.enabled));
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(loaded);
+  const scanned = enabled.filter(Boolean).length;
+
+  async function toggle(i: number) {
+    const next = !enabled[i];
+    const set = (value: boolean) => setEnabled((all) => all.map((v, n) => (n === i ? value : v)));
+    set(next);
+    setPending(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/portals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: watched[i].name, enabled: next, revision }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+      setRevision(body.revision);
+    } catch (e) {
+      set(!next);
+      setError(`${watched[i].name}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <div className="mt-5">
       <p className="text-sm text-muted">
@@ -171,17 +201,30 @@ function WatchedList({ watched }: { watched: WatchedCompany[] }) {
         <span className="tabular-nums">{watched.length - scanned}</span> paused · run a health check to see which boards
         still answer
       </p>
+      {error && (
+        <p role="alert" className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
+          {error}
+        </p>
+      )}
       <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
         {watched.map((c, i) => (
-          <li key={`${i}-${c.name}`} className={cn("flex items-center gap-3 px-4 py-2.5", !c.enabled && "opacity-60")}>
-            <CompanyLogo name={c.name} size={20} />
-            <span className="shrink-0 text-sm font-medium">{c.name}</span>
-            <span className="truncate font-mono text-xs text-faint">{c.host}</span>
-            {!c.enabled && (
-              <span className="ml-auto shrink-0 rounded bg-surface-hover px-1.5 py-0.5 text-[10px] font-semibold text-muted">
-                paused
-              </span>
-            )}
+          <li key={`${i}-${c.name}`} className="flex items-center gap-3 px-4 py-2.5">
+            <div className={cn("flex min-w-0 items-center gap-3", !enabled[i] && "opacity-60")}>
+              <CompanyLogo name={c.name} size={20} />
+              <span className="shrink-0 text-sm font-medium">{c.name}</span>
+              <span className="truncate font-mono text-xs text-faint">{c.host}</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled[i]}
+              aria-label={`Scan ${c.name}`}
+              disabled={pending}
+              onClick={() => toggle(i)}
+              className={cn("relative ml-auto h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60", enabled[i] ? "bg-brand" : "bg-surface-hover")}
+            >
+              <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", enabled[i] ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
+            </button>
           </li>
         ))}
       </ul>

@@ -223,6 +223,71 @@ export function patchPortalFiltersText(source, roles, locations) {
 }
 
 /**
+ * The tracked_companies entries whose `name` is exactly `name`, untrimmed:
+ * zero means no such company, more than one means the edit cannot tell them apart.
+ *
+ * @param {Record<string, unknown>} doc
+ * @param {string} name
+ */
+export function companiesNamed(doc, name) {
+  return (Array.isArray(doc.tracked_companies) ? doc.tracked_companies : []).filter((c) => isMapping(c) && c.name === name);
+}
+
+/**
+ * portals.yml text with one tracked company's `enabled:` set, every other line
+ * byte for byte. Returns null when the name matches zero or several entries,
+ * when the entry is flow style, or when the result does not parse to the
+ * intended document.
+ *
+ * @param {string} source
+ * @param {string} name
+ * @param {boolean} enabled
+ * @returns {string | null}
+ */
+export function setCompanyEnabledText(source, name, enabled) {
+  let doc;
+  try {
+    doc = yaml.load(source);
+  } catch {
+    return null;
+  }
+  if (!isMapping(doc) || companiesNamed(doc, name).length !== 1) return null;
+  const eol = source.includes("\r\n") ? "\r\n" : "\n";
+  const lines = source.split(/\r?\n/);
+  const head = lines.findIndex((l) => /^tracked_companies:\s*(#.*)?$/.test(l));
+  if (head < 0) return null;
+  let end = head + 1;
+  while (end < lines.length && !isTopLevelKey(lines[end])) end++;
+  const valueOf = (rest) => {
+    try {
+      return yaml.load(rest);
+    } catch {
+      return undefined;
+    }
+  };
+  const hits = [];
+  for (let i = head + 1; i < end; i++) {
+    const m = lines[i].match(/^(\s*(?:- )?)name:\s(.*)$/);
+    if (m && valueOf(m[2]) === name) hits.push({ at: i, indent: " ".repeat(m[1].length) });
+  }
+  if (hits.length !== 1) return null;
+  const { at, indent } = hits[0];
+  // The entry's keys sit at the name key's column, and the entry ends at the first line left of it.
+  let stop = at + 1;
+  while (stop < end && (isNote(lines[stop]) || indentOf(lines[stop]) >= indent.length)) stop++;
+  const flag = lines.findIndex((l, i) => i > at && i < stop && l.startsWith(`${indent}enabled:`));
+  if (flag < 0) lines.splice(at + 1, 0, `${indent}enabled: ${enabled}`);
+  else lines[flag] = `${indent}enabled: ${enabled}${(lines[flag].match(/\s+#.*$/) ?? [""])[0]}`;
+  const text = lines.join(eol);
+  companiesNamed(doc, name)[0].enabled = enabled;
+  try {
+    return isDeepStrictEqual(yaml.load(text), doc) ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @typedef {{ name: string, enabled: boolean, host: string }} WatchedCompany
  */
 
@@ -244,6 +309,7 @@ export function watchedCompanies(doc) {
   };
   return list
     .filter((c) => isMapping(c) && typeof c.name === "string" && c.name.trim())
-    .map((c) => ({ name: c.name.trim(), enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api) }))
+    // The exact name: the Portals switch sends it back, and "Acme " is not "Acme".
+    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api) }))
     .sort((a, b) => Number(b.enabled) - Number(a.enabled));
 }
