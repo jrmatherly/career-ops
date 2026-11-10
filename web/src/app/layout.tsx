@@ -4,6 +4,9 @@ import { inter, instrumentSerif, instrumentSerifItalic } from "@/lib/fonts";
 import { AppShell } from "@/components/app-shell";
 import { RouteProgressHost } from "@/components/route-progress-host";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DataRootRefused } from "@/components/data-root-refused";
+import { careerOpsRoot } from "@/lib/career-ops";
+import { dataRootRefusal } from "@/lib/core/data-root.mjs";
 import { readFollowupsEnabled } from "@/lib/followups-server";
 import "./globals.css";
 
@@ -31,7 +34,9 @@ const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('career-ops:the
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   await connection();
-  const followupsEnabled = readFollowupsEnabled();
+  // An expected error, rendered here: thrown from a page, production would
+  // show only a generic message and a digest.
+  const refusal = dataRootRefusal(careerOpsRoot);
   return (
     <html
       lang="en"
@@ -42,7 +47,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <RouteProgressHost />
         <ThemeProvider>
-          <AppShell followupsEnabled={followupsEnabled}>{children}</AppShell>
+          {refusal ? (
+            <DataRootRefused source={refusal.source} root={refusal.root} />
+          ) : (
+            <AppShell followupsEnabled={readFollowupsEnabled()}>{children}</AppShell>
+          )}
         </ThemeProvider>
       </body>
     </html>

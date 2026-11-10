@@ -80,3 +80,25 @@ test('a server that exits during startup is not blamed on the port', async () =>
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a data root inside a plugin install copy is refused in one line, with no stack trace', async () => {
+  const dir = launcherTree();
+  try {
+    const nextDir = join(dir, 'web', 'node_modules', 'next');
+    mkdirSync(nextDir, { recursive: true });
+    writeFileSync(join(nextDir, 'package.json'), JSON.stringify({ name: 'next', version: '15.0.0', bin: { next: 'cli.js' } }));
+    const unsafe = join(dir, 'claude', 'plugins', 'cache', 'career-ops', 'data');
+    const run = spawnSync(process.execPath, [join(dir, 'scripts', 'ui-server.mjs'), '--no-open', `--port=${await freePort()}`], {
+      cwd: dir,
+      encoding: 'utf-8',
+      timeout: 30_000,
+      env: { ...process.env, CLAUDE_CONFIG_DIR: join(dir, 'claude'), CLAUDE_CODE_PLUGIN_CACHE_DIR: '', CAREER_OPS_ROOT: unsafe, CAREER_OPS_WEB_ALLOWED_HOSTS: '' },
+    });
+    assert.equal(run.status, 1, describeSpawn(run));
+    assert.match(run.stderr, /CAREER_OPS_ROOT points inside a Claude Code plugin install/);
+    assert.doesNotMatch(run.stderr, /^\s+at /m);
+    assert.doesNotMatch(run.stdout, /Web UI:|Data root resolved/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

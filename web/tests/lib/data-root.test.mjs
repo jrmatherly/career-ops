@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveDataRoot } from "../../src/lib/core/data-root.mjs";
+import { dataRootRefusal, resolveDataRoot } from "../../src/lib/core/data-root.mjs";
 
 const CORE = path.resolve(import.meta.dirname, "../../..");
 const UNSAFE = "throws CAREER_OPS_UNSAFE_DATA_ROOT";
@@ -189,4 +189,24 @@ test("AGREES with the core's path-resolver.mjs on every branch", async (t) => {
     if (c.expect === UNSAFE) assert.ok(web_answer.startsWith(UNSAFE), `${c.name}: ${web_answer}`);
     else if (c.expect) assert.equal(web_answer, subst(c.expect), c.name);
   }
+});
+
+// ── the refusal as a value the layout can render ─────────────────────────────
+
+test("dataRootRefusal: null when the root resolves", () => {
+  assert.equal(dataRootRefusal(() => "/some/root"), null);
+});
+
+test("dataRootRefusal: an override inside a plugin copy comes back as its message, source and root", () => {
+  const config = tmpdir();
+  const inside = path.join(config, "plugins", "cache", "career-ops", "data");
+  const refusal = dataRootRefusal(() => resolve(tmpdir(), { CLAUDE_CONFIG_DIR: config, CAREER_OPS_DATA_DIR: inside }));
+  assert.equal(refusal.source, "CAREER_OPS_DATA_DIR");
+  assert.equal(refusal.root, inside);
+  assert.match(refusal.message, /points inside a Claude Code plugin install/);
+});
+
+test("dataRootRefusal: any other failure is rethrown, never shown as a refusal", () => {
+  const boom = new Error("disk on fire");
+  assert.throws(() => dataRootRefusal(() => { throw boom; }), boom);
 });

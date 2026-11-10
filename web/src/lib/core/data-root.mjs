@@ -132,3 +132,21 @@ export function resolveDataRoot(coreRoot, readMarker, env, resolve, join) {
 
   return isPluginInstallCopy(coreRoot, env) ? pluginDefaultDataRoot() : coreRoot;
 }
+
+/**
+ * The unsafe-root refusal as a value, for a caller that shows it to the user.
+ * Production strips a thrown server error's message before an error boundary
+ * sees it, so the root layout renders this instead of letting the page throw.
+ *
+ * @param {() => string} resolveRoot A data-root resolver, such as careerOpsRoot.
+ * @returns {{ message: string, source: string, root: string } | null} null when the root resolves.
+ */
+export function dataRootRefusal(resolveRoot) {
+  try {
+    resolveRoot();
+    return null;
+  } catch (err) {
+    if (err?.code !== "CAREER_OPS_UNSAFE_DATA_ROOT") throw err;
+    return { message: err.message, source: err.source, root: err.root };
+  }
+}
