@@ -7,7 +7,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { getCareerOpsRoot } from "../path-resolver.mjs";
+import { UnsafeDataRootError, getCareerOpsRoot } from "../path-resolver.mjs";
 import { isWildcardAddress, planNextRun } from "../web/src/lib/bind-host.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -109,7 +109,14 @@ console.log("\x1b[1m\x1b[36m             Career-ops Local Web UI                
 console.log("\x1b[1m\x1b[36m=====================================================\x1b[0m\n");
 
 // Resolve data root canonically
-const dataRoot = getCareerOpsRoot();
+let dataRoot;
+try {
+  dataRoot = getCareerOpsRoot();
+} catch (err) {
+  if (!(err instanceof UnsafeDataRootError)) throw err;
+  console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+  process.exit(1);
+}
 console.log("\x1b[32m✓\x1b[0m Data root resolved: " + dataRoot);
 
 // Plan Next.js run and resolve bind host from CAREER_OPS_WEB_ALLOWED_HOSTS

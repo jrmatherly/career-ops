@@ -83,7 +83,7 @@ export class UnsafeDataRootError extends Error {
   constructor(root, source) {
     super(
       `${source} points inside a Claude Code plugin install (${root}), which Claude Code replaces on every plugin update. ` +
-      `Set it to a folder outside ~/.claude/plugins, or remove it to use ${pluginDefaultDataRoot()}.`,
+      `Set it to a folder outside ~/.claude/plugins, or remove it: with no other override set, career-ops uses ${isPluginInstallCopy() ? pluginDefaultDataRoot() : 'its own folder'}.`,
     );
     this.name = 'UnsafeDataRootError';
     this.code = 'CAREER_OPS_UNSAFE_DATA_ROOT';

@@ -53,11 +53,11 @@ function pluginDefaultDataRoot() {
 
 // Same refusal, message and code as the core's UnsafeDataRootError: an override
 // names a folder on purpose, so it is refused rather than silently redirected.
-function explicitRoot(root, source, env) {
+function explicitRoot(root, source, env, coreRoot) {
   if (!isPluginInstallCopy(root, env)) return root;
   const err = new Error(
     `${source} points inside a Claude Code plugin install (${root}), which Claude Code replaces on every plugin update. ` +
-      `Set it to a folder outside ~/.claude/plugins, or remove it to use ${pluginDefaultDataRoot()}.`,
+      `Set it to a folder outside ~/.claude/plugins, or remove it: with no other override set, career-ops uses ${isPluginInstallCopy(coreRoot, env) ? pluginDefaultDataRoot() : "its own folder"}.`,
   );
   err.name = "UnsafeDataRootError";
   err.code = "CAREER_OPS_UNSAFE_DATA_ROOT";
@@ -118,7 +118,7 @@ export function resolveDataRoot(coreRoot, readMarker, env, resolve, join) {
   // CAREER_OPS_DATA_DIR when both are set.
   const fromEnv = env.CAREER_OPS_ROOT?.trim() || env.CAREER_OPS_DATA_DIR?.trim();
   if (fromEnv) {
-    return explicitRoot(resolve(coreRoot, fromEnv), env.CAREER_OPS_ROOT?.trim() ? "CAREER_OPS_ROOT" : "CAREER_OPS_DATA_DIR", env);
+    return explicitRoot(resolve(coreRoot, fromEnv), env.CAREER_OPS_ROOT?.trim() ? "CAREER_OPS_ROOT" : "CAREER_OPS_DATA_DIR", env, coreRoot);
   }
 
   const marker = readMarker(join(coreRoot, ".career-ops-data"));
@@ -127,8 +127,26 @@ export function resolveDataRoot(coreRoot, readMarker, env, resolve, join) {
     // An empty or whitespace-only marker is not a root — the core falls through
     // to its default rather than resolving to `coreRoot` by accident, and a
     // disagreement here would be invisible.
-    if (content) return explicitRoot(resolve(coreRoot, content), "The .career-ops-data marker", env);
+    if (content) return explicitRoot(resolve(coreRoot, content), "The .career-ops-data marker", env, coreRoot);
   }
 
   return isPluginInstallCopy(coreRoot, env) ? pluginDefaultDataRoot() : coreRoot;
+}
+
+/**
+ * The unsafe-root refusal as a value, for a caller that shows it to the user.
+ * Production strips a thrown server error's message before an error boundary
+ * sees it, so the root layout renders this instead of letting the page throw.
+ *
+ * @param {() => string} resolveRoot A data-root resolver, such as careerOpsRoot.
+ * @returns {{ message: string, source: string } | null} null when the root resolves.
+ */
+export function dataRootRefusal(resolveRoot) {
+  try {
+    resolveRoot();
+    return null;
+  } catch (err) {
+    if (err?.code !== "CAREER_OPS_UNSAFE_DATA_ROOT") throw err;
+    return { message: err.message, source: err.source };
+  }
 }

@@ -30,8 +30,8 @@ export default function ReportError({
         <div>
           <h1 className="font-display text-2xl tracking-tight text-landing">Report #{id} could not be read</h1>
           <p className="mt-2 text-sm text-muted">
-            The file is there, but the server could not open it. Common causes are its permissions, a sync app
-            holding it, or a folder with a .md name under <code className="text-foreground">reports/</code>.
+            The server hit an error while reading it. If the report file exists, common causes are its permissions, a
+            sync app holding it, or a folder with a .md name under <code className="text-foreground">reports/</code>.
           </p>
           {error.digest && <p className="mt-3 font-mono text-xs text-faint">Error digest {error.digest}</p>}
           <button
