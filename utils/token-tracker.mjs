@@ -1,6 +1,7 @@
 /**
  * utils/token-tracker.mjs — Token tracking and cost estimation for career-ops
  */
+import '../lib/settings-env.mjs';
 
 export const RATES = {
   // MiniMax models (legacy entries remain available for explicit model requests)

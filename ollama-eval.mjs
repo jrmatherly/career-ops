@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 /**
  * ollama-eval.mjs — Ollama-powered Job Offer Evaluator for career-ops
  *

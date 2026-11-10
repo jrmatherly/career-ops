@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 /**
  * openai-tailor.mjs — OpenAI-compatible CV Tailoring for career-ops
  *

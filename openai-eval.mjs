@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 /**
  * openai-eval.mjs — OpenAI-compatible Job Offer Evaluator for career-ops
  *

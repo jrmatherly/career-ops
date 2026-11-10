@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './lib/settings-env.mjs';
 
 /**
  * scan-hn.mjs — Hacker News scanner with Optional AI Enhancement.
