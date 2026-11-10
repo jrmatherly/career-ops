@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pickDefaultInstalled, pickUsableCli } from "../../src/lib/cli-pick.mjs";
@@ -26,6 +26,31 @@ function root(t, envFile) {
   if (envFile !== undefined) writeFileSync(join(dir, ".env"), envFile);
   return dir;
 }
+
+test("readRememberedCli puts the CLI saved from the Settings page ahead of the shell", (t) => {
+  const saved = (text) => {
+    const dir = root(t, "CAREER_OPS_CLI=grok\n");
+    mkdirSync(join(dir, "config"));
+    writeFileSync(join(dir, "config", "settings.json"), text);
+    return dir;
+  };
+  const codex = JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: "codex" } });
+  assert.equal(readRememberedCli(saved(codex), {}), "codex");
+  assert.equal(readRememberedCli(saved(codex), { CAREER_OPS_CLI: "claude" }), "codex");
+  assert.equal(readRememberedCli(saved(codex), { CAREER_OPS_SETTINGS: "OFF", CAREER_OPS_CLI: "claude" }), "claude");
+  assert.equal(readRememberedCli(saved("{not json"), { CAREER_OPS_CLI: "claude" }), "claude");
+  assert.equal(readRememberedCli(saved("{not json"), {}), "grok");
+  assert.equal(readRememberedCli(saved(JSON.stringify({ version: 2, values: { CAREER_OPS_CLI: "codex" } })), {}), "grok");
+  assert.equal(readRememberedCli(saved(JSON.stringify({ version: 1, values: { CAREER_OPS_CLI: 7 } })), {}), "grok");
+});
+
+test("a saved CLI the overlay put in this process's environment does not outlive its reset", (t) => {
+  const mark = (pair) => ({ CAREER_OPS_CLI: "codex", CAREER_OPS_SETTINGS_APPLIED: JSON.stringify({ CAREER_OPS_CLI: pair }) });
+  assert.equal(readRememberedCli(root(t, "CAREER_OPS_CLI=grok\n"), mark(["codex", null])), "grok");
+  assert.equal(readRememberedCli(root(t), mark(["codex", "claude"])), "claude");
+  assert.equal(readRememberedCli(root(t), mark(["kimi", null])), "codex", "the variable changed since the overlay");
+  assert.equal(readRememberedCli(root(t), { CAREER_OPS_CLI: "codex", CAREER_OPS_SETTINGS_APPLIED: "{not json" }), "codex");
+});
 
 test("readRememberedCli reads CAREER_OPS_CLI from the shell, then the data root .env", (t) => {
   assert.equal(readRememberedCli(root(t, "CAREER_OPS_CLI=grok\n"), {}), "grok");

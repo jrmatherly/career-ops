@@ -194,5 +194,5 @@ test("the nav lists /resume right after /config, where PR-06 appended it", () =>
   const source = readFileSync(join(codeRoot, "web", "src", "lib", "nav-items.ts"), "utf8");
   const items = source.slice(source.indexOf("NAV_ITEMS"), source.indexOf("];"));
   const entries = [...items.matchAll(/\{ href: "([^"]+)", label: "([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
-  assert.equal(entries[entries.indexOf("/config Config") + 1], "/resume Resume");
+  assert.equal(entries[entries.indexOf("/config Settings") + 1], "/resume Resume");
 });

@@ -13,6 +13,8 @@ import { CadenceSettings } from "@/components/followups/cadence-settings";
 import { persistCliId, readSavedCliId } from "@/lib/saved-cli";
 import { keepIfInstalled, pickDefaultInstalled } from "@/lib/cli-pick.mjs";
 import { CONFIG_KEY as STORAGE_KEY, writeConfig } from "@/lib/config-events.mjs";
+import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
+import type { SettingsResponse } from "@/lib/settings-form.mjs";
 
 type Cli = {
   id: string;
@@ -32,6 +34,27 @@ const PROVIDERS = [
   { id: "openrouter", label: "OpenRouter" },
 ] as const;
 
+/**
+ * Save the chosen CLI where scheduled and terminal runs read it (CAREER_OPS_CLI
+ * in config/settings.json), so they use the CLI the dashboard does.
+ */
+async function saveCliForScripts(cliId: string): Promise<void> {
+  const loaded = await fetch("/api/settings", { cache: "no-store" });
+  if (!loaded.ok) throw new Error(`the server answered ${loaded.status}`);
+  const current: SettingsResponse = await loaded.json();
+  const row = current.groups.flatMap((g) => g.settings).find((s) => s.id === "CAREER_OPS_CLI");
+  if (!row?.editable || (row.source === "saved" && row.value === cliId)) return;
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision: current.revision, changes: { CAREER_OPS_CLI: cliId } }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.errors?.CAREER_OPS_CLI ?? body.error ?? `the server answered ${res.status}`);
+  }
+  window.dispatchEvent(new Event(SETTINGS_SAVED_EVENT));
+}
 
 export function ConfigForm() {
   const [mode, setMode] = useState<Mode>("cli");
@@ -41,6 +64,7 @@ export function ConfigForm() {
   const [apiKey, setApiKey] = useState("");
   const [logos, setLogos] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [cliSaveError, setCliSaveError] = useState<string | null>(null);
 
   // Load saved prefs
   useEffect(() => {
@@ -95,13 +119,16 @@ export function ConfigForm() {
     writeConfig(localStorage, window, { mode, cliId, provider, logos });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    setCliSaveError(null);
+    // No CLI installed leaves cliId empty, which is not a value the setting takes.
+    if (cliId) saveCliForScripts(cliId).catch((e) => setCliSaveError(e instanceof Error ? e.message : "it could not be saved"));
   }
 
   const installed = clis?.filter((c) => c.installed) ?? [];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
-      <h1 className="font-display text-2xl tracking-tight text-landing">Config</h1>
+      <h1 className="font-display text-2xl tracking-tight text-landing">Settings</h1>
       <p className="mt-1 text-sm text-muted">
         Run career-ops on your own AI, right on your computer. Your CV and data never leave your machine.
       </p>
@@ -308,7 +335,13 @@ export function ConfigForm() {
           {saved ? <Check className="size-4" /> : null}
           {saved ? "Saved" : "Save config"}
         </button>
-        <span className="text-xs text-faint">Local-first · on our roadmap</span>
+        {cliSaveError ? (
+          <span role="alert" className="text-xs text-red-500 dark:text-red-400">
+            Saved in this browser. The AI tool was not saved for scheduled and terminal runs: {cliSaveError}.
+          </span>
+        ) : (
+          <span className="text-xs text-faint">Local-first · on our roadmap</span>
+        )}
       </div>
     </div>
   );
