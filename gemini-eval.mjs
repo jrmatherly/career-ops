@@ -68,7 +68,7 @@ import { loadYaml } from './lib/yaml-document.mjs';
 // ---------------------------------------------------------------------------
 try {
   const { config } = await import('dotenv');
-  config();
+  config({ path: join(getCareerOpsRoot(), '.env'), quiet: true });
 } catch {
   // dotenv is optional — fall back to process.env if not installed
 }

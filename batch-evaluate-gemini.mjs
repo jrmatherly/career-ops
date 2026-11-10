@@ -34,7 +34,7 @@ const execFileAsync = promisify(execFile);
 const BROWSER_PROCESS_ENV = snapshotBrowserProcessEnv();
 try {
   const { config } = await import('dotenv');
-  config();
+  config({ path: join(getCareerOpsRoot(), '.env'), quiet: true });
 } catch {}
 
 import { GoogleGenerativeAI } from '@google/generative-ai';

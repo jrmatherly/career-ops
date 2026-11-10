@@ -18,7 +18,7 @@ const deepEqual = (a, b, label = `assertion ${n + 1}`) => {
 
 const SECRET_IDS = ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'PUBLISH_API_KEY', 'APIFY_TOKEN', 'USAJOBS_API_KEY', 'NOTION_ACCESS_TOKEN', 'GMAIL_CLIENT_ID', 'GMAIL_CLIENT_SECRET', 'GMAIL_REFRESH_TOKEN', 'H1B_API_TOKEN'];
 const READONLY_IDS = ['CAREER_OPS_ROOT', 'CAREER_OPS_SCHEDULER', 'CAREER_OPS_WEB_ALLOWED_HOSTS', 'CAREER_OPS_ALLOWED_ORIGINS', 'ANTHROPIC_BASE_URL', 'PRIVACY_GUARD', 'CAREER_OPS_AUTO_EVALUATE_LOCAL', 'CAREER_OPS_CONNECTION_SCOPE', 'CAREER_OPS_TRUST_PROXY_EGRESS', 'OLLAMA_ALLOW_REMOTE'];
-const DOTENV_IDS = ['CAREER_OPS_SCAN_CONCURRENCY', 'CAREER_OPS_SCAN_HOST_CONCURRENCY', 'CAREER_OPS_HTTP_CACHE', 'CAREER_OPS_HTTP_CACHE_TTL_MS', 'CAREER_OPS_HTTP_TIMEOUT_MS', 'CAREER_OPS_BROWSER_AUTODETECT', 'CAREER_OPS_CLI', 'PUBLISH_URL', 'USAJOBS_USER_AGENT', 'NOTION_PARENT_PAGE_ID'];
+const DOTENV_IDS = ['CAREER_OPS_SCAN_CONCURRENCY', 'CAREER_OPS_SCAN_HOST_CONCURRENCY', 'CAREER_OPS_HTTP_CACHE', 'CAREER_OPS_HTTP_CACHE_TTL_MS', 'CAREER_OPS_HTTP_TIMEOUT_MS', 'CAREER_OPS_BROWSER_AUTODETECT', 'CAREER_OPS_CLI', 'PUBLISH_URL', 'USAJOBS_USER_AGENT', 'NOTION_PARENT_PAGE_ID', 'GEMINI_MODEL', 'OPENAI_BASE_URL', 'OPENAI_MODEL', 'OPENAI_TIMEOUT_MS', 'OLLAMA_MODEL', 'OLLAMA_BASE_URL', 'OLLAMA_NUM_CTX', 'OLLAMA_TIMEOUT_MS'];
 
 const conc = settingById('CAREER_OPS_SCAN_CONCURRENCY');
 
@@ -33,7 +33,7 @@ deepEqual(SETTINGS.filter(s => s.kind === 'secret').length, 14, 'exactly the 14 
 ok(!settingById('PRIVACY_BYPASS_TOKEN') && !settingById('PUBLISH_SECRET'), 'gate tokens and the publish service\'s own secrets are not listed');
 deepEqual(SETTINGS.filter(s => s.kind === 'readonly').map(s => s.id).sort(), [...READONLY_IDS].sort(), 'the 10 read-only deployment rows');
 ok(SETTINGS.filter(s => s.kind === 'readonly').every(s => s.group === 'deployment'), 'read-only rows sit in deployment');
-deepEqual(SETTINGS.filter(s => s.dotenv).map(s => s.id).sort(), [...DOTENV_IDS].sort(), 'dotenv marks the ten ids whose reader loads .env first');
+deepEqual(SETTINGS.filter(s => s.dotenv).map(s => s.id).sort(), [...DOTENV_IDS].sort(), 'dotenv marks the eighteen ids whose reader loads .env first');
 deepEqual(settingById('ANTHROPIC_BASE_URL').display, 'origin', 'a base URL shows its origin only');
 deepEqual(SETTINGS.filter(s => s.display === 'value').map(s => s.id).sort(), ['CAREER_OPS_ALLOWED_ORIGINS', 'CAREER_OPS_CONNECTION_SCOPE', 'CAREER_OPS_ROOT', 'CAREER_OPS_SCHEDULER', 'CAREER_OPS_WEB_ALLOWED_HOSTS'], 'rows that show their value');
 ok(SETTINGS.filter(s => s.kind === 'readonly' || s.kind === 'secret').every(s => s.display || s.kind === 'secret'), 'every read-only row says how it displays');
