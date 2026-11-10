@@ -1327,11 +1327,10 @@ function checkEnvFileProfile(root) {
   };
 }
 
-// The root's own .env names a data root. Only the commands that load a .env see
-// it, and only after the load, so one run can read part of its input from each
-// root. The check works out which variable names the root once the file is
-// loaded: CAREER_OPS_ROOT outranks CAREER_OPS_DATA_DIR, so a shell
-// CAREER_OPS_DATA_DIR does not shadow a CAREER_OPS_ROOT line.
+// The root's own .env names a data root or, under a dotenv override, clears the
+// one the shell names. Only the commands that load a .env see that, and only
+// after the load, so one run can read part of its input from each root. The
+// check asks path-resolver.mjs for the root as it will be once the file is loaded.
 function checkEnvFileRoot(root) {
   if (explicitTarget) return null;
   let fileEnv;
@@ -1340,16 +1339,31 @@ function checkEnvFileRoot(root) {
   } catch {
     return null; // no .env, or unreadable
   }
-  const loaded = dotenvOverride ? { ...shellRootEnv, ...fileEnv } : { ...fileEnv, ...shellRootEnv };
-  const name = ROOT_VARS.find((n) => loaded[n]?.trim());
-  const fromFile = dotenvOverride ? name in fileEnv : !(name in shellRootEnv);
-  if (!name || !fromFile) return null;
-  const value = loaded[name].trim();
-  // path-resolver.mjs resolves the value against the code folder.
-  if (resolve(__dirname, value) === resolve(root)) return null;
+  // The lines a load applies: all of them under an override, else those the shell leaves unset.
+  const applied = ROOT_VARS.filter((n) => n in fileEnv && (dotenvOverride || !(n in shellRootEnv)));
+  if (!applied.length) return null;
+  const current = ROOT_VARS.map((n) => [n, process.env[n]]);
+  const setRootVars = (pairs) => {
+    for (const [n, value] of pairs) {
+      if (value === undefined) delete process.env[n];
+      else process.env[n] = value;
+    }
+  };
+  let after = null;
+  try {
+    setRootVars(ROOT_VARS.map((n) => [n, applied.includes(n) ? fileEnv[n] : shellRootEnv[n]]));
+    after = getCareerOpsRoot();
+  } catch {
+    // path-resolver.mjs refuses the folder the line names: still not this root.
+  } finally {
+    setRootVars(current);
+  }
+  if (after && resolve(after) === resolve(root)) return null;
+  const name = applied.find((n) => fileEnv[n].trim()) ?? applied[0];
+  const value = fileEnv[name].trim();
   return {
     warn: true,
-    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use the other folder from then on`,
+    label: `.env sets ${name}=${value}, but most commands never load .env and keep using ${root}; the evaluators, and any command that looks the folder up again after it or scan.mjs has loaded the file, use ${after ?? 'the folder it names'} from then on`,
     fix: [dotenvOverride
       ? `Remove it from .env: with DOTENV_OVERRIDE or DOTENV_CONFIG_OVERRIDE on, the line replaces a value exported in the shell`
       : `Export ${name}=${value} in your shell (or write it to a .career-ops-data file in ${__dirname}) so every command uses one folder, or remove it from .env`],

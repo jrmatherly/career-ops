@@ -59,7 +59,7 @@ for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
     assert.ok(warning, 'doctor --json carries no warning for a root set only in .env');
     assert.ok(warning.includes(other), warning);
     assert.ok(warning.includes(copy), warning);
-    assert.match(warning, /shell/);
+    assert.match(warning, /Export .* in your shell/);
 
     const human = doctor([]);
     assert.match(human, new RegExp(`\\.env sets ${name}=`));
@@ -120,7 +120,26 @@ for (const flag of ['DOTENV_OVERRIDE', 'DOTENV_CONFIG_OVERRIDE']) {
   });
 }
 
-test('doctor treats DOTENV_OVERRIDE=false as off', (t) => {
+test('doctor treats dotenv\'s off values as off', (t) => {
   if (depsReason) return t.skip(depsReason);
-  silent(`CAREER_OPS_ROOT=${other}\n`, [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: 'false' });
+  for (const off of ['false', 'OFF', '0', '']) {
+    silent(`CAREER_OPS_ROOT=${other}\n`, [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: off });
+  }
+});
+
+test('doctor warns when an override lets an empty line clear the root the shell names', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  const shellRoot = join(base, 'shell-root');
+  mkdirSync(shellRoot, { recursive: true });
+  writeFileSync(join(shellRoot, '.env'), 'CAREER_OPS_ROOT=\n');
+  const [warning] = rootWarnings(doctor(['--json'], { CAREER_OPS_ROOT: shellRoot, DOTENV_OVERRIDE: 'true' }));
+  assert.ok(warning, 'no warning for a root the .env clears');
+  // With the shell value cleared, the root falls back to the code folder.
+  assert.ok(warning.includes(`use ${copy} from then on`), warning);
+  assert.match(warning, /Remove it from \.env/);
+});
+
+test('doctor says nothing when the cleared root falls back to the same folder', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  silent('CAREER_OPS_ROOT=\n', [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: 'true' });
 });
