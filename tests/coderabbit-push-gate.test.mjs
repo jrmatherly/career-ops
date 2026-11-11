@@ -37,7 +37,7 @@ function scratchRepo(t) {
   return { repo, git, run, commit };
 }
 
-const event = (findings, extra = {}) => `{"type":"heartbeat"}\n${JSON.stringify({ type: 'complete', findings, outcome: 'completed', gate: { status: findings ? 'blocked' : 'passed' }, ...extra })}\n`;
+const event = (findings, extra = {}) => `{"type":"heartbeat"}\n${JSON.stringify({ type: 'complete', status: 'review_completed', findings, outcome: 'completed', gate: { status: findings ? 'blocked' : 'passed' }, ...extra })}\n`;
 const reviewWith = (findings, status = findings ? 2 : 0) => () => ({ status, stdout: event(findings) });
 const line = (sha, branch = 'feat', local = `refs/heads/${branch}`) => `${local} ${sha} refs/heads/${branch} ${ZERO}\n`;
 const plant = (repo, sha, body) => {
@@ -142,6 +142,7 @@ test('a review that failed, covered part of the diff or contradicts its exit sta
     'a file left unreviewed': { status: 0, stdout: event(0, { outcome: 'completed_with_warnings', unreviewedFileCount: 1 }) },
     'a clean event behind a failing exit': { status: 1, stdout: event(0) },
     'a clean event behind the gate exit': { status: 2, stdout: event(0) },
+    'a scope with nothing to review': { status: 0, stdout: event(0, { status: 'review_skipped', message: 'No changes detected' }) },
     'a gate with no result': { status: 0, stdout: event(0, { gate: { status: 'incomplete' } }) },
     'a missing CLI': { status: null, error: Object.assign(new Error('spawnSync coderabbit ENOENT'), { code: 'ENOENT' }) },
     'a killed review': { status: null, signal: 'SIGTERM', stdout: '' },

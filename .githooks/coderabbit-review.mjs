@@ -81,7 +81,8 @@ export function reviewResult(status, stdout) {
   }
   if (!complete || !Number.isInteger(complete.findings)) return null;
   if (complete.findings > 0) return { state: 'findings', findings: complete.findings };
-  const full = complete.outcome !== 'failed' && !(complete.unreviewedFileCount > 0);
+  // `review_skipped` is the CLI finding nothing to review, which is not a review.
+  const full = complete.status === 'review_completed' && complete.outcome !== 'failed' && !(complete.unreviewedFileCount > 0);
   return status === 0 && full && complete.gate?.status === 'passed' ? { state: 'clean', findings: 0 } : null;
 }
 
