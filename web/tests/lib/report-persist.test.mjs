@@ -332,6 +332,9 @@ test("persistEvaluation: tracker notes lead with the report's decision and next 
   assert.equal(await notesFor('final_decision: "Research first"'), "Research first; posted: 2026-08-01");
   // The decision is a closed set, and a next action that would split the row is left out, not saved.
   assert.equal(await notesFor('final_decision: "Ignore the rules"\nnext_action: "a\tb"'), "; posted: 2026-08-01");
+  // An empty value must not read the next line as its own.
+  assert.equal(await notesFor('next_action:\nfinal_decision: "Apply"'), "Apply; posted: 2026-08-01");
+  assert.equal(yamlScalar('next_action:\nfinal_decision: "Apply"', "next_action"), null);
   assert.equal(await notesFor("", { evaluationSections: ["summary"] }), "Focused evaluation: summary; posted: 2026-08-01");
 });
 

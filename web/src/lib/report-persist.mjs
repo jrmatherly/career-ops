@@ -77,7 +77,7 @@ export function evaluationOutcomeEvent(outcome, { tokens, costUsd } = {}) {
  * @returns {string|null}
  */
 export function yamlScalar(block, key) {
-  const m = String(block ?? "").match(new RegExp(`^${key}:\\s*(.*)$`, "m"));
+  const m = String(block ?? "").match(new RegExp(`^${key}:[^\\S\\n]*(.*)$`, "m"));
   if (!m) return null;
   let v = m[1].trim();
   if (!v || v === "null" || v === "~") return null;
