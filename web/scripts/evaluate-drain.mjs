@@ -187,7 +187,7 @@ export async function runDrain({
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
   // Each run this drain wrote a row for, with the change to its stop message: set by a
-  // stop, cleared by an evaluation that got an answer, left alone by a row that only waited.
+  // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
   const touchedRuns = new Map();
   let status = "drained";
 
@@ -245,7 +245,9 @@ export async function runDrain({
         timeoutMs: runTimeoutMs,
       }));
       await append(outcome.state, outcome.reason);
-      touchedRuns.get(entry.runId).drainMessage = outcome.stop && `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
+      const note = touchedRuns.get(entry.runId);
+      if (outcome.stop) note.drainMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
+      else if (outcome.state !== "queued") note.drainMessage = undefined;
       if (outcome.stop) {
         status = outcome.stop === "offline" ? "offline" : "stopped";
         log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
@@ -261,13 +263,18 @@ export async function runDrain({
 
 /**
  * Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up,
- * and its stop message, which a drain that gets through clears.
+ * and its stop message, which a finished evaluation clears. So does a run with no row left
+ * to try, or the message would outlive the rows it is about.
  */
 async function recordDrainCounts(root, storePath, runs, nowMs) {
   const entries = readLedger(root, { now: nowMs });
   for (const [runId, message] of runs) {
     const own = entries.filter((entry) => entry.runId === runId);
     const count = (state) => own.filter((entry) => entry.state === state).length;
-    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"), ...message });
+    const waiting = own.some((entry) => !entry.final);
+    await recordStepCounts(storePath, runId, {
+      evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"),
+      ...(waiting ? message : { drainMessage: message.drainMessage }),
+    });
   }
 }

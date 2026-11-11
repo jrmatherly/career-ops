@@ -283,7 +283,8 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
   row's three tries. The rest stay queued for the next tick.
 - **The run history says why.** When a batch stops, or the dashboard was
   offline, the scheduled run in the dashboard's run history shows the reason
-  until a later tick evaluates that run's rows.
+  until a later tick finishes an evaluation for that run, or the run has no
+  row left to try.
 
 Check the queue with `node evaluate-queue.mjs dump --json`.
 
