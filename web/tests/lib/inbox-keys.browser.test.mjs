@@ -42,6 +42,34 @@ test("select all checks only the rows the filter leaves listed", { skip: liveSer
   assert.deepEqual(errors, []);
 });
 
+// Writes nothing either: it never presses a bulk action.
+test("a filter that hides a checked row unchecks it", { skip: liveServerSkip("INBOX_KEYS_TEST_URL", "INBOX_KEYS_TEST_ROOT"), timeout: 60_000 }, async (t) => {
+  const origin = new URL(url);
+  assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname));
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const checkbox = (company) => page.locator("li").filter({ hasText: company }).getByRole("checkbox");
+  const filter = page.getByPlaceholder("Filter by company or role…");
+  const bulkSkip = page.getByRole("button", { name: "Skip selected", exact: true });
+
+  await settled(page, () => page.goto(`${origin.origin}/pipeline`));
+  await checkbox("Fixture Alpha").click();
+  await bulkSkip.waitFor();
+  await filter.fill("Designer");
+  await checkbox("Fixture Alpha").waitFor({ state: "hidden" });
+  await checkbox("Fixture Beta").waitFor();
+  await bulkSkip.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => assert.fail("Skip selected still reaches a row the filter hid"));
+
+  await filter.fill("");
+  await checkbox("Fixture Alpha").waitFor();
+  assert.equal(await checkbox("Fixture Alpha").isChecked(), false, "the hidden row came back checked");
+  assert.deepEqual(errors, []);
+});
+
 test("inbox keys act on the cursor row and on checked rows", { skip: liveServerSkip("INBOX_KEYS_TEST_URL", "INBOX_KEYS_TEST_ROOT"), timeout: 120_000 }, async (t) => {
   const origin = new URL(url);
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname));

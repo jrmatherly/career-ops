@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithout, typingFromTarget } from "../../src/lib/inbox-keys.mjs";
+import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithin, selectionWithout, typingFromTarget } from "../../src/lib/inbox-keys.mjs";
 
 test("j and k move, s saves, and x skips the focused posting", () => {
   assert.equal(inboxCommand({ key: "j" }), "next");
@@ -70,6 +70,14 @@ test("select all checks every listed posting and keeps the checks already there"
   assert.deepEqual([...next].sort(), ["https://example.com/a", "https://example.com/b", "https://example.com/off-list"]);
   assert.equal(selectionWithAll(next, urls), next, "nothing new keeps the same set");
   assert.equal(selectionWithAll(selected, []), selected);
+});
+
+test("a row that leaves the list loses its check and the listed ones keep theirs", () => {
+  const selected = new Set(["https://example.com/a", "https://example.com/off-list"]);
+  const next = selectionWithin(selected, ["https://example.com/a", "https://example.com/b"]);
+  assert.deepEqual([...next], ["https://example.com/a"]);
+  assert.equal(selectionWithin(next, ["https://example.com/a"]), next, "nothing dropped keeps the same set");
+  assert.equal(selectionWithin(selected, []).size, 0);
 });
 
 test("skipping the focused row leaves the cursor on the row that slides up", () => {
