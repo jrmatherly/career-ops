@@ -42,7 +42,7 @@ test("select all checks only the rows the filter leaves listed", { skip: liveSer
   assert.deepEqual(errors, []);
 });
 
-// Writes nothing either: it never presses a bulk action.
+// Writes nothing either while it passes: its Shift+X has no checked row to skip.
 test("a filter that hides a checked row unchecks it", { skip: liveServerSkip("INBOX_KEYS_TEST_URL", "INBOX_KEYS_TEST_ROOT"), timeout: 60_000 }, async (t) => {
   const origin = new URL(url);
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname));
@@ -63,6 +63,12 @@ test("a filter that hides a checked row unchecks it", { skip: liveServerSkip("IN
   await checkbox("Fixture Alpha").waitFor({ state: "hidden" });
   await checkbox("Fixture Beta").waitFor();
   await bulkSkip.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => assert.fail("Skip selected still reaches a row the filter hid"));
+
+  // Focus leaves the filter so Shift+X is a key command, then it must skip nothing.
+  await page.locator("h1").first().click();
+  await page.keyboard.press("Shift+X");
+  await page.waitForTimeout(300);
+  assert.ok(!fs.readFileSync(path.join(root, "data/pipeline.md"), "utf8").includes("[x]"), "Shift+X skipped a row the filter hid");
 
   await filter.fill("");
   await checkbox("Fixture Alpha").waitFor();
