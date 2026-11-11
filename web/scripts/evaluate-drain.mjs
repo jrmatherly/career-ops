@@ -33,7 +33,10 @@ const HEALTH_TIMEOUT_MS = 5_000;
 const TERMINAL = new Set(["done", "gated", "error"]);
 
 const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate?.mode === "auto");
-const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg);
+// A gateway's 429 names neither a quota nor a rate limit: Claude Code reports
+// "Request rejected (429)", and CLIProxyAPI says its seats are "cooling down".
+const GATEWAY_LIMIT_RE = /request rejected \(429\)|cooling down/i;
+const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg) || GATEWAY_LIMIT_RE.test(msg);
 const log = (line) => process.stderr.write(`drain: ${line}\n`);
 
 const keySet = (urls) => new Set(urls.map(normalizeUrl).filter(Boolean));
