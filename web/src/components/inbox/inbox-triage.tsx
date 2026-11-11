@@ -265,7 +265,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
       return n;
     });
   const saveSelected = () => {
-    const add = enriched
+    const add = visible
       .filter((e) => selected.has(e.job.url) && !isShortlisted(e.job.url))
       .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role }));
     if (add.length) setShortlist((s) => [...s, ...add]);
@@ -300,7 +300,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
     ).finally(() => router.refresh());
   };
   const skipSelected = () => {
-    const jobs = skippableJobs(enriched.filter((e) => selected.has(e.job.url)).map((e) => e.job), scoreByUrl);
+    const jobs = skippableJobs(visible.filter((e) => selected.has(e.job.url)).map((e) => e.job), scoreByUrl);
     skipUrls(jobs, `Skipped ${jobs.length}`);
   };
 
