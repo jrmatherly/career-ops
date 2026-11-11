@@ -38,6 +38,7 @@ const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" &
 const GATEWAY_LIMIT_RE = /request rejected \(429\)|cooling down/i;
 const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg) || GATEWAY_LIMIT_RE.test(msg);
 const log = (line) => process.stderr.write(`drain: ${line}\n`);
+const messageOf = (error) => (error instanceof Error ? error.message : String(error));
 
 const keySet = (urls) => new Set(urls.map(normalizeUrl).filter(Boolean));
 
@@ -191,68 +192,85 @@ export async function runDrain({
   const touchedRuns = new Map();
   let status = "drained";
 
-  jobs: for (const job of jobs) {
-    const tried = new Set();
-    let started = 0;
-    for (let entry; (entry = planFor(job, tried, started)[0]);) {
-      tried.add(entry.key);
-      const { url } = entry;
-      const append = async (state, reason = "") => {
-        await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
-        if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, {});
-        if (state !== "running") counts[state] += 1;
-      };
-      if (!online) {
-        if (entry.state !== "queued" || entry.reason !== "dashboard-offline") await append("queued", "dashboard-offline");
-        // Set on every offline tick, not only with the row: an evaluation in between may have cleared it.
-        touchedRuns.set(entry.runId, { drainMessage: "The dashboard did not answer, so nothing was evaluated. Queued rows wait." });
-        status = "offline";
-        continue;
-      }
-      persisted ??= persistedKeys(root);
-      const skip = skipReason(root, entry.key, persisted);
-      if (skip) {
-        await append("skipped", skip);
-        continue;
-      }
-      if (!JD_TEXT_API_ATS.has(resolveAtsApi(url)?.ats)) {
-        await append("skipped", "no-api-text");
-        continue;
-      }
-      let jd = null;
-      let why = "the ATS API returned no text";
-      try {
-        jd = await fetchJd(url);
-      } catch (error) {
-        why = error instanceof Error ? error.message : String(error);
-      }
-      // The route refuses a NUL, which argv cannot carry; with it in, the same row would be refused every tick.
-      const jdText = jd?.text?.replaceAll("\0", "");
-      if (!jdText?.trim()) {
-        log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
-        // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
-        // Compared in the form the ledger stores, or a message with a newline would never match.
-        const reason = tsvCell(`no-text: ${why}`);
-        if (entry.reason !== reason) await append("queued", reason);
-        continue;
-      }
+  let current;
+  let lastRunId;
+  try {
+    jobs: for (const job of jobs) {
+      const tried = new Set();
+      let started = 0;
+      for (let entry; (entry = planFor(job, tried, started)[0]); current = undefined) {
+        current = entry;
+        tried.add(entry.key);
+        const { url } = entry;
+        const append = async (state, reason = "") => {
+          await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
+          if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, {});
+          lastRunId = entry.runId;
+          if (state !== "running") counts[state] += 1;
+        };
+        if (!online) {
+          if (entry.state !== "queued" || entry.reason !== "dashboard-offline") await append("queued", "dashboard-offline");
+          // Set on every offline tick, not only with the row: an evaluation in between may have cleared it.
+          touchedRuns.set(entry.runId, { drainMessage: "The dashboard did not answer, so nothing was evaluated. Queued rows wait." });
+          status = "offline";
+          continue;
+        }
+        persisted ??= persistedKeys(root);
+        const skip = skipReason(root, entry.key, persisted);
+        if (skip) {
+          await append("skipped", skip);
+          continue;
+        }
+        if (!JD_TEXT_API_ATS.has(resolveAtsApi(url)?.ats)) {
+          await append("skipped", "no-api-text");
+          continue;
+        }
+        let jd = null;
+        let why = "the ATS API returned no text";
+        try {
+          jd = await fetchJd(url);
+        } catch (error) {
+          why = error instanceof Error ? error.message : String(error);
+        }
+        // The route refuses a NUL, which argv cannot carry; with it in, the same row would be refused every tick.
+        const jdText = jd?.text?.replaceAll("\0", "");
+        if (!jdText?.trim()) {
+          log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
+          // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
+          // Compared in the form the ledger stores, or a message with a newline would never match.
+          const reason = tsvCell(`no-text: ${why}`);
+          if (entry.reason !== reason) await append("queued", reason);
+          continue;
+        }
 
-      await append("running");
-      started += 1;
-      const outcome = outcomeOf(await request(baseUrl, "/api/run", {
-        body: { kind: "evaluate-text", input: url, cliId: "claude", jdText },
-        timeoutMs: runTimeoutMs,
-      }));
-      await append(outcome.state, outcome.reason);
-      const note = touchedRuns.get(entry.runId);
-      if (outcome.stop) note.drainMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
-      else if (outcome.state !== "queued") note.drainMessage = undefined;
-      if (outcome.stop) {
-        status = outcome.stop === "offline" ? "offline" : "stopped";
-        log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
-        break jobs;
+        await append("running");
+        started += 1;
+        const outcome = outcomeOf(await request(baseUrl, "/api/run", {
+          body: { kind: "evaluate-text", input: url, cliId: "claude", jdText },
+          timeoutMs: runTimeoutMs,
+        }));
+        await append(outcome.state, outcome.reason);
+        const note = touchedRuns.get(entry.runId);
+        if (outcome.stop) note.drainMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
+        else if (outcome.state !== "queued") note.drainMessage = undefined;
+        if (outcome.stop) {
+          status = outcome.stop === "offline" ? "offline" : "stopped";
+          log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
+          break jobs;
+        }
       }
     }
+  } catch (error) {
+    // What this drain finished still counts on its runs, and one run says why it stopped: the
+    // failing row's, or between rows the last one this drain wrote to.
+    const runId = current?.runId ?? lastRunId;
+    if (runId) touchedRuns.set(runId, { drainMessage: `The drain failed${current ? ` at ${current.url}` : ""} and the rest stay queued: ${messageOf(error)}` });
+    try {
+      await recordDrainCounts(root, storePath, touchedRuns, now());
+    } catch (recordError) {
+      log(`the failed drain was not recorded on its run: ${messageOf(recordError)}`);
+    }
+    throw error;
   }
 
   await recordDrainCounts(root, storePath, touchedRuns, now());
