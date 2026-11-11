@@ -9,7 +9,7 @@ import type { InboxJob } from "@/lib/career-ops";
 import type { AtsSource } from "@/lib/explore";
 import { ATS_SOURCES } from "@/lib/explore";
 import { daysSince, seniorityFromTitle, sourceFromUrl, SENIORITY_ORDER, type Seniority } from "@/lib/inbox";
-import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
+import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithin, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
 import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips } from "./facet-chips";
@@ -182,8 +182,13 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
 
   const anyFacet = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
   const capped = !showAll && !anyFacet;
-  const visible = capped ? ordered.slice(0, BATCH) : ordered;
+  const visible = useMemo(() => (capped ? ordered.slice(0, BATCH) : ordered), [capped, ordered]);
   const hiddenCount = hidden.length;
+
+  // A bulk action must never reach a row the filters took off the list.
+  useEffect(() => {
+    setSelected((current) => selectionWithin(current, visible.map((e) => e.job.url)));
+  }, [visible]);
 
   useEffect(() => {
     setCursor((index) => (visible.length === 0 ? -1 : index < 0 ? index : Math.min(index, visible.length - 1)));
@@ -260,7 +265,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
       return n;
     });
   const saveSelected = () => {
-    const add = enriched
+    const add = visible
       .filter((e) => selected.has(e.job.url) && !isShortlisted(e.job.url))
       .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role }));
     if (add.length) setShortlist((s) => [...s, ...add]);
@@ -295,7 +300,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
     ).finally(() => router.refresh());
   };
   const skipSelected = () => {
-    const jobs = skippableJobs(enriched.filter((e) => selected.has(e.job.url)).map((e) => e.job), scoreByUrl);
+    const jobs = skippableJobs(visible.filter((e) => selected.has(e.job.url)).map((e) => e.job), scoreByUrl);
     skipUrls(jobs, `Skipped ${jobs.length}`);
   };
 

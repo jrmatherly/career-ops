@@ -49,6 +49,13 @@ export function selectionWithAll(selected, urls) {
   return new Set([...selected, ...urls]);
 }
 
+/** Keep only the checks on listed postings. The same set comes back when nothing drops. */
+export function selectionWithin(selected, urls) {
+  const listed = new Set(urls);
+  const next = new Set([...selected].filter((url) => listed.has(url)));
+  return next.size === selected.size ? selected : next;
+}
+
 /** The removed row left the list. An earlier removal shifts the cursor up. The focused removal stays put, on the row that slid into that slot. */
 export function cursorAfterRemoval(index, removedIndex) {
   if (removedIndex < index) return index - 1;
