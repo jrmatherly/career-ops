@@ -1,5 +1,57 @@
 # Changelog
 
+## [1.1.0](https://github.com/jrmatherly/career-ops/compare/web-v1.0.0...web-v1.1.0) (2026-11-11)
+
+
+### Features
+
+* Inbox select-all and a doctor warning for a missing data root ([b565c7d](https://github.com/jrmatherly/career-ops/commit/b565c7d1350c42710c063439ddb879d4a861ba23))
+* **portals:** turn a tracked company on or off from the Portals page ([e18147d](https://github.com/jrmatherly/career-ops/commit/e18147d63710c9ac6b6afb44612841862d4da328))
+* **settings:** apply saved settings over the environment in every reader ([6581b36](https://github.com/jrmatherly/career-ops/commit/6581b360077836a17d7103ce1ec53d2fed68782f))
+* **settings:** apply saved settings over the environment in every reader ([8d2e1d2](https://github.com/jrmatherly/career-ops/commit/8d2e1d279313b8a91a3242669bac4eabe47d3326))
+* **settings:** company switches, model runners and plugin status ([ff2300a](https://github.com/jrmatherly/career-ops/commit/ff2300a4f575ec4a9e0ea7ccd2fb689a15ed77b3))
+* **settings:** edit top-level profile and portals keys without losing comments ([2ee0cbc](https://github.com/jrmatherly/career-ops/commit/2ee0cbca8a8b83fda523d7e1327d55c1afcafe2a))
+* **settings:** plugin status on the Settings page ([4b58534](https://github.com/jrmatherly/career-ops/commit/4b585342e80eab702d465b93f8d1325fd39f0669))
+* **settings:** profile preferences and scan filters on the Settings page ([f994c30](https://github.com/jrmatherly/career-ops/commit/f994c30041e8509c0f4bbdc930a58d535753b62e))
+* **settings:** profile preferences and scan filters on the Settings page ([9cf58c5](https://github.com/jrmatherly/career-ops/commit/9cf58c50130ada4895d0e6ba855845e4a7c4cd9f))
+* **settings:** save profile and portals settings from /api/settings ([bdae8ff](https://github.com/jrmatherly/career-ops/commit/bdae8ff94b7153e4d34aa3df8275a5b9e617c704))
+* **settings:** Settings page and /api/settings (Settings UI PR 2 of 4) ([66ae715](https://github.com/jrmatherly/career-ops/commit/66ae71526280b75b506c4809accfd9a5774f0729))
+* **settings:** Settings page and /api/settings for saved environment settings ([834e066](https://github.com/jrmatherly/career-ops/commit/834e06685748ca664fcd04236bc4767eb4248110))
+* **web:** select every listed inbox row at once ([47a13cd](https://github.com/jrmatherly/career-ops/commit/47a13cd361f83188af6c1ed179ae304107ce1701))
+
+
+### Bug Fixes
+
+* **path-resolver:** compare whole path segments when checking for a plugin copy ([557f7ed](https://github.com/jrmatherly/career-ops/commit/557f7ed96315ccd2b68068a794bc46fc4bfece3c))
+* **path-resolver:** say what removing a refused override falls back to ([42b8eb7](https://github.com/jrmatherly/career-ops/commit/42b8eb7c5ed22722e7f3775c8c608f9fa174b88d))
+* **portals:** keep focus on a pending switch, and show what a plugin can reach before it is turned on ([bf24beb](https://github.com/jrmatherly/career-ops/commit/bf24beb0c50d5b4aef3052ff63619652ac256e4e))
+* **settings:** act on the PR review of the saved-settings overlay ([b5fb1c8](https://github.com/jrmatherly/career-ops/commit/b5fb1c881603b50b470d81e7190021244fb289ad))
+* **settings:** call the page Settings wherever the dashboard names it ([e23a67f](https://github.com/jrmatherly/career-ops/commit/e23a67f4e88c2662de8b72cb4c119bd557b13994))
+* **settings:** find the Settings page in the command palette by its path ([61c2d93](https://github.com/jrmatherly/career-ops/commit/61c2d930d8818d7ccf693f91e54caa7ba2342152))
+* **settings:** keep line endings, switch an entry whose enabled comes first, and report a broken plugins.yml ([f2f336d](https://github.com/jrmatherly/career-ops/commit/f2f336d0834deae92a7a74b6aea775e6d4cbfe06))
+* **settings:** keep list entries, their comments and their place when a list is saved ([16d38bf](https://github.com/jrmatherly/career-ops/commit/16d38bf69de7cb3eced6283d92a8166d5a7ac485))
+* **settings:** leave a list the page cannot show to the file, and say why a field cannot be cleared ([fe33123](https://github.com/jrmatherly/career-ops/commit/fe33123d9bc4f719a3734d30faacf62f6a4fc69e))
+* **settings:** report failed saves and unreadable files, and keep a mistyped number from resetting ([5486f84](https://github.com/jrmatherly/career-ops/commit/5486f84e80a337351a4359c27be446dc6c475bb6))
+* **web:** a limit stop leaves the row queued with its retries ([ec38d13](https://github.com/jrmatherly/career-ops/commit/ec38d137fc47fa9379b6d2ce3f246ec3c5563a62))
+* **web:** a row that times out on its last try leaves no stop reason behind ([4b86d68](https://github.com/jrmatherly/career-ops/commit/4b86d689e3dc873b33547037fdfc1e7298327a62))
+* **web:** a run cut off at the time limit stops the evaluate drain ([5bb285c](https://github.com/jrmatherly/career-ops/commit/5bb285c34165b9beeb97c609f8f38530ebed1571))
+* **web:** a tick that only re-queues a row keeps the drain's stop reason ([3044cd4](https://github.com/jrmatherly/career-ops/commit/3044cd49462b66c56789cbbc1c8fe1cead7485b2))
+* **web:** a timed-out evaluation stops the drain, and the run history says why a batch stopped ([82b6ab8](https://github.com/jrmatherly/career-ops/commit/82b6ab8c4285d220ed2abd32a61deeadb998d353))
+* **web:** an offline tick names itself on the run every time ([472ab2c](https://github.com/jrmatherly/career-ops/commit/472ab2c687c633a105bc177eadfebf8c7874ed58))
+* **web:** bulk inbox actions never reach a row a filter hid ([a3c7f20](https://github.com/jrmatherly/career-ops/commit/a3c7f209ab9cd6b01859c71c62da6026d3386f26))
+* **web:** bulk inbox actions read the listed rows ([7115108](https://github.com/jrmatherly/career-ops/commit/711510846589a08ee6829d128e8e3f5148b069d1))
+* **web:** find a page in the command palette by its full path ([7d035b8](https://github.com/jrmatherly/career-ops/commit/7d035b8319f386a815bb9e6353f1ef4cc47ea191))
+* **web:** only a finished evaluation or an empty run clears the drain's stop reason ([8dc3efe](https://github.com/jrmatherly/career-ops/commit/8dc3efed4b09881e7895c3a7a1f3104c2f1f8db7))
+* **web:** render the resolver's own refusal text and test the screen in a browser ([c6fca23](https://github.com/jrmatherly/career-ops/commit/c6fca230e86d8554395bedf91a4c03801333b7be))
+* **web:** resolve the data root to ~/career-ops-data on a plugin install ([5f279bc](https://github.com/jrmatherly/career-ops/commit/5f279bc2b6935b38799bad290b32d219927bedde))
+* **web:** resolve the data root to ~/career-ops-data on a plugin install ([8d535e8](https://github.com/jrmatherly/career-ops/commit/8d535e8f16f77860b7b128464975d23f1040e640))
+* **web:** show why a data root was refused, and give server errors a page ([e6ad3d6](https://github.com/jrmatherly/career-ops/commit/e6ad3d63326367bf8476ab61a38f3150341adf42))
+* **web:** show why a data root was refused, and give server errors a page ([62ece74](https://github.com/jrmatherly/career-ops/commit/62ece747f3c9262c92ece0056123e52c7603c543))
+* **web:** show why an evaluate drain stopped on its scheduled run ([e72d855](https://github.com/jrmatherly/career-ops/commit/e72d855e4769aa1fbe12ceb1c72941a500ec748c))
+* **web:** stop the drain when a gateway's seats are all cooling down ([3287991](https://github.com/jrmatherly/career-ops/commit/32879913914e7f814f9bf234d3d4b29c97a4735c))
+* **web:** stop the drain when a gateway's seats are all cooling down ([2a44fd9](https://github.com/jrmatherly/career-ops/commit/2a44fd9f0355a0ff1f5f567a51aba3bc81ea3a8b))
+* **web:** uncheck an inbox row when a filter hides it ([6e04894](https://github.com/jrmatherly/career-ops/commit/6e04894f273547b2f546f0e4d41eb948cd5e1b92))
+
 ## [1.0.0](https://github.com/jrmatherly/career-ops/compare/web-v0.17.0...web-v1.0.0) (2026-11-09)
 
 

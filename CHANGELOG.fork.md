@@ -1,5 +1,60 @@
 # Changelog
 
+## [2.1.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.0.0...career-ops-v2.1.0) (2026-11-11)
+
+
+### Features
+
+* **doctor:** warn when the data root override names a missing folder ([9098dbe](https://github.com/jrmatherly/career-ops/commit/9098dbe0600bece9f7f7012f7245a8c75898030b))
+* Inbox select-all and a doctor warning for a missing data root ([b565c7d](https://github.com/jrmatherly/career-ops/commit/b565c7d1350c42710c063439ddb879d4a861ba23))
+* **settings:** apply saved settings over the environment in every reader ([6581b36](https://github.com/jrmatherly/career-ops/commit/6581b360077836a17d7103ce1ec53d2fed68782f))
+* **settings:** apply saved settings over the environment in every reader ([8d2e1d2](https://github.com/jrmatherly/career-ops/commit/8d2e1d279313b8a91a3242669bac4eabe47d3326))
+* **settings:** company switches, model runners and plugin status ([ff2300a](https://github.com/jrmatherly/career-ops/commit/ff2300a4f575ec4a9e0ea7ccd2fb689a15ed77b3))
+* **settings:** model runner settings ([532d37e](https://github.com/jrmatherly/career-ops/commit/532d37e21604f1ba459eaadb7f0d9f1fa1f872a1))
+* **settings:** profile preferences and scan filters on the Settings page ([f994c30](https://github.com/jrmatherly/career-ops/commit/f994c30041e8509c0f4bbdc930a58d535753b62e))
+* **settings:** save profile and portals settings from /api/settings ([bdae8ff](https://github.com/jrmatherly/career-ops/commit/bdae8ff94b7153e4d34aa3df8275a5b9e617c704))
+* **settings:** Settings page and /api/settings (Settings UI PR 2 of 4) ([66ae715](https://github.com/jrmatherly/career-ops/commit/66ae71526280b75b506c4809accfd9a5774f0729))
+* **settings:** Settings page and /api/settings for saved environment settings ([834e066](https://github.com/jrmatherly/career-ops/commit/834e06685748ca664fcd04236bc4767eb4248110))
+
+
+### Bug Fixes
+
+* **doctor:** ask the resolver for the root a .env load leaves ([bdc4855](https://github.com/jrmatherly/career-ops/commit/bdc485513cdbbb3d53e27f5131c0a5aae5e4409c))
+* **doctor:** judge the .env root line by the variable that wins after the load ([afe1a77](https://github.com/jrmatherly/career-ops/commit/afe1a77b503bbab1211c97c8cf02540111d2de6a))
+* **doctor:** keep template init and an empty marker out of the missing-root check ([0bb386d](https://github.com/jrmatherly/career-ops/commit/0bb386d4d14f49860051b33b620e09ab270638e8))
+* **doctor:** leave a missing override root uncreated ([3534184](https://github.com/jrmatherly/career-ops/commit/35341844bfa3213ccf02f050a9062a80ab458795))
+* **doctor:** report a .env root line that dotenv is told to let win ([737a185](https://github.com/jrmatherly/career-ops/commit/737a185e392adb4dab3b4e3debfda4623d6293c1))
+* **doctor:** report a .env root line that dotenv is told to let win ([8cc2d99](https://github.com/jrmatherly/career-ops/commit/8cc2d9950030eb8048afdafefbbf4d599e0b049c))
+* **doctor:** say which commands follow a root line in .env ([4860bd2](https://github.com/jrmatherly/career-ops/commit/4860bd29b9316c1096862604f4fdd3a261691cb5))
+* **doctor:** warn when the data root's own .env names another data root ([60b6b75](https://github.com/jrmatherly/career-ops/commit/60b6b75390795aeac95247d552efc93176ed2a37))
+* **doctor:** warn when the data root's own .env names another data root ([e0c03b5](https://github.com/jrmatherly/career-ops/commit/e0c03b569aa304b842cc621a37a11b7a84109985))
+* **openrouter:** name the data root .env in setup messages, and pin the fallback loader ([aa85df9](https://github.com/jrmatherly/career-ops/commit/aa85df90b8e26c08d472552b5676e520cb7078e3))
+* **openrouter:** parse the fallback .env the way the Settings page does ([0f32c80](https://github.com/jrmatherly/career-ops/commit/0f32c8020907beb4514a74a0e11dd82ffc0413ef))
+* **path-resolver:** compare whole path segments when checking for a plugin copy ([557f7ed](https://github.com/jrmatherly/career-ops/commit/557f7ed96315ccd2b68068a794bc46fc4bfece3c))
+* **path-resolver:** say what removing a refused override falls back to ([42b8eb7](https://github.com/jrmatherly/career-ops/commit/42b8eb7c5ed22722e7f3775c8c608f9fa174b88d))
+* **settings:** act on the PR review of the saved-settings overlay ([b5fb1c8](https://github.com/jrmatherly/career-ops/commit/b5fb1c881603b50b470d81e7190021244fb289ad))
+* **settings:** allow plain http only to localhost and the loopback addresses ([6abc8f8](https://github.com/jrmatherly/career-ops/commit/6abc8f8c49bb652a9013e4249d855b96aef40c65))
+* **settings:** call the page Settings wherever the dashboard names it ([e23a67f](https://github.com/jrmatherly/career-ops/commit/e23a67f4e88c2662de8b72cb4c119bd557b13994))
+* **settings:** find the Settings page in the command palette by its path ([61c2d93](https://github.com/jrmatherly/career-ops/commit/61c2d930d8818d7ccf693f91e54caa7ba2342152))
+* **settings:** keep line endings, switch an entry whose enabled comes first, and report a broken plugins.yml ([f2f336d](https://github.com/jrmatherly/career-ops/commit/f2f336d0834deae92a7a74b6aea775e6d4cbfe06))
+* **settings:** keep list entries, their comments and their place when a list is saved ([16d38bf](https://github.com/jrmatherly/career-ops/commit/16d38bf69de7cb3eced6283d92a8166d5a7ac485))
+* **settings:** model runners read the data root .env the Settings page reads ([0492768](https://github.com/jrmatherly/career-ops/commit/0492768eb6e998bd185f363add07b6f0f27c252f))
+* **settings:** model runners read the data root .env the Settings page reads ([bc6b2ba](https://github.com/jrmatherly/career-ops/commit/bc6b2bad42b813f2ff402261ad9ea3ec353ffecd))
+* **settings:** name the .env a runner reads, and prove a working-directory .env is ignored ([71f80d4](https://github.com/jrmatherly/career-ops/commit/71f80d4e762a83def9b30320de924bd6b3c6858e))
+* **settings:** refuse a saved plain-http URL that leaves this machine ([f342d9a](https://github.com/jrmatherly/career-ops/commit/f342d9a787f49ef07bead9b9dcb004f3600de817))
+* **settings:** report failed saves and unreadable files, and keep a mistyped number from resetting ([5486f84](https://github.com/jrmatherly/career-ops/commit/5486f84e80a337351a4359c27be446dc6c475bb6))
+* **settings:** show an OpenRouter model or timeout set in the data root .env ([a6c6886](https://github.com/jrmatherly/career-ops/commit/a6c6886e49734be407c044a949ed1a95bf28d203))
+* **settings:** show an OpenRouter model or timeout set in the data root .env ([ea14221](https://github.com/jrmatherly/career-ops/commit/ea14221c430514549c192b4fb46474f28d47ce42))
+* **settings:** undo an inherited overlay before applying saved settings ([75e9ab4](https://github.com/jrmatherly/career-ops/commit/75e9ab4fdf35453b4b93edb5740f77a04e5b839e))
+* **web:** a limit stop leaves the row queued with its retries ([ec38d13](https://github.com/jrmatherly/career-ops/commit/ec38d137fc47fa9379b6d2ce3f246ec3c5563a62))
+* **web:** a timed-out evaluation stops the drain, and the run history says why a batch stopped ([82b6ab8](https://github.com/jrmatherly/career-ops/commit/82b6ab8c4285d220ed2abd32a61deeadb998d353))
+* **web:** only a finished evaluation or an empty run clears the drain's stop reason ([8dc3efe](https://github.com/jrmatherly/career-ops/commit/8dc3efed4b09881e7895c3a7a1f3104c2f1f8db7))
+* **web:** render the resolver's own refusal text and test the screen in a browser ([c6fca23](https://github.com/jrmatherly/career-ops/commit/c6fca230e86d8554395bedf91a4c03801333b7be))
+* **web:** resolve the data root to ~/career-ops-data on a plugin install ([5f279bc](https://github.com/jrmatherly/career-ops/commit/5f279bc2b6935b38799bad290b32d219927bedde))
+* **web:** show why a data root was refused, and give server errors a page ([e6ad3d6](https://github.com/jrmatherly/career-ops/commit/e6ad3d63326367bf8476ab61a38f3150341adf42))
+* **web:** show why a data root was refused, and give server errors a page ([62ece74](https://github.com/jrmatherly/career-ops/commit/62ece747f3c9262c92ece0056123e52c7603c543))
+* **web:** stop the drain when a gateway's seats are all cooling down ([3287991](https://github.com/jrmatherly/career-ops/commit/32879913914e7f814f9bf234d3d4b29c97a4735c))
+
 ## [2.0.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v1.39.0...career-ops-v2.0.0) (2026-11-09)
 
 
