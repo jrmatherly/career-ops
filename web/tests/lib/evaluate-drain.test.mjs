@@ -551,6 +551,18 @@ test("a cap message does not outlive its day when the row then waits for posting
   assert.equal(runOf(storePath).drainMessage, undefined);
 });
 
+test("a limit message is cleared by a pass that finds nothing left to evaluate", async (t) => {
+  const { storePath, drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  await drain();
+  assert.match(runOf(storePath).drainMessage, /^This pass started the job's limit of 1/);
+  const store = readScheduledStore(storePath);
+  store.jobs[0].evaluate.rankThreshold = 5.5;
+  fs.writeFileSync(storePath, JSON.stringify(store));
+  assert.equal((await drain()).status, "idle");
+  assert.equal(posts.length, 1);
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});
+
 test("a row that waits for posting text is not blamed on a limit", async (t) => {
   const { storePath, drain, state } = await withDrainRoot(t, { urls: [url(1)] });
   assert.equal((await drain({ fetchJd: async () => null })).status, "drained");

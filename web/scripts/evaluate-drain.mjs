@@ -207,14 +207,14 @@ export async function runDrain({
     }
   };
   if (!jobs.some((job) => planFor(job).length)) {
-    if (!jobs.some((job) => planFor(job, undefined, 0, Infinity).length)) return { status: "idle", ...counts };
-    log(`daily cap ${dailyCap} reached, ${startedToday(ledger, now())} started today; queued rows wait for the next UTC day`);
+    const capped = jobs.some((job) => planFor(job, undefined, 0, Infinity).length);
+    if (capped) log(`daily cap ${dailyCap} reached, ${startedToday(ledger, now())} started today; queued rows wait for the next UTC day`);
     noteLimits(new Set());
-    // A capped tick comes every few minutes: write only a message its run does not already carry.
+    // A capped or idle tick comes every few minutes: write only a message its run does not already carry.
     const recorded = new Map(readScheduledStore(storePath).runs.map((run) => [run.id, run.drainMessage]));
     for (const [runId, note] of touchedRuns) if (!recorded.has(runId) || recorded.get(runId) === note.drainMessage) touchedRuns.delete(runId);
     if (touchedRuns.size) await recordDrainCounts(root, storePath, touchedRuns, now());
-    return { status: "capped", ...counts };
+    return { status: capped ? "capped" : "idle", ...counts };
   }
   const health = await request(baseUrl, "/api/healthz", { timeoutMs: HEALTH_TIMEOUT_MS });
   const online = health.status === 200;
