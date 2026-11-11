@@ -415,7 +415,7 @@ test("an offline tick names itself on the run again after an evaluation cleared 
   const offline = { baseUrl: "http://127.0.0.1:1" };
   await drain(offline);
   await drain();
-  assert.deepEqual([state(url(1)).state, state(url(2)).reason, run().drainMessage], ["evaluated", "dashboard-offline", "This pass evaluated the job's limit of 1; 1 queued row waits for the next pass."]);
+  assert.deepEqual([state(url(1)).state, state(url(2)).reason, run().drainMessage], ["evaluated", "dashboard-offline", "This pass started the job's limit of 1; 1 queued row waits for the next pass."]);
   await drain(offline);
   assert.match(run().drainMessage, /^The dashboard did not answer/);
   assert.equal(state(url(2)).rows.length, 2, "the ledger still gets the offline row once");
@@ -530,14 +530,24 @@ test("a run first seen at a full cap gets the message on the capped tick", async
   dailyCap(t, root, 0);
   assert.equal((await drain()).status, "capped");
   assert.equal(posts.length, 0);
-  assert.equal(runOf(storePath).drainMessage, "Daily cap 0 reached on 2026-11-08 (UTC); 2 queued rows wait for the next UTC day.");
+  assert.equal(runOf(storePath).drainMessage, "Daily cap 0 evaluates nothing; 2 queued rows wait until pipeline.auto_evaluate_daily_cap is raised.");
 });
 
 test("rows the job's per-pass limit leaves queued say so until a later pass evaluates them", async (t) => {
   const { storePath, drain } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
   assert.equal((await drain()).status, "drained");
-  assert.equal(runOf(storePath).drainMessage, "This pass evaluated the job's limit of 1; 1 queued row waits for the next pass.");
+  assert.equal(runOf(storePath).drainMessage, "This pass started the job's limit of 1; 1 queued row waits for the next pass.");
   assert.equal((await drain()).status, "drained");
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});
+
+test("a cap message does not outlive its day when the row then waits for posting text", async (t) => {
+  const { root, storePath, drain, state } = await withDrainRoot(t, { urls: [url(1), url(2)] });
+  dailyCap(t, root, 1);
+  await drain();
+  assert.match(runOf(storePath).drainMessage, /^Daily cap 1 reached on 2026-11-08/);
+  await drain({ now: () => T0 + 86_400_000, fetchJd: async () => null });
+  assert.equal(state(url(2)).state, "queued");
   assert.equal(runOf(storePath).drainMessage, undefined);
 });
 

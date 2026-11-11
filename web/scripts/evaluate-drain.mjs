@@ -38,6 +38,8 @@ const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" &
 const GATEWAY_LIMIT_RE = /request rejected \(429\)|cooling down/i;
 const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg) || GATEWAY_LIMIT_RE.test(msg);
 const log = (line) => process.stderr.write(`drain: ${line}\n`);
+// The messages noteLimits writes. They are worked out again on every pass, so one a pass does not renew is cleared.
+const LIMIT_MESSAGE_RE = /^(Daily cap \d+ |This pass started the job's limit )/;
 const messageOf = (error) => (error instanceof Error ? error.message : String(error));
 
 const keySet = (urls) => new Set(urls.map(normalizeUrl).filter(Boolean));
@@ -181,21 +183,27 @@ export async function runDrain({
   // Each run this drain wrote a row for, with the change to its stop message: set by a
   // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
   const touchedRuns = new Map();
-  // A waiting row this drain did not try was held back by a limit, and its run says which. A cap
-  // names its day, because only that run's own rows clear the message.
+  // A waiting row this drain did not try was held back by a limit, and its run says which.
   const noteLimits = (tried) => {
+    const limited = new Set();
     const capped = startedToday(readLedger(root, { now: now() }), now()) >= dailyCap;
     const today = new Date(now()).toISOString().slice(0, 10);
     for (const job of jobs) {
       const waiting = drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, dailyCap: Infinity, now: now(), exclude: tried });
       for (const [runId, rows] of Map.groupBy(waiting, (entry) => entry.runId)) {
         const left = `${rows.length} queued row${rows.length === 1 ? " waits" : "s wait"}`;
+        limited.add(runId);
         touchedRuns.set(runId, {
-          drainMessage: capped
-            ? `Daily cap ${dailyCap} reached on ${today} (UTC); ${left} for the next UTC day.`
-            : `This pass evaluated the job's limit of ${job.evaluate.maxPerRun}; ${left} for the next pass.`,
+          drainMessage: !capped
+            ? `This pass started the job's limit of ${job.evaluate.maxPerRun}; ${left} for the next pass.`
+            : dailyCap === 0
+              ? `Daily cap 0 evaluates nothing; ${left} until pipeline.auto_evaluate_daily_cap is raised.`
+              : `Daily cap ${dailyCap} reached on ${today} (UTC); ${left} for the next UTC day.`,
         });
       }
+    }
+    for (const run of readScheduledStore(storePath).runs) {
+      if (!limited.has(run.id) && LIMIT_MESSAGE_RE.test(run.drainMessage ?? "")) touchedRuns.set(run.id, { drainMessage: undefined });
     }
   };
   if (!jobs.some((job) => planFor(job).length)) {
