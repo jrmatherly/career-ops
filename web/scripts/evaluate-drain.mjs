@@ -274,7 +274,7 @@ async function recordDrainCounts(root, storePath, runs, nowMs) {
     const waiting = own.some((entry) => !entry.final);
     await recordStepCounts(storePath, runId, {
       evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"),
-      ...(waiting ? message : { drainMessage: message.drainMessage }),
+      ...(waiting ? message : { drainMessage: undefined }),
     });
   }
 }

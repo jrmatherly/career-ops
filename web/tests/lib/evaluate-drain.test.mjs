@@ -326,6 +326,17 @@ test("a stop reason goes when its run has no row left to try", async (t) => {
   assert.deepEqual([state(url(1)).state, run().drainMessage], ["skipped", undefined]);
 });
 
+test("a row that times out on its last try leaves no stop reason behind", async (t) => {
+  const answer = () => [{ type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state, storePath } = await withDrainRoot(t, { urls: [url(1)], answer });
+  await drain();
+  await drain();
+  assert.match(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, /^Evaluation stopped/);
+  assert.equal((await drain()).status, "stopped");
+  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  assert.deepEqual([state(url(1)).failures, run.evalErrors, run.drainMessage], [3, 1, undefined], "no later tick touches the run, so nothing could clear it");
+});
+
 test("the stop reason goes on the run whose row stopped the batch, not on the others", async (t) => {
   const RUN2 = "33333333-3333-4333-8333-333333333333";
   const answer = (body) => (body.input === url(1) ? done(1) : [{ type: "error", msg: "429 rate limit exceeded" }]);
