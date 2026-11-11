@@ -293,6 +293,8 @@ test("a stopped batch is named on its scheduled run until a later drain gets thr
   const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
   await drain();
   assert.equal(run().drainMessage, `Evaluation stopped at ${url(1)} and the rest stay queued: ${limit}`);
+  await drain({ fetchJd: async () => null });
+  assert.match(run().drainMessage, /^Evaluation stopped/, "a tick that only re-queues the row keeps the reason");
   limited = false;
   await drain();
   assert.deepEqual([run().evaluated, run().drainMessage], [1, undefined]);

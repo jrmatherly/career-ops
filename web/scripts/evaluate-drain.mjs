@@ -186,7 +186,8 @@ export async function runDrain({
   const online = health.status === 200;
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
-  // Each run this drain wrote a row for, with why the drain stopped there, if it did.
+  // Each run this drain wrote a row for, with the change to its stop message: set by a
+  // stop, cleared by an evaluation that got an answer, left alone by a row that only waited.
   const touchedRuns = new Map();
   let status = "drained";
 
@@ -198,13 +199,13 @@ export async function runDrain({
       const { url } = entry;
       const append = async (state, reason = "") => {
         await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
-        if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, undefined);
+        if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, {});
         if (state !== "running") counts[state] += 1;
       };
       if (!online) {
         if (entry.state !== "queued" || entry.reason !== "dashboard-offline") {
           await append("queued", "dashboard-offline");
-          touchedRuns.set(entry.runId, "The dashboard did not answer, so nothing was evaluated. Queued rows wait.");
+          touchedRuns.get(entry.runId).drainMessage = "The dashboard did not answer, so nothing was evaluated. Queued rows wait.";
         }
         status = "offline";
         continue;
@@ -244,10 +245,10 @@ export async function runDrain({
         timeoutMs: runTimeoutMs,
       }));
       await append(outcome.state, outcome.reason);
+      touchedRuns.get(entry.runId).drainMessage = outcome.stop && `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
       if (outcome.stop) {
         status = outcome.stop === "offline" ? "offline" : "stopped";
         log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
-        touchedRuns.set(entry.runId, `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`);
         break jobs;
       }
     }
@@ -264,9 +265,9 @@ export async function runDrain({
  */
 async function recordDrainCounts(root, storePath, runs, nowMs) {
   const entries = readLedger(root, { now: nowMs });
-  for (const [runId, drainMessage] of runs) {
+  for (const [runId, message] of runs) {
     const own = entries.filter((entry) => entry.runId === runId);
     const count = (state) => own.filter((entry) => entry.state === state).length;
-    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"), drainMessage });
+    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"), ...message });
   }
 }
