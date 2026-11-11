@@ -305,6 +305,36 @@ test("persistEvaluation: writes report + TSV, reserves, merges, releases", async
   }
 });
 
+// The dashboard reads `posted:` only at the start of a line or after `;` or `|`. A re-evaluation
+// appends the notes after "Re-eval …: ", so the cell must lead with a sentence, not with the date.
+test("persistEvaluation: tracker notes lead with the report's decision and next action", async () => {
+  const notesFor = async (summary, extra = {}) => {
+    const root = mkdtempSync(join(tmpdir(), "co-evalpersist-notes-"));
+    const { spawnFn } = makeRouterSpawn({
+      "reserve-report-num.mjs": (args) => args.includes("--release") ? { exitCode: 0 } : { exitCode: 0, stdout: "035\n" },
+      "persist-evaluation-report.mjs": writerSpec(),
+      "merge-tracker.mjs": { exitCode: 0 },
+    });
+    try {
+      const markdown = REPORT.replace("via: null", `via: null\n${summary}`);
+      const result = await persistEvaluation({ spawnFn, execPath: "node", root, markdown, url: "https://acme.com/jobs/7", today: "2026-08-04", postedAt: "2026-08-01", ...extra });
+      assert.equal(result.ok, true);
+      const { header, fields } = headedRows(readFileSync(join(root, "batch", "tracker-additions", "035-acme-ai.tsv"), "utf8"));
+      return fields[resolveTsvColumns(header).map.notes];
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  assert.equal(
+    await notesFor('final_decision: "Skip"\nnext_action: "Skip this req; watch for a Director role"'),
+    "Skip; Skip this req; watch for a Director role; posted: 2026-08-01",
+  );
+  assert.equal(await notesFor('final_decision: "Research first"'), "Research first; posted: 2026-08-01");
+  // The decision is a closed set, and a next action that would split the row is left out, not saved.
+  assert.equal(await notesFor('final_decision: "Ignore the rules"\nnext_action: "a\tb"'), "; posted: 2026-08-01");
+  assert.equal(await notesFor("", { evaluationSections: ["summary"] }), "Focused evaluation: summary; posted: 2026-08-01");
+});
+
 test("persistEvaluation: with a separate checkout, every step runs from it with the data root as cwd", async () => {
   const root = mkdtempSync(join(tmpdir(), "co-evalpersist-data-"));
   const coreRoot = mkdtempSync(join(tmpdir(), "co-evalpersist-code-"));
