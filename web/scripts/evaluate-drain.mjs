@@ -38,7 +38,7 @@ const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" &
 const GATEWAY_LIMIT_RE = /request rejected \(429\)|cooling down/i;
 const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg) || GATEWAY_LIMIT_RE.test(msg);
 const log = (line) => process.stderr.write(`drain: ${line}\n`);
-// The messages noteLimits writes. They are worked out again on every pass, so one a pass does not renew is cleared.
+// The limit messages noteWaiting writes. A pass that gets as far as planning works them out again and clears one it does not renew.
 const LIMIT_MESSAGE_RE = /^(Daily cap \d+ |This pass started the job's limit )/;
 const messageOf = (error) => (error instanceof Error ? error.message : String(error));
 
@@ -165,8 +165,8 @@ export async function runDrain({
 }) {
   const counts = { evaluated: 0, gated: 0, failed: 0, skipped: 0, queued: 0 };
   const jobs = autoJobs(readScheduledStore(storePath));
-  if (!jobs.length) return { status: "idle", ...counts };
-  if (!env.KUBERNETES_SERVICE_HOST && env[LOCAL_OPT_IN] !== "1") {
+  // With no auto job left there is nothing to refuse: the pass only clears the reasons its runs carry.
+  if (jobs.length && !env.KUBERNETES_SERVICE_HOST && env[LOCAL_OPT_IN] !== "1") {
     log(`auto mode evaluates only inside the web pod; set ${LOCAL_OPT_IN}=1 to drain on this host. Nothing was evaluated.`);
     return { status: "refused", reason: `not a pod and ${LOCAL_OPT_IN} is not 1`, ...counts };
   }
@@ -180,39 +180,51 @@ export async function runDrain({
   const planFor = (job, tried = new Set(), started = 0, cap = dailyCap) => drainPlan(root, {
     jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun - started, dailyCap: cap, now: now(), exclude: tried,
   });
-  // Each run this drain wrote a row for, with the change to its stop message: set by a
-  // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
+  // Runs whose stored message this drain changes: set by a stop or a limit, cleared by an evaluation
+  // that finished or a reason that no longer holds. {} leaves it alone (a row that only waited, a 409 too).
   const touchedRuns = new Map();
-  // A waiting row this drain did not try was held back by a limit, and its run says which.
-  const noteLimits = (tried) => {
-    const limited = new Set();
+  /*
+   * Every run with a waiting row this drain did not try says why: the stop that ended the pass,
+   * else the limit that held the row back. A row a rank pass queued while the drain ran has neither,
+   * and the next pass takes it. Returns the stored runs by id.
+   */
+  const noteWaiting = (tried, startedBy = new Map(), stop) => {
+    const stored = new Map(readScheduledStore(storePath).runs.map((run) => [run.id, run]));
+    const named = new Set();
     const capped = startedToday(readLedger(root, { now: now() }), now()) >= dailyCap;
     const today = new Date(now()).toISOString().slice(0, 10);
     for (const job of jobs) {
-      const waiting = drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, dailyCap: Infinity, now: now(), exclude: tried });
+      const { maxPerRun } = job.evaluate;
+      // A run the store has trimmed has nowhere to carry a message.
+      const waiting = drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, dailyCap: Infinity, now: now(), exclude: tried })
+        .filter((entry) => stored.has(entry.runId));
       for (const [runId, rows] of Map.groupBy(waiting, (entry) => entry.runId)) {
         const left = `${rows.length} queued row${rows.length === 1 ? " waits" : "s wait"}`;
-        limited.add(runId);
-        touchedRuns.set(runId, {
-          drainMessage: !capped
-            ? `This pass started the job's limit of ${job.evaluate.maxPerRun}; ${left} for the next pass.`
+        const drainMessage = stop
+          ?? (!capped
+            ? (startedBy.get(job.id) ?? 0) >= maxPerRun ? `This pass started the job's limit of ${maxPerRun}; ${left} for the next pass.` : undefined
             : dailyCap === 0
               ? `Daily cap 0 evaluates nothing; ${left} until pipeline.auto_evaluate_daily_cap is raised.`
-              : `Daily cap ${dailyCap} reached on ${today} (UTC); ${left} for the next UTC day.`,
-        });
+              : `Daily cap ${dailyCap} reached on ${today} (UTC); ${left} for the next UTC day.`);
+        if (!drainMessage) continue;
+        named.add(runId);
+        touchedRuns.set(runId, { drainMessage });
       }
     }
-    for (const run of readScheduledStore(storePath).runs) {
-      if (!limited.has(run.id) && LIMIT_MESSAGE_RE.test(run.drainMessage ?? "")) touchedRuns.set(run.id, { drainMessage: undefined });
+    // A limit message this pass did not renew is no longer true, and neither is any reason on a run whose job left auto mode.
+    const auto = new Set(jobs.map((job) => job.id));
+    for (const run of stored.values()) {
+      if (!run.drainMessage || named.has(run.id) || touchedRuns.get(run.id)?.drainMessage) continue;
+      if (LIMIT_MESSAGE_RE.test(run.drainMessage) || !auto.has(run.jobId)) touchedRuns.set(run.id, { drainMessage: undefined });
     }
+    return stored;
   };
   if (!jobs.some((job) => planFor(job).length)) {
     const capped = jobs.some((job) => planFor(job, undefined, 0, Infinity).length);
     if (capped) log(`daily cap ${dailyCap} reached, ${startedToday(ledger, now())} started today; queued rows wait for the next UTC day`);
-    noteLimits(new Set());
-    // A capped or idle tick comes every few minutes: write only a message its run does not already carry.
-    const recorded = new Map(readScheduledStore(storePath).runs.map((run) => [run.id, run.drainMessage]));
-    for (const [runId, note] of touchedRuns) if (!recorded.has(runId) || recorded.get(runId) === note.drainMessage) touchedRuns.delete(runId);
+    const stored = noteWaiting(new Set());
+    // The runner comes back to a capped or idle queue on every tick: write only a message its run does not already carry.
+    for (const [runId, note] of touchedRuns) if (stored.get(runId).drainMessage === note.drainMessage) touchedRuns.delete(runId);
     if (touchedRuns.size) await recordDrainCounts(root, storePath, touchedRuns, now());
     return { status: capped ? "capped" : "idle", ...counts };
   }
@@ -221,6 +233,8 @@ export async function runDrain({
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
   const tried = new Set();
+  const startedBy = new Map();
+  let stopMessage;
   let status = "drained";
 
   let current;
@@ -275,13 +289,14 @@ export async function runDrain({
 
         await append("running");
         started += 1;
+        startedBy.set(job.id, started);
         const outcome = outcomeOf(await request(baseUrl, "/api/run", {
           body: { kind: "evaluate-text", input: url, cliId: "claude", jdText },
           timeoutMs: runTimeoutMs,
         }));
         await append(outcome.state, outcome.reason);
         const note = touchedRuns.get(entry.runId);
-        if (outcome.stop) note.drainMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
+        if (outcome.stop) note.drainMessage = stopMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
         else if (outcome.state !== "queued") note.drainMessage = undefined;
         if (outcome.stop) {
           status = outcome.stop === "offline" ? "offline" : "stopped";
@@ -290,7 +305,7 @@ export async function runDrain({
         }
       }
     }
-    if (status === "drained") noteLimits(tried);
+    noteWaiting(tried, startedBy, stopMessage);
   } catch (error) {
     // What this drain finished still counts on its runs, and one run says why it stopped: the
     // failing row's, or between rows the last one this drain wrote to.
@@ -311,7 +326,7 @@ export async function runDrain({
 
 /**
  * Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up,
- * and its stop message, which a finished evaluation clears. So does a run with no row left
+ * and its drain message, which a finished evaluation clears. So does a run with no row left
  * to try, or the message would outlive the rows it is about.
  */
 async function recordDrainCounts(root, storePath, runs, nowMs) {

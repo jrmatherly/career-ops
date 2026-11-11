@@ -523,10 +523,13 @@ async function defaultDrain(options) {
 /*
  * Drain the auto jobs' queue after the rank pass, under its own lock, so a
  * tick that fires while a long drain runs still scans and ranks. The drain
- * module loads only when an auto job exists, which keeps an idle tick cheap.
+ * module loads only when an auto job exists or a run still carries a drain
+ * reason, which keeps an idle tick cheap.
  */
 async function drainPass(root, storePath, drainFn) {
-  if (!readScheduledStore(storePath).jobs.some((job) => job.status === "active" && job.evaluate?.mode === "auto")) return;
+  const store = readScheduledStore(storePath);
+  // A run that still carries a reason gets one more pass after the last auto job is gone, to clear it.
+  if (!store.jobs.some((job) => job.status === "active" && job.evaluate?.mode === "auto") && !store.runs.some((run) => run.drainMessage)) return;
   try {
     await withResourceLock(`${storePath}.drain`, () => drainFn({ root, storePath }), DRAIN_LOCK);
   } catch (error) {

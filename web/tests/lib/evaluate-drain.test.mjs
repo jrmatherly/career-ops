@@ -569,3 +569,106 @@ test("a row that waits for posting text is not blamed on a limit", async (t) => 
   assert.equal(state(url(1)).state, "queued");
   assert.equal(runOf(storePath).drainMessage, undefined);
 });
+
+const JOB2 = "33333333-3333-4333-8333-333333333333";
+const RUN2 = "44444444-4444-4444-8444-444444444444";
+const RUN3 = "55555555-5555-4555-8555-555555555555";
+const STOPPED = `Evaluation stopped at ${url(1)} and the rest stay queued: refused: refused 400`;
+
+/** Rewrite the store: `change(store)` edits it in place. */
+function editStore(storePath, change) {
+  const store = readScheduledStore(storePath);
+  change(store);
+  fs.writeFileSync(storePath, JSON.stringify(store));
+}
+/** Move `urls` in the ledger to run `runId` of job `jobId`, adding the run (and the job, given `evaluate`) to the store. */
+async function requeue(root, storePath, urls, { jobId = JOB, runId, evaluate, drainMessage }) {
+  editStore(storePath, (store) => {
+    if (evaluate) store.jobs.push({ ...store.jobs[0], id: jobId, name: "Second", evaluate });
+    store.runs.push({ ...store.runs[0], id: runId, jobId, ...(drainMessage ? { drainMessage } : {}) });
+  });
+  for (const u of urls) await appendRow(root, { url: u, at: new Date(T0 - 30_000).toISOString(), jobId, runId, rank: 4, state: "queued", source: "rank-pass" });
+}
+const messageOn = (storePath, runId) => readScheduledStore(storePath).runs.find((r) => r.id === runId).drainMessage;
+
+test("each run counts its own waiting rows and quotes its own job's limit", async (t) => {
+  const urls = [1, 2, 3, 4, 5, 6, 7, 8].map(url);
+  const { root, storePath, drain } = await withDrainRoot(t, { urls, evaluate: { ...AUTO, maxPerRun: 1 } });
+  await requeue(root, storePath, [url(3), url(4)], { runId: RUN2 });
+  await requeue(root, storePath, [url(5), url(6), url(7), url(8)], { jobId: JOB2, runId: RUN3, evaluate: { ...AUTO, maxPerRun: 2 } });
+  assert.equal((await drain()).evaluated, 3);
+  assert.deepEqual([RUN, RUN2, RUN3].map((id) => messageOn(storePath, id)), [
+    "This pass started the job's limit of 1; 1 queued row waits for the next pass.",
+    "This pass started the job's limit of 1; 2 queued rows wait for the next pass.",
+    "This pass started the job's limit of 2; 2 queued rows wait for the next pass.",
+  ]);
+});
+
+test("a pass that reaches both limits names the daily cap, with the day it was reached", async (t) => {
+  const { root, storePath, drain } = await withDrainRoot(t, { urls: [url(1), url(2), url(3)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  dailyCap(t, root, 1);
+  await drain();
+  assert.equal(runOf(storePath).drainMessage, "Daily cap 1 reached on 2026-11-08 (UTC); 2 queued rows wait for the next UTC day.");
+  await drain({ now: () => T0 + 86_400_000 });
+  assert.equal(runOf(storePath).drainMessage, "Daily cap 1 reached on 2026-11-09 (UTC); 1 queued row waits for the next UTC day.");
+});
+
+test("a cap-of-0 message is cleared once nothing waits", async (t) => {
+  const { root, storePath, drain } = await withDrainRoot(t, { urls: [url(1)] });
+  dailyCap(t, root, 0);
+  await drain();
+  assert.match(runOf(storePath).drainMessage, /^Daily cap 0 /);
+  editStore(storePath, (store) => { store.jobs[0].evaluate.rankThreshold = 5.5; });
+  assert.equal((await drain()).status, "idle");
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});
+
+test("a capped tick leaves a run the store has trimmed alone", async (t) => {
+  const { root, storePath, drain, stderr } = await withDrainRoot(t, { urls: [url(1)] });
+  dailyCap(t, root, 0);
+  editStore(storePath, (store) => { store.runs = []; });
+  const written = fs.readFileSync(storePath, "utf8");
+  assert.equal((await drain()).status, "capped");
+  assert.equal(fs.readFileSync(storePath, "utf8"), written);
+  assert.doesNotMatch(stderr.join(""), /no longer in the store/);
+});
+
+test("a job that leaves auto mode takes its runs' reasons with it", async (t) => {
+  const { storePath, drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  await drain();
+  assert.match(runOf(storePath).drainMessage, /^This pass started/);
+  editStore(storePath, (store) => { store.jobs[0].evaluate.mode = "manual"; });
+  assert.equal((await drain({ env: {} })).status, "idle");
+  assert.equal(posts.length, 1);
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});
+
+test("a stop is named on every run it leaves rows waiting on, in place of an older limit", async (t) => {
+  const { root, storePath, drain } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => 400 });
+  await requeue(root, storePath, [url(2)], { runId: RUN2, drainMessage: "Daily cap 5 reached on 2026-11-07 (UTC); 1 queued row waits for the next UTC day." });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([messageOn(storePath, RUN), messageOn(storePath, RUN2)], [STOPPED, STOPPED]);
+});
+
+test("a stop does not lose its reason to the limit message its own run carried", async (t) => {
+  const { storePath, drain } = await withDrainRoot(t, { urls: [url(1)], answer: () => 400 });
+  editStore(storePath, (store) => { store.runs[0].drainMessage = "This pass started the job's limit of 5; 1 queued row waits for the next pass."; });
+  await drain();
+  assert.equal(runOf(storePath).drainMessage, STOPPED);
+});
+
+test("a row queued for a job after its turn in the pass is not blamed on a limit", async (t) => {
+  const { root, storePath, drain } = await withDrainRoot(t, {
+    urls: [url(1), url(2), url(3)],
+    // A rank pass on another tick queues a row for the first job while the second job's row is evaluated.
+    answer: (body, dir) => {
+      if (body.input === url(2)) fs.appendFileSync(path.join(dir, "data", "evaluate-queue.tsv"), `${url(3)}\t${new Date(T0).toISOString()}\t${JOB}\t${RUN}\t4\t\tqueued\trank-pass\n`);
+      return done(1);
+    },
+  });
+  await requeue(root, storePath, [url(2)], { jobId: JOB2, runId: RUN2, evaluate: AUTO });
+  await appendRow(root, { url: url(3), at: new Date(T0 - 30_000).toISOString(), jobId: JOB, runId: RUN, reason: "below-threshold", state: "skipped", source: "rank-pass" });
+  assert.equal((await drain()).evaluated, 2);
+  assert.equal(readLedger(root, { now: T0 }).find((entry) => entry.url === url(3)).state, "queued");
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});

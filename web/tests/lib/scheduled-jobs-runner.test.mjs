@@ -1510,6 +1510,18 @@ test("the drain runs after the rank pass only on a tick without --job, and only 
   });
 });
 
+test("a run's drain reason is cleared by the tick after its job leaves auto mode, and then the drain rests", async () => {
+  await withTickRoot(async ({ root, storePath, spawnWith }) => {
+    const spawnFn = spawnWith(() => ({ status: 0, stdout: "{}", stderr: "" }));
+    await withScheduledStore(storePath, (store) => { store.runs[0].drainMessage = "Evaluation stopped at a posting and the rest stay queued: request rejected (429)"; });
+    await quietly(() => runnerTick([], { root, spawnFn }));
+    assert.deepEqual(readScheduledStore(storePath).runs.filter((run) => run.drainMessage), []);
+    const drains = [];
+    await quietly(() => runnerTick([], { root, spawnFn, drainFn: async (options) => { drains.push(options); } }));
+    assert.equal(drains.length, 0, "nothing left to clear");
+  });
+});
+
 test("a failing drain or a drain lock held elsewhere goes to stderr and the tick still returns", async () => {
   await withTickRoot(async ({ root, storePath, spawnWith }) => {
     await withScheduledStore(storePath, (store) => { store.jobs[0].evaluate.mode = "auto"; });
