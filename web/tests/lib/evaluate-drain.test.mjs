@@ -249,7 +249,7 @@ test("a usage-limit error stops the batch and leaves the rest queued", async (t)
   assert.equal(posts.length, 2);
   const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
   assert.equal(run.evalErrors, 0);
-  assert.match(run.drainMessage, new RegExp(`stopped at ${url(2)} `), "the row evaluated before the stop does not clear it");
+  assert.ok(run.drainMessage.includes(`stopped at ${url(2)} `), "the row evaluated before the stop does not clear it");
 });
 
 test("an ordinary error is failed and the batch goes on, and a rate limit stops it too", async (t) => {
@@ -348,7 +348,7 @@ test("the stop reason goes on the run whose row stopped the batch, not on the ot
   await drain();
   const runs = readScheduledStore(storePath).runs;
   assert.equal(runs.find((r) => r.id === RUN).drainMessage, undefined);
-  assert.match(runs.find((r) => r.id === RUN2).drainMessage, new RegExp(`stopped at ${url(2)} `));
+  assert.ok(runs.find((r) => r.id === RUN2).drainMessage.includes(`stopped at ${url(2)} `));
 });
 
 test("a dashboard that is offline is named on the scheduled run", async (t) => {
