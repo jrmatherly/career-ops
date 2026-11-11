@@ -278,6 +278,12 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
 - **A limit stops the batch.** A usage limit, a rate limit, or a gateway whose
   seats are all cooling down stops the batch. The row that met it stays queued
   with its retries, and so does the rest.
+- **A timed-out evaluation stops the batch too.** An evaluation the dashboard
+  cuts off at its 740-second limit is recorded as failed and spends one of the
+  row's three tries. The rest stay queued for the next tick.
+- **The run history says why.** When a batch stops, or the dashboard was
+  offline, the scheduled run in the dashboard's run history shows the reason
+  until a later tick evaluates that run's rows.
 
 Check the queue with `node evaluate-queue.mjs dump --json`.
 
