@@ -86,6 +86,7 @@ export function RunHistoryDrawer({
                   <p className="mt-2 text-muted leading-relaxed">{run.message || "Execution completed"}</p>
                   {counts && <p className="mt-1 font-medium text-foreground">{counts}</p>}
                   {run.evalMessage && <p className="mt-1 text-muted leading-relaxed">{run.evalMessage}</p>}
+                  {run.drainMessage && <p className="mt-1 text-muted leading-relaxed break-words">{run.drainMessage}</p>}
 
                   <div className="mt-2 flex items-center justify-between text-[11px] text-faint border-t border-border/40 pt-1.5">
                     <span>Date: {new Date(run.at).toLocaleDateString()}</span>

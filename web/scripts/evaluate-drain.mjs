@@ -12,7 +12,7 @@ import path from "node:path";
 import { readScheduledStore } from "../src/lib/scheduled-jobs-store.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
-import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE } from "../src/lib/run-cli-support.mjs";
+import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
 import { appendRow, drainPlan, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
@@ -137,7 +137,11 @@ function outcomeOf(response) {
   // The limit event names why the batch stops; the terminal error after it is generic.
   // A limit is the account's or the gateway's, not this row's, so the row keeps its retries.
   const limit = events.find((event) => event.type === "error" && isLimitError(String(event.msg ?? "")));
-  return limit ? { state: "queued", reason: String(limit.msg), stop: "limit" } : { state: "failed", reason: String(terminal.msg ?? "") };
+  if (limit) return { state: "queued", reason: String(limit.msg), stop: "limit" };
+  const reason = String(terminal.msg ?? "");
+  // A time-limit kill is a slow posting or a gateway the CLI retried in silence. The row
+  // spends a retry either way, and the batch stops because each next row could cost the same wait.
+  return { state: "failed", reason, stop: isTimeoutMessage(reason) ? "timeout" : undefined };
 }
 
 /**
@@ -182,7 +186,9 @@ export async function runDrain({
   const online = health.status === 200;
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
-  const touchedRuns = new Set();
+  // Each run this drain wrote a row for, with the change to its stop message: set by a
+  // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
+  const touchedRuns = new Map();
   let status = "drained";
 
   jobs: for (const job of jobs) {
@@ -193,11 +199,13 @@ export async function runDrain({
       const { url } = entry;
       const append = async (state, reason = "") => {
         await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
-        touchedRuns.add(entry.runId);
+        if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, {});
         if (state !== "running") counts[state] += 1;
       };
       if (!online) {
         if (entry.state !== "queued" || entry.reason !== "dashboard-offline") await append("queued", "dashboard-offline");
+        // Set on every offline tick, not only with the row: an evaluation in between may have cleared it.
+        touchedRuns.set(entry.runId, { drainMessage: "The dashboard did not answer, so nothing was evaluated. Queued rows wait." });
         status = "offline";
         continue;
       }
@@ -236,6 +244,9 @@ export async function runDrain({
         timeoutMs: runTimeoutMs,
       }));
       await append(outcome.state, outcome.reason);
+      const note = touchedRuns.get(entry.runId);
+      if (outcome.stop) note.drainMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
+      else if (outcome.state !== "queued") note.drainMessage = undefined;
       if (outcome.stop) {
         status = outcome.stop === "offline" ? "offline" : "stopped";
         log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
@@ -249,12 +260,20 @@ export async function runDrain({
   return { status, ...counts };
 }
 
-/** Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up. */
-async function recordDrainCounts(root, storePath, runIds, nowMs) {
+/**
+ * Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up,
+ * and its stop message, which a finished evaluation clears. So does a run with no row left
+ * to try, or the message would outlive the rows it is about.
+ */
+async function recordDrainCounts(root, storePath, runs, nowMs) {
   const entries = readLedger(root, { now: nowMs });
-  for (const runId of runIds) {
+  for (const [runId, message] of runs) {
     const own = entries.filter((entry) => entry.runId === runId);
     const count = (state) => own.filter((entry) => entry.state === state).length;
-    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed") });
+    const waiting = own.some((entry) => !entry.final);
+    await recordStepCounts(storePath, runId, {
+      evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"),
+      ...(waiting ? message : { drainMessage: undefined }),
+    });
   }
 }

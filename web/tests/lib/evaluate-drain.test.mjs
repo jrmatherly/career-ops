@@ -9,6 +9,7 @@ import { runDrain } from "../../scripts/evaluate-drain.mjs";
 import { rankPass } from "../../scripts/scheduled-jobs-runner.mjs";
 import { readScheduledStore } from "../../src/lib/scheduled-jobs-store.mjs";
 import { checkRequest } from "../../src/lib/origin-guard.mjs";
+import { timeoutMessage } from "../../src/lib/run-cli-support.mjs";
 import { appendRow, readLedger } from "../../../lib/evaluate-queue.mjs";
 
 const JOB = "11111111-1111-4111-8111-111111111111";
@@ -246,7 +247,9 @@ test("a usage-limit error stops the batch and leaves the rest queued", async (t)
   assert.equal(state(url(2)).reason, "Claude AI usage limit reached|1762650000", "the row names the limit, not the generic terminal error");
   assert.equal(state(url(2)).failures, 0, "the row keeps its retries");
   assert.equal(posts.length, 2);
-  assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN).evalErrors, 0);
+  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  assert.equal(run.evalErrors, 0);
+  assert.ok(run.drainMessage.includes(`stopped at ${url(2)} `), "the row evaluated before the stop does not clear it");
 });
 
 test("an ordinary error is failed and the batch goes on, and a rate limit stops it too", async (t) => {
@@ -275,6 +278,105 @@ test("a gateway whose seats are all cooling down stops the batch", async (t) => 
   }
 });
 
+// A CLI that retries a 429 in silence is killed at the time limit with no limit event before it.
+test("a run cut off at the route's time limit fails its row and stops the batch", async (t) => {
+  const answer = () => [{ type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([state(url(1)).state, state(url(1)).failures, state(url(2)).state], ["failed", 1, "queued"], "the slow row spends a retry, the rest are not started");
+  assert.equal(posts.length, 1);
+});
+
+test("a stopped batch is named on its scheduled run until a later drain gets through", async (t) => {
+  const limit = "Claude AI usage limit reached|1762650000";
+  let reply = [{ type: "error", msg: limit }];
+  const answer = () => reply;
+  const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], answer });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  await drain();
+  assert.equal(run().drainMessage, `Evaluation stopped at ${url(1)} and the rest stay queued: ${limit}`);
+  await drain({ fetchJd: async () => null });
+  assert.match(run().drainMessage, /^Evaluation stopped/, "a tick that only re-queues the row keeps the reason");
+  reply = 409;
+  await drain();
+  assert.match(run().drainMessage, /^Evaluation stopped/, "a 409 evaluated nothing, so the reason stays");
+  reply = done(1);
+  await drain();
+  assert.deepEqual([run().evaluated, run().drainMessage], [1, undefined]);
+});
+
+test("an evaluation that fails without stopping the batch clears the stop reason", async (t) => {
+  let reply = [{ type: "error", msg: "429 rate limit exceeded" }];
+  const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], answer: () => reply });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  await drain();
+  assert.match(run().drainMessage, /^Evaluation stopped/);
+  reply = [{ type: "error", msg: "merge-tracker.mjs failed." }];
+  await drain();
+  assert.deepEqual([run().evalErrors, run().drainMessage], [1, undefined]);
+});
+
+test("a stop reason goes when its run has no row left to try", async (t) => {
+  const { root, drain, state, storePath } = await withDrainRoot(t, { urls: [url(1)], answer: () => [{ type: "error", msg: "429 rate limit exceeded" }] });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  await drain();
+  assert.match(run().drainMessage, /^Evaluation stopped/);
+  fs.writeFileSync(path.join(root, "data", "pipeline.md"), "## Pending\n");
+  await drain();
+  assert.deepEqual([state(url(1)).state, run().drainMessage], ["skipped", undefined]);
+});
+
+test("a row that times out on its last try leaves no stop reason behind", async (t) => {
+  const answer = () => [{ type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state, storePath } = await withDrainRoot(t, { urls: [url(1)], answer });
+  await drain();
+  await drain();
+  assert.match(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, /^Evaluation stopped/);
+  assert.equal((await drain()).status, "stopped");
+  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  assert.deepEqual([state(url(1)).failures, run.evalErrors, run.drainMessage], [3, 1, undefined], "no later tick touches the run, so nothing could clear it");
+});
+
+test("the stop reason goes on the run whose row stopped the batch, not on the others", async (t) => {
+  const RUN2 = "33333333-3333-4333-8333-333333333333";
+  const answer = (body) => (body.input === url(1) ? done(1) : [{ type: "error", msg: "429 rate limit exceeded" }]);
+  const { root, drain, storePath } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
+  const store = readScheduledStore(storePath);
+  store.runs.push({ ...store.runs[0], id: RUN2 });
+  fs.writeFileSync(storePath, JSON.stringify(store));
+  await appendRow(root, { url: url(2), at: new Date(T0 - 30_000).toISOString(), jobId: JOB, runId: RUN2, rank: 4, state: "queued", source: "rank-pass" });
+  await drain();
+  const runs = readScheduledStore(storePath).runs;
+  assert.equal(runs.find((r) => r.id === RUN).drainMessage, undefined);
+  assert.ok(runs.find((r) => r.id === RUN2).drainMessage.includes(`stopped at ${url(2)} `));
+});
+
+test("a dashboard that is offline is named on the scheduled run", async (t) => {
+  const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], healthy: false });
+  await drain();
+  assert.match(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, /^The dashboard did not answer/);
+});
+
+test("an offline tick names itself on the run again after an evaluation cleared the reason", async (t) => {
+  const { drain, state, storePath } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  const offline = { baseUrl: "http://127.0.0.1:1" };
+  await drain(offline);
+  await drain();
+  assert.deepEqual([state(url(1)).state, state(url(2)).reason, run().drainMessage], ["evaluated", "dashboard-offline", undefined]);
+  await drain(offline);
+  assert.match(run().drainMessage, /^The dashboard did not answer/);
+  assert.equal(state(url(2)).rows.length, 2, "the ledger still gets the offline row once");
+});
+
+test("a limit named before the time-limit kill is still a limit, and the row keeps its retries", async (t) => {
+  const limit = "Claude AI usage limit reached|1762650000";
+  const answer = () => [{ type: "error", msg: limit }, { type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).failures], ["queued", limit, 0]);
+});
+
 test("a 409 leaves the row queued as in-flight", async (t) => {
   const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer: () => 409 });
   await drain();
@@ -297,13 +399,16 @@ test("a row with no posting text yet does not hold the job's only slot", async (
 
 test("a POST that fails in transport leaves the row queued as dashboard-offline with no retry used", async (t) => {
   for (const answer of [() => "drop", () => [{ type: "status", label: "Saving report…" }]]) {
-    const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
+    const { drain, state, posts, storePath } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
     const result = await drain();
     assert.equal(result.status, "offline");
     assert.equal(posts.length, 1, "the drain stops at the first offline answer");
     const entry = state(url(1));
     assert.deepEqual([entry.state, entry.reason, entry.failures], ["queued", "dashboard-offline", 0]);
     assert.equal(state(url(2)).rows.length, 1);
+    const { drainMessage } = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+    assert.match(drainMessage, /^Evaluation stopped/);
+    assert.doesNotMatch(drainMessage, /dashboard-offline$/, "the run names the cause, not the ledger's word for it");
   }
 });
 

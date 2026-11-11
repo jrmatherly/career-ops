@@ -57,6 +57,7 @@ export type JobRun = {
   gated?: number;
   evalErrors?: number;
   evalMessage?: string;
+  drainMessage?: string;
 };
 
 type QueueItem = { id: string; jobId: string; queuedAt: string };
