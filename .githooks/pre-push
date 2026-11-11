@@ -1,7 +1,6 @@
 #!/bin/sh
 # Enabled per clone with: git config core.hooksPath .githooks
 # (.claude/hooks/session-start.mjs does this for Claude Code sessions.)
-# A worktree on a branch cut before this hook existed has no script to run.
-hook="$(git rev-parse --show-toplevel)/.githooks/pre-push.mjs"
-[ -f "$hook" ] || exit 0
-exec node "$hook"
+# The script beside this file, not the pushed worktree's: with an absolute core.hooksPath
+# one checkout's hooks serve every worktree, and a branch cut before the gate has no copy.
+exec node "$(dirname "$0")/pre-push.mjs"
