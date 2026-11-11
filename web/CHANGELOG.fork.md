@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1](https://github.com/jrmatherly/career-ops/compare/web-v1.1.0...web-v1.1.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **web:** name a failed drain on the right run ([57168d5](https://github.com/jrmatherly/career-ops/commit/57168d56dfd0c85e2d6c874ff683adb36726c188))
+* **web:** put a between-rows drain failure on the last run written ([9721875](https://github.com/jrmatherly/career-ops/commit/972187550a0db7706d7c55c7fa1db2a2f6f80f05))
+* **web:** record a drain that throws on its scheduled run ([ee89cd1](https://github.com/jrmatherly/career-ops/commit/ee89cd1bfb3f5067ba6d599375d5fd1e06aa9e5f))
+* **web:** record a drain that throws on its scheduled run ([0992656](https://github.com/jrmatherly/career-ops/commit/0992656b6625e183ebdbed78c4cc304dde7be325))
+
 ## [1.1.0](https://github.com/jrmatherly/career-ops/compare/web-v1.0.0...web-v1.1.0) (2026-11-11)
 
 
