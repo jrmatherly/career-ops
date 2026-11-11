@@ -274,8 +274,10 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
   runner cannot read through an API is skipped as `no-api-text`; evaluate it
   from the Inbox.
 - **Never twice.** A row you already evaluated from the Inbox, or one with a
-  report or tracker row, is skipped, and a usage-limit error stops the batch with
-  the rest still queued.
+  report or tracker row, is skipped.
+- **A limit stops the batch.** A usage limit, a rate limit, or a gateway whose
+  seats are all cooling down stops the batch. The row that met it stays queued
+  with its retries, and so does the rest.
 
 Check the queue with `node evaluate-queue.mjs dump --json`.
 
