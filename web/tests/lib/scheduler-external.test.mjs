@@ -123,8 +123,9 @@ test("POST /api/scheduler still starts the runner when the log cannot be opened"
     const { POST } = await import("@/app/api/scheduler/route.ts");
     assert.equal((await POST()).status, 202);
     assert.equal(existsSync(tick), true);
+    // Windows opens a directory for append and fails on the first write instead.
     assert.equal(warnings.length, 1);
-    assert.match(warnings[0], /runner log could not be opened/);
+    assert.match(warnings[0], /runner log/);
   } finally {
     console.warn = warn;
     rmSync(log, { recursive: true, force: true });
