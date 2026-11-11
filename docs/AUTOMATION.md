@@ -269,7 +269,7 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
   runner's environment to accept that on this host.
 - **A daily cap.** `pipeline.auto_evaluate_daily_cap` in `config/profile.yml` (default
   10) caps the evaluations started (running rows) per UTC day across every job. When it
-  is reached, the runner says so on stderr and the rows wait for the next UTC day.
+  is reached, the rows wait for the next UTC day.
 - **Boards with a public API only.** A row on a board whose posting text the
   runner cannot read through an API is skipped as `no-api-text`; evaluate it
   from the Inbox.
@@ -281,10 +281,13 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
 - **A timed-out evaluation stops the batch too.** An evaluation the dashboard
   cuts off at its 740-second limit is recorded as failed and spends one of the
   row's three tries. The rest stay queued for the next tick.
-- **The run history says why.** When a batch stops, or the dashboard was
-  offline, the scheduled run in the dashboard's run history shows the reason
-  until a later tick finishes an evaluation for that run, or the run has no
-  row left to try.
+- **The run history says why.** When rows are left queued, their scheduled run
+  in the dashboard's run history shows the reason: the batch stopped, the
+  dashboard was offline, the daily cap was reached, or the job's evaluations
+  per run were used up. The reason goes when a later tick finishes an
+  evaluation for that run, when the limit no longer holds, when the run has no
+  row left to try, or when the job leaves Auto. A row that waits for its
+  posting text, or sits below a rank threshold you raised, shows no reason.
 
 Check the queue with `node evaluate-queue.mjs dump --json`.
 
