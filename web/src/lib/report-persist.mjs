@@ -21,6 +21,8 @@ import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./eva
 
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const YAML_FENCE = /^##\s*Machine Summary\s*\n+```(?:yaml|yml)?\s*\n([\s\S]*?)\n```/i;
+// final_decision's values in batch/batch-prompt.md.
+const DECISIONS = new Set(["Apply", "Consider", "Research first", "Skip"]);
 const TITLE_RE = /^#\s+Evaluation:\s+(.+?)\s+(?:—|--|–|-)\s+(.+)$/m;
 
 /**
@@ -105,7 +107,7 @@ export function formatScore(raw) {
  * `# Evaluation: Company — Role` title is the fallback for company/role.
  *
  * @param {string} markdown
- * @returns {{ok: true, company: string, role: string, score: string, via: string|null} | {ok: false, error: string}}
+ * @returns {{ok: true, company: string, role: string, score: string, via: string|null, decision: string|null, nextAction: string|null} | {ok: false, error: string}}
  */
 const TSV_BREAK = /[\t\r\n]/;
 
@@ -132,7 +134,14 @@ export function parseReportMeta(markdown) {
       return { ok: false, error: `The report's Machine Summary has a tab or newline in ${field}, so the tracker row cannot be built.` };
     }
   }
-  return { ok: true, company, role, score, via };
+  // Notes only, so neither can fail the row: an unknown decision or a cell-splitting next action is left out.
+  const decision = yamlScalar(fence, "final_decision");
+  const nextAction = yamlScalar(fence, "next_action");
+  return {
+    ok: true, company, role, score, via,
+    decision: DECISIONS.has(decision) ? decision : null,
+    nextAction: tsvUnsafe(nextAction) ? null : nextAction,
+  };
 }
 
 /**
@@ -296,8 +305,16 @@ export async function persistEvaluation({ spawnFn, execPath, root, coreRoot = ro
   }
 
   const postingUrl = /^https?:\/\//i.test(String(url ?? "")) ? String(url) : "";
-  const notes = (ISO_DATE_RE.test(String(postedAt ?? "")) ? `; posted: ${postedAt}` : "")
-    + (!evaluation.full ? `; Focused evaluation: ${evaluation.sections.join(", ") || "fit score only"}` : "");
+  // `{decision}; {next action}; posted: {date}`. The dashboard reads `posted:` only at the start of
+  // a line or after `;` or `|`, and a re-evaluation appends these notes after "Re-eval …: ", so a
+  // cell with no sentence to lead it keeps the bare `; `.
+  const segments = [
+    meta.decision,
+    meta.nextAction,
+    !evaluation.full && `Focused evaluation: ${evaluation.sections.join(", ") || "fit score only"}`,
+    ISO_DATE_RE.test(String(postedAt ?? "")) && `posted: ${postedAt}`,
+  ].filter(Boolean);
+  const notes = (segments[0]?.startsWith("posted: ") ? "; " : "") + segments.join("; ");
 
   const written = await spawnScript({
     spawnFn, execPath, root: coreRoot, cwd: root,
