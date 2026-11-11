@@ -27,7 +27,7 @@ function scratchRepo(t) {
   return { repo, git, commit };
 }
 
-const reviewWith = (findings, status = findings ? 2 : 0) => () => ({ status, stdout: `{"type":"heartbeat"}\n{"type":"complete","findings":${findings}}\n` });
+const reviewWith = (findings, status = findings ? 2 : 0) => () => ({ status, stdout: `{"type":"heartbeat"}\n{"type":"complete","findings":${findings},"outcome":"completed"}\n` });
 const line = (sha, branch = 'feat') => `refs/heads/${branch} ${sha} refs/heads/${branch} ${ZERO}\n`;
 
 test('a branch whose tip has no review is refused, and main, a tag and a deletion pass', (t) => {
@@ -73,6 +73,11 @@ test('a review that did not complete records nothing', (t) => {
   const review = main([], { cwd: repo, run: () => ({ status: 1, stdout: '{"type":"error","message":"rate limited"}\n' }) });
   assert.equal(review.code, 1);
   assert.match(review.err, /did not complete/);
+  assert.equal(readMarker(repo, sha), null);
+  const partial = { status: 1, stdout: '{"type":"complete","findings":0,"outcome":"failed","unreviewedFileCount":1}\n' };
+  assert.equal(main([], { cwd: repo, run: () => partial }).code, 1, 'a failed review that reports no findings is not clean');
+  assert.equal(main([], { cwd: repo, run: () => ({ ...partial, status: 0 }) }).code, 1);
+  assert.equal(main([], { cwd: repo, run: reviewWith(0, 1) }).code, 1, 'nor is a complete event behind a failing exit');
   assert.equal(readMarker(repo, sha), null);
 });
 

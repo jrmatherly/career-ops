@@ -48,12 +48,12 @@ export function writeMarker(cwd, sha, marker) {
 
 const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--committed', '--base', 'main', '--gate', 'info'], { cwd, encoding: 'utf-8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 64 * 1024 * 1024 });
 
-/** How many findings the review's closing event reports, or null when the review did not complete. */
+/** How many findings the review's closing event reports, or null when the review did not complete in full. */
 export function findingsIn(stdout) {
   for (const line of String(stdout ?? '').split('\n').reverse()) {
     try {
       const event = JSON.parse(line);
-      if (event.type === 'complete' && Number.isInteger(event.findings)) return event.findings;
+      if (event.type === 'complete') return event.outcome === 'completed' && Number.isInteger(event.findings) ? event.findings : null;
     } catch { /* not an event line */ }
   }
   return null;
@@ -80,7 +80,8 @@ export function main(args, { cwd = process.cwd(), run = runCodeRabbit } = {}) {
 
   const review = run(cwd);
   const out = review.stdout ?? '';
-  const findings = findingsIn(out);
+  // The CLI exits 0 when clean and 2 at the gate; anything else is a failed or partial review, whatever it printed.
+  const findings = review.status === 0 || review.status === 2 ? findingsIn(out) : null;
   if (review.error || findings === null) {
     return { code: review.status || 1, out, err: `The review did not complete${review.error ? ` (${review.error.message})` : ''}, so ${sha} is not recorded. See \`coderabbit review --usage\` for the quota.\n` };
   }
