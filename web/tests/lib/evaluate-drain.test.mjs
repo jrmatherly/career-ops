@@ -258,6 +258,17 @@ test("an ordinary error is failed and the batch goes on, and a rate limit stops 
   assert.equal(run2.state(url(2)).state, "queued");
 });
 
+// Claude Code 2.1.321's result text for CLIProxyAPI v8.0.62's 429 when every seat is cooling down.
+test("a gateway whose seats are all cooling down stops the batch", async (t) => {
+  const cooldown = "API Error: Request rejected (429) · All credentials for model claude-opus-5-5 are cooling down";
+  const answer = () => [{ type: "error", msg: cooldown }, { type: "error", msg: "This run hit an error before finishing." }];
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([state(url(1)).state, state(url(2)).state], ["failed", "queued"]);
+  assert.equal(state(url(1)).reason, cooldown);
+  assert.equal(posts.length, 1);
+});
+
 test("a 409 leaves the row queued as in-flight", async (t) => {
   const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer: () => 409 });
   await drain();
