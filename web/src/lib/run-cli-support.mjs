@@ -475,6 +475,9 @@ export function timeoutMessage(killMs, kind) {
   return `This run passed the ${Math.round(killMs / 1000)}s time limit and was stopped before it could finish — re-run it, or run a very long ${kind} on Claude Code directly. The CLI was working; we cut it off, so it isn't recorded as a result.`;
 }
 
+/** Whether an error event's msg is timeoutMessage's, for a caller that reads the stream. */
+export const isTimeoutMessage = (msg) => /^This run passed the \d+s time limit/.test(msg);
+
 /**
  * Structured CLIs stream each assistant message as text deltas with nothing
  * between messages. A tool call ends a message, so the next text starts on a new

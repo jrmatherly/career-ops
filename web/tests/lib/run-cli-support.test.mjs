@@ -605,7 +605,7 @@ test("the fallback still catches every real failure it caught before", () => {
 // #3124: evaluate runs were killed at 285s (well under the 800s maxDuration) and
 // the kill was then misreported as "didn't save a report", blaming the CLI for a
 // limit the route imposed. These guard the budget and the honest message.
-import { killMsForKind, timeoutMessage, RUN_MAX_DURATION_S } from "../../src/lib/run-cli-support.mjs";
+import { isTimeoutMessage, killMsForKind, timeoutMessage, RUN_MAX_DURATION_S } from "../../src/lib/run-cli-support.mjs";
 
 test("evaluate's kill budget gives real headroom, not the old 285s floor (#3124)", () => {
   const ms = killMsForKind("evaluate");
@@ -670,4 +670,10 @@ test("the generic stderr classifier flags the Antigravity permission line, so th
   // Without this the helper has nothing to append: the route only keeps a stderr
   // line the classifier flags.
   assert.equal(isFatalGenericStderr(AGY_PERMISSION_LINE), true);
+});
+
+test("isTimeoutMessage knows timeoutMessage's text for any kind and limit, and nothing else", () => {
+  assert.ok(isTimeoutMessage(timeoutMessage(740_000, "evaluate-text")));
+  assert.ok(isTimeoutMessage(timeoutMessage(600_000, "pdf")));
+  assert.ok(!isTimeoutMessage("This run hit an error before finishing."));
 });

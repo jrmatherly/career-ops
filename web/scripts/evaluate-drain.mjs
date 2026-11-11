@@ -12,7 +12,7 @@ import path from "node:path";
 import { readScheduledStore } from "../src/lib/scheduled-jobs-store.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
-import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE } from "../src/lib/run-cli-support.mjs";
+import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
 import { appendRow, drainPlan, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
@@ -137,7 +137,11 @@ function outcomeOf(response) {
   // The limit event names why the batch stops; the terminal error after it is generic.
   // A limit is the account's or the gateway's, not this row's, so the row keeps its retries.
   const limit = events.find((event) => event.type === "error" && isLimitError(String(event.msg ?? "")));
-  return limit ? { state: "queued", reason: String(limit.msg), stop: "limit" } : { state: "failed", reason: String(terminal.msg ?? "") };
+  if (limit) return { state: "queued", reason: String(limit.msg), stop: "limit" };
+  const reason = String(terminal.msg ?? "");
+  // A time-limit kill is a slow posting or a gateway the CLI retried in silence. The row
+  // spends a retry either way, and the batch stops because each next row could cost the same wait.
+  return { state: "failed", reason, stop: isTimeoutMessage(reason) ? "timeout" : undefined };
 }
 
 /**
