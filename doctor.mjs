@@ -134,6 +134,7 @@ const dotenvOverride = (() => {
   return value != null && !['false', '0', 'no', 'off', ''].includes(value.toLowerCase());
 })();
 const projectRoot = explicitTarget || getCareerOpsRoot();
+const dataRootMissing = !explicitTarget && !existsSync(projectRoot);
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
 // With no override the path is the root the doctor started from: the human run
@@ -1371,6 +1372,30 @@ function checkEnvFileRoot(root) {
   };
 }
 
+// As path-resolver.mjs reads it: an empty or unreadable marker names nothing.
+function markerNamesRoot() {
+  try {
+    return readFileSync(join(__dirname, '.career-ops-data'), 'utf-8').trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
+// An override names a folder that is not there. Every read finds nothing, so
+// setup looks unfinished, and the first write creates the folder and starts a
+// second, empty data root.
+function checkDataRootExists(root) {
+  if (!dataRootMissing) return null;
+  const source = ROOT_VARS.find((n) => shellRootEnv[n]?.trim())
+    ?? (markerNamesRoot() ? 'The .career-ops-data marker' : null);
+  if (!source) return null; // the plugin default before its first write
+  return {
+    warn: true,
+    label: `${source} names ${root}, which does not exist; your CV, profile and tracker read as missing, and the first write creates an empty data root there`,
+    fix: [`Point it at the folder that holds your cv.md and data/, or create ${root} if a new data root is what you want`],
+  };
+}
+
 function checkPrereq(prereq) {
   const { path, fix } = prereq;
   if (emptyYamlPrereqs(projectRoot).includes(prereq)) {
@@ -1758,7 +1783,9 @@ async function main() {
     checkTitleFilterConflicts(projectRoot),
     checkCvShape(projectRoot),
     checkUserTemplates(projectRoot),
-    ...(userLayerWritable
+    // A missing override root is not created here: the folder would exist on
+    // the next run and the warning below would go quiet on a wrong path.
+    ...(userLayerWritable && !checkDataRootExists(projectRoot)
       ? [checkAutoDir('data'), checkPipelineFile(), checkAutoDir('output'), checkAutoDir('reports')]
       : []),
     checkPlugins(projectRoot),
@@ -1766,6 +1793,7 @@ async function main() {
     // checkPrereq already explains the .env case when the profile is missing.
     prereqPresent(projectRoot, { path: 'config/profile.yml' }) ? checkEnvFileProfile(projectRoot) : null,
     checkEnvFileRoot(projectRoot),
+    checkDataRootExists(projectRoot),
   ].filter(Boolean);
 
   // Network-bound portals.yml reachability probe — only under --strict.
@@ -2002,8 +2030,9 @@ function onboardingState(root) {
     const targetPath = join(root, ...target.split('/'));
     const rootTemplatePath = join(root, ...template.split('/'));
     const templatePath = existsSync(rootTemplatePath) ? rootTemplatePath : join(__dirname, ...template.split('/'));
-    // Diagnosis must not create user files. Copy only during explicit onboarding.
-    if (INIT_TEMPLATES && userLayerWritable && !existsSync(targetPath) && existsSync(templatePath)) {
+    // Diagnosis must not create user files. Copy only during explicit onboarding,
+    // and never into a missing override root: see checkDataRootExists.
+    if (INIT_TEMPLATES && userLayerWritable && !checkDataRootExists(root) && !existsSync(targetPath) && existsSync(templatePath)) {
       try {
         mkdirSync(dirname(targetPath), { recursive: true });
         copyFileSync(templatePath, targetPath, constants.COPYFILE_EXCL);
@@ -2040,6 +2069,7 @@ function onboardingState(root) {
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
   const envFileRoot = checkEnvFileRoot(root);
+  const dataRoot = checkDataRootExists(root);
   const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
@@ -2052,6 +2082,7 @@ function onboardingState(root) {
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
     ...(envFileRoot ? [`${envFileRoot.label}\n→ ${envFileRoot.fix.join('\n  ')}`] : []),
+    ...(dataRoot ? [`${dataRoot.label}\n→ ${dataRoot.fix.join('\n  ')}`] : []),
     ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];

@@ -9,7 +9,7 @@ import type { InboxJob } from "@/lib/career-ops";
 import type { AtsSource } from "@/lib/explore";
 import { ATS_SOURCES } from "@/lib/explore";
 import { daysSince, seniorityFromTitle, sourceFromUrl, SENIORITY_ORDER, type Seniority } from "@/lib/inbox";
-import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
+import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
 import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips } from "./facet-chips";
@@ -428,6 +428,11 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         <p className="text-sm font-medium text-foreground">
           {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
         </p>
+        {visible.some((e) => !selected.has(e.job.url)) && (
+          <button type="button" onClick={() => setSelected((s) => selectionWithAll(s, visible.map((e) => e.job.url)))} className="ml-auto text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
+            Select all {visible.length}
+          </button>
+        )}
         {hiddenCount > 0 && (
           <button type="button" onClick={() => void restoreHidden()} disabled={restoring} aria-busy={restoring} className="text-xs text-faint transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-[44px]">
             {hiddenCount} hidden · {restoring ? "restoring…" : "restore"}

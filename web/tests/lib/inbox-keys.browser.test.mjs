@@ -13,6 +13,35 @@ import { settled } from "../helpers/streaming.mjs";
 const url = process.env.INBOX_KEYS_TEST_URL;
 const root = process.env.INBOX_KEYS_TEST_ROOT;
 
+// First in the file: it writes nothing, and the tests below skip the fixture rows.
+test("select all checks only the rows the filter leaves listed", { skip: liveServerSkip("INBOX_KEYS_TEST_URL", "INBOX_KEYS_TEST_ROOT"), timeout: 60_000 }, async (t) => {
+  const origin = new URL(url);
+  assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname));
+  const { chromium } = await import("playwright-core");
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const checkbox = (company) => page.locator("li").filter({ hasText: company }).getByRole("checkbox");
+  const filter = page.getByPlaceholder("Filter by company or role…");
+
+  await settled(page, () => page.goto(`${origin.origin}/pipeline`));
+  await checkbox("Fixture Beta").waitFor();
+  await filter.fill("Designer");
+  await checkbox("Fixture Alpha").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Select all 1", exact: true }).click();
+  assert.equal(await checkbox("Fixture Beta").isChecked(), true);
+  assert.equal(await page.getByRole("button", { name: /^Select all/ }).count(), 0, "nothing listed is left to check");
+
+  await filter.fill("");
+  await checkbox("Fixture Alpha").waitFor();
+  assert.equal(await checkbox("Fixture Alpha").isChecked(), false, "a row the filter hid was checked");
+  assert.equal(await checkbox("Fixture Beta").isChecked(), true);
+  await page.getByRole("button", { name: "Select all 2", exact: true }).waitFor();
+  assert.deepEqual(errors, []);
+});
+
 test("inbox keys act on the cursor row and on checked rows", { skip: liveServerSkip("INBOX_KEYS_TEST_URL", "INBOX_KEYS_TEST_ROOT"), timeout: 120_000 }, async (t) => {
   const origin = new URL(url);
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname));
