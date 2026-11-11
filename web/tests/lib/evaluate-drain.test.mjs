@@ -292,7 +292,7 @@ test("a stopped batch is named on its scheduled run until a later drain gets thr
   const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], answer });
   const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
   await drain();
-  assert.equal(run().drainMessage, `Evaluation stopped at ${url(1)}: ${limit}. The rest stay queued.`);
+  assert.equal(run().drainMessage, `Evaluation stopped at ${url(1)} and the rest stay queued: ${limit}`);
   limited = false;
   await drain();
   assert.deepEqual([run().evaluated, run().drainMessage], [1, undefined]);

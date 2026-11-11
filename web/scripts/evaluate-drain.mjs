@@ -186,7 +186,8 @@ export async function runDrain({
   const online = health.status === 200;
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
-  const touchedRuns = new Set();
+  // Each run this drain wrote a row for, with why the drain stopped there, if it did.
+  const touchedRuns = new Map();
   let status = "drained";
 
   jobs: for (const job of jobs) {
@@ -197,11 +198,14 @@ export async function runDrain({
       const { url } = entry;
       const append = async (state, reason = "") => {
         await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
-        touchedRuns.add(entry.runId);
+        if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, undefined);
         if (state !== "running") counts[state] += 1;
       };
       if (!online) {
-        if (entry.state !== "queued" || entry.reason !== "dashboard-offline") await append("queued", "dashboard-offline");
+        if (entry.state !== "queued" || entry.reason !== "dashboard-offline") {
+          await append("queued", "dashboard-offline");
+          touchedRuns.set(entry.runId, "The dashboard did not answer, so nothing was evaluated. Queued rows wait.");
+        }
         status = "offline";
         continue;
       }
@@ -243,6 +247,7 @@ export async function runDrain({
       if (outcome.stop) {
         status = outcome.stop === "offline" ? "offline" : "stopped";
         log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);
+        touchedRuns.set(entry.runId, `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`);
         break jobs;
       }
     }
@@ -253,12 +258,15 @@ export async function runDrain({
   return { status, ...counts };
 }
 
-/** Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up. */
-async function recordDrainCounts(root, storePath, runIds, nowMs) {
+/**
+ * Each originating run's totals, from the whole ledger, so a run drained over several ticks adds up,
+ * and its stop message, which a drain that gets through clears.
+ */
+async function recordDrainCounts(root, storePath, runs, nowMs) {
   const entries = readLedger(root, { now: nowMs });
-  for (const runId of runIds) {
+  for (const [runId, drainMessage] of runs) {
     const own = entries.filter((entry) => entry.runId === runId);
     const count = (state) => own.filter((entry) => entry.state === state).length;
-    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed") });
+    await recordStepCounts(storePath, runId, { evaluated: count("evaluated"), gated: count("gated"), evalErrors: count("failed"), drainMessage });
   }
 }
