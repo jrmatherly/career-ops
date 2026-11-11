@@ -1372,13 +1372,22 @@ function checkEnvFileRoot(root) {
   };
 }
 
+// As path-resolver.mjs reads it: an empty or unreadable marker names nothing.
+function markerNamesRoot() {
+  try {
+    return readFileSync(join(__dirname, '.career-ops-data'), 'utf-8').trim() !== '';
+  } catch {
+    return false;
+  }
+}
+
 // An override names a folder that is not there. Every read finds nothing, so
-// setup looks unfinished, and the first write creates the folder and starts an
-// empty data root beside the real one.
+// setup looks unfinished, and the first write creates the folder and starts a
+// second, empty data root.
 function checkDataRootExists(root) {
   if (!dataRootMissing) return null;
   const source = ROOT_VARS.find((n) => shellRootEnv[n]?.trim())
-    ?? (existsSync(join(__dirname, '.career-ops-data')) ? 'The .career-ops-data marker' : null);
+    ?? (markerNamesRoot() ? 'The .career-ops-data marker' : null);
   if (!source) return null; // the plugin default before its first write
   return {
     warn: true,
@@ -2021,8 +2030,9 @@ function onboardingState(root) {
     const targetPath = join(root, ...target.split('/'));
     const rootTemplatePath = join(root, ...template.split('/'));
     const templatePath = existsSync(rootTemplatePath) ? rootTemplatePath : join(__dirname, ...template.split('/'));
-    // Diagnosis must not create user files. Copy only during explicit onboarding.
-    if (INIT_TEMPLATES && userLayerWritable && !existsSync(targetPath) && existsSync(templatePath)) {
+    // Diagnosis must not create user files. Copy only during explicit onboarding,
+    // and never into a missing override root: see checkDataRootExists.
+    if (INIT_TEMPLATES && userLayerWritable && !checkDataRootExists(root) && !existsSync(targetPath) && existsSync(templatePath)) {
       try {
         mkdirSync(dirname(targetPath), { recursive: true });
         copyFileSync(templatePath, targetPath, constants.COPYFILE_EXCL);

@@ -381,3 +381,17 @@ test('doctor sets up ~/career-ops-data for a plugin copy with no override', (t) 
   assert.equal(existsSync(join(dataRoot, 'data')), true);
   assert.equal(existsSync(join(setup.copy, 'data', 'pipeline.md')), false);
 });
+
+test('doctor sets up ~/career-ops-data for a plugin copy whose marker is empty', (t) => {
+  const setup = doctorPluginCopy(t);
+  if (!setup) return;
+  const marker = join(setup.copy, '.career-ops-data');
+  writeFileSync(marker, '\n');
+  try {
+    const run = runDoctor(setup, []);
+    assert.doesNotMatch(run.stdout, /does not exist/);
+    assert.equal(existsSync(join(run.home, 'career-ops-data', 'data')), true);
+  } finally {
+    rmSync(marker);
+  }
+});

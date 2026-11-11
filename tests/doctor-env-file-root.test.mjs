@@ -1,12 +1,14 @@
 // tests/doctor-env-file-root.test.mjs — doctor warns when the data root's own
-// .env names another data root.
+// .env names another data root, and when an override names a folder that does
+// not exist.
 //
 // Only the commands that load a .env see that line, and only after the load:
 // getCareerOpsRoot() answers one folder before `import('./scan.mjs')` and the
 // other after it. Doctor stays on the root it started from and says so.
 //
-// The root has to be picked by default, not by the environment, so doctor runs
-// from a copy of the tracked code files whose own folder is the data root.
+// In the .env cases the root has to be picked by default, not by the
+// environment, so doctor runs from a copy of the tracked code files whose own
+// folder is the data root.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -156,8 +158,25 @@ for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
 
     assert.match(doctor([], { [name]: gone }), new RegExp(`${name} names .*does not exist`));
     assert.ok(!existsSync(gone), 'the human run created the folder, so the next run would stop warning');
+    assert.deepEqual(doctor(['--json', '--init-templates'], { [name]: gone }).autoCopied, []);
+    assert.ok(!existsSync(gone), '--init-templates seeded a root that does not exist');
 
     assert.deepEqual(missing(doctor(['--json'], { [name]: other })), []);
     assert.deepEqual(missing(doctor(['--json'])), []);
   });
 }
+
+test('doctor warns when the marker names a folder that does not exist', (t) => {
+  if (depsReason) return t.skip(depsReason);
+  const gone = join(base, 'gone-marker');
+  writeFileSync(join(copy, '.env'), '');
+  writeFileSync(join(copy, '.career-ops-data'), `${gone}\n`);
+  try {
+    const [warning] = doctor(['--json']).warnings.filter((w) => w.includes('does not exist'));
+    assert.ok(warning?.startsWith(`The .career-ops-data marker names ${gone}`), String(warning));
+    doctor([]);
+    assert.ok(!existsSync(gone));
+  } finally {
+    rmSync(join(copy, '.career-ops-data'));
+  }
+});
