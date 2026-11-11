@@ -26,6 +26,10 @@ export function pushVerdict(stdin, cwd) {
 }
 
 if (isMainModule(import.meta.url)) {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(`Usage: git runs this as its pre-push hook, with the pushed refs on stdin.\nA branch other than main needs a review of its tip commit first: ${REVIEW}`);
+    process.exit(0);
+  }
   const { refused, notes } = pushVerdict(readFileSync(0, 'utf-8'), process.cwd());
   for (const note of notes) console.error(`pre-push: ${note}`);
   for (const message of refused) console.error(`pre-push: ${message}`);
