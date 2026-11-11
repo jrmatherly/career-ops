@@ -193,6 +193,7 @@ export async function runDrain({
   let status = "drained";
 
   let current;
+  let lastRunId;
   try {
     jobs: for (const job of jobs) {
       const tried = new Set();
@@ -204,6 +205,7 @@ export async function runDrain({
         const append = async (state, reason = "") => {
           await appendRow(root, { url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason, state, source: "drain" });
           if (!touchedRuns.has(entry.runId)) touchedRuns.set(entry.runId, {});
+          lastRunId = entry.runId;
           if (state !== "running") counts[state] += 1;
         };
         if (!online) {
@@ -261,7 +263,7 @@ export async function runDrain({
   } catch (error) {
     // What this drain finished still counts on its runs, and one run says why it stopped: the
     // failing row's, or between rows the last one this drain wrote to.
-    const runId = current?.runId ?? [...touchedRuns.keys()].at(-1);
+    const runId = current?.runId ?? lastRunId;
     if (runId) touchedRuns.set(runId, { drainMessage: `The drain failed${current ? ` at ${current.url}` : ""} and the rest stay queued: ${messageOf(error)}` });
     try {
       await recordDrainCounts(root, storePath, touchedRuns, now());
