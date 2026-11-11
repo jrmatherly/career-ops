@@ -267,6 +267,11 @@ test("a gateway whose seats are all cooling down stops the batch", async (t) => 
   assert.deepEqual([state(url(1)).state, state(url(2)).state], ["failed", "queued"]);
   assert.equal(state(url(1)).reason, cooldown);
   assert.equal(posts.length, 1);
+  // Each wording stops it alone: the CLI's for another gateway, the proxy's if the CLI rewords its own.
+  for (const msg of ["API Error: Request rejected (429) · upstream busy", "All credentials for model claude-opus-5-5 are cooling down"]) {
+    const run = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => [{ type: "error", msg }] });
+    assert.equal((await run.drain()).status, "stopped", msg);
+  }
 });
 
 test("a 409 leaves the row queued as in-flight", async (t) => {
