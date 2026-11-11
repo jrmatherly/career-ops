@@ -143,3 +143,21 @@ test('doctor says nothing when the cleared root falls back to the same folder', 
   if (depsReason) return t.skip(depsReason);
   silent('CAREER_OPS_ROOT=\n', [], { CAREER_OPS_ROOT: copy, DOTENV_OVERRIDE: 'true' });
 });
+
+for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
+  test(`doctor warns when ${name} names a folder that does not exist`, (t) => {
+    if (depsReason) return t.skip(depsReason);
+    writeFileSync(join(copy, '.env'), '');
+    const gone = join(base, `gone-${name}`);
+    const missing = (json) => json.warnings.filter((w) => w.includes('does not exist'));
+
+    const [warning] = missing(doctor(['--json'], { [name]: gone }));
+    assert.ok(warning?.startsWith(`${name} names ${gone}`), String(warning));
+
+    // The human run creates data/ under the root; the warning must come from before that.
+    assert.match(doctor([], { [name]: gone }), new RegExp(`${name} names .*does not exist`));
+
+    assert.deepEqual(missing(doctor(['--json'], { [name]: other })), []);
+    assert.deepEqual(missing(doctor(['--json'])), []);
+  });
+}

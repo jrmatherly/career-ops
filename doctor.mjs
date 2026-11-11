@@ -134,6 +134,9 @@ const dotenvOverride = (() => {
   return value != null && !['false', '0', 'no', 'off', ''].includes(value.toLowerCase());
 })();
 const projectRoot = explicitTarget || getCareerOpsRoot();
+// Read at startup: the human run creates data/, output/ and reports/ under the
+// root further down, which would make a mistyped folder look like a real one.
+const dataRootMissing = !explicitTarget && !existsSync(projectRoot);
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
 // With no override the path is the root the doctor started from: the human run
@@ -1371,6 +1374,21 @@ function checkEnvFileRoot(root) {
   };
 }
 
+// An override names a folder that is not there. Every read finds nothing, so
+// setup looks unfinished, and the first write creates the folder and starts an
+// empty data root beside the real one.
+function checkDataRootExists(root) {
+  if (!dataRootMissing) return null;
+  const source = ROOT_VARS.find((n) => shellRootEnv[n]?.trim())
+    ?? (existsSync(join(__dirname, '.career-ops-data')) ? 'The .career-ops-data marker' : null);
+  if (!source) return null; // the plugin default before its first write
+  return {
+    warn: true,
+    label: `${source} names ${root}, which does not exist; your CV, profile and tracker read as missing, and the first write creates an empty data root there`,
+    fix: [`Point it at the folder that holds your cv.md and data/, or create ${root} if a new data root is what you want`],
+  };
+}
+
 function checkPrereq(prereq) {
   const { path, fix } = prereq;
   if (emptyYamlPrereqs(projectRoot).includes(prereq)) {
@@ -1766,6 +1784,7 @@ async function main() {
     // checkPrereq already explains the .env case when the profile is missing.
     prereqPresent(projectRoot, { path: 'config/profile.yml' }) ? checkEnvFileProfile(projectRoot) : null,
     checkEnvFileRoot(projectRoot),
+    checkDataRootExists(projectRoot),
   ].filter(Boolean);
 
   // Network-bound portals.yml reachability probe — only under --strict.
@@ -2040,6 +2059,7 @@ function onboardingState(root) {
   const userTemplates = checkUserTemplates(root);
   const envFileProfile = checkEnvFileProfile(root);
   const envFileRoot = checkEnvFileRoot(root);
+  const dataRoot = checkDataRootExists(root);
   const billingSource = checkBillingSource();
   const warnings = [
     ...(cliWarning ? [cliWarning] : []),
@@ -2052,6 +2072,7 @@ function onboardingState(root) {
     ...(userTemplates?.warn ? [`${userTemplates.label}\n→ ${[].concat(userTemplates.fix || []).join('\n  ')}`] : []),
     ...(envFileProfile ? [`${envFileProfile.label}\n→ ${envFileProfile.fix.join('\n  ')}`] : []),
     ...(envFileRoot ? [`${envFileRoot.label}\n→ ${envFileRoot.fix.join('\n  ')}`] : []),
+    ...(dataRoot ? [`${dataRoot.label}\n→ ${dataRoot.fix.join('\n  ')}`] : []),
     ...(billingSource.warn ? [`${billingSource.label}\n→ ${billingSource.fix.join('\n  ')}`] : []),
     ...unpersonalized.map((u) => `${u.path} ${u.reason} — ${u.impact}\n→ Personalize it from cv.md before running evaluations.`),
   ];
