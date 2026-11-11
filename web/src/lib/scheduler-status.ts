@@ -35,7 +35,7 @@ export function schedulerTickPath(root = careerOpsRoot()): string {
   return scheduledStorePath(root) + ".tick";
 }
 
-/** Where the runner's stderr goes: the file the cron line from install-scan-schedule.sh appends to. */
+/** Where the runner's stderr goes: the file the schedule install-scan-schedule.sh installs appends to. */
 export function schedulerLogPath(root = careerOpsRoot()): string {
   return path.join(path.dirname(scheduledStorePath(root)), "scheduled-jobs.log");
 }

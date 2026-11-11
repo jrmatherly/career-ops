@@ -21,8 +21,8 @@ import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./eva
 
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const YAML_FENCE = /^##\s*Machine Summary\s*\n+```(?:yaml|yml)?\s*\n([\s\S]*?)\n```/i;
-// final_decision's values in batch/batch-prompt.md.
-const DECISIONS = new Set(["Apply", "Consider", "Research first", "Skip"]);
+// final_decision's values in batch/batch-prompt.md, keyed in lower case.
+const DECISIONS = new Map(["Apply", "Consider", "Research first", "Skip"].map((value) => [value.toLowerCase(), value]));
 const TITLE_RE = /^#\s+Evaluation:\s+(.+?)\s+(?:—|--|–|-)\s+(.+)$/m;
 
 /**
@@ -107,7 +107,7 @@ export function formatScore(raw) {
  * `# Evaluation: Company — Role` title is the fallback for company/role.
  *
  * @param {string} markdown
- * @returns {{ok: true, company: string, role: string, score: string, via: string|null, decision: string|null, nextAction: string|null} | {ok: false, error: string}}
+ * @returns {{ok: true, company: string, role: string, score: string, via: string|null, decision: string|null} | {ok: false, error: string}}
  */
 const TSV_BREAK = /[\t\r\n]/;
 
@@ -134,14 +134,9 @@ export function parseReportMeta(markdown) {
       return { ok: false, error: `The report's Machine Summary has a tab or newline in ${field}, so the tracker row cannot be built.` };
     }
   }
-  // Notes only, so neither can fail the row: an unknown decision or a cell-splitting next action is left out.
-  const decision = yamlScalar(fence, "final_decision");
-  const nextAction = yamlScalar(fence, "next_action");
-  return {
-    ok: true, company, role, score, via,
-    decision: DECISIONS.has(decision) ? decision : null,
-    nextAction: tsvUnsafe(nextAction) ? null : nextAction,
-  };
+  // Notes only, so an unknown decision is left out and cannot fail the row.
+  const decision = DECISIONS.get(yamlScalar(fence, "final_decision")?.toLowerCase()) ?? null;
+  return { ok: true, company, role, score, via, decision };
 }
 
 /**
@@ -305,12 +300,12 @@ export async function persistEvaluation({ spawnFn, execPath, root, coreRoot = ro
   }
 
   const postingUrl = /^https?:\/\//i.test(String(url ?? "")) ? String(url) : "";
-  // `{decision}; {next action}; posted: {date}`. The dashboard reads `posted:` only at the start of
-  // a line or after `;` or `|`, and a re-evaluation appends these notes after "Re-eval …: ", so a
-  // cell with no sentence to lead it keeps the bare `; `.
+  // Other tools read dates and requisition numbers out of this cell, so only the decision leads it,
+  // never the report's free text. The dashboard reads `posted:` only at the start of a line or after
+  // `;` or `|`, and a re-evaluation appends these notes after "Re-eval …: ", so notes that would
+  // start with `posted:` keep a leading `; `.
   const segments = [
     meta.decision,
-    meta.nextAction,
     !evaluation.full && `Focused evaluation: ${evaluation.sections.join(", ") || "fit score only"}`,
     ISO_DATE_RE.test(String(postedAt ?? "")) && `posted: ${postedAt}`,
   ].filter(Boolean);
