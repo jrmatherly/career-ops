@@ -115,6 +115,9 @@ export function main(args, { cwd = process.cwd(), run = runCodeRabbit } = {}) {
 
   const review = run(cwd);
   const out = review.stdout ?? '';
+  // The CLI reviews whatever HEAD is when it starts reading, so a commit made meanwhile leaves the result unowned.
+  const moved = git(cwd, 'rev-parse', 'HEAD') !== sha;
+  if (moved) return { code: 1, out, err: `HEAD moved off ${sha} while the review ran, so nothing is recorded. Run it again.\n` };
   const result = review.error ? null : reviewResult(review.status, out);
   if (!result) {
     return { code: 1, out, err: `Nothing is recorded for ${sha}: ${failureOf(review)}. Run it again (\`coderabbit review --usage\` shows the quota), or record why the push goes without it: --skip "<reason>".\n` };

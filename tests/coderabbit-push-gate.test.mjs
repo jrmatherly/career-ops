@@ -109,6 +109,16 @@ test('a second review of a declined commit replaces the decline, and a failed on
   assert.match(pushVerdict(line(sha), repo).refused[0], /has 1 open finding\(s\)/);
 });
 
+test('a commit made while the review runs leaves nothing on record', (t) => {
+  const { repo, commit } = scratchRepo(t);
+  const reviewed = commit();
+  let later;
+  const review = main([], { cwd: repo, run: () => { later = commit(); return reviewWith(0)(); } });
+  assert.equal(review.code, 1);
+  assert.match(review.err, /HEAD moved/);
+  assert.deepEqual([readMarker(repo, reviewed), readMarker(repo, later)], [null, null]);
+});
+
 test('a decline needs a review with findings to decline', (t) => {
   const { repo, commit } = scratchRepo(t);
   commit();
