@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enabled per clone with: git config core.hooksPath .githooks
+# (.claude/hooks/session-start.mjs does this for Claude Code sessions.)
+# The script beside this file, not the pushed worktree's: with an absolute core.hooksPath
+# one checkout's hooks serve every worktree, and a branch cut before the gate has no copy.
+exec node "$(dirname "$0")/pre-push.mjs"
