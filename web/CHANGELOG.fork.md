@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.2](https://github.com/jrmatherly/career-ops/compare/web-v1.1.1...web-v1.1.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **web:** an idle drain pass clears a limit message it no longer holds ([210f154](https://github.com/jrmatherly/career-ops/commit/210f1544a78ff8934426ab3239a814e366405ae3))
+* **web:** clear a drain reason left on a run with no row still waiting ([a87e636](https://github.com/jrmatherly/career-ops/commit/a87e636d987875af8ada1c7a2a4f5b92d4d85ac3))
+* **web:** keep the drain's limit messages true past their pass ([44e0f12](https://github.com/jrmatherly/career-ops/commit/44e0f12b2fb9da5f02ba9f2d1bdcca53efb0bcd4))
+* **web:** name a drain's stop on every run it leaves waiting ([2cabb90](https://github.com/jrmatherly/career-ops/commit/2cabb9051c8b65e59e726e73b07a600da23b6bb9))
+* **web:** name the limit that leaves evaluate rows queued on their run ([f21c158](https://github.com/jrmatherly/career-ops/commit/f21c15860c66e5e3e9f52ca46e68d62134fc5782))
+* **web:** name the limit that leaves evaluate rows queued on their run ([c69fbcd](https://github.com/jrmatherly/career-ops/commit/c69fbcd37e0aceaac1f634770e360659008faf7f))
+
 ## [1.1.1](https://github.com/jrmatherly/career-ops/compare/web-v1.1.0...web-v1.1.1) (2026-11-11)
 
 
