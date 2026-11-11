@@ -43,6 +43,12 @@ export function selectionWithout(selected, url) {
   return next;
 }
 
+/** Check every listed posting, keeping the checks already there. The same set comes back when nothing is new. */
+export function selectionWithAll(selected, urls) {
+  if (urls.every((url) => selected.has(url))) return selected;
+  return new Set([...selected, ...urls]);
+}
+
 /** The removed row left the list. An earlier removal shifts the cursor up. The focused removal stays put, on the row that slid into that slot. */
 export function cursorAfterRemoval(index, removedIndex) {
   if (removedIndex < index) return index - 1;
