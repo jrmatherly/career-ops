@@ -93,8 +93,11 @@ neither saved job.
 Engine `portals` runs `scan.mjs`. Engine `full` runs `scan-ats-full.mjs`.
 Nothing else runs on the tick. There is no portal health check and no
 follow-up sweep. `POST /api/scheduler` answers 202 when the runner is spawned,
-not when the scan ends, and the runner is detached with its output ignored, so
-a failed scan shows only in the run history inside `data/scheduled-jobs.json`.
+not when the scan ends. The runner is detached. Its stderr is appended to
+`scheduled-jobs.log` beside the store (`/data/data/scheduled-jobs.log` here),
+under one timestamped `tick` line per POST, and the file is never rotated. A
+failed scan also shows in the run history inside `data/scheduled-jobs.json`,
+but a rank pass or a drain that throws is recorded only in the log.
 
 ## Rollouts kill in-flight runs
 
