@@ -123,7 +123,7 @@ test('the closing event of a real run is read: clean when the gate passed, findi
   assert.deepEqual(reviewResult(0, event(0, { outcome: 'completed_with_warnings', unreviewedFileCount: 0 })), { state: 'clean', findings: 0 }, 'warnings with every file reviewed are still a full review');
 });
 
-test('a review that failed, covered part of the diff or contradicts its exit status records nothing', (t) => {
+test('a review that failed, covered part of the diff or contradicts its exit status records nothing, unless it reports findings', (t) => {
   const { repo, commit } = scratchRepo(t);
   const sha = commit();
   const runs = {
@@ -132,7 +132,6 @@ test('a review that failed, covered part of the diff or contradicts its exit sta
     'a file left unreviewed': { status: 0, stdout: event(0, { outcome: 'completed_with_warnings', unreviewedFileCount: 1 }) },
     'a clean event behind a failing exit': { status: 1, stdout: event(0) },
     'a clean event behind the gate exit': { status: 2, stdout: event(0) },
-    'findings behind a passing exit': { status: 0, stdout: event(2) },
     'a gate with no result': { status: 0, stdout: event(0, { gate: { status: 'incomplete' } }) },
     'a missing CLI': { status: null, error: Object.assign(new Error('spawnSync coderabbit ENOENT'), { code: 'ENOENT' }) },
     'a killed review': { status: null, signal: 'SIGTERM', stdout: '' },
@@ -144,6 +143,11 @@ test('a review that failed, covered part of the diff or contradicts its exit sta
     assert.equal(readMarker(repo, sha), null, name);
   }
   assert.match(main([], { cwd: repo, run: () => runs['a missing CLI'] }).err, /not on PATH/);
+  for (const partial of [{ status: 1, stdout: event(2, { outcome: 'failed', unreviewedFileCount: 3 }) }, { status: 0, stdout: event(2) }]) {
+    assert.equal(main([], { cwd: repo, run: () => partial }).code, 2, 'findings from a partial review are still findings');
+    assert.equal(main(['--skip', 'it only half ran'], { cwd: repo }).code, 1);
+    rmSync(join(markerDir(repo), `${sha}.json`));
+  }
   assert.match(main([], { cwd: repo, run: () => runs['a killed review'] }).err, /killed by SIGTERM/);
 });
 

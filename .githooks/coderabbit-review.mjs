@@ -66,10 +66,10 @@ export function writeMarker(cwd, sha, marker) {
 const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--committed', '--base', 'main', '--gate', 'info'], { cwd, encoding: 'utf-8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 64 * 1024 * 1024 });
 
 /**
- * What a finished `coderabbit review --agent --gate info` run established: {state: "clean"} or
- * {state: "findings", findings}, or null when it failed, covered only part of the diff, or its
- * exit status and closing event disagree. The CLI exits 0 when the gate passed and 2 when it is
- * blocked; `completed_with_warnings` is still a full review while no file is left unreviewed.
+ * What a finished `coderabbit review --agent --gate info` run established: {state: "findings",
+ * findings} whenever its closing event reports any, even from a partial review, so they are
+ * declined and not skipped; {state: "clean"} only when the CLI exited 0, the gate passed and no
+ * file was left unreviewed (`completed_with_warnings` is then still a full review); else null.
  */
 export function reviewResult(status, stdout) {
   let complete = null;
@@ -79,10 +79,10 @@ export function reviewResult(status, stdout) {
       if (event?.type === 'complete') complete = event;
     } catch { /* not an event line */ }
   }
-  if (!complete || complete.outcome === 'failed' || complete.unreviewedFileCount > 0 || !Number.isInteger(complete.findings)) return null;
-  if (status === 0 && complete.gate?.status === 'passed' && complete.findings === 0) return { state: 'clean', findings: 0 };
-  if (status === 2 && complete.gate?.status === 'blocked' && complete.findings > 0) return { state: 'findings', findings: complete.findings };
-  return null;
+  if (!complete || !Number.isInteger(complete.findings)) return null;
+  if (complete.findings > 0) return { state: 'findings', findings: complete.findings };
+  const full = complete.outcome !== 'failed' && !(complete.unreviewedFileCount > 0);
+  return status === 0 && full && complete.gate?.status === 'passed' ? { state: 'clean', findings: 0 } : null;
 }
 
 function failureOf(review) {
