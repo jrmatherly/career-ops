@@ -305,6 +305,24 @@ test("a stopped batch is named on its scheduled run until a later drain gets thr
   assert.deepEqual([run().evaluated, run().drainMessage], [1, undefined]);
 });
 
+test("a drain that throws still records what it finished and names the failure on the run", async (t) => {
+  const { drain, storePath, posts } = await withDrainRoot(t, { urls: [url(1), url(2)] });
+  let broken = false;
+  const now = () => {
+    if (!broken) return T0;
+    broken = false;
+    throw new Error("disk went away");
+  };
+  const fetchJd = async (u) => {
+    broken = u === url(2);
+    return { text: "Posting text." };
+  };
+  await assert.rejects(drain({ now, fetchJd }), /disk went away/);
+  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  assert.equal(posts.length, 1);
+  assert.deepEqual([run.evaluated, run.drainMessage], [1, `The drain failed at ${url(2)} and the rest stay queued: disk went away`]);
+});
+
 test("an evaluation that fails without stopping the batch clears the stop reason", async (t) => {
   let reply = [{ type: "error", msg: "429 rate limit exceeded" }];
   const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], answer: () => reply });
