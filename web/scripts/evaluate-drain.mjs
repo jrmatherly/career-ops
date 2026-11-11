@@ -178,25 +178,47 @@ export async function runDrain({
   const planFor = (job, tried = new Set(), started = 0, cap = dailyCap) => drainPlan(root, {
     jobId: job.id, rankThreshold: job.evaluate.rankThreshold, maxPerRun: job.evaluate.maxPerRun - started, dailyCap: cap, now: now(), exclude: tried,
   });
+  // Each run this drain wrote a row for, with the change to its stop message: set by a
+  // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
+  const touchedRuns = new Map();
+  // A waiting row this drain did not try was held back by a limit, and its run says which. A cap
+  // names its day, because only that run's own rows clear the message.
+  const noteLimits = (tried) => {
+    const capped = startedToday(readLedger(root, { now: now() }), now()) >= dailyCap;
+    const today = new Date(now()).toISOString().slice(0, 10);
+    for (const job of jobs) {
+      const waiting = drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, dailyCap: Infinity, now: now(), exclude: tried });
+      for (const [runId, rows] of Map.groupBy(waiting, (entry) => entry.runId)) {
+        const left = `${rows.length} queued row${rows.length === 1 ? " waits" : "s wait"}`;
+        touchedRuns.set(runId, {
+          drainMessage: capped
+            ? `Daily cap ${dailyCap} reached on ${today} (UTC); ${left} for the next UTC day.`
+            : `This pass evaluated the job's limit of ${job.evaluate.maxPerRun}; ${left} for the next pass.`,
+        });
+      }
+    }
+  };
   if (!jobs.some((job) => planFor(job).length)) {
     if (!jobs.some((job) => planFor(job, undefined, 0, Infinity).length)) return { status: "idle", ...counts };
     log(`daily cap ${dailyCap} reached, ${startedToday(ledger, now())} started today; queued rows wait for the next UTC day`);
+    noteLimits(new Set());
+    // A capped tick comes every few minutes: write only a message its run does not already carry.
+    const recorded = new Map(readScheduledStore(storePath).runs.map((run) => [run.id, run.drainMessage]));
+    for (const [runId, note] of touchedRuns) if (!recorded.has(runId) || recorded.get(runId) === note.drainMessage) touchedRuns.delete(runId);
+    if (touchedRuns.size) await recordDrainCounts(root, storePath, touchedRuns, now());
     return { status: "capped", ...counts };
   }
   const health = await request(baseUrl, "/api/healthz", { timeoutMs: HEALTH_TIMEOUT_MS });
   const online = health.status === 200;
   if (!online) log(`the dashboard at ${baseUrl} did not answer /api/healthz (${health.transport?.message ?? `HTTP ${health.status}`}); queued rows wait`);
   let persisted = null;
-  // Each run this drain wrote a row for, with the change to its stop message: set by a
-  // stop, cleared by an evaluation that finished, left alone by a row that only waited (a 409 too).
-  const touchedRuns = new Map();
+  const tried = new Set();
   let status = "drained";
 
   let current;
   let lastRunId;
   try {
     jobs: for (const job of jobs) {
-      const tried = new Set();
       let started = 0;
       for (let entry; (entry = planFor(job, tried, started)[0]); current = undefined) {
         current = entry;
@@ -260,6 +282,7 @@ export async function runDrain({
         }
       }
     }
+    if (status === "drained") noteLimits(tried);
   } catch (error) {
     // What this drain finished still counts on its runs, and one run says why it stopped: the
     // failing row's, or between rows the last one this drain wrote to.
