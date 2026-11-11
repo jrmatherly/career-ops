@@ -25,13 +25,24 @@ export async function POST() {
   // The runner's rank and drain lines are the only record of some failures. A file, not this
   // server's stderr: a detached runner must not depend on the server's terminal or its lifetime.
   let logFd: number | null = null;
-  // Written to the log when it is open, so a line there never depends on the server's own output being kept.
+  const closeLog = () => {
+    if (logFd === null) return;
+    const fd = logFd;
+    logFd = null;
+    try {
+      fs.closeSync(fd);
+    } catch (error) {
+      console.warn("career-ops web: could not close the runner log:", error);
+    }
+  };
+  // A log that refuses a write is not handed to the runner, whose own writes to it would throw.
   const note = (line: string) => {
     if (logFd === null) return;
     try {
       fs.writeSync(logFd, `${line}\n`);
     } catch (error) {
-      console.warn(`career-ops web: could not write "${line}" to the runner log:`, error);
+      console.warn("career-ops web: the runner log could not be written, so the runner's stderr is not kept:", error);
+      closeLog();
     }
   };
   try {
@@ -70,11 +81,7 @@ export async function POST() {
     return NextResponse.json({ error: "Could not start the local scheduled-job runner." }, { status: 500 });
   } finally {
     // The child holds its own copy. A failed close must not replace the response.
-    try {
-      if (logFd !== null) fs.closeSync(logFd);
-    } catch (error) {
-      console.warn("career-ops web: could not close the runner log:", error);
-    }
+    closeLog();
   }
 
   // An external scheduler has no cron line to touch the tick, so this route does; a manual click in OS mode must not.
