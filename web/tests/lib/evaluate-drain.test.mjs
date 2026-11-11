@@ -672,3 +672,11 @@ test("a row queued for a job after its turn in the pass is not blamed on a limit
   assert.equal(readLedger(root, { now: T0 }).find((entry) => entry.url === url(3)).state, "queued");
   assert.equal(runOf(storePath).drainMessage, undefined);
 });
+
+test("a reason left on a run with no row still waiting is cleared by the next pass", async (t) => {
+  const { storePath, drain } = await withDrainRoot(t, { urls: [url(1)] });
+  await drain();
+  editStore(storePath, (store) => { store.runs[0].drainMessage = STOPPED; });
+  assert.equal((await drain()).status, "idle");
+  assert.equal(runOf(storePath).drainMessage, undefined);
+});

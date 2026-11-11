@@ -191,7 +191,8 @@ export async function runDrain({
   const noteWaiting = (tried, startedBy = new Map(), stop) => {
     const stored = new Map(readScheduledStore(storePath).runs.map((run) => [run.id, run]));
     const named = new Set();
-    const capped = startedToday(readLedger(root, { now: now() }), now()) >= dailyCap;
+    const entries = readLedger(root, { now: now() });
+    const capped = startedToday(entries, now()) >= dailyCap;
     const today = new Date(now()).toISOString().slice(0, 10);
     for (const job of jobs) {
       const { maxPerRun } = job.evaluate;
@@ -211,11 +212,13 @@ export async function runDrain({
         touchedRuns.set(runId, { drainMessage });
       }
     }
-    // A limit message this pass did not renew is no longer true, and neither is any reason on a run whose job left auto mode.
+    // A limit message this pass did not renew is no longer true, and neither is any reason on a run
+    // whose job left auto mode or whose rows have all reached an end.
     const auto = new Set(jobs.map((job) => job.id));
+    const live = new Set(entries.filter((entry) => !entry.final).map((entry) => entry.runId));
     for (const run of stored.values()) {
       if (!run.drainMessage || named.has(run.id) || touchedRuns.get(run.id)?.drainMessage) continue;
-      if (LIMIT_MESSAGE_RE.test(run.drainMessage) || !auto.has(run.jobId)) touchedRuns.set(run.id, { drainMessage: undefined });
+      if (LIMIT_MESSAGE_RE.test(run.drainMessage) || !auto.has(run.jobId) || !live.has(run.id)) touchedRuns.set(run.id, { drainMessage: undefined });
     }
     return stored;
   };
