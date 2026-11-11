@@ -134,8 +134,6 @@ const dotenvOverride = (() => {
   return value != null && !['false', '0', 'no', 'off', ''].includes(value.toLowerCase());
 })();
 const projectRoot = explicitTarget || getCareerOpsRoot();
-// Read at startup: the human run creates data/, output/ and reports/ under the
-// root further down, which would make a mistyped folder look like a real one.
 const dataRootMissing = !explicitTarget && !existsSync(projectRoot);
 // --target diagnoses a whole other checkout, so that checkout's profile is the
 // one that counts; otherwise CAREER_OPS_PROFILE applies as it does everywhere.
@@ -1776,7 +1774,9 @@ async function main() {
     checkTitleFilterConflicts(projectRoot),
     checkCvShape(projectRoot),
     checkUserTemplates(projectRoot),
-    ...(userLayerWritable
+    // A missing override root is not created here: the folder would exist on
+    // the next run and the warning below would go quiet on a wrong path.
+    ...(userLayerWritable && !checkDataRootExists(projectRoot)
       ? [checkAutoDir('data'), checkPipelineFile(), checkAutoDir('output'), checkAutoDir('reports')]
       : []),
     checkPlugins(projectRoot),

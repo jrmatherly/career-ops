@@ -154,8 +154,8 @@ for (const name of ['CAREER_OPS_ROOT', 'CAREER_OPS_DATA_DIR']) {
     const [warning] = missing(doctor(['--json'], { [name]: gone }));
     assert.ok(warning?.startsWith(`${name} names ${gone}`), String(warning));
 
-    // The human run creates data/ under the root; the warning must come from before that.
     assert.match(doctor([], { [name]: gone }), new RegExp(`${name} names .*does not exist`));
+    assert.ok(!existsSync(gone), 'the human run created the folder, so the next run would stop warning');
 
     assert.deepEqual(missing(doctor(['--json'], { [name]: other })), []);
     assert.deepEqual(missing(doctor(['--json'])), []);
