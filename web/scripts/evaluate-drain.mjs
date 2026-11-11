@@ -38,6 +38,7 @@ const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" &
 const GATEWAY_LIMIT_RE = /request rejected \(429\)|cooling down/i;
 const isLimitError = (msg) => FATAL_QUOTA_STDERR_RE.test(msg) || CLAUDE_FATAL_STDERR_RE.test(msg) || GATEWAY_LIMIT_RE.test(msg);
 const log = (line) => process.stderr.write(`drain: ${line}\n`);
+const messageOf = (error) => (error instanceof Error ? error.message : String(error));
 
 const keySet = (urls) => new Set(urls.map(normalizeUrl).filter(Boolean));
 
@@ -196,7 +197,7 @@ export async function runDrain({
     jobs: for (const job of jobs) {
       const tried = new Set();
       let started = 0;
-      for (let entry; (entry = planFor(job, tried, started)[0]);) {
+      for (let entry; (entry = planFor(job, tried, started)[0]); current = undefined) {
         current = entry;
         tried.add(entry.key);
         const { url } = entry;
@@ -258,10 +259,15 @@ export async function runDrain({
       }
     }
   } catch (error) {
-    // What this drain finished still counts on its runs, and the run it failed on says why.
-    const message = error instanceof Error ? error.message : String(error);
-    if (current) touchedRuns.set(current.runId, { drainMessage: `The drain failed at ${current.url} and the rest stay queued: ${message}` });
-    await recordDrainCounts(root, storePath, touchedRuns, now()).catch((recordError) => log(`the failed drain was not recorded on its run: ${recordError.message}`));
+    // What this drain finished still counts on its runs, and one run says why it stopped: the
+    // failing row's, or between rows the last one this drain wrote to.
+    const runId = current?.runId ?? [...touchedRuns.keys()].at(-1);
+    if (runId) touchedRuns.set(runId, { drainMessage: `The drain failed${current ? ` at ${current.url}` : ""} and the rest stay queued: ${messageOf(error)}` });
+    try {
+      await recordDrainCounts(root, storePath, touchedRuns, now());
+    } catch (recordError) {
+      log(`the failed drain was not recorded on its run: ${messageOf(recordError)}`);
+    }
     throw error;
   }
 

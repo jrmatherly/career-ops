@@ -318,9 +318,43 @@ test("a drain that throws still records what it finished and names the failure o
     return { text: "Posting text." };
   };
   await assert.rejects(drain({ now, fetchJd }), /disk went away/);
-  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
   assert.equal(posts.length, 1);
-  assert.deepEqual([run.evaluated, run.drainMessage], [1, `The drain failed at ${url(2)} and the rest stay queued: disk went away`]);
+  assert.deepEqual([run().evaluated, run().drainMessage], [1, `The drain failed at ${url(2)} and the rest stay queued: disk went away`]);
+  await drain();
+  assert.deepEqual([run().evaluated, run().drainMessage], [2, undefined], "a later drain that gets through clears the failure");
+});
+
+test("a throw between rows is not blamed on the row that just finished", async (t) => {
+  const { root, drain, storePath, state } = await withDrainRoot(t, { urls: [url(1), url(2)] });
+  let thrown = false;
+  const now = () => {
+    if (thrown || readLedger(root, { now: T0 }).find((entry) => entry.url === url(1))?.state !== "evaluated") return T0;
+    thrown = true;
+    throw new Error("plan broke");
+  };
+  await assert.rejects(drain({ now }), /plan broke/);
+  const run = readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  assert.deepEqual([state(url(1)).state, state(url(2)).state], ["evaluated", "queued"]);
+  assert.deepEqual([run.evaluated, run.drainMessage], [1, "The drain failed and the rest stay queued: plan broke"]);
+});
+
+test("a failed drain whose record fails too still rejects with the first error", async (t) => {
+  const { drain, storePath, stderr } = await withDrainRoot(t, { urls: [url(1)] });
+  let broken = false;
+  const now = () => {
+    if (!broken) return T0;
+    broken = false;
+    throw new Error("disk went away");
+  };
+  const fetchJd = async () => {
+    broken = true;
+    fs.rmSync(storePath);
+    fs.mkdirSync(storePath);
+    return { text: "Posting text." };
+  };
+  await assert.rejects(drain({ now, fetchJd }), /disk went away/);
+  assert.match(stderr.join(""), /the failed drain was not recorded on its run: /);
 });
 
 test("an evaluation that fails without stopping the batch clears the stop reason", async (t) => {
