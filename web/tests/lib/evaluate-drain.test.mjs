@@ -9,6 +9,7 @@ import { runDrain } from "../../scripts/evaluate-drain.mjs";
 import { rankPass } from "../../scripts/scheduled-jobs-runner.mjs";
 import { readScheduledStore } from "../../src/lib/scheduled-jobs-store.mjs";
 import { checkRequest } from "../../src/lib/origin-guard.mjs";
+import { timeoutMessage } from "../../src/lib/run-cli-support.mjs";
 import { appendRow, readLedger } from "../../../lib/evaluate-queue.mjs";
 
 const JOB = "11111111-1111-4111-8111-111111111111";
@@ -273,6 +274,34 @@ test("a gateway whose seats are all cooling down stops the batch", async (t) => 
     const run = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => [{ type: "error", msg }] });
     assert.equal((await run.drain()).status, "stopped", msg);
   }
+});
+
+// A CLI that retries a 429 in silence is killed at the time limit with no limit event before it.
+test("a run cut off at the route's time limit fails its row and stops the batch", async (t) => {
+  const answer = () => [{ type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([state(url(1)).state, state(url(1)).failures, state(url(2)).state], ["failed", 1, "queued"], "the slow row spends a retry, the rest are not started");
+  assert.equal(posts.length, 1);
+});
+
+test("a stopped batch is named on its scheduled run until a later drain gets through", async (t) => {
+  let limited = true;
+  const limit = "Claude AI usage limit reached|1762650000";
+  const answer = () => (limited ? [{ type: "error", msg: limit }] : done(1));
+  const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], answer });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  await drain();
+  assert.equal(run().drainMessage, `Evaluation stopped at ${url(1)}: ${limit}. The rest stay queued.`);
+  limited = false;
+  await drain();
+  assert.deepEqual([run().evaluated, run().drainMessage], [1, undefined]);
+});
+
+test("a dashboard that is offline is named on the scheduled run", async (t) => {
+  const { drain, storePath } = await withDrainRoot(t, { urls: [url(1)], healthy: false });
+  await drain();
+  assert.match(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, /^The dashboard did not answer/);
 });
 
 test("a 409 leaves the row queued as in-flight", async (t) => {
