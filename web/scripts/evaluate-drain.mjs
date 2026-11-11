@@ -203,10 +203,9 @@ export async function runDrain({
         if (state !== "running") counts[state] += 1;
       };
       if (!online) {
-        if (entry.state !== "queued" || entry.reason !== "dashboard-offline") {
-          await append("queued", "dashboard-offline");
-          touchedRuns.get(entry.runId).drainMessage = "The dashboard did not answer, so nothing was evaluated. Queued rows wait.";
-        }
+        if (entry.state !== "queued" || entry.reason !== "dashboard-offline") await append("queued", "dashboard-offline");
+        // Set on every offline tick, not only with the row: an evaluation in between may have cleared it.
+        touchedRuns.set(entry.runId, { drainMessage: "The dashboard did not answer, so nothing was evaluated. Queued rows wait." });
         status = "offline";
         continue;
       }

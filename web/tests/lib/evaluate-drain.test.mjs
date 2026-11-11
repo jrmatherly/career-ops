@@ -357,6 +357,26 @@ test("a dashboard that is offline is named on the scheduled run", async (t) => {
   assert.match(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, /^The dashboard did not answer/);
 });
 
+test("an offline tick names itself on the run again after an evaluation cleared the reason", async (t) => {
+  const { drain, state, storePath } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  const run = () => readScheduledStore(storePath).runs.find((r) => r.id === RUN);
+  const offline = { baseUrl: "http://127.0.0.1:1" };
+  await drain(offline);
+  await drain();
+  assert.deepEqual([state(url(1)).state, state(url(2)).reason, run().drainMessage], ["evaluated", "dashboard-offline", undefined]);
+  await drain(offline);
+  assert.match(run().drainMessage, /^The dashboard did not answer/);
+  assert.equal(state(url(2)).rows.length, 2, "the ledger still gets the offline row once");
+});
+
+test("a limit named before the time-limit kill is still a limit, and the row keeps its retries", async (t) => {
+  const limit = "Claude AI usage limit reached|1762650000";
+  const answer = () => [{ type: "error", msg: limit }, { type: "error", msg: timeoutMessage(740_000, "evaluate-text") }];
+  const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer });
+  assert.equal((await drain()).status, "stopped");
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).failures], ["queued", limit, 0]);
+});
+
 test("a 409 leaves the row queued as in-flight", async (t) => {
   const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer: () => 409 });
   await drain();
