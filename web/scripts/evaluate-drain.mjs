@@ -135,8 +135,9 @@ function outcomeOf(response) {
   if (terminal.type === "done") return { state: "evaluated", reason: terminal.reportN ? `report ${terminal.reportN}` : "" };
   if (terminal.type === "gated") return { state: "gated", reason: terminal.reason || terminal.message || "" };
   // The limit event names why the batch stops; the terminal error after it is generic.
+  // A limit is the account's or the gateway's, not this row's, so the row keeps its retries.
   const limit = events.find((event) => event.type === "error" && isLimitError(String(event.msg ?? "")));
-  return limit ? { state: "failed", reason: String(limit.msg), stop: "limit" } : { state: "failed", reason: String(terminal.msg ?? "") };
+  return limit ? { state: "queued", reason: String(limit.msg), stop: "limit" } : { state: "failed", reason: String(terminal.msg ?? "") };
 }
 
 /**

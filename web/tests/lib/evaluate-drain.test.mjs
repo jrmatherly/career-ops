@@ -242,14 +242,15 @@ test("a usage-limit error stops the batch and leaves the rest queued", async (t)
   const { drain, state, posts, storePath } = await withDrainRoot(t, { urls, answer });
   const result = await drain();
   assert.equal(result.status, "stopped");
-  assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "failed", "queued"]);
+  assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "queued", "queued"], "the limit is not the row's failure");
   assert.equal(state(url(2)).reason, "Claude AI usage limit reached|1762650000", "the row names the limit, not the generic terminal error");
+  assert.equal(state(url(2)).failures, 0, "the row keeps its retries");
   assert.equal(posts.length, 2);
-  assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN).evalErrors, 1);
+  assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN).evalErrors, 0);
 });
 
 test("an ordinary error is failed and the batch goes on, and a rate limit stops it too", async (t) => {
-  const answer = (body) => (body.input === url(1) ? [{ type: "error", msg: "The report was saved but merge-tracker.mjs failed." }] : done(2));
+  const answer = (body) => (body.input === url(1) ? [{ type: "error", msg: "reports/429-acme-2026-11-10.md was saved but merge-tracker.mjs failed (HTTP 429 from the board)." }] : done(2));
   const run1 = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
   await run1.drain();
   assert.deepEqual([run1.state(url(1)).state, run1.state(url(2)).state], ["failed", "evaluated"]);
@@ -264,7 +265,7 @@ test("a gateway whose seats are all cooling down stops the batch", async (t) => 
   const answer = () => [{ type: "error", msg: cooldown }, { type: "error", msg: "This run hit an error before finishing." }];
   const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer });
   assert.equal((await drain()).status, "stopped");
-  assert.deepEqual([state(url(1)).state, state(url(2)).state], ["failed", "queued"]);
+  assert.deepEqual([state(url(1)).state, state(url(2)).state], ["queued", "queued"]);
   assert.equal(state(url(1)).reason, cooldown);
   assert.equal(posts.length, 1);
   // Each wording stops it alone: the CLI's for another gateway, the proxy's if the CLI rewords its own.
