@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { Modal } from "@/components/ui/modal";
 import { runStatusTone } from "@/lib/scheduled-run-status.mjs";
 import { runCountsLine } from "@/lib/evaluate-settings.mjs";
+import { formatWhen } from "@/lib/format-time.mjs";
 
 export function RunHistoryDrawer({
   isOpen,
@@ -72,14 +73,14 @@ export function RunHistoryDrawer({
                         {isSuccess ? "Success" : isRunning ? "Running" : isQueued ? "Queued" : isCancelled ? "Cancelled" : "Failed"}
                       </span>
                       {run.engine && (
-                        <span className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-faint uppercase font-mono">
+                        <span className="rounded bg-surface-hover px-1.5 py-0.5 text-xs text-faint uppercase font-mono">
                           {run.engine}
                         </span>
                       )}
                     </div>
-                    <span className="flex items-center gap-1 text-[11px] text-faint">
+                    <span className="flex items-center gap-1 text-xs text-faint">
                       <Clock className="size-3" />
-                      {new Date(run.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      {formatWhen(run.at)}
                     </span>
                   </div>
 
@@ -88,12 +89,11 @@ export function RunHistoryDrawer({
                   {run.evalMessage && <p className="mt-1 text-muted leading-relaxed">{run.evalMessage}</p>}
                   {run.drainMessage && <p className="mt-1 text-muted leading-relaxed break-words">{run.drainMessage}</p>}
 
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-faint border-t border-border/40 pt-1.5">
-                    <span>Date: {new Date(run.at).toLocaleDateString()}</span>
-                    {typeof run.rolesFound === "number" && (
+                  {typeof run.rolesFound === "number" && (
+                    <div className="mt-2 flex items-center justify-end text-xs border-t border-border/40 pt-1.5">
                       <span className="font-semibold text-foreground">{run.rolesFound} roles found</span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })

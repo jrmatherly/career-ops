@@ -75,7 +75,7 @@ export function OnboardingBanner() {
           }
           setDismissed(true);
         }}
-        className="absolute right-3 top-3 text-faint transition-colors hover:text-foreground"
+        className="absolute right-2 top-2 inline-flex size-6 items-center justify-center text-faint transition-colors hover:text-foreground"
         aria-label="Dismiss"
       >
         <X className="size-4" />

@@ -42,10 +42,14 @@ export default function Home() {
   return (
     <>
       {lead === "queue" && dashboard}
-      {onboardingNeeded && <OnboardingBanner />}
+      {onboardingNeeded && (
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <OnboardingBanner />
+        </div>
+      )}
       {/* The growing-profile panel stays until every prerequisite AND every
           personalization section is theirs — it renders nothing once complete. */}
-      <div className="mx-auto max-w-5xl px-6 pt-6">
+      <div className="mx-auto max-w-6xl px-4 pt-6 last:pb-32 sm:px-6">
         <OnboardingProgress />
       </div>
       {lead === "setup" && dashboard}

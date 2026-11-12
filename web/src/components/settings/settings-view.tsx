@@ -77,7 +77,7 @@ export function SettingsView() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-2xl px-6 pb-10">
+      <div className="pb-10">
         <div role="alert" className={BANNER}>
           <p>The settings could not be loaded. {loadError}</p>
           <button type="button" onClick={() => void load()} className={`mt-3 ${QUIET}`}>Retry</button>
@@ -87,7 +87,7 @@ export function SettingsView() {
   }
   if (!data) {
     return (
-      <div className="mx-auto flex max-w-2xl items-center gap-2 px-6 pb-10 text-sm text-muted">
+      <div className="flex items-center gap-2 pb-10 text-sm text-muted">
         <Loader2 className="size-4 animate-spin" /> Loading settings…
       </div>
     );
@@ -113,7 +113,7 @@ export function SettingsView() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-6 pb-16">
+    <div className="pb-16">
       {data.overlayDisabled && (
         <p role="status" className={BANNER}>
           Saved settings are turned off for this server (CAREER_OPS_SETTINGS=off). The values below come from the environment.
@@ -133,7 +133,7 @@ export function SettingsView() {
 
       <nav aria-label="Settings sections" className="mb-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-6 text-sm">
         {data.groups.map((g) => (
-          <a key={g.id} href={`#settings-${g.id}`} className="text-brand-text hover:underline max-sm:inline-flex max-sm:min-h-[44px] max-sm:items-center">{g.label}</a>
+          <a key={g.id} href={`#settings-${g.id}`} className="inline-flex min-h-6 items-center text-brand-text hover:underline max-sm:min-h-[44px]">{g.label}</a>
         ))}
       </nav>
 

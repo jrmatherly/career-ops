@@ -95,7 +95,7 @@ export function PipelineSankey({
                   y={node.y + node.height / 2}
                   textAnchor={anchor}
                   dominantBaseline="middle"
-                  className="fill-foreground text-[11px] font-medium"
+                  className="fill-foreground text-xs font-medium"
                   stroke="var(--bg)"
                   strokeWidth={4}
                   paintOrder="stroke"

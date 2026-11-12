@@ -3,7 +3,7 @@ import { instrumentSerif } from "@/lib/fonts";
 import { cn } from "@/lib/cn";
 
 // Stat tile with the home's resting gradient corner + lit edge + shadow. The
-// number is serif ONLY when `featured` (≤1 serif number per route); the rest
+// number is serif ONLY when `featured` (≤1 serif number per row of cards; ui/stat-tile.tsx is the all-serif variant); the rest
 // use Inter tabular-nums so numerals never form a serif wall.
 const CORNERS = {
   br: "bg-gradient-to-br",

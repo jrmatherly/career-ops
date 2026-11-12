@@ -5,6 +5,7 @@ import { Check, Clock, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CompanyLogo } from "@/components/company-logo";
 import { NextDateDialog } from "@/components/followups/next-date-dialog";
+import { agoLabel, formatDay } from "@/lib/format-time.mjs";
 
 export type FollowUp = {
   num?: number;
@@ -12,6 +13,7 @@ export type FollowUp = {
   role?: string;
   status?: string;
   appliedDate?: string;
+  daysSinceApplication?: number;
   notes?: string;
   // Raw pass-through from followup-cadence.mjs — 'urgent'/'overdue' entries
   // are due now, 'waiting'/'cold' are not (#86).
@@ -71,8 +73,8 @@ export function FollowUpCard({ followup, onLogged }: { followup: FollowUp; onLog
             <span className="font-medium text-foreground">{followup.company}</span>
             {followup.role && <span className="text-muted"> · {followup.role}</span>}
           </p>
-          <p className="flex items-center gap-1 text-[11px] text-faint">
-            <Clock className="size-3" /> {followup.appliedDate ? `applied ${followup.appliedDate}` : "follow-up due"}
+          <p className="flex items-center gap-1 text-xs text-faint">
+            <Clock className="size-3" /> {followup.appliedDate ? [`Applied ${formatDay(followup.appliedDate)}`, agoLabel(followup.daysSinceApplication ?? null)].filter(Boolean).join(" · ") : "follow-up due"}
           </p>
         </div>
       </div>
@@ -102,7 +104,7 @@ export function FollowUpCard({ followup, onLogged }: { followup: FollowUp; onLog
           disabled={state === "logging" || followup.num == null}
           onClick={() => setShowNextDate(true)}
           title={followup.num == null ? "An application number is required to snooze this follow-up." : "Choose the next follow-up date"}
-          className="inline-flex shrink-0 items-center justify-center text-[11px] text-faint transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 max-sm:min-h-[44px] max-sm:min-w-[44px]"
+          className="inline-flex min-h-6 shrink-0 items-center justify-center text-xs text-faint transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 max-sm:min-h-[44px] max-sm:min-w-[44px]"
         >
           Snooze
         </button>

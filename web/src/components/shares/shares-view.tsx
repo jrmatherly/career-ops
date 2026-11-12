@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ExternalLink, Loader2, RefreshCw, X } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { useDeployment } from "@/components/deployment-context";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -58,14 +59,10 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
 
   return (
     <PageFrame>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Shares</h1>
-          <p className="mt-1 text-sm text-muted">
-            <span className="tabular-nums">{shares.length}</span> published · views and comments refresh on Pull
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        title="Shares"
+        description={<><span className="tabular-nums">{shares.length}</span> published · views and comments refresh on Pull</>}
+        actions={<div className="flex flex-wrap items-center gap-2">
           {accountUrl && (
             <a href={accountUrl} target="_blank" rel="noopener" className={buttonVariants({ variant: "outline", size: "sm" })}>
               <ExternalLink className="size-3.5" />
@@ -78,8 +75,8 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
               Pull all
             </Button>
           )}
-        </div>
-      </div>
+        </div>}
+      />
 
       {error && (
         <p role="alert" className="mt-6 rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-400">
@@ -127,7 +124,7 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
         <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
           <div role="status" className="flex max-w-2xl items-start gap-2 rounded-2xl border border-border bg-surface px-4 py-2 text-sm text-red-700 shadow-lg dark:text-red-400">
             <p className="max-h-[50vh] min-w-0 overflow-y-auto break-words">{toast}</p>
-            <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 text-muted hover:text-foreground">
+            <button type="button" onClick={() => setToast(null)} aria-label="Dismiss" className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted hover:text-foreground">
               <X className="size-3.5" />
             </button>
           </div>

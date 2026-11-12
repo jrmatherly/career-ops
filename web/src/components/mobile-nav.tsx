@@ -11,7 +11,7 @@ import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
 import { useDeployment } from "@/components/deployment-context";
-import { visibleNavItems, isActivePath } from "@/lib/nav-items";
+import { navGroups, isActivePath, type NavItem } from "@/lib/nav-items";
 import { useJobs } from "@/components/jobs/job-store";
 
 // Mobile navigation (< md): a glass top bar + a right-side slide-over drawer that
@@ -45,6 +45,27 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
   const { jobs } = useJobs();
   const { host } = useDeployment();
   const running = jobs.filter((j) => j.status === "running").length;
+  const groups = navGroups(followupsEnabled);
+  const main = groups.filter((g) => g.label !== "Pinned");
+  const pinned = groups.find((g) => g.label === "Pinned")?.items ?? [];
+  const navLink = ({ href, label, icon: Icon }: NavItem) => {
+    const active = isActivePath(href, pathname);
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={() => setOpen(false)}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] transition-colors",
+          active ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-hover hover:text-foreground",
+        )}
+      >
+        <Icon className="size-5" />
+        {label}
+      </Link>
+    );
+  };
 
   // Close on route change.
   useEffect(() => {
@@ -165,30 +186,13 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3">
-          {visibleNavItems(followupsEnabled).map(({ href, label, icon: Icon, chip }) => {
-            const active = isActivePath(href, pathname);
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] transition-colors",
-                  active ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-hover hover:text-foreground",
-                )}
-              >
-                <Icon className="size-5" />
-                {label}
-                {chip && (
-                  <span className="ml-auto rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-text">
-                    {chip}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+        <nav aria-label="Main" className="flex flex-col gap-1 px-3">
+          {main.map(({ label, items }) => (
+            <div key={label} role="group" aria-labelledby={`drawer-nav-group-${label}`} className="flex flex-col gap-1">
+              <div id={`drawer-nav-group-${label}`} className="px-3 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+              {items.map(navLink)}
+            </div>
+          ))}
         </nav>
 
         <div className="px-3">
@@ -197,10 +201,11 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
 
         <div className="co-msafe mt-auto space-y-3 border-t border-border px-4 pt-4">
           <UsageMeter />
+          <nav aria-label="Pinned" className="-mx-3">{pinned.map(navLink)}</nav>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
-              <span className="font-mono text-[10px] text-faint">THEME</span>
+              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : ""}</span>
+              <span className="font-mono text-xs text-faint">THEME</span>
             </div>
             <ThemeToggle showLabel className="bg-surface-hover/40" />
           </div>

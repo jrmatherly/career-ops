@@ -1,15 +1,12 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ExploreLoading() {
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8 md:px-8" aria-label="Loading job discovery">
+    <PageFrame aria-label="Loading job discovery">
       <header className="mb-6">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <Skeleton className="size-6 rounded-full" />
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-5 w-12 rounded-full" />
-          </div>
+          <Skeleton className="h-9 w-28" />
           <Skeleton className="h-11 w-full rounded-xl sm:ml-auto sm:w-48" />
         </div>
         <div className="mt-3 space-y-2">
@@ -47,6 +44,6 @@ export default function ExploreLoading() {
           </div>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 }

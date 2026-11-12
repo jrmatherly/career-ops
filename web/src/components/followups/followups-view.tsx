@@ -24,6 +24,8 @@ import {
   urgencyTone,
 } from "@/lib/followups";
 import { cn } from "@/lib/cn";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { FollowupsTableRowsSkeleton } from "@/components/page-loading-skeletons";
 import { startRouteProgress } from "@/components/route-progress";
 import { selectUpcomingFollowups } from "@/lib/core/followup-view.mjs";
@@ -205,16 +207,16 @@ export function FollowupsView() {
   );
 
   return (
-    <div className="mx-auto max-w-none px-6 py-8">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Follow-up Tracker</h1>
-          <p className="mt-1 text-sm text-muted">{subtitle}</p>
-          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-faint">
+    <PageFrame>
+      <PageHeader
+        title="Follow-ups"
+        description={<>
+          {subtitle}
+          <span className="mt-2 block max-w-3xl text-xs leading-relaxed text-faint">
             Use <span className="font-medium text-muted">Log</span> after you actually send an email, LinkedIn message, or call. The count and next date update automatically; status changes recalculate urgency, while <span className="font-medium text-muted">Next date</span> lets you pin a custom reminder.
-          </p>
-        </div>
-        <div className="relative w-56 max-w-[35vw]">
+          </span>
+        </>}
+        actions={<div className="relative w-56 max-w-[35vw]">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
           <input
             value={q}
@@ -222,8 +224,8 @@ export function FollowupsView() {
             placeholder="Search company or role…"
             className="w-full rounded-md border border-border bg-surface/60 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/40"
           />
-        </div>
-      </div>
+        </div>}
+      />
 
       {followupsSummarySlot({
         pending: !data,
@@ -279,7 +281,7 @@ export function FollowupsView() {
                     <th key={c.key} aria-sort={active ? (dir === 1 ? "ascending" : "descending") : "none"} className="px-2.5 py-2.5 font-medium">
                       <button
                         type="button"
-                        className="inline-flex cursor-pointer select-none items-center gap-1 uppercase tracking-wide hover:text-foreground"
+                        className="inline-flex min-h-6 cursor-pointer select-none items-center gap-1 uppercase tracking-wide hover:text-foreground"
                         onClick={() =>
                           // First click on Urgency descends (most pressing first —
                           // how ▼ reads); other columns start ascending.
@@ -339,7 +341,7 @@ export function FollowupsView() {
 
       {dialogFor && <LogDialog entry={dialogFor} onClose={() => setDialogFor(null)} onLogged={refetch} />}
       {pinFor && <NextDateDialog entry={pinFor} onClose={() => setPinFor(null)} onChanged={refetch} />}
-    </div>
+    </PageFrame>
   );
 }
 

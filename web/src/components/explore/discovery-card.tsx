@@ -8,12 +8,13 @@ import { ATS_LABEL, type AtsSource, type DiscoveredOffer } from "@/lib/explore";
 import { CHINA_SOURCES, EMPLOYER_LABEL } from "@/lib/employer-preset.mjs";
 import { evaluationGateForJob } from "@/lib/job-gate.mjs";
 import { useJobs } from "@/components/jobs/job-store";
+import { agoLabel } from "@/lib/format-time.mjs";
 import { useExplore } from "./explore-provider";
 
 function freshness(postedAt: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(postedAt)) return "";
   const days = Math.max(0, Math.round((Date.now() - new Date(postedAt + "T00:00:00Z").getTime()) / 86_400_000));
-  return days === 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
+  return agoLabel(days);
 }
 
 // Real company logo (favicon) via the localhost proxy, cached on disk FOREVER per
@@ -90,7 +91,7 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
         </a>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="rounded border border-border px-1.5 py-0.5 font-medium text-muted">{ATS_LABEL[offer.ats as AtsSource] ?? EMPLOYER_LABEL[offer.ats as keyof typeof EMPLOYER_LABEL] ?? offer.ats}</span>
         {(fresh || employer) && <span className="text-faint">{fresh || "Posting date unknown"}</span>}
         {unverified && (
@@ -109,7 +110,7 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
         {offer.fit && (
           <span
             className={cn(
-              "rounded border px-1 py-0.5 text-[11px] font-medium",
+              "rounded border px-1 py-0.5 text-xs font-medium",
               offer.fit.band === "strong"
                 ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
                 : "text-faint",

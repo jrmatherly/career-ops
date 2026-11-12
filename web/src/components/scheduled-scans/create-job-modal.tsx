@@ -105,7 +105,7 @@ export function CreateJobModal({
                 <option value="full">Full ATS Dataset Sweep</option>
                 <option value="portals">Zero-Token Portals.yml</option>
               </select>
-              <p className="mt-1 text-[11px] text-faint">
+              <p className="mt-1 text-xs text-faint">
                 {engine === "full"
                   ? "Sweeps public Greenhouse/Lever/Ashby datasets."
                   : "Scans pre-configured portals.yml companies (0 AI cost)."}
@@ -208,7 +208,7 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
           </div>
         </>
       )}
-      {caveat && <p className="text-[11px] text-faint">{caveat}</p>}
+      {caveat && <p className="text-xs text-faint">{caveat}</p>}
     </div>
   );
 }
@@ -220,11 +220,11 @@ export function FiltersFromToggle({ value, onChange }: { value: FiltersFrom; onC
         type="checkbox"
         checked={value === "file"}
         onChange={(e) => onChange(e.target.checked ? "file" : "custom")}
-        className="mt-0.5 size-4 accent-brand"
+        className="size-6 shrink-0 accent-brand"
       />
       <span>
         <span className="font-medium">Use portals.yml filters</span>
-        <span className="block text-[11px] text-faint">Each run reads the title and location lists from portals.yml, so later edits to that file apply. Posted within, sources and scan depth still come from this job.</span>
+        <span className="block text-xs text-faint">Each run reads the title and location lists from portals.yml, so later edits to that file apply. Posted within, sources and scan depth still come from this job.</span>
       </span>
     </label>
   );

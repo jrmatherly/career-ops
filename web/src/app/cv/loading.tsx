@@ -1,8 +1,9 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CvLoading() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8" aria-label="Loading CV editor">
+    <PageFrame aria-label="Loading CV editor">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-8 w-36" />
@@ -30,6 +31,6 @@ export default function CvLoading() {
           <Skeleton className="mt-3 h-4 w-4/5" />
         </article>
       </div>
-    </div>
+    </PageFrame>
   );
 }

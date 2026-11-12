@@ -6,6 +6,7 @@ import type { ScheduledJob } from "@/lib/scheduled-jobs";
 import { evaluateModeLabel } from "@/lib/evaluate-settings.mjs";
 import { cn } from "@/lib/cn";
 import { instrumentSerif } from "@/lib/fonts";
+import { formatWhen } from "@/lib/format-time.mjs";
 
 export function JobCard({
   job,
@@ -130,7 +131,7 @@ export function JobCard({
         </div>
 
         {/* Engine & Status Badges */}
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-medium",
@@ -163,9 +164,9 @@ export function JobCard({
 
         {/* Keywords clamped to max 2 lines */}
         {job.filtersFrom === "file" ? (
-          <p className="text-[11px] text-faint">uses portals.yml</p>
+          <p className="text-xs text-faint">uses portals.yml</p>
         ) : positiveList.length > 0 && (
-          <div className="max-h-12 overflow-hidden flex flex-wrap items-center gap-1.5 text-[11px]">
+          <div className="max-h-12 overflow-hidden flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-faint shrink-0">matched:</span>
             {positiveList.map((kw, i) => (
               <span key={i} className="rounded border border-border px-1.5 py-0.5 font-medium text-muted truncate max-w-[140px]">
@@ -185,7 +186,7 @@ export function JobCard({
           ) : job.lastRunAt ? (
             <p className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400">
               <CheckCircle2 className="size-3.5 shrink-0" />
-              Last run {new Date(job.lastRunAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·{" "}
+              Last run {formatWhen(job.lastRunAt)} ·{" "}
               {job.rolesFoundCount || 0} roles found
             </p>
           ) : (

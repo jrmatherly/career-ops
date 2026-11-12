@@ -48,7 +48,7 @@ export function CvStudio({ n }: { n: string }) {
   }, [n]);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-[1400px] px-4 pb-32 pt-6 sm:px-6">
       <BackLink href={reportHref} className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand-text">
         <ArrowLeft className="size-4" /> Report #{n}
       </BackLink>

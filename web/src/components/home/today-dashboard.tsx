@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Bell, CircleHelp, Sparkles, ArrowRight, Undo2, X } from "lucide-react";
 import { instrumentSerif } from "@/lib/fonts";
 import { HeroGlow } from "@/components/hero-glow";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import type { DiscoveredOffer } from "@/lib/explore";
 import { DiscoveryCard } from "@/components/explore/discovery-card";
@@ -168,16 +170,14 @@ export function TodayDashboard({
   const inboxUrls = useMemo(() => new Set(inbox.map((j) => j.url)), [inbox]);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10 max-sm:pb-24">
+    <PageFrame>
+      <PageHeader title="Today" description={dateLabel} />
       <section className="dot-bg relative overflow-hidden rounded-2xl border border-border bg-surface/40 px-7 py-10 md:px-10 md:py-12">
         <HeroGlow />
         {/* Readability scrim between the animated glow (z-0) and the copy (z-10). */}
         <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-surface/55 backdrop-blur-[2px] dark:bg-background/45" />
         <div className="relative z-10">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
-            <span className="text-faint">//</span> today · <span className="tabular-nums">{dateLabel}</span>
-          </p>
-          <h1 className={`${instrumentSerif.className} mt-3 text-4xl leading-[1.05] text-landing md:text-5xl`}>
+          <h2 className={`${instrumentSerif.className} text-3xl leading-[1.05] text-landing`}>
             {heroState === "loading" ? (
               <>Your career queue is loading.</>
             ) : heroState === "unavailable" ? (
@@ -205,7 +205,7 @@ export function TodayDashboard({
             ) : (
               <>Your queue is waiting.</>
             )}
-          </h1>
+          </h2>
           <p className="mt-4 max-w-xl text-sm text-muted">
             {heroState === "unavailable"
               ? "We couldn't load all of today's updates. Try again."
@@ -348,14 +348,14 @@ export function TodayDashboard({
               <Undo2 className="size-3.5" /> {decisionUndo.busy ? "Undoing…" : decisionUndo.error ? "Retry undo" : "Undo"}
             </button>
             {decisionUndo.error && (
-              <button type="button" onClick={() => setDecisionUndo(null)} aria-label="Dismiss" className="inline-flex shrink-0 items-center text-faint hover:text-muted max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:justify-center">
+              <button type="button" onClick={() => setDecisionUndo(null)} aria-label="Dismiss" className="inline-flex size-6 shrink-0 items-center justify-center text-faint hover:text-muted max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:justify-center">
                 <X className="size-3.5" />
               </button>
             )}
           </div>
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }
 

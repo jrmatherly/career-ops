@@ -75,7 +75,7 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
           <Row key={p.key} state={missing.has(p.key) ? "missing" : "filled"} label={p.label} />
         ))}
         {showSections && (
-          <li className="pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-faint">personalization — what evaluations score against</li>
+          <li className="pt-2 font-mono text-xs uppercase tracking-[0.18em] text-faint">personalization — what evaluations score against</li>
         )}
         {showSections && sections.map((s) => (
           <Row key={s.id} state={s.state} label={s.heading.replace(/^## Your /, "")} />
@@ -107,7 +107,7 @@ function Row({ state, label }: { state: "filled" | "template" | "missing"; label
     <li className={`flex items-center gap-2 ${tone}`}>
       <Icon className={`size-3.5 shrink-0 ${state === "filled" ? "text-brand-text" : "text-faint"}`} aria-hidden />
       <span className="truncate">{label}</span>
-      {hint && <span className="ml-auto shrink-0 text-[11px] text-faint">{hint}</span>}
+      {hint && <span className="ml-auto shrink-0 text-xs text-faint">{hint}</span>}
     </li>
   );
 }

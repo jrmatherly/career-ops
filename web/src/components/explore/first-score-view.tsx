@@ -123,7 +123,7 @@ export function FirstScoreView() {
         </button>
 
         <div className="relative px-7 pb-7 pt-8">
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-brand-text">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-brand-text">
             <span className="text-faint">//</span> the job we found you — scored
           </p>
 
@@ -142,7 +142,7 @@ export function FirstScoreView() {
                 >
                   {score}
                 </div>
-                <div className="text-[11px] uppercase tracking-wide text-faint">/ 5 fit</div>
+                <div className="text-xs uppercase tracking-wide text-faint">/ 5 fit</div>
               </div>
             )}
           </div>
@@ -155,7 +155,7 @@ export function FirstScoreView() {
           {legit && (
             <div
               className={cn(
-                "mt-4 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                "mt-4 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
                 legitimacyTone(legit) === "good" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-400",
               )}
             >

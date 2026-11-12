@@ -164,7 +164,7 @@ export function CadenceSettings() {
                 checked={enabled}
                 disabled={toggling || saving}
                 onChange={(e) => toggle(e.target.checked)}
-                className="size-4 accent-brand"
+                className="size-6 accent-brand"
               />
               Track follow-ups
               {toggling && <Loader2 className="size-3.5 animate-spin" />}

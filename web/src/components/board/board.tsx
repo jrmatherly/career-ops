@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { Column } from "@/components/board/column";
 import { ApplicationSheet } from "@/components/board/application-sheet";
 import { groupByColumn } from "@/lib/board.mjs";
@@ -58,10 +59,10 @@ export function Board({ cards }: { cards: BoardCard[] }) {
 
   return (
     <PageFrame>
-      <h1 className="font-display text-2xl tracking-tight text-landing">Board</h1>
-      <p className="mt-1 text-sm text-muted">
-        <span className="tabular-nums">{state.rows.length}</span> tracked · drag a card, or focus it and press M to move it
-      </p>
+      <PageHeader
+        title="Board"
+        description={<><span className="tabular-nums">{state.rows.length}</span> tracked · drag a card, or focus it and press M to move it</>}
+      />
       {state.rows.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-8 text-center">
           <p className="text-sm text-muted">No tracked applications yet.</p>

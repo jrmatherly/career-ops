@@ -69,7 +69,7 @@ test("the page renders both parts and the nav calls it Settings", () => {
   const page = src("app/config/page.tsx");
   assert.match(page, /<ConfigForm [^>]*\/>\s*<SettingsView \/>/);
   assert.match(src("lib/nav-items.ts"), /href: "\/config", label: "Settings"/);
-  assert.match(form, />Settings<\/h1>/);
+  assert.match(form, /<PageHeader\s+title="Settings"/);
 });
 
 test("a free list is a textarea with its entry count, and a list of choices is checkboxes", () => {

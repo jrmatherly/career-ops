@@ -1,8 +1,7 @@
-// Desktop chrome must stay in the sidebar column. At 1440x900 the version
-// pill and the Ask button used to sit on the main column: the pill crossed
-// out of the 240px sidebar, and Ask covered the bottom-right of the page.
-// On short desktop windows the sidebar has no free space at its foot, so Ask
-// must stay off its links and controls there.
+// The version pill stays in the sidebar column: at 1440x900 it used to cross
+// out of the 240px sidebar onto the page. Ask lives in the bottom-right corner
+// at every height, so the page frame's bottom padding must let the last row
+// scroll clear of it, and it must never sit on a sidebar link or control.
 // Set CHROME_OVERLAP_TEST_URL to a local server. npm test skips this.
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -18,7 +17,7 @@ function overlapSize(a, b) {
   return { w: Math.round(w), h: Math.round(h) };
 }
 
-test("version pill and Ask stay out of the main column at 1440x900", {
+test("the version pill stays in the sidebar and the page scrolls clear of Ask at 1440x900", {
   skip: liveServerSkip("CHROME_OVERLAP_TEST_URL"),
   timeout: 120_000,
 }, async (t) => {
@@ -39,14 +38,19 @@ test("version pill and Ask stay out of the main column at 1440x900", {
   const main = await page.locator("main").boundingBox();
   const askBox = await ask.boundingBox();
   const pillBox = await report.locator("xpath=..").boundingBox();
-  const theme = await page.getByRole("complementary").filter({ has: page.getByRole("navigation") }).getByRole("button", { name: "Dark mode" }).boundingBox();
-  assert.ok(main && askBox && pillBox && theme);
+  const sidebar = page.getByRole("complementary").filter({ has: page.getByRole("navigation") });
+  const settings = await sidebar.getByText("Settings", { exact: true }).boundingBox();
+  assert.ok(main && askBox && pillBox && settings);
 
   assert.equal(overlapSize(pillBox, main), null, "version pill intersects main");
-  assert.equal(overlapSize(askBox, main), null, "Ask button intersects main");
   assert.equal(overlapSize(askBox, pillBox), null, "Ask button intersects the version pill");
-  assert.equal(overlapSize(askBox, theme), null, "Ask button covers Dark mode");
-  assert.equal(overlapSize(pillBox, theme), null, "version pill covers Dark mode");
+  assert.equal(overlapSize(pillBox, settings), null, "version pill covers the Settings section");
+  assert.ok(1440 - (askBox.x + askBox.width) <= 40 && 900 - (askBox.y + askBox.height) <= 40, `Ask is not in the bottom-right corner: ${JSON.stringify(askBox)}`);
+  const framePad = await page.locator("main > .mx-auto").last().evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
+  // Back to top sits above Ask and is laid out even while hidden, 8px lower than where it shows.
+  const topBox = await page.getByRole("button", { name: "Back to top", includeHidden: true }).boundingBox();
+  assert.ok(topBox);
+  assert.ok(framePad >= 900 - (topBox.y - 8), `the page frame's ${framePad}px bottom padding cannot scroll content clear of the tabs, whose top is at y=${topBox.y - 8}`);
 
   const hits = await page.evaluate(() => {
     const labelAt = (x, y) => {
@@ -54,13 +58,9 @@ test("version pill and Ask stay out of the main column at 1440x900", {
       const control = el?.closest("button, a");
       return control?.getAttribute("aria-label") || control?.textContent?.trim() || "";
     };
-    return {
-      left: labelAt(300, 870),
-      right: labelAt(1400, 860),
-    };
+    return { left: labelAt(300, 870) };
   });
   assert.equal(hits.left.includes("Report a bug"), false, `bottom of the main column hit ${hits.left}`);
-  assert.equal(hits.right.includes("Ask the assistant"), false, `bottom-right of the viewport hit ${hits.right}`);
   assert.deepEqual(errors, []);
 });
 
@@ -79,7 +79,7 @@ test("Ask stays off the sidebar's links and controls at short and tall desktop h
     const ask = page.getByRole("button", { name: "Ask the assistant", exact: true });
     const sidebar = page.getByRole("complementary").filter({ has: page.getByRole("navigation") });
     await ask.waitFor();
-    await sidebar.getByRole("button", { name: "Dark mode" }).waitFor();
+    await sidebar.getByRole("link", { name: "Analytics" }).waitFor();
 
     const askBox = await ask.boundingBox();
     assert.ok(askBox);
