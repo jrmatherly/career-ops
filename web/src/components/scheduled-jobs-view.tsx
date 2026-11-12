@@ -40,6 +40,11 @@ export function ScheduledJobsView() {
   const loadSeq = useRef(0);
   const appliedLoad = useRef(0);
 
+  // After a write, a poll that began before it holds the old list, even when the reload that follows fails.
+  const discardEarlierLoads = () => {
+    appliedLoad.current = ++loadSeq.current;
+  };
+
   const loadData = async (quiet = false) => {
     const mine = ++loadSeq.current;
     if (!quiet) setLoading(true);
@@ -87,6 +92,7 @@ export function ScheduledJobsView() {
     const nextStatus = currentStatus === "active" ? "paused" : "active";
     try {
       await updateScheduledJobRequest(id, { status: nextStatus });
+      discardEarlierLoads();
       await loadData();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
@@ -103,6 +109,7 @@ export function ScheduledJobsView() {
         setActionError(body.error || "Could not delete scheduled scan.");
         return;
       }
+      discardEarlierLoads();
       await loadData();
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");

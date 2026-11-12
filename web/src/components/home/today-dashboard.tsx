@@ -17,7 +17,7 @@ import { QuickEvaluate } from "@/components/quick-evaluate";
 import { LinkedInPaste } from "@/components/linkedin-paste";
 import { FollowupsDueSectionSkeleton } from "@/components/page-loading-skeletons";
 import { scoreNum } from "@/lib/format";
-import { BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
+import { APPLY_LINE, BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
 import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
@@ -199,7 +199,7 @@ export function TodayDashboard({
         {followupsEnabled && (
           <StatTile value={tileValue({ loading: followupsLoading, error: followupsError, count: shown.overdue })} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
         )}
-        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} href="/pipeline?tab=EVALUATED" />
+        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} href={`/pipeline?tab=EVALUATED&min=${APPLY_LINE}`} />
       </div>
       {/* The tiles carry the counts; the states with no count to show still get said in words. */}
       {(heroState === "loading" || heroState === "unavailable" || allClear) && (
