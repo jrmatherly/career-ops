@@ -127,3 +127,85 @@ test('the bullet-only Education fixture absorbs with no layout key', () => {
   assert.equal(result.data.sections.education.items.length, 2);
   assert.equal('layout' in result.data.sections.education, false);
 });
+
+const roundTrips = (md) => {
+  const result = absorb(md, null);
+  assert.deepEqual(result.report.unparsed, []);
+  assert.equal(result.lossless, true);
+  assert.equal(resumeToCvMarkdown(result.data), md);
+  const stored = parseResume(JSON.parse(JSON.stringify(result.data)));
+  assert.equal(resumeToCvMarkdown(stored.data), md, 'the layout survives a save');
+  return result;
+};
+
+test('an Education entry with a blank line under its heading round-trips', () => {
+  roundTrips(`${HEADER}## Education\n\n### Uni — City\n\n**BS**\n2010 – 2012\n`);
+});
+
+test('a bullet directly under an Education heading round-trips', () => {
+  roundTrips(`${HEADER}## Education\n\n### Uni\n- GPA 4.0\n`);
+});
+
+test('a bullet or a lead line directly under the period line round-trips', () => {
+  roundTrips(`${HEADER}## Education\n\n### MIT\n**BS**\n2010\n- BS, State University, City (2005)\n`);
+  roundTrips(`${HEADER}## Education\n\n### MIT\n**BS**\n2010\nGraduated with honors.\n`);
+});
+
+test('Education written in the Work Experience shape round-trips, bullets included', () => {
+  const { data } = roundTrips(`${HEADER}## Education\n\n### Uni — City\n\n**BS**\n2010 – 2012\n\n- GPA 4.0\n- Honors\n\n### Other — Town\n\n**MS**\n2013 – 2014\n`);
+  assert.equal(data.sections.education.items.length, 2);
+});
+
+test('a file that reads cleanly is lossless or names a line that is not written back', () => {
+  const bodies = [
+    '## Education\n\n### Uni — City\n\n**BS**\n2010 – 2012\n\n### Other — Town\n**MS**\n2013 – 2014\n',
+    '## Education\n\n### MIT\n**BS**\n2010\n- a\n\n### Other — Town\n**MS**\n2012\n\n- c\n',
+    '## Education\n### Uni — City\n**BS**\n2010 – 2012\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n### Other — Town\n**MS**\n2013 – 2014\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n\ntext\n- b\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n\n* b\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n\n- a\n\n- b\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n\nline one\nline two\n',
+    '## Education\n\n### Uni — City\n**BS**\n2010 – 2012\n## Skills\n\n- **A:** b\n',
+  ];
+  for (const body of bodies) {
+    const md = HEADER + body;
+    const result = absorb(md, null);
+    assert.ok(result.lossless || result.report.unparsed.length > 0, `silent loss: ${JSON.stringify(body)}`);
+    for (const { line, text } of result.report.unparsed) assert.equal(md.split('\n')[line - 1], text);
+  }
+});
+
+test('a mixed-shape section names the first entry that departs from the section layout', () => {
+  const md = `${HEADER}## Education\n\n### Uni — City\n\n**BS**\n2010 – 2012\n\n### Other — Town\n**MS**\n2013 – 2014\n`;
+  const { lossless, report } = absorb(md, null);
+  assert.equal(lossless, false);
+  assert.deepEqual(report.unparsed, [{ line: 11, text: '**MS**' }]);
+});
+
+test('an edited entry updates the stored item, and a new period orphans it', () => {
+  const md = `${HEADER}## Education\n\n### Uni — City\n**BS Computer Science**\n2010 – 2012\n\nGraduated with honors.\n`;
+  const first = absorb(md, null);
+  const [before] = first.data.sections.education.items;
+
+  const edited = md.replace('BS Computer Science', 'BSc Informatics').replace('with honors', 'first in class');
+  const second = absorb(edited, first.data);
+  const [item] = second.data.sections.education.items;
+  assert.equal(second.lossless, true);
+  assert.equal(second.report.changed, 1);
+  assert.equal(second.report.added, 0);
+  assert.deepEqual(second.report.orphans, []);
+  assert.equal(second.data.sections.education.items.length, 1);
+  assert.equal(item.id, before.id);
+  assert.equal(item.degree, 'BSc Informatics');
+  assert.equal(item.area, '');
+  assert.equal(item.description, '<p>Graduated first in class.</p>');
+
+  const third = absorb(edited.replace('2010 – 2012', '2010 – 2013'), second.data);
+  assert.equal(third.report.added, 1);
+  assert.deepEqual(third.report.orphans, [{ section: 'education', id: item.id, name: 'Uni' }]);
+  assert.equal(third.report.removed, 1);
+  assert.deepEqual(third.data.sections.education.items.map((i) => i.period), ['2010 – 2013', '2010 – 2012']);
+  assert.equal(third.lossless, false);
+  assert.deepEqual(third.report.unparsed, []);
+});
