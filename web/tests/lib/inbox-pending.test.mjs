@@ -58,3 +58,24 @@ test("pendingInbox drops done postings and repeated URLs", () => {
   ];
   assert.deepEqual(pendingInbox(inbox).map((j) => j.role), ["First", "Third"]);
 });
+
+test("markGated marks the gated posting with the ledger's reason and leaves its sibling alone", async () => {
+  const { markGated } = await import("../../src/lib/inbox-pending.mjs");
+  const board = "https://jobs.ashbyhq.com/example";
+  const a = { url: `${board}/11111111-1111-4111-8111-111111111111`, company: "Example", role: "A", done: false };
+  const b = { url: `${board}/22222222-2222-4222-8222-222222222222`, company: "Example", role: "B", done: false };
+  const marked = markGated([a, b], [{ url: `${a.url}?utm_source=x`, state: "gated", reason: "dealbreaker" }]);
+  assert.equal(marked[0].gated, "dealbreaker");
+  assert.equal("gated" in marked[1], false);
+  assert.equal("gated" in a, false, "the input row is not edited");
+});
+
+test("markGated marks nothing for an evaluated, skipped or unreadable entry", async () => {
+  const { markGated } = await import("../../src/lib/inbox-pending.mjs");
+  const jobs = [{ url: "https://jobs.ashbyhq.com/example/11111111-1111-4111-8111-111111111111", done: false }];
+  for (const state of ["evaluated", "skipped", "queued"]) {
+    assert.equal(markGated(jobs, [{ url: jobs[0].url, state, reason: "x" }]), jobs);
+  }
+  assert.equal(markGated(jobs, [null, { state: "gated" }, { url: "not a url", state: "gated" }]), jobs);
+  assert.equal(markGated(jobs, []), jobs);
+});

@@ -5,13 +5,16 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * The Inbox order. Rows that carry a rank (rank-pipeline.mjs) come first,
  * highest rank first. Everything else, and ties, go newest first, with an
- * unknown age last.
+ * unknown age last. A row the drain gated goes after every row it did not,
+ * whatever its rank.
  *
- * @param {{ job: { rank?: number }, age: number | null }} a
- * @param {{ job: { rank?: number }, age: number | null }} b
+ * @param {{ job: { rank?: number, gated?: string }, age: number | null }} a
+ * @param {{ job: { rank?: number, gated?: string }, age: number | null }} b
  * @returns {number}
  */
 export function compareInboxJobs(a, b) {
+  const gated = Number(Boolean(a.job.gated)) - Number(Boolean(b.job.gated));
+  if (gated) return gated;
   const rankA = a.job.rank ?? -Infinity;
   const rankB = b.job.rank ?? -Infinity;
   if (rankA !== rankB) return rankB - rankA;

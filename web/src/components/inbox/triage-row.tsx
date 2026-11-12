@@ -99,7 +99,9 @@ export function TriageRow({
           {ago && <span>{ago}</span>}
           {/* Never labelled a score: the N/5 Badge below is the evaluation score; this is rank-pipeline.mjs's cheap prior.
               An opaque bg-surface keeps brand-text at AA whatever hover or selected tint the row adds beneath it. */}
-          {rankLabel && (
+          {job.gated ? (
+            <Badge tone="bad">Gated: {job.gated}</Badge>
+          ) : rankLabel && (
             <span title={job.rankReason} className="shrink-0 whitespace-nowrap rounded bg-surface px-1 py-px font-medium tabular-nums text-brand-text ring-1 ring-inset ring-brand/30">
               {rankLabel}
             </span>
