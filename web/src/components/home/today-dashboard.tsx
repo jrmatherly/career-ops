@@ -198,7 +198,7 @@ export function TodayDashboard({
         {followupsEnabled && (
           <StatTile value={followupsLoading ? "…" : followupsError ? "—" : shown.overdue} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
         )}
-        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} />
+        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} href="/pipeline?tab=EVALUATED" />
       </div>
       {/* The tiles carry the counts; the states with no count to show still get said in words. */}
       {(heroState === "loading" || heroState === "unavailable" || allClear) && (
