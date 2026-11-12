@@ -256,6 +256,29 @@ for (const [name, char] of [["space", " "], ["comma", ","], ["star", "*"], ["que
   });
 }
 
+test("an unattended pdf run takes the Read denies, and one started by hand does not", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t, undefined, { codeRoot: "checkout" });
+  fs.mkdirSync(path.join(root, "reports"));
+  fs.writeFileSync(path.join(root, "reports", "094-fictional-co-2026-11-12.md"), "# Evaluation: Fictional Co — Platform Engineer\n");
+  fs.writeFileSync(path.join(root, "cv.md"), "# CV\n");
+  const denied = [];
+  globalThis.__onSpawn = (args) => { denied.push(argValue(args, "--disallowedTools")); };
+  await (await run({ kind: "pdf", input: "94", unattended: true })).text();
+  await (await run({ kind: "pdf", input: "94" })).text();
+  assert.equal(denied.length, 2);
+  assert.ok(denied[0].includes("Read(//var/run/secrets/**)"), denied[0]);
+  assert.ok(!denied[1].includes("Read("), denied[1]);
+});
+
+test("unattended is refused off the pdf kind, as anything but true, and on any CLI but claude", async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => assert.fail("no CLI may start");
+  assert.equal(await refusal(await run({ jdText: "Role.", unattended: true })), 'unattended is for kind "pdf" only, not "evaluate-text".');
+  assert.equal(await refusal(await run({ kind: "pdf", input: "94", unattended: "yes" })), "unattended must be true when it is sent.");
+  globalThis.__resolvedCliId = "codex";
+  assert.match(await refusal(await run({ kind: "pdf", input: "94", unattended: true })), /unattended pdf run runs on Claude only/);
+});
+
 test("evaluate-text refuses a data root it cannot resolve", async (t) => {
   const root = fixtureRoot(t);
   process.env.CAREER_OPS_ROOT = path.join(root, "missing");
@@ -415,6 +438,7 @@ VERDICT: 4.1/5
 `;
   const stream = await events(await run({ input: url, jdText: "Platform Engineer at Fictional Co." }));
   assert.ok(!stream.some((event) => event.type === "error"), `run failed: ${JSON.stringify(stream)}`);
+  assert.equal(stream.find((event) => event.type === "done")?.score, 4.1);
 
   const reports = fs.readdirSync(path.join(root, "reports")).filter((file) => file.endsWith(".md"));
   assert.equal(reports.length, 1, `expected one report, got ${reports}`);

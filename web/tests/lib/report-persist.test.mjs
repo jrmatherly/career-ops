@@ -270,7 +270,7 @@ test("persistEvaluation: writes report + TSV, reserves, merges, releases", async
     assert.equal(result.ok, true);
     assert.equal(result.num, "035");
     assert.equal(result.reportFile, "035-acme-ai-2026-08-04.md");
-    assert.equal(result.score, scoreValue(parseReportMeta(REPORT).score));
+    assert.equal(result.score, 4.2);
     assert.equal(typeof result.score, "number");
     assert.deepEqual(result.warnings, []);
     assert.equal(readFileSync(join(root, "data", "pipeline.md"), "utf8"), pipeline.replace("- [ ] https://acme.com/jobs/7", "- [x] https://acme.com/jobs/7"));

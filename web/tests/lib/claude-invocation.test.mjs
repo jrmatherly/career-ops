@@ -319,7 +319,15 @@ test("claudeCliArgs: evaluate-text denies Read on secrets and PII by absolute pa
   }
 });
 
-test("claudeCliArgs: the Read denies are evaluate-text's alone", () => {
+test("claudeCliArgs: a pdf run given both roots takes the same Read denies as evaluate-text", () => {
+  const denies = (kind) => argValue(claudeCliArgs({ kind, prompt: "x", dataRoot: "/data", codeRoot: "/app" }), "--disallowedTools").split(",").filter((rule) => rule.startsWith("Read("));
+  assert.ok(denies("pdf").includes("Read(//var/run/secrets/**)"));
+  assert.deepEqual(denies("pdf"), denies("evaluate-text"));
+  assert.ok(!argValue(claudeCliArgs({ kind: "pdf", prompt: "x" }), "--disallowedTools").includes("Read("));
+  assert.throws(() => claudeCliArgs({ kind: "pdf", prompt: "x", dataRoot: "/data" }), /pdf needs an absolute codeRoot/);
+});
+
+test("claudeCliArgs: a run given no roots takes no Read denies", () => {
   // Given the interactive evaluate kind, which has a user watching
   const deny = argValue(claudeCliArgs({ kind: "evaluate", prompt: "x" }), "--disallowedTools");
 

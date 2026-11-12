@@ -693,7 +693,7 @@ test("an evaluation at the automatic CV score starts a CV run for its report, af
   cvThreshold(root, 4);
   const result = await drain();
   assert.deepEqual(posts.map((post) => post.body.kind), ["evaluate-text", "pdf"]);
-  assert.deepEqual(posts[1].body, { kind: "pdf", input: "94", cliId: "claude" });
+  assert.deepEqual(posts[1].body, { kind: "pdf", input: "94", cliId: "claude", unattended: true });
   assert.equal(posts[1].headers.host, "localhost");
   assert.equal(result.evaluated, 1);
   assert.deepEqual(state(url(1)).rows.map((row) => row.state), ["queued", "running", "evaluated"]);
@@ -707,6 +707,13 @@ test("an evaluation under the score, or with no readable score or report, starts
     await drain();
     assert.deepEqual(cvPosts(posts), [], JSON.stringify(events));
   }
+});
+
+test("a threshold of 0 starts a CV run for every scored evaluation, a score of 0 included", async (t) => {
+  const { root, drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(body.input === url(1) ? 5 : 6, body.input === url(1) ? 0 : 1.2)) });
+  cvThreshold(root, 0);
+  await drain();
+  assert.deepEqual(cvPosts(posts).map((post) => post.body.input), ["5", "6"]);
 });
 
 test("with no profile the CV run starts at the default score of 3", async (t) => {

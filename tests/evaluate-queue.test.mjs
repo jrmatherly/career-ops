@@ -139,6 +139,8 @@ try {
   check(readAutoPdfThreshold(profile) === 3, 'the automatic CV score defaults to 3 with no key', '');
   writeFileSync(profile, 'auto_pdf_score_threshold: 4\n');
   check(readAutoPdfThreshold(profile) === 4, 'the automatic CV score reads auto_pdf_score_threshold', '');
+  writeFileSync(profile, 'auto_pdf_score_threshold: 0\n');
+  check(readAutoPdfThreshold(profile) === 0, 'an automatic CV score of 0 is read as 0, not as unset', '');
   writeFileSync(profile, 'auto_pdf_score_threshold: "high"\n');
   warned.length = 0;
   process.stderr.write = (chunk) => { warned.push(String(chunk)); return true; };

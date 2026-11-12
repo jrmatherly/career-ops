@@ -1,6 +1,7 @@
 /**
  * The drain: evaluates the rows auto-mode jobs queued in data/evaluate-queue.tsv
- * by POSTing evaluate-text runs to the dashboard over loopback. It never spawns
+ * by POSTing evaluate-text runs to the dashboard over loopback, and a pdf run for
+ * a report that scores at or above auto_pdf_score_threshold. It never spawns
  * a CLI itself: every writer stays in the dashboard's process tree, where the
  * tracker write token and the report-number locks live.
  *
@@ -24,8 +25,8 @@ import { reportUrlToken } from "../../tracker-utils.mjs";
 import { tsvCell } from "../../lib/application-meta.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
-// A wall-clock deadline on one evaluation: the route's 740 s kill, 60 s of
-// persist and 100 s of slack. It outlasts RUNNING_STALE_MS (860 s), so in the
+// A wall-clock deadline on one run. For an evaluation: the route's 740 s kill,
+// 60 s of persist and 100 s of slack; a CV run ends inside the route's 800 s. It outlasts RUNNING_STALE_MS (860 s), so in the
 // last 40 s a concurrent `evaluate-queue.mjs dump` reads the live row as stale; the
 // drain lock keeps a second drain from acting on that.
 const RUN_TIMEOUT_MS = 900_000;
@@ -324,11 +325,10 @@ export async function runDrain({
         const note = touchedRuns.get(entry.runId);
         if (outcome.stop) note.drainMessage = stopMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
         else if (outcome.state !== "queued") note.drainMessage = undefined;
-        // After the evaluation's response has ended: both runs take the tracker write lock.
         // A CV is extra to the evaluation, so it changes no ledger row, counts toward no limit and stops nothing.
         if (outcome.state === "evaluated" && outcome.reportN && outcome.score !== null && outcome.score >= cvThreshold) {
           const failure = cvFailure(await request(baseUrl, "/api/run", {
-            body: { kind: "pdf", input: String(outcome.reportN), cliId: "claude" },
+            body: { kind: "pdf", input: String(outcome.reportN), cliId: "claude", unattended: true },
             timeoutMs: runTimeoutMs,
           }));
           log(`cv for report ${outcome.reportN}: ${failure === null ? "ready" : `failed (${failure})`}`);
