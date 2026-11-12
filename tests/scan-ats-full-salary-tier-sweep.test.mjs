@@ -4,27 +4,41 @@
 // behind an --import preload, a temp data root, and no network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { ROOT, NODE } from './helpers.mjs';
 
-function sweepRoot(t, portals) {
+function sweepRoot(t, portals, companies = ['sandbox-co']) {
   const dir = mkdtempSync(join(tmpdir(), 'ats-full-salary-tier-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, 'portals.yml'), portals);
   mkdirSync(join(dir, 'data', 'cache', 'ats-companies'), { recursive: true });
-  writeFileSync(join(dir, 'data', 'cache', 'ats-companies', 'greenhouse.json'), JSON.stringify(['sandbox-co']));
+  writeFileSync(join(dir, 'data', 'cache', 'ats-companies', 'greenhouse.json'), JSON.stringify(companies));
   writeFileSync(join(dir, 'data', 'pipeline.md'), '# Pipeline\n\n## Pendientes\n');
   const preload = join(dir, 'preload.mjs');
   writeFileSync(preload, `
 import provider from ${JSON.stringify(pathToFileURL(join(ROOT, 'providers', 'greenhouse.mjs')).href)};
-const job = (id, title, extra = {}) => ({ title, url: 'https://job-boards.greenhouse.io/sandbox-co/jobs/' + id,
-  company: 'sandbox-co', location: 'Remote', postedAt: Date.now(), description: '', ...extra });
+let board = 'sandbox-co';
+// The dedup key of a greenhouse posting is its job id, so each board gets its own ids.
+let idBase = 0;
+const job = (id, title, extra = {}) => ({ title, url: 'https://job-boards.greenhouse.io/' + board + '/jobs/' + (idBase + id),
+  company: board, location: 'Remote', postedAt: Date.now(), description: '', ...extra });
 provider.fetchListing = undefined;
-provider.fetch = async () => process.env.STUB_NO_DATE_BOARD ? Object.assign([
+const resolverDown = () => { const err = new TypeError('fetch failed');
+  err.cause = Object.assign(new Error('getaddrinfo EAI_AGAIN boards-api.greenhouse.io'), { code: 'EAI_AGAIN' }); return err; };
+provider.fetch = async (entry) => {
+  board = entry.name;
+  const n = Number(String(entry.name).replace('sandbox-co-', ''));
+  idBase = entry.name === 'other-co' ? 100 : Number.isInteger(n) ? 1000 * n : 0;
+  if (process.env.STUB_REPLAY) {
+    if (n < 5) return [job(1, 'Platform Engineer I')];
+    if (process.env.STUB_REPLAY === 'outage') throw resolverDown();
+    return [];
+  }
+  return process.env.STUB_NO_DATE_BOARD ? Object.assign([
   job(7, 'Platform Engineer I', { postedAt: undefined }),
   job(8, 'Principal Engineer', { postedAt: undefined }),
   job(9, 'Sales Associate', { postedAt: undefined }),
@@ -36,6 +50,7 @@ provider.fetch = async () => process.env.STUB_NO_DATE_BOARD ? Object.assign([
   job(5, 'Platform Engineer I', { postedAt: undefined }),
   job(6, 'Principal Engineer', { postedAt: undefined }),
 ];
+};
 provider.enrichDate = async (j) => { process.stderr.write('ENRICHED ' + j.title + '\\n'); };
 globalThis.fetch = async () => { throw new Error('Unexpected network request'); };
 `);
@@ -100,4 +115,33 @@ test('a tier drop is not also reported in the no-date breakdown of its board', (
   const out = result.stdout + result.stderr;
   assert.match(out, /Tier-filtered:\s+1/);
   assert.match(out, /Undated dropped: 2 \(incl\. 2 from 1 workday/);
+});
+
+test('a resumed sweep does not count again the drops of boards it replays', (t) => {
+  const companies = Array.from({ length: 120 }, (_, i) => `sandbox-co-${i}`);
+  const { dir, run } = sweepRoot(t, `${TITLES}skip_tiers: [entry]\n`, companies);
+  run(['--json'], { STUB_REPLAY: 'outage' });
+  const file = join(dir, 'data', 'cache', 'ats-full-checkpoint.json');
+  assert.ok(existsSync(file), 'premise: the resolver breaker stopped the sweep and kept its checkpoint');
+  const checkpoint = JSON.parse(readFileSync(file, 'utf-8'));
+  assert.equal(checkpoint.counters.droppedTier, 5, 'premise: five boards each dropped one skipped level');
+  // What a slow early board does to a periodic checkpoint: the counters hold
+  // drops from boards past resumeAt, which the resumed run fetches again.
+  checkpoint.current.resumeAt = 0;
+  writeFileSync(file, JSON.stringify(checkpoint));
+  const resumed = run(['--json', '--resume'], { STUB_REPLAY: 'clean' });
+  assert.equal(resumed.status, 0, resumed.stderr.slice(-800));
+  assert.equal(JSON.parse(resumed.stdout.trim().split('\n').at(-1)).postingsDroppedTier, 5);
+});
+
+test('a tier drop on a history board leaves the directory boards\' no-date breakdown alone', (t) => {
+  const { dir, run } = sweepRoot(t, `${TITLES}skip_tiers: [entry]\n`);
+  writeFileSync(join(dir, 'data', 'scan-history.tsv'),
+    'url\tfirst_seen\tportal\ttitle\tcompany\tstatus\nhttps://job-boards.greenhouse.io/other-co/jobs/99\t2026-01-01\tgreenhouse\tDirector\tother-co\tadded\n');
+  const result = run(['--dry-run', '--history-seeds'], { STUB_NO_DATE_BOARD: '1' });
+  assert.equal(result.status, 0, result.stderr.slice(-800));
+  const out = result.stdout + result.stderr;
+  assert.match(out, /Application history — 1 unique ATS board/, 'premise: the history board was scanned');
+  assert.match(out, /Tier-filtered:\s+2/);
+  assert.match(out, /Undated dropped: 4 \(incl\. 2 from 1 workday/);
 });
