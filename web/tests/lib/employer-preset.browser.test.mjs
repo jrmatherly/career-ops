@@ -48,7 +48,21 @@ test(
       logo.push(route.request().url());
       return route.abort();
     });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`${origin.origin}/explore`);
+    const firstScreenScan = page.getByRole("button", {
+      name: "Discover (free)",
+      exact: true,
+    });
+    await firstScreenScan.waitFor();
+    const scanBox = await firstScreenScan.boundingBox();
+    assert.ok(
+      scanBox && scanBox.y + scanBox.height <= 900,
+      `scan button must sit on the first 1280x900 screen, bottom edge at ${scanBox && scanBox.y + scanBox.height}`,
+    );
+    await page
+      .getByRole("button", { name: "More location controls & scan depth", exact: true })
+      .click();
     const preset = page.getByRole("radio", {
       name: "Public ATS network",
       exact: true,
@@ -327,6 +341,9 @@ test(
         });
       });
       await page.goto(`${new URL(base).origin}/explore`);
+      await page
+        .getByRole("button", { name: "More location controls & scan depth", exact: true })
+        .click();
       const preset = page.getByRole("radio", {
         name: "Public ATS network",
         exact: true,
