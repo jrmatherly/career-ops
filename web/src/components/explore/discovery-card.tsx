@@ -8,12 +8,13 @@ import { ATS_LABEL, type AtsSource, type DiscoveredOffer } from "@/lib/explore";
 import { CHINA_SOURCES, EMPLOYER_LABEL } from "@/lib/employer-preset.mjs";
 import { evaluationGateForJob } from "@/lib/job-gate.mjs";
 import { useJobs } from "@/components/jobs/job-store";
+import { agoLabel } from "@/lib/format-time.mjs";
 import { useExplore } from "./explore-provider";
 
 function freshness(postedAt: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(postedAt)) return "";
   const days = Math.max(0, Math.round((Date.now() - new Date(postedAt + "T00:00:00Z").getTime()) / 86_400_000));
-  return days === 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
+  return agoLabel(days);
 }
 
 // Real company logo (favicon) via the localhost proxy, cached on disk FOREVER per

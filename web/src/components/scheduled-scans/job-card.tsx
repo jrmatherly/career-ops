@@ -6,6 +6,7 @@ import type { ScheduledJob } from "@/lib/scheduled-jobs";
 import { evaluateModeLabel } from "@/lib/evaluate-settings.mjs";
 import { cn } from "@/lib/cn";
 import { instrumentSerif } from "@/lib/fonts";
+import { formatWhen } from "@/lib/format-time.mjs";
 
 export function JobCard({
   job,
@@ -185,7 +186,7 @@ export function JobCard({
           ) : job.lastRunAt ? (
             <p className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400">
               <CheckCircle2 className="size-3.5 shrink-0" />
-              Last run {new Date(job.lastRunAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·{" "}
+              Last run {formatWhen(job.lastRunAt)} ·{" "}
               {job.rolesFoundCount || 0} roles found
             </p>
           ) : (

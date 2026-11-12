@@ -5,6 +5,7 @@ import { Check, Clock, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CompanyLogo } from "@/components/company-logo";
 import { NextDateDialog } from "@/components/followups/next-date-dialog";
+import { agoLabel, formatDay } from "@/lib/format-time.mjs";
 
 export type FollowUp = {
   num?: number;
@@ -12,6 +13,7 @@ export type FollowUp = {
   role?: string;
   status?: string;
   appliedDate?: string;
+  daysSinceApplication?: number;
   notes?: string;
   // Raw pass-through from followup-cadence.mjs — 'urgent'/'overdue' entries
   // are due now, 'waiting'/'cold' are not (#86).
@@ -72,7 +74,7 @@ export function FollowUpCard({ followup, onLogged }: { followup: FollowUp; onLog
             {followup.role && <span className="text-muted"> · {followup.role}</span>}
           </p>
           <p className="flex items-center gap-1 text-[11px] text-faint">
-            <Clock className="size-3" /> {followup.appliedDate ? `applied ${followup.appliedDate}` : "follow-up due"}
+            <Clock className="size-3" /> {followup.appliedDate ? [`Applied ${formatDay(followup.appliedDate)}`, agoLabel(followup.daysSinceApplication ?? null)].filter(Boolean).join(" · ") : "follow-up due"}
           </p>
         </div>
       </div>

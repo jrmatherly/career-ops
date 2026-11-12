@@ -1,3 +1,5 @@
+import { formatWhen } from "./format-time.mjs";
+
 export function isSchedulerStatusPayload(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value)
     && value.task && typeof value.task === "object" && !Array.isArray(value.task)
@@ -16,11 +18,8 @@ export function osSchedulerFor(platform) {
   return Object.hasOwn(OS_SCHEDULERS, platform) ? OS_SCHEDULERS[platform] : undefined;
 }
 
-function formatTaskTime(value) {
-  if (!value) return "Not reported";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
+// "Not reported", not formatWhen's "Not yet": the OS did not say, which is not the same as never.
+const formatTaskTime = (value, now) => (value ? formatWhen(value, { now: new Date(now) }) : "Not reported");
 
 // The app does not know an external scheduler's cadence; the runner's own grid is a quarter hour,
 // so an hour without a tick is four missed and the card stops calling it running.
@@ -41,7 +40,7 @@ export function schedulerCardCopy(status, now = Date.now()) {
       title: status.description ?? "External scheduler",
       badge: healthy ? "Running" : task.lastRun ? "No recent tick" : "Waiting for first tick",
       healthy,
-      subline: task.lastRun ? `Last tick ${formatTaskTime(task.lastRun)}` : "No tick recorded yet",
+      subline: task.lastRun ? `Last tick ${formatTaskTime(task.lastRun, now)}` : "No tick recorded yet",
     };
   }
   const os = osSchedulerFor(status.platform ?? "");
@@ -53,7 +52,7 @@ export function schedulerCardCopy(status, now = Date.now()) {
     badge: task.exists ? (task.enabled ? "Task enabled" : "Task disabled") : "Task not installed",
     healthy: task.exists && task.enabled,
     subline: task.exists
-      ? `Next OS check: ${formatTaskTime(task.nextRun)} · Last OS check: ${formatTaskTime(task.lastRun)}`
+      ? `Next OS check: ${formatTaskTime(task.nextRun, now)} · Last OS check: ${formatTaskTime(task.lastRun, now)}`
       : `Install with ${os.install} to run due jobs automatically.`,
   };
 }

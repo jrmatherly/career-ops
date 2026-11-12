@@ -10,17 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { CompanyLogo } from "@/components/company-logo";
 import { cn } from "@/lib/cn";
 import { inboxScoreTarget } from "@/lib/inbox-score-target.mjs";
+import { agoLabel } from "@/lib/format-time.mjs";
 
 export type RowScore = { score: number | null; tone: "good" | "warn" | "bad" | "muted"; jobId: string; running: boolean; reportN?: number | null; needsReview?: boolean };
-
-function agoLabel(age: number | null): string | null {
-  if (age == null) return null;
-  if (age <= 0) return "today";
-  if (age === 1) return "yesterday";
-  if (age < 7) return `${age}d ago`;
-  if (age < 30) return `${Math.floor(age / 7)}w ago`;
-  return `${Math.floor(age / 30)}mo ago`;
-}
 
 // One raw posting in the triage list. Shows ONLY cheap, free signals + an honest
 // "not scored" (CRUDA) — never a fake match%. Once its shortlist eval finishes it
