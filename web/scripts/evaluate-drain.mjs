@@ -1,6 +1,7 @@
 /**
  * The drain: evaluates the rows auto-mode jobs queued in data/evaluate-queue.tsv
- * by POSTing evaluate-text runs to the dashboard over loopback. It never spawns
+ * by POSTing evaluate-text runs to the dashboard over loopback, and a pdf run for
+ * a report that scores at or above auto_pdf_score_threshold. It never spawns
  * a CLI itself: every writer stays in the dashboard's process tree, where the
  * tracker write token and the report-number locks live.
  *
@@ -15,7 +16,7 @@ import { pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
-import { appendRow, drainPlan, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
+import { appendRow, drainPlan, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
 import { JD_TEXT_API_ATS, resolveAtsApi } from "../../liveness-api.mjs";
 import { fetchJdViaKnownApi } from "../../browser-extract.mjs";
 import { resolveTrackerPath } from "../../path-resolver.mjs";
@@ -24,8 +25,8 @@ import { reportUrlToken } from "../../tracker-utils.mjs";
 import { tsvCell } from "../../lib/application-meta.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
-// A wall-clock deadline on one evaluation: the route's 740 s kill, 60 s of
-// persist and 100 s of slack. It outlasts RUNNING_STALE_MS (860 s), so in the
+// A wall-clock deadline on one run. For an evaluation: the route's 740 s kill,
+// 60 s of persist and 100 s of slack; a CV run ends inside the route's 800 s. It outlasts RUNNING_STALE_MS (860 s), so in the
 // last 40 s a concurrent `evaluate-queue.mjs dump` reads the live row as stale; the
 // drain lock keeps a second drain from acting on that.
 const RUN_TIMEOUT_MS = 900_000;
@@ -135,7 +136,14 @@ function outcomeOf(response) {
   const events = streamEvents(response.text);
   const terminal = events.findLast((event) => TERMINAL.has(event.type));
   if (!terminal) return { state: "queued", reason: "dashboard-offline", stop: "offline", detail: "the stream ended with no terminal event" };
-  if (terminal.type === "done") return { state: "evaluated", reason: terminal.reportN ? `report ${terminal.reportN}` : "" };
+  if (terminal.type === "done") {
+    return {
+      state: "evaluated",
+      reason: terminal.reportN ? `report ${terminal.reportN}` : "",
+      reportN: terminal.reportN ?? null,
+      score: typeof terminal.score === "number" ? terminal.score : null,
+    };
+  }
   if (terminal.type === "gated") return { state: "gated", reason: terminal.reason || terminal.message || "" };
   // The limit event names why the batch stops; the terminal error after it is generic.
   // A limit is the account's or the gateway's, not this row's, so the row keeps its retries.
@@ -145,6 +153,28 @@ function outcomeOf(response) {
   // A time-limit kill is a slow posting or a gateway the CLI retried in silence. The row
   // spends a retry either way, and the batch stops because each next row could cost the same wait.
   return { state: "failed", reason, stop: isTimeoutMessage(reason) ? "timeout" : undefined };
+}
+
+/** Why one CV POST did not end in a rendered PDF, or null when it did. */
+function cvFailure(response) {
+  if (response.transport) return response.transport.message;
+  if (response.status !== 200) {
+    try {
+      return JSON.parse(response.text).error || `HTTP ${response.status}`;
+    } catch {
+      return `HTTP ${response.status}`;
+    }
+  }
+  const terminal = streamEvents(response.text).findLast((event) => TERMINAL.has(event.type));
+  if (terminal?.type === "done") return null;
+  return String(terminal?.msg ?? terminal?.message ?? "the stream ended with no terminal event");
+}
+
+/** The render and tracker warnings the pdf route sends as `⚠️ ` text events before its terminal event. */
+function cvWarnings(response) {
+  return streamEvents(response.text ?? "")
+    .filter((event) => event?.type === "text" && typeof event.text === "string" && event.text.startsWith("⚠️ "))
+    .map((event) => event.text.trim());
 }
 
 /**
@@ -175,6 +205,7 @@ export async function runDrain({
   const ledger = readLedger(root, { now: now(), skipped: skippedRows });
   if (skippedRows.length) log(`${skippedRows.length} malformed row(s) in data/evaluate-queue.tsv skipped, first at line ${skippedRows[0].line}`);
   const dailyCap = readDailyCap(getProfilePath(root));
+  const cvThreshold = readAutoPdfThreshold(getProfilePath(root));
   // Re-planned before each row, so the cap counts what this drain started and a
   // row tried this tick (a posting with no text yet, say) does not hold a slot.
   const planFor = (job, tried = new Set(), started = 0, cap = dailyCap) => drainPlan(root, {
@@ -301,6 +332,16 @@ export async function runDrain({
         const note = touchedRuns.get(entry.runId);
         if (outcome.stop) note.drainMessage = stopMessage = `Evaluation stopped at ${url} and the rest stay queued: ${outcome.detail ?? outcome.reason}`;
         else if (outcome.state !== "queued") note.drainMessage = undefined;
+        // A CV is extra to the evaluation, so it changes no ledger row, counts toward no limit and stops nothing.
+        if (outcome.state === "evaluated" && outcome.reportN && outcome.score !== null && outcome.score >= cvThreshold) {
+          const response = await request(baseUrl, "/api/run", {
+            body: { kind: "pdf", input: String(outcome.reportN), cliId: "claude", unattended: true },
+            timeoutMs: runTimeoutMs,
+          });
+          const failure = cvFailure(response);
+          for (const warning of cvWarnings(response)) log(`cv for report ${outcome.reportN}: ${warning}`);
+          log(`cv for report ${outcome.reportN}: ${failure === null ? "ready" : `failed (${failure})`}`);
+        }
         if (outcome.stop) {
           status = outcome.stop === "offline" ? "offline" : "stopped";
           log(`job ${job.id}: stopped at ${url}: ${outcome.detail ?? outcome.reason}; the rest stay queued`);

@@ -680,3 +680,78 @@ test("a reason left on a run with no row still waiting is cleared by the next pa
   assert.equal((await drain()).status, "idle");
   assert.equal(runOf(storePath).drainMessage, undefined);
 });
+
+const scored = (n, score) => [{ type: "done", tokens: 1, costUsd: 0, reportN: n, score }];
+function cvThreshold(root, threshold, extra = "") {
+  fs.mkdirSync(path.join(root, "config"));
+  fs.writeFileSync(path.join(root, "config", "profile.yml"), `auto_pdf_score_threshold: ${threshold}\n${extra}`);
+}
+const cvPosts = (posts) => posts.filter((post) => post.body.kind === "pdf");
+
+test("an evaluation at the automatic CV score starts a CV run for its report, after the evaluation", async (t) => {
+  const { root, drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1)], answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(94, 4)) });
+  cvThreshold(root, 4);
+  const result = await drain();
+  assert.deepEqual(posts.map((post) => post.body.kind), ["evaluate-text", "pdf"]);
+  assert.deepEqual(posts[1].body, { kind: "pdf", input: "94", cliId: "claude", unattended: true });
+  assert.equal(posts[1].headers.host, "localhost");
+  assert.equal(result.evaluated, 1);
+  assert.deepEqual(state(url(1)).rows.map((row) => row.state), ["queued", "running", "evaluated"]);
+  assert.match(stderr.join(""), /cv for report 94: ready/);
+});
+
+test("an evaluation under the score, or with no readable score or report, starts no CV run", async (t) => {
+  for (const events of [scored(94, 3.9), scored(94, null), done(94), [{ type: "done", score: 4.5 }]]) {
+    const { root, drain, posts } = await withDrainRoot(t, { urls: [url(1)], answer: () => events });
+    cvThreshold(root, 4);
+    await drain();
+    assert.deepEqual(cvPosts(posts), [], JSON.stringify(events));
+  }
+});
+
+test("a CV run's warnings reach the run log beside its result", async (t) => {
+  const cv = [{ type: "text", text: "Tailoring the summary." }, { type: "text", text: "⚠️ The tracker row was not marked.\n" }, { type: "done" }];
+  const { root, drain, stderr } = await withDrainRoot(t, { urls: [url(1)], answer: (body) => (body.kind === "pdf" ? cv : scored(94, 4)) });
+  cvThreshold(root, 4);
+  await drain();
+  const log = stderr.join("");
+  assert.match(log, /cv for report 94: ⚠️ The tracker row was not marked\.\n.*cv for report 94: ready/s);
+  assert.doesNotMatch(log, /Tailoring the summary/);
+});
+
+test("a threshold of 0 starts a CV run for every scored evaluation, a score of 0 included", async (t) => {
+  const { root, drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(body.input === url(1) ? 5 : 6, body.input === url(1) ? 0 : 1.2)) });
+  cvThreshold(root, 0);
+  await drain();
+  assert.deepEqual(cvPosts(posts).map((post) => post.body.input), ["5", "6"]);
+});
+
+test("with no profile the CV run starts at the default score of 3", async (t) => {
+  const { drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(body.input === url(1) ? 5 : 6, body.input === url(1) ? 3 : 2.9)) });
+  await drain();
+  assert.deepEqual(cvPosts(posts).map((post) => post.body.input), ["5"]);
+});
+
+test("a CV run that fails leaves the row evaluated and the next row still runs", async (t) => {
+  for (const cvReply of [500, "drop", [{ type: "error", msg: "render failed" }]]) {
+    const urls = [url(1), url(2)];
+    const { root, drain, state, posts, stderr, storePath } = await withDrainRoot(t, { urls, answer: (body) => (body.kind === "pdf" ? cvReply : scored(body.input === url(1) ? 94 : 95, 4.2)) });
+    cvThreshold(root, 4);
+    const result = await drain();
+    assert.equal(result.status, "drained");
+    assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "evaluated"]);
+    assert.deepEqual(posts.map((post) => post.body.kind), ["evaluate-text", "pdf", "evaluate-text", "pdf"]);
+    assert.match(stderr.join(""), /cv for report 94: failed \(/);
+    assert.equal(readScheduledStore(storePath).runs.find((r) => r.id === RUN).drainMessage, undefined);
+  }
+});
+
+test("CV runs count toward neither the job's per-pass limit nor the daily cap", async (t) => {
+  const urls = [url(1), url(2)];
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls, evaluate: { ...AUTO, maxPerRun: 2 }, answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(body.input === url(1) ? 94 : 95, 4)) });
+  cvThreshold(root, 4, "pipeline:\n  auto_evaluate_daily_cap: 2\n");
+  const result = await drain();
+  assert.equal(result.evaluated, 2);
+  assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "evaluated"]);
+  assert.equal(cvPosts(posts).length, 2);
+});

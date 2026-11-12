@@ -57,7 +57,7 @@ const POSTING_INPUT: Record<string, { pattern: RegExp; shape: string }> = {
 };
 
 export async function POST(req: Request) {
-  const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown; jdText?: unknown }>(req);
+  const body = await readJsonObject<{ kind?: string; input?: string; cliId?: string; brief?: unknown; evaluationSections?: unknown; jdText?: unknown; unattended?: unknown }>(req);
   if (!body) return new Response(JSON.stringify({ error: "bad json" }), { status: 400 });
   const { kind = "evaluate", input, cliId: requestedCliId, brief } = body;
   // An unknown kind would fall through to the URL-fetch prompt and spawn a paid run.
@@ -67,11 +67,17 @@ export async function POST(req: Request) {
     ["jdText", kind === "evaluate-text", 'kind "evaluate-text"'],
     ["brief", kind === "cover", 'kind "cover"'],
     ["evaluationSections", isEvaluateKind(kind), "the evaluate kinds"],
+    ["unattended", kind === "pdf", 'kind "pdf"'],
   ] as const) {
     if (!owns && body[field] !== undefined) {
       return Response.json({ error: `${field} is for ${owner} only, not "${kind}".` }, { status: 400 });
     }
   }
+  if (body.unattended !== undefined && body.unattended !== true) {
+    return Response.json({ error: "unattended must be true when it is sent." }, { status: 400 });
+  }
+  // No one watches these runs, so they run on Claude only and take its Read denies.
+  const fenced = kind === "evaluate-text" || body.unattended === true;
   const evaluation = isEvaluateKind(kind) ? parseEvaluationOptions(body.evaluationSections) : undefined;
   if (evaluation && !evaluation.ok) return Response.json({ error: evaluation.error }, { status: 400 });
   if (typeof input !== "string" || !input.trim()) {
@@ -111,14 +117,14 @@ export async function POST(req: Request) {
   const { spec, binPath } = resolved;
   // The CLI actually running: fencing, capabilities and argv below are keyed on it.
   const cliId = spec.id;
-  if (kind === "evaluate-text" && cliId !== "claude") {
-    return Response.json({ error: "evaluate-text runs on Claude only, and Claude is not available." }, { status: 400 });
+  if (fenced && cliId !== "claude") {
+    return Response.json({ error: `${kind === "pdf" ? "An unattended pdf run" : kind} runs on Claude only, and Claude is not available.` }, { status: 400 });
   }
   // Scripts and system modes live in the code checkout, which on a split-layout
   // install is not the data root (cv.md, reports/ and output stay under that).
   const codeRoot = resolveCodeRoot(process.cwd(), process.env);
   const denyRoots: { dataRoot?: string; codeRoot?: string } = {};
-  if (kind === "evaluate-text") {
+  if (fenced) {
     // The denies name the real paths, so a symlinked root still covers the files.
     for (const [key, label, root, envName] of [
       ["dataRoot", "data root", careerOpsRoot(), "CAREER_OPS_ROOT"],
@@ -129,12 +135,12 @@ export async function POST(req: Request) {
         real = fs.realpathSync(root);
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
-        console.error(`/api/run: evaluate-text realpath of the ${label} failed: ${code}`);
-        return Response.json({ error: `evaluate-text could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
+        console.error(`/api/run: ${kind} realpath of the ${label} failed: ${code}`);
+        return Response.json({ error: `${kind} could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
       }
       if (!DENY_SAFE_ROOT.test(real)) {
         return Response.json({
-          error: `evaluate-text needs a ${label} of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${real}). Point ${envName} at such a path.`,
+          error: `${kind} needs a ${label} of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${real}). Point ${envName} at such a path.`,
         }, { status: 400 });
       }
       denyRoots[key] = real;
@@ -600,9 +606,9 @@ export async function POST(req: Request) {
           sendWarnings(result.warnings);
           const reportN = Number(result.num);
           if (Number.isFinite(reportN)) {
-            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, reportN });
+            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, reportN, score: result.score });
           } else {
-            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd });
+            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, score: result.score });
           }
         } catch (e) {
           send({ type: "error", msg: `Evaluation persist crashed unexpectedly: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200) });

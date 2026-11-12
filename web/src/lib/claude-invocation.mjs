@@ -152,8 +152,10 @@ export function grantsWriteCapability(scope) {
  * Assembled here, not in the route, so a guard can assert on the command line
  * that actually ships instead of on source text that can be rewritten around it.
  *
- * evaluate-text runs unattended on untrusted posting text, so it also denies
- * Read on what a hostile posting would aim at: the process environment, the
+ * evaluate-text runs unattended on untrusted posting text, and so does a pdf run
+ * the scheduled drain starts (its report archives the posting). The route passes
+ * both roots for those, and the run then also denies Read on what a hostile
+ * posting would aim at: the process environment, the
  * service-account token, the CLI's own home and credentials, the host's SSH,
  * AWS, GitHub CLI and GPG credentials, the data root's .env, the two third-party
  * PII files, and the checkout's env files.
@@ -163,8 +165,8 @@ export function grantsWriteCapability(scope) {
  */
 export function claudeCliArgs({ kind, prompt, dataRoot, codeRoot }) {
   const scope = toolScopeFor(kind);
-  const disallowed = kind === "evaluate-text"
-    ? [scope.disallowed, ...evaluateTextReadDenies(dataRoot, codeRoot)].join(",")
+  const disallowed = kind === "evaluate-text" || dataRoot !== undefined || codeRoot !== undefined
+    ? [scope.disallowed, ...unattendedReadDenies(kind, dataRoot, codeRoot)].join(",")
     : scope.disallowed;
   return [
     "-p", prompt,
@@ -185,10 +187,10 @@ export function claudeCliArgs({ kind, prompt, dataRoot, codeRoot }) {
 
 // `//` is Claude Code's absolute-path prefix; a single slash anchors at the
 // settings source, so `Read(/proc/**)` would not cover /proc.
-function evaluateTextReadDenies(dataRoot, codeRoot) {
+function unattendedReadDenies(kind, dataRoot, codeRoot) {
   for (const [name, value] of [["dataRoot", dataRoot], ["codeRoot", codeRoot]]) {
     if (!value?.startsWith("/")) {
-      throw new Error(`claudeCliArgs: evaluate-text needs an absolute ${name} for its Read denies`);
+      throw new Error(`claudeCliArgs: ${kind} needs an absolute ${name} for its Read denies`);
     }
   }
   const absolute = (dir) => `/${dir.replace(/\/+$/, "")}`;

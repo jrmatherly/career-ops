@@ -81,3 +81,12 @@ test("addedEmptyState counts a hidden row as skipped", () => {
   const title = addedEmptyState("2026-11-05", [{ url: "a", addedAt: "2026-11-05" }], ["a"], ["2026-11-05"])?.title;
   assert.equal(title, "Every role added on 2026-11-05 has been skipped or tracked");
 });
+
+test("a gated row sorts after every row that is not, whatever its rank", () => {
+  const gated = { job: { rank: 3.7, gated: "dealbreaker" }, age: 0 };
+  const low = { job: { rank: 1.0 }, age: 9 };
+  const unranked = { job: {}, age: null };
+  assert.deepEqual([gated, unranked, low].sort(compareInboxJobs), [low, unranked, gated]);
+  const gatedHigher = { job: { rank: 4.5, gated: "dealbreaker" }, age: 0 };
+  assert.deepEqual([gated, gatedHigher].sort(compareInboxJobs), [gatedHigher, gated]);
+});

@@ -109,6 +109,8 @@ export type InboxJob = {
   rank?: number; rankReason?: string;
   /** The scan-history first_seen date, set by pipelineSummary; the Inbox groups a scan date's rows by it. */
   addedAt?: string;
+  /** The reason the auto-mode drain gated this posting (the ledger's, such as `dealbreaker`), set by markGated. */
+  gated?: string;
 };
 
 /** Parse data/pipeline.md. The row grammar and its labeled-segment handling

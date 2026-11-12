@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pass, fail, run, NODE, ROOT, rmSync } from './helpers.mjs';
-import { appendRow, drainPlan, ledgerPath, readDailyCap, readLedger, startedToday } from '../lib/evaluate-queue.mjs';
+import { appendRow, drainPlan, ledgerPath, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from '../lib/evaluate-queue.mjs';
 
 console.log('\nevaluate-queue ledger — appendRow/readLedger/drainPlan and evaluate-queue.mjs');
 
@@ -134,6 +134,19 @@ try {
   process.stderr.write = (chunk) => { warned.push(String(chunk)); return true; };
   try { readDailyCap(profile); } finally { process.stderr.write = write; }
   check(warned.length === 0, 'a missing cap key falls back in silence', warned.join(''));
+
+  check(readAutoPdfThreshold(join(tmp, 'config', 'missing.yml')) === 3, 'the automatic CV score defaults to 3 with no profile', '');
+  check(readAutoPdfThreshold(profile) === 3, 'the automatic CV score defaults to 3 with no key', '');
+  writeFileSync(profile, 'auto_pdf_score_threshold: 4\n');
+  check(readAutoPdfThreshold(profile) === 4, 'the automatic CV score reads auto_pdf_score_threshold', '');
+  writeFileSync(profile, 'auto_pdf_score_threshold: 0\n');
+  check(readAutoPdfThreshold(profile) === 0, 'an automatic CV score of 0 is read as 0, not as unset', '');
+  writeFileSync(profile, 'auto_pdf_score_threshold: "high"\n');
+  warned.length = 0;
+  process.stderr.write = (chunk) => { warned.push(String(chunk)); return true; };
+  try { fellBack = readAutoPdfThreshold(profile); } finally { process.stderr.write = write; }
+  check(fellBack === 3 && /auto_pdf_score_threshold is "high", not a number from 0 to 5; using 3/.test(warned.join('')),
+    'a score that is not a number falls back to 3 and says so on stderr', warned.join(''));
 
   const opts = { stdio: 'pipe', env: { ...process.env, CAREER_OPS_ROOT: tmp, CAREER_OPS_PROFILE: '' } };
   const cli = (...args) => run(NODE, [join(ROOT, 'evaluate-queue.mjs'), ...args], opts);

@@ -41,3 +41,26 @@ export function pendingInbox(inbox) {
   }
   return out;
 }
+
+/**
+ * Marks each posting the auto-mode drain gated with the ledger's reason, by
+ * posting identity (the key reconcileInbox uses), so a sibling opening at the
+ * same company stays unmarked.
+ *
+ * @template {{ url: string }} T
+ * @param {T[]} jobs
+ * @param {{ url?: string, state?: string, reason?: string }[]} ledgerEntries
+ * @returns {(T & { gated?: string })[]}
+ */
+export function markGated(jobs, ledgerEntries) {
+  const gated = new Map();
+  for (const entry of ledgerEntries) {
+    const key = entry?.state === "gated" && canonicalJobKey(entry.url);
+    if (key) gated.set(key, entry.reason || "gated");
+  }
+  if (!gated.size) return jobs;
+  return jobs.map((job) => {
+    const reason = gated.get(canonicalJobKey(job.url));
+    return reason ? { ...job, gated: reason } : job;
+  });
+}

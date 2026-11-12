@@ -17,6 +17,7 @@ import {
   reportSlug,
   trackerTsvLine,
   persistEvaluation,
+  scoreValue,
 } from "../../src/lib/report-persist.mjs";
 import { writeEvaluationArtifacts } from "../../../persist-evaluation-report.mjs";
 import { resolveTsvColumns, TSV_ADDITION_HEADER } from "../../../tracker-parse.mjs";
@@ -269,6 +270,8 @@ test("persistEvaluation: writes report + TSV, reserves, merges, releases", async
     assert.equal(result.ok, true);
     assert.equal(result.num, "035");
     assert.equal(result.reportFile, "035-acme-ai-2026-08-04.md");
+    assert.equal(result.score, 4.2);
+    assert.equal(typeof result.score, "number");
     assert.deepEqual(result.warnings, []);
     assert.equal(readFileSync(join(root, "data", "pipeline.md"), "utf8"), pipeline.replace("- [ ] https://acme.com/jobs/7", "- [x] https://acme.com/jobs/7"));
     assert.equal(existsSync(join(root, "data", "pipeline.md.lock")), false);
@@ -588,4 +591,12 @@ test("persistEvaluation: refuses a non-ISO today rather than joining it into a p
   });
   assert.equal(result.ok, false);
   assert.match(result.error, /Invalid evaluation date/);
+});
+
+test("scoreValue: a score cell as a number, or null when it is not one", () => {
+  assert.equal(scoreValue("4.0/5"), 4);
+  assert.equal(scoreValue("3.9/5"), 3.9);
+  assert.equal(scoreValue("N/A"), null);
+  assert.equal(scoreValue("7.0/5"), null);
+  assert.equal(scoreValue(null), null);
 });
