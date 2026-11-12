@@ -1574,8 +1574,10 @@ async function main() {
       // !includeUndated meant --include-undated left every icims posting
       // undated, and since classifyPostingDate can never call an undated
       // posting stale, --since was silently ignored for the entire source.
-      // Enrich first, then let the undated policy decide.
-      if (dateClass === 'undated' && provider.enrichDate
+      // Enrich first, then let the undated policy decide. A skipped tier is
+      // dropped whatever its date, so it never pays for the request either.
+      const tierSkipped = skipTiers.length > 0 && skipTiers.includes(classifyTier(job.title));
+      if (dateClass === 'undated' && provider.enrichDate && !tierSkipped
           && titleFilter(job.title, companySlug) && locationFilter(job.location, job.url, job.title, job)) {
         try { await provider.enrichDate(job, ctx); } catch { /* stays undated */ }
         if (!shouldContinue()) return;
@@ -1584,7 +1586,7 @@ async function main() {
       if (dateClass === 'stale') continue;
       if (dateClass === 'undated' && !opts.includeUndated) { droppedNoDate++; continue; }
       if (!titleFilter(job.title, companySlug)) continue;
-      if (skipTiers.length && skipTiers.includes(classifyTier(job.title))) { droppedTier++; continue; }
+      if (tierSkipped) { droppedTier++; continue; }
       // job.url is passed so the location filter can fall back to the URL's own
       // location segment when the provider reports a rolled-up "N Locations" string;
       // job.title so a title-stated remote role survives a city-only location.
