@@ -9,7 +9,7 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import childProcess, { execFileSync } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
@@ -109,6 +109,33 @@ test("an empty ledger answers 200 with []", async () => {
   assert.equal(r.status, 200);
   assert.deepEqual(r.body, []);
   assert.equal(r.skipped, null, "no header without a warning");
+});
+
+test("each entry carries its tracker row's company, role, score and number, else the inbox's company and role", async () => {
+  planned = null;
+  const dump = ["https://jobs.example.com/t/1", "https://jobs.example.com/i/2", "https://jobs.example.com/n/3"]
+    .map((url) => ({ ...DUMP[0], key: url, url }));
+  standIn(`console.log(${JSON.stringify(JSON.stringify(dump))});`);
+  mkdirSync(join(dataRoot, "data"), { recursive: true });
+  writeFileSync(join(dataRoot, "data", "applications.md"), [
+    "# Applications Tracker", "",
+    "| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |",
+    "|---|---|---|---|---|---|---|---|---|---|",
+    "| 94 | 2026-11-01 | Company A | Platform Engineer | 4.0/5 | Evaluated | ❌ | — | | [example](https://jobs.example.com/t/1) |", "",
+  ].join("\n"));
+  writeFileSync(join(dataRoot, "data", "pipeline.md"), "- [ ] https://jobs.example.com/i/2 | Company B | Data Engineer\n");
+  try {
+    const r = await get();
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, [
+      { ...dump[0], company: "Company A", role: "Platform Engineer", score: "4.0/5", trackerN: "94" },
+      { ...dump[1], company: "Company B", role: "Data Engineer" },
+      dump[2],
+    ]);
+  } finally {
+    rmSync(join(dataRoot, "data", "applications.md"), { force: true });
+    rmSync(join(dataRoot, "data", "pipeline.md"), { force: true });
+  }
 });
 
 test("503 without the CLI's stderr when it exits non-zero, fails to spawn, times out or prints no JSON array", async () => {

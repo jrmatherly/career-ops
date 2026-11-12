@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ListChecks, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { scoreTone } from "@/lib/format";
 import type { ScheduledJob } from "@/lib/scheduled-jobs";
 import { addedLink, groupLedger, postingHref } from "@/lib/evaluate-settings.mjs";
 
-type LedgerEntry = { key: string; url: string; state: string; reason: string; rank?: number; jobId: string; runId: string; rows: { at: string }[] };
+type LedgerEntry = { key: string; url: string; state: string; reason: string; rank?: number; company?: string; role?: string; score?: string; trackerN?: string; jobId: string; runId: string; rows: { at: string }[] };
 
 // The auto-mode ledger, read-only. The drain writes it on its own schedule, so it is
 // read on mount and on Refresh, not on every reload of the jobs (each read spawns the CLI).
@@ -75,17 +77,23 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                 {group.entries.map((entry: LedgerEntry) => {
                   const link = entry.state === "queued" ? addedLink(entry) : null;
                   const href = postingHref(entry.url);
+                  const title = entry.company && entry.role ? `${entry.company} · ${entry.role}` : entry.url;
                   return (
                     <li key={entry.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
                       {href ? (
                         <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 max-w-full truncate text-foreground hover:text-brand-text">
-                          {entry.url}
+                          {title}
                         </a>
                       ) : (
-                        <span className="min-w-0 max-w-full truncate text-foreground">{entry.url}</span>
+                        <span className="min-w-0 max-w-full truncate text-foreground">{title}</span>
                       )}
-                      <span className="text-muted">{typeof entry.rank === "number" ? `rank ${entry.rank.toFixed(1)}` : "unranked"}</span>
-                      {entry.reason && <span className="text-muted">{entry.reason}</span>}
+                      <span className="text-muted">{typeof entry.rank === "number" ? `est. ${entry.rank.toFixed(1)}` : "unranked"}</span>
+                      {entry.score && (
+                        <span className="text-muted">
+                          → <Badge tone={scoreTone(entry.score)}>{entry.score}</Badge>
+                        </span>
+                      )}
+                      {entry.reason && !/^report \d+$/.test(entry.reason) && <span className="text-muted">{entry.reason}</span>}
                       <span className="text-faint">{names.get(entry.jobId) ?? entry.jobId}</span>
                       {link && (
                         <Link
@@ -94,6 +102,11 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                           className="text-brand-text underline-offset-2 hover:underline"
                         >
                           In the Inbox
+                        </Link>
+                      )}
+                      {entry.trackerN && (
+                        <Link href={`/pipeline/${encodeURIComponent(entry.trackerN)}`} className="inline-flex min-h-6 items-center text-brand-text underline-offset-2 hover:underline">
+                          View evaluation
                         </Link>
                       )}
                     </li>

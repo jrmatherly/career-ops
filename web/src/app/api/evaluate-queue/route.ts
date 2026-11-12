@@ -1,6 +1,7 @@
 import fs from "node:fs";
-import { rootScript } from "@/lib/career-ops";
+import { readApplications, readInbox, rootScript } from "@/lib/career-ops";
 import { runCoreCli } from "@/lib/core-cli";
+import { enrichLedger } from "@/lib/evaluate-settings.mjs";
 
 export const runtime = "nodejs"; // delegates to the core CLI via child_process
 export const dynamic = "force-dynamic";
@@ -33,5 +34,12 @@ export async function GET() {
   if (!Array.isArray(entries)) return unreadable("stdout is not a JSON array");
   // The CLI exits 0 and counts the rows it could not parse on stderr; the count rides a header so the dump keeps its shape.
   const skipped = /^warning: (\d+) malformed row/m.exec(stderr)?.[1];
+  // Names are a convenience: an unreadable tracker or inbox leaves the rows as URLs rather than hiding the queue.
+  try {
+    const applications = readApplications();
+    entries = enrichLedger(entries, readInbox(applications), applications);
+  } catch (cause) {
+    console.error(`/api/evaluate-queue: the rows are not named: ${cause instanceof Error ? cause.message : String(cause)}`);
+  }
   return Response.json(entries, skipped ? { headers: { [SKIPPED_HEADER]: skipped } } : undefined);
 }

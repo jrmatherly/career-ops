@@ -1,4 +1,6 @@
 import { scheduledEvaluate } from "./scheduled-job-input.mjs";
+import { canonicalJobKey } from "./core/url-key.mjs";
+import { readTrackerUrl } from "./posting-url.mjs";
 
 /** The threshold and per-run fields apply to Auto only. */
 export const evaluateFieldsVisible = (mode) => mode === "auto";
@@ -78,3 +80,22 @@ export function evaluateForm(stored) {
 
 /** A ledger URL the panel may link to: http(s) only, since the ledger stores whatever the scan found. */
 export const postingHref = (url) => (/^https?:\/\//i.test(url) ? url : null);
+
+/**
+ * Ledger entries with the tracker row's `company`, `role`, `score` and `trackerN` added when
+ * one shares the entry's URL key, else the inbox row's `company` and `role`. Blank cells add
+ * nothing, and an entry with no match comes back as it was.
+ */
+export function enrichLedger(entries, inboxJobs, applications) {
+  const tracked = new Map(applications.map((app) => [canonicalJobKey(readTrackerUrl(app.url)), app]));
+  const inbox = new Map(inboxJobs.map((job) => [canonicalJobKey(job.url), job]));
+  tracked.delete("");
+  inbox.delete("");
+  return entries.map((entry) => {
+    const key = canonicalJobKey(entry.url);
+    const app = key ? tracked.get(key) : undefined;
+    const job = key ? inbox.get(key) : undefined;
+    const found = app ? { company: app.company, role: app.role, score: app.score, trackerN: app.n } : { company: job?.company, role: job?.role };
+    return { ...entry, ...Object.fromEntries(Object.entries(found).filter(([, value]) => value)) };
+  });
+}
