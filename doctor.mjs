@@ -1178,8 +1178,8 @@ function resolveActiveCli() {
 function checkPlaywrightMcp(root, activeCli, env = process.env) {
   // doctor runs outside the web process and cannot see how the page is
   // served, so it keys on the scheduler and Kubernetes variables.
-  if (env.KUBERNETES_SERVICE_HOST || env.CAREER_OPS_SCHEDULER === 'external') {
-    return { pass: true, notNeeded: true, label: 'Playwright MCP not needed here (hosted install: web workers load no MCP servers)' };
+  if (env.KUBERNETES_SERVICE_HOST || String(env.CAREER_OPS_SCHEDULER ?? '').trim().toLowerCase() === 'external') {
+    return { pass: true, notNeeded: true, label: "Playwright MCP not needed here (hosted install: the web's read-only workers load no MCP servers)" };
   }
   // Unknown CLI (typo / not in AGENT_CLIS), or several CLIs on PATH and no
   // selection yet. Neither has a config to scan, and neither should be handed

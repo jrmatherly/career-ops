@@ -22,27 +22,36 @@ function formatTaskTime(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+// The app does not know an external scheduler's cadence; the runner's own grid is a quarter hour,
+// so an hour without a tick is four missed and the card stops calling it running.
+const TICK_FRESH_MS = 60 * 60_000;
+
 /**
- * The scheduler card's title, badge and subline for a GET /api/scheduler payload.
+ * The scheduler card's title, badge and subline for a GET /api/scheduler payload, and whether
+ * the badge is the healthy (green) one.
  * @param {{ source?: string, description?: string | null, platform?: string, task: { exists: boolean, enabled: boolean, nextRun: string | null, lastRun: string | null } }} status
- * @returns {{ title: string, badge: string, subline: string }}
+ * @param {number} [now]
+ * @returns {{ title: string, badge: string, subline: string, healthy: boolean }}
  */
-export function schedulerCardCopy(status) {
+export function schedulerCardCopy(status, now = Date.now()) {
   const { task } = status;
   if (status.source === "external") {
+    const healthy = Boolean(task.lastRun) && now - Date.parse(task.lastRun) <= TICK_FRESH_MS;
     return {
       title: status.description ?? "External scheduler",
-      badge: "Running",
+      badge: healthy ? "Running" : task.lastRun ? "No recent tick" : "Waiting for first tick",
+      healthy,
       subline: task.lastRun ? `Last tick ${formatTaskTime(task.lastRun)}` : "No tick recorded yet",
     };
   }
   const os = osSchedulerFor(status.platform ?? "");
   if (!os) {
-    return { title: "Manual scans", badge: "No automatic schedule", subline: "Automatic scheduling is not available on this platform." };
+    return { title: "Manual scans", badge: "No automatic schedule", healthy: false, subline: "Automatic scheduling is not available on this platform." };
   }
   return {
     title: os.title,
     badge: task.exists ? (task.enabled ? "Task enabled" : "Task disabled") : "Task not installed",
+    healthy: task.exists && task.enabled,
     subline: task.exists
       ? `Next OS check: ${formatTaskTime(task.nextRun)} · Last OS check: ${formatTaskTime(task.lastRun)}`
       : `Install with ${os.install} to run due jobs automatically.`,

@@ -1232,13 +1232,14 @@ try {
     }
   }
 
-  // A hosted install's web workers load no MCP servers, so the warning would
-  // ask for something that cannot be used there.
+  // On a hosted install every non-writing web worker runs with --strict-mcp-config,
+  // so the warning would ask for something the evaluation workers cannot use.
   {
     const dir = mkdtempSync(join(tmpdir(), 'co-mcp-hosted-'));
     try {
       for (const [name, env] of [
         ['CAREER_OPS_SCHEDULER=external', { CAREER_OPS_SCHEDULER: 'external' }],
+        ['CAREER_OPS_SCHEDULER= External ', { CAREER_OPS_SCHEDULER: ' External ' }],
         ['KUBERNETES_SERVICE_HOST set', { KUBERNETES_SERVICE_HOST: '10.0.0.1' }],
       ]) {
         const state = runDoctor(dir, [], env);

@@ -129,3 +129,18 @@ test("a ledger entry takes company, role, score and tracker number from its trac
   assert.deepEqual(c, entries[2], "no match leaves the entry as it was, URL intact");
   assert.deepEqual(d, entries[3], "an inbox row with blank cells adds nothing");
 });
+
+test("rows with no URL key never lend their name, and a score sentinel is not shown as a score", () => {
+  const entries = [{ url: "local:jds/x.md" }, { url: "" }, { url: "https://jobs.example.com/e/5" }];
+  const inbox = [{ url: "", company: "Inbox Blank", role: "r" }];
+  const applications = [
+    { n: "1", company: "No Url", role: "R", score: "3/5", url: "" },
+    { n: "2", company: "Dash", role: "R", score: "3/5", url: "—" },
+    { n: "3", company: "Backfilled", role: "R", score: "N/A", url: "https://jobs.example.com/e/5" },
+  ];
+  assert.deepEqual(enrichLedger(entries, inbox, applications), [
+    entries[0],
+    entries[1],
+    { ...entries[2], company: "Backfilled", role: "R", trackerN: "3" },
+  ]);
+});

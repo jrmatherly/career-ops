@@ -35,7 +35,7 @@ async function get() {
   console.error = (...args) => errors.push(args.join(" "));
   try {
     const res = await GET();
-    return { status: res.status, body: await res.json(), skipped: res.headers.get("X-Evaluate-Queue-Skipped"), launches: [...launches], errors };
+    return { status: res.status, body: await res.json(), skipped: res.headers.get("X-Evaluate-Queue-Skipped"), unnamed: res.headers.get("X-Evaluate-Queue-Unnamed"), launches: [...launches], errors };
   } finally {
     console.error = realError;
   }
@@ -171,4 +171,21 @@ test("503 core-script-missing when the checkout has no evaluate-queue.mjs", asyn
   assert.equal(r.status, 503);
   assert.equal(r.body.code, "core-script-missing");
   assert.equal(r.launches.length, 0);
+});
+
+test("an unreadable inbox leaves the rows as the ledger gave them and says so in a header, never in the body", async () => {
+  planned = null;
+  standIn(`console.log(${JSON.stringify(JSON.stringify(DUMP))});`);
+  // A directory where the file belongs makes the read throw (EISDIR); a missing file reads as empty.
+  mkdirSync(join(dataRoot, "data", "pipeline.md"), { recursive: true });
+  try {
+    const r = await get();
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, DUMP);
+    assert.equal(r.unnamed, "1");
+    assert.ok(r.errors.some((line) => /the rows are not named/.test(line)), r.errors.join("\n"));
+    assert.ok(!JSON.stringify(r.body).includes(dataRoot));
+  } finally {
+    rmSync(join(dataRoot, "data", "pipeline.md"), { recursive: true, force: true });
+  }
 });

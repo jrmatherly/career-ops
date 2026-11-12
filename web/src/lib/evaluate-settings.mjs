@@ -83,8 +83,8 @@ export const postingHref = (url) => (/^https?:\/\//i.test(url) ? url : null);
 
 /**
  * Ledger entries with the tracker row's `company`, `role`, `score` and `trackerN` added when
- * one shares the entry's URL key, else the inbox row's `company` and `role`. Blank cells add
- * nothing, and an entry with no match comes back as it was.
+ * one shares the entry's URL key, else the inbox row's `company` and `role`. Blank cells and a
+ * score sentinel (`N/A`, `—`) add nothing, and an entry with no match comes back as it was.
  */
 export function enrichLedger(entries, inboxJobs, applications) {
   const tracked = new Map(applications.map((app) => [canonicalJobKey(readTrackerUrl(app.url)), app]));
@@ -95,7 +95,7 @@ export function enrichLedger(entries, inboxJobs, applications) {
     const key = canonicalJobKey(entry.url);
     const app = key ? tracked.get(key) : undefined;
     const job = key ? inbox.get(key) : undefined;
-    const found = app ? { company: app.company, role: app.role, score: app.score, trackerN: app.n } : { company: job?.company, role: job?.role };
+    const found = app ? { company: app.company, role: app.role, score: /\d/.test(app.score ?? "") ? app.score : undefined, trackerN: app.n } : { company: job?.company, role: job?.role };
     return { ...entry, ...Object.fromEntries(Object.entries(found).filter(([, value]) => value)) };
   });
 }

@@ -15,6 +15,7 @@ type LedgerEntry = { key: string; url: string; state: string; reason: string; ra
 export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
   const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
   const [skipped, setSkipped] = useState(0);
+  const [unnamed, setUnnamed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Only the newest request may set state; a slow earlier one must not overwrite it.
@@ -30,6 +31,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
       if (seq !== requestSeq.current) return;
       setEntries(body);
       setSkipped(Number(response.headers.get("X-Evaluate-Queue-Skipped")) || 0);
+      setUnnamed(response.headers.has("X-Evaluate-Queue-Unnamed"));
       setError(null);
     } catch (cause) {
       if (seq !== requestSeq.current) return;
@@ -120,6 +122,11 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
       {entries && skipped > 0 && (
         <p className="mt-3 text-xs text-muted">
           {skipped} {skipped === 1 ? "row" : "rows"} in data/evaluate-queue.tsv could not be read and {skipped === 1 ? "is" : "are"} not shown; the server log names the lines.
+        </p>
+      )}
+      {entries && unnamed && (
+        <p role="status" className="mt-3 text-xs text-muted">
+          The tracker or the inbox could not be read, so rows show their URL with no company, score or evaluation link; the server log has the reason.
         </p>
       )}
     </section>
