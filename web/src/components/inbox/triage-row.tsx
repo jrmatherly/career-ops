@@ -9,14 +9,15 @@ import { unscoredInboxHref } from "@/lib/posting-url.mjs";
 import { Badge } from "@/components/ui/badge";
 import { CompanyLogo } from "@/components/company-logo";
 import { cn } from "@/lib/cn";
+import { compactLocation, displayCompany } from "@/lib/company-presentation.mjs";
 import { inboxScoreTarget } from "@/lib/inbox-score-target.mjs";
 import { agoLabel } from "@/lib/format-time.mjs";
 
 export type RowScore = { score: number | null; tone: "good" | "warn" | "bad" | "muted"; jobId: string; running: boolean; reportN?: number | null; needsReview?: boolean };
 
-// One raw posting in the triage list. Shows ONLY cheap, free signals + an honest
-// "not scored" (CRUDA) — never a fake match%. Once its shortlist eval finishes it
-// flips to EVALUADA (a real A–F badge). Save→shortlist / Skip→hidden are free + undoable.
+// One raw posting in the triage list. Shows ONLY cheap, free signals; the ranker's
+// prior is a dashed "est." pill, never a fake match%. Once its shortlist eval finishes
+// it flips to EVALUADA (a real A–F badge). Save→shortlist / Skip→hidden are free + undoable.
 export function TriageRow({
   index,
   cursor,
@@ -46,10 +47,12 @@ export function TriageRow({
   const target = inboxScoreTarget(scored);
   const evaluated = target.evaluated;
   const postingHref = unscoredInboxHref(job.url, evaluated);
-  const rankLabel = job.rank != null ? `rank ${job.rank.toFixed(1)}` : null;
+  const rankLabel = job.rank != null ? `est. ${job.rank.toFixed(1)}` : null;
+  const company = displayCompany(job.company);
+  const location = job.location ? compactLocation(job.location) : "";
   const title = (
     <>
-      <span className="font-medium text-foreground">{job.company}</span>
+      <span className="font-medium text-foreground">{company}</span>
       <span className="text-muted"> · {job.role}</span>
     </>
   );
@@ -69,7 +72,7 @@ export function TriageRow({
         type="checkbox"
         checked={selected}
         onChange={onToggleSelect}
-        aria-label={rankLabel ? `Select ${job.company} ${job.role}, ${rankLabel}: ${job.rankReason}` : `Select ${job.company} ${job.role}`}
+        aria-label={rankLabel ? `Select ${company} ${job.role}, ${rankLabel}: ${job.rankReason}` : `Select ${company} ${job.role}`}
         className="size-6 shrink-0 accent-brand max-sm:min-h-[44px]"
       />
 
@@ -86,20 +89,18 @@ export function TriageRow({
           )}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-faint">
-          {job.location && <span className="truncate">{job.location}</span>}
+          {location && <span className="truncate" title={job.location}>{location}</span>}
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
           {job.gated ? (
             <Badge tone="bad">Gated: {job.gated}</Badge>
           ) : rankLabel && (
-            // Never labelled a score: the N/5 Badge below is the evaluation score; this is rank-pipeline.mjs's cheap prior.
+            // Dashed, never solid: the N/5 Badge is the evaluation score; this is rank-pipeline.mjs's cheap prior.
             // An opaque bg-surface keeps brand-text at AA whatever hover or selected tint the row adds beneath it.
-            <span title={job.rankReason} className="shrink-0 whitespace-nowrap rounded bg-surface px-1 py-px font-medium tabular-nums text-brand-text ring-1 ring-inset ring-brand/30">
+            <span title="Estimated from the title and company. Not an evaluation." className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-brand/50 bg-surface px-2 py-px font-medium tabular-nums text-brand-text">
               {rankLabel}
             </span>
           )}
-          {/* 🔴 CRUDA: honest "not scored" — no fabricated match%. */}
-          {!evaluated && <span className="italic text-muted">not scored</span>}
         </p>
       </div>
 
@@ -113,7 +114,7 @@ export function TriageRow({
             type="button"
             onClick={onSkip}
             title="Skip — hide from the inbox"
-            aria-label={`Skip ${job.company} ${job.role}`}
+            aria-label={`Skip ${company} ${job.role}`}
             className="inline-flex items-center justify-center rounded-md p-1 text-faint transition-colors hover:bg-surface-hover hover:text-foreground max-sm:min-h-[44px] max-sm:min-w-[44px]"
           >
             <X className="size-4" />
