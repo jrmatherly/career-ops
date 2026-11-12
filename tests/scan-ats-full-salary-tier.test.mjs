@@ -61,3 +61,13 @@ test('a salary_filter the scanner would turn off or choke on is named as a probl
   assert.match(salaryFilterProblem({ min: 200000, max: 150000 }), /min cannot be above/);
   assert.match(salaryFilterProblem({ min: 100000, currency: 1 }), /currency must be a currency code/);
 });
+test('onDrop names the stage that dropped a posting, and stays quiet for a title miss or a pass', () => {
+  const stages = [];
+  const opts = { ...base, salaryFilter, skipTiers: ['entry'], onDrop: (stage) => stages.push(stage) };
+  passesFilters({ title: 'Infrastructure Engineer I' }, opts);
+  passesFilters({ title: 'Director', salary: { max: 120000, currency: 'USD' } }, opts);
+  passesFilters({ title: 'Director', description: 'x' }, { ...opts, contentFilter: () => false });
+  passesFilters({ title: 'Director' }, opts);
+  passesFilters({ title: 'Engineer I' }, { ...opts, titleFilter: () => false });
+  assert.deepEqual(stages, ['tier', 'salary', 'content']);
+});

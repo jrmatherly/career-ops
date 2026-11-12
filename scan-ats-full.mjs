@@ -876,20 +876,20 @@ export function retryGateDecision(jobs, domainFilter, wasDeferred) {
 
 // Title/tier/location/salary/content filter chain for one posting, used by
 // runSeedScan(). processJobs() below inlines the same five checks in the same
-// order (it counts the tier, salary and content drops for the run summary),
-// but this shared,
+// order and counts the tier, salary and content drops for the run summary;
+// `onDrop(stage)` gives runSeedScan() the same three counts. This shared,
 // pure, exported helper keeps the content_filter.by_title_keyword wiring
-// (#1846) unit-testable without mocking providers or duplicating the rule
-// order in two places for the caller that doesn't need per-stage counts.
-export function passesFilters(job, { titleFilter, locationFilter, contentFilter, titleFilterConfig, companySlug, salaryFilter = () => true, skipTiers = [] }) {
+// (#1846) unit-testable without mocking providers.
+export function passesFilters(job, { titleFilter, locationFilter, contentFilter, titleFilterConfig, companySlug, salaryFilter = () => true, skipTiers = [], onDrop = () => {} }) {
+  const dropped = (stage) => { onDrop(stage); return false; };
   if (!titleFilter(job.title, companySlug)) return false;
-  if (skipTiers.length && skipTiers.includes(classifyTier(job.title))) return false;
+  if (skipTiers.length && skipTiers.includes(classifyTier(job.title))) return dropped('tier');
   // job.url is passed so the location filter can fall back to the URL's own
   // location segment when the provider reports a rolled-up "N Locations" string;
   // job.title so a title-stated remote role survives a city-only location.
   if (!locationFilter(job.location, job.url, job.title, job)) return false;
-  if (!salaryFilter(job.salary)) return false;
-  if (contentFilter && !contentFilter(job.description, matchedTitleKeywords(job.title, titleFilterConfig))) return false;
+  if (!salaryFilter(job.salary)) return dropped('salary');
+  if (contentFilter && !contentFilter(job.description, matchedTitleKeywords(job.title, titleFilterConfig))) return dropped('content');
   return true;
 }
 
@@ -1019,6 +1019,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
 
   const cutoff = Date.now() - opts.sinceDays * 86_400_000;
   const offers = [];
+  const dropped = { tier: 0, salary: 0, content: 0 };
   let errors = 0;
 
   await parallelEach(capped, CONCURRENCY, async (company) => {
@@ -1055,6 +1056,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
         contentFilter: opts.contentFilter,
         salaryFilter: opts.salaryFilter,
         skipTiers: opts.skipTiers,
+        onDrop: (stage) => { dropped[stage] += 1; },
         companySlug: entry.name,
         titleFilterConfig: opts.titleFilterConfig,
       })) continue;
@@ -1069,7 +1071,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
     }
   });
 
-  return { offers, errors, total: capped.length };
+  return { offers, errors, total: capped.length, dropped };
 }
 
 /**
@@ -1963,6 +1965,9 @@ async function main() {
     if (result && result.offers) {
       totalCompaniesScanned += result.total || 0;
       totalErrors += result.errors || 0;
+      droppedTier += result.dropped?.tier || 0;
+      droppedSalary += result.dropped?.salary || 0;
+      droppedContent += result.dropped?.content || 0;
       newOffers.push(...result.offers);
       log(`  done — ${result.total} companies probed, ${result.offers.length} matches (${result.errors} errors)`);
     }
