@@ -35,7 +35,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
         href={href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+          "flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
           active ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-hover hover:text-foreground",
         )}
       >
@@ -70,7 +70,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
           <nav className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
             {main.map(({ label, items }) => (
               <div key={label} className="flex flex-col gap-0.5">
-                <div className="px-3 pb-1 pt-4 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+                <div className="px-3 pb-1 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
                 {items.map(navLink)}
               </div>
             ))}
