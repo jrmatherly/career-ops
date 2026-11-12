@@ -232,6 +232,7 @@ export function FollowupsView() {
         filtering,
         hasSummary: Boolean(meta),
         due: (meta?.overdue ?? 0) + (meta?.urgent ?? 0),
+        active: meta?.actionable ?? 0,
       }) === "reserved" ? (
         <div className="mt-5 rounded-xl border border-transparent px-4 py-3 text-sm leading-5" aria-hidden="true">
           <div className="h-10" />
@@ -319,7 +320,7 @@ export function FollowupsView() {
 
       {data?.available && upcoming.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">Upcoming</h2>
+          <h2 className="text-base font-semibold text-foreground">Upcoming</h2>
           <p className="mt-1 text-xs text-faint">These have a next date and are not due yet.</p>
           <ul className="mt-3 divide-y divide-border rounded-2xl border border-border">
             {upcoming.map((entry) => (
@@ -421,7 +422,7 @@ function FollowupRow({
             </span>
           )}
         </td>
-        <td className="max-w-56 truncate px-2.5 py-3 text-muted">{e.role}</td>
+        <td className="min-w-40 px-2.5 py-3 text-muted">{e.role}</td>
         <td className="px-2.5 py-3">
           <Badge tone={scoreTone(e.score)}>{e.score || "—"}</Badge>
         </td>

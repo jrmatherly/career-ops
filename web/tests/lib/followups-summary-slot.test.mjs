@@ -10,7 +10,12 @@ test("a follow-up list with nothing due keeps the loading slot", () => {
 });
 
 test("due follow-ups show the narrative, and a filter or a missing cadence hides the slot", () => {
-  assert.equal(followupsSummarySlot({ pending: false, filtering: false, hasSummary: true, due: 2 }), "narrative");
+  assert.equal(followupsSummarySlot({ pending: false, filtering: false, hasSummary: true, due: 2, active: 6 }), "narrative");
   assert.equal(followupsSummarySlot({ pending: true, filtering: true, hasSummary: false, due: 0 }), "hidden");
   assert.equal(followupsSummarySlot({ pending: false, filtering: false, hasSummary: false, due: 0 }), "hidden");
+});
+
+test("five or fewer active follow-ups fit the table, so the narrative stays out", () => {
+  assert.equal(followupsSummarySlot({ pending: false, filtering: false, hasSummary: true, due: 3, active: 5 }), "reserved");
+  assert.equal(followupsSummarySlot({ pending: false, filtering: false, hasSummary: true, due: 3, active: 6 }), "narrative");
 });
