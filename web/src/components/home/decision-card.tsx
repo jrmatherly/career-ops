@@ -9,6 +9,7 @@ import { CompanyLogo } from "@/components/company-logo";
 import { scoreNum, scoreTone } from "@/lib/format";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
 import { statusWriteError } from "@/lib/home/status-result.mjs";
+import { decisionBadges } from "@/lib/home/awaiting.mjs";
 import type { Application } from "@/lib/career-ops";
 import type { CardReason } from "@/lib/machine-summary.mjs";
 
@@ -22,7 +23,7 @@ const DECISION_TONE: Record<string, string> = {
 // Awaiting-decision row: a scored role with no terminal status. Primary action
 // opens the report (PDF + Apply live there). Skip / Applied still write status,
 // and onDecided lets the parent offer an undo once the card is gone.
-export function DecisionCard({ app, reason, onDecided }: { app: Application; reason?: CardReason; onDecided?: (status: "Applied" | "Discarded") => void }) {
+export function DecisionCard({ app, reason, pdfReady, onDecided }: { app: Application; reason?: CardReason; pdfReady: boolean; onDecided?: (status: "Applied" | "Discarded") => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"" | "Applied" | "Discarded">("");
   const [done, setDone] = useState<string | null>(null);
@@ -81,6 +82,20 @@ export function DecisionCard({ app, reason, onDecided }: { app: Application; rea
           </span>
         )}
       </div>
+      <ul aria-label="State" className="flex flex-wrap gap-1.5">
+        {decisionBadges(app, { pdfReady }).map((b) => (
+          <li
+            key={b.label}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
+              b.tone === "good" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "border-border text-muted",
+            )}
+          >
+            {b.tone === "good" && <span aria-hidden className="size-1.5 rounded-full bg-current" />}
+            {b.label}
+          </li>
+        ))}
+      </ul>
       {reason && (
         <div data-testid="card-reason" className="space-y-0.5 text-xs leading-snug">
           {reason.decision && <p className={cn("font-medium", DECISION_TONE[reason.decision] ?? "text-muted")}>{reason.decision}</p>}

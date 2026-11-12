@@ -23,7 +23,7 @@ export type FollowUp = {
   daysUntilNext?: number | null;
 };
 
-// One-tap overdue follow-up row (demand loop). "Mark followed up" appends a
+// One-tap overdue follow-up row (demand loop). "Log follow-up" appends a
 // table row to data/follow-ups.md (append-only) so the core cadence advances;
 // "Snooze" pins a date through the same persisted schedule as /followups.
 export function FollowUpCard({ followup, onLogged }: { followup: FollowUp; onLogged?: () => void }) {
@@ -90,8 +90,8 @@ export function FollowUpCard({ followup, onLogged }: { followup: FollowUp; onLog
           )}
         >
           {state === "logging" ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}{" "}
-          <span className="hidden max-w-48 truncate sm:inline">{state === "error" ? `${errorMsg ?? "Failed"} — retry` : "Mark followed up"}</span>
-          <span className="sm:hidden">{state === "error" ? "Retry" : "Followed up"}</span>
+          <span className="hidden max-w-48 truncate sm:inline">{state === "error" ? `${errorMsg ?? "Failed"} — retry` : "Log follow-up"}</span>
+          <span className="sm:hidden">{state === "error" ? "Retry" : "Log follow-up"}</span>
         </button>
         {followup.num != null && (
           <a href={`/pipeline/${followup.num}`} title="Open report" className="inline-flex shrink-0 items-center justify-center gap-1 rounded p-1 text-xs text-faint transition hover:text-brand-text max-sm:min-h-[44px] max-sm:min-w-[44px]">
