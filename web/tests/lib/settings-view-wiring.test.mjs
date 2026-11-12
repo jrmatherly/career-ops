@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { GROUPS } from "../../../lib/settings-registry.mjs";
 import { test } from "node:test";
 
 const src = (file) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../src", file), "utf8");
@@ -15,8 +16,8 @@ const form = src("components/config-form.tsx");
 
 test("SettingsView loads from and saves to /api/settings with the loaded revision", () => {
   assert.match(view, /fetch\("\/api\/settings", \{ cache: "no-store" \}\)/);
-  assert.match(view, /method: "POST"[^\n]*JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
-  assert.match(view, /dirtyChanges\(group\.settings, form\)/);
+  assert.match(view, /method: "POST"[^\n]*JSON\.stringify\(\{ revision: revision\.current, changes \}\)/);
+  assert.match(view, /pendingFromGroups\(data\.groups, form\)/);
 });
 
 test("a failed load shows the error and Retry, never rows", () => {
@@ -29,7 +30,7 @@ test("a failed load shows the error and Retry, never rows", () => {
 });
 
 test("a conflict offers Reload, and the off banner reads as specified", () => {
-  assert.match(view, /note\?\.kind === "conflict" && <button[^\n]*\bload\(\)[^\n]*>Reload</);
+  assert.match(view, /notice\?\.kind === "conflict" && <button[^\n]*\bload\(\)[^\n]*>Reload</);
   assert.ok(view.includes("Saved settings are turned off for this server (CAREER_OPS_SETTINGS=off). The values below come from the environment."));
 });
 
@@ -67,7 +68,7 @@ test("saving the AI engine also saves CAREER_OPS_CLI, and the sections reload af
 
 test("the page renders both parts and the nav calls it Settings", () => {
   const page = src("app/config/page.tsx");
-  assert.match(page, /<ConfigForm [^>]*\/>\s*<SettingsView \/>/);
+  assert.match(page, /<ConfigForm [^>]*\/>\s*<\/div>\s*<SettingsView \/>/);
   assert.match(src("lib/nav-items.ts"), /href: "\/config", label: "Settings"/);
   assert.match(form, /<PageHeader\s+title="Settings"/);
 });
@@ -94,7 +95,8 @@ test("Profile preferences names its file and the scanner's file rows sit under t
 test("a save sends every file's revision and keeps the new ones", () => {
   assert.match(src("lib/settings-form.mjs"), /revision: \{ settings: string, profile: string, portals: string \}/);
   assert.match(view, /if \(res\.ok\) \{\s*setData\(body\);/);
-  assert.match(view, /body: JSON\.stringify\(\{ revision: data\.revision, changes \}\)/);
+  assert.match(view, /body: JSON\.stringify\(\{ revision: revision\.current, changes \}\)/);
+  assert.match(view, /if \(res\.ok\) \{[^}]*revision\.current = body\.revision;/, "the next group in a save sends the revision this one returned");
   assert.match(view, /Already saved: \$\{body\.written\.join\(", "\)\}/, "a partial save names the file that was written");
 });
 
@@ -119,10 +121,30 @@ test("plugin status says when config/plugins.yml did not parse and when no plugi
 
 test("a company switch sends the exact name with the page's revision, keeps the new one and rolls back on failure", () => {
   const portals = src("components/portals-view.tsx");
-  assert.match(portals, /body: JSON\.stringify\(\{ company: watched\[i\]\.name, enabled: next, revision \}\)/);
+  assert.match(portals, /body: JSON\.stringify\(\{ company: name, enabled: next, revision \}\)/);
   assert.match(portals, /setRevision\(body\.revision\)/);
   assert.match(portals, /catch \(e\) \{\s+set\(!next\);/);
   assert.match(portals, /if \(pending\) return;/);
   assert.match(portals, /aria-disabled=\{pending\}/);
   assert.ok(!/\sdisabled=\{pending\}/.test(portals), "a pending switch keeps keyboard focus");
+});
+
+test("one save bar replaces the per-section buttons and saves group by group, stopping at the first failure", () => {
+  assert.doesNotMatch(view, /Save \{group\.label/, "no per-section Save button");
+  assert.match(view, /saveInOrder\(pending\.groups,/, "the order and the stop are saveInOrder's, tested in settings-changes");
+  assert.match(view, /<span role="status"[^>]*>\{pending\.count > 0 \? `\$\{pending\.count\} unsaved/, "the count is a live region that is always mounted");
+  assert.match(view, />Discard</);
+  assert.match(view, /Save changes/);
+  assert.match(view, /role=\{notice\.kind === "saved" \? "status" : "alert"\}/);
+  assert.match(view, /if \(notice\?\.kind !== "saved"\) return;/, "only a success fades, a failure stays");
+});
+
+test("the page is a section list beside the content, and every link has a target", () => {
+  const page = src("app/config/page.tsx");
+  assert.match(page, /id="settings-engine"/);
+  assert.match(src("components/followups/cadence-settings.tsx"), /id="settings-cadence"/);
+  assert.match(view, /id=\{`settings-\$\{group\.id\}`\}/);
+  // From the registry, so a new group cannot be left out of the section list.
+  for (const { id, label } of GROUPS) assert.ok(page.includes(`["${id}", "${label}"]`), `${label} is listed`);
+  assert.match(view, /<h2 [^>]*className="mb-2 text-base font-semibold text-foreground"/);
 });

@@ -1,20 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  CalendarClock,
-  CalendarPlus,
-  CheckCircle2,
-  Clock,
-  History,
-  Layers,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-import { scanSuccessLabel } from "@/lib/scan-success.mjs";
+import { useEffect, useRef, useState } from "react";
+import { CalendarClock, CalendarPlus, Clock, History, Loader2, RefreshCw, Search, Zap } from "lucide-react";
 import { CreateJobModal } from "./scheduled-scans/create-job-modal";
 import { EditJobModal } from "./scheduled-scans/edit-job-modal";
 import { JobCard } from "./scheduled-scans/job-card";
@@ -23,6 +10,7 @@ import { EvaluateQueuePanel } from "./scheduled-scans/evaluate-queue-panel";
 import type { ScheduledJob, JobRun } from "@/lib/scheduled-jobs";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
+import { StatTile } from "@/components/ui/stat-tile";
 import { updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 import { isSchedulerStatusPayload, osSchedulerFor, schedulerCardCopy } from "@/lib/scheduled-scheduler-status.mjs";
 
@@ -47,10 +35,19 @@ export function ScheduledJobsView() {
   const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null);
   const [osRunning, setOsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Apart from the load error, so a background refetch never clears a failed delete or pause.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const loadSeq = useRef(0);
+  const appliedLoad = useRef(0);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  // After a write, a poll that began before it holds the old list, even when the reload that follows fails.
+  const discardEarlierLoads = () => {
+    appliedLoad.current = ++loadSeq.current;
+  };
+
+  const loadData = async (quiet = false) => {
+    const mine = ++loadSeq.current;
+    if (!quiet) setLoading(true);
     try {
       const [jobsResponse, schedulerResponse] = await Promise.all([
         fetch("/api/scheduled-jobs", { cache: "no-store" }),
@@ -58,50 +55,69 @@ export function ScheduledJobsView() {
       ]);
       const resJobs = await jobsResponse.json().catch(() => ({}));
       const resScheduler = await schedulerResponse.json().catch(() => null);
-      if (!jobsResponse.ok) throw new Error(resJobs.error || "Could not load scheduled scans.");
-      if (!schedulerResponse.ok && resScheduler?.error) setError(resScheduler.error);
-      setStore({
-        jobs: Array.isArray(resJobs.jobs) ? resJobs.jobs : [],
-        runs: Array.isArray(resJobs.runs) ? resJobs.runs : [],
-      });
-      if (schedulerResponse.ok && isSchedulerStatusPayload(resScheduler)) setScheduler(resScheduler as SchedulerStatus);
+      // A 200 that is not the list (a gateway's HTML page) must not read as "no scans".
+      if (!jobsResponse.ok || !Array.isArray(resJobs.jobs)) throw new Error(resJobs.error || "Could not load scheduled scans.");
+      // A slower, older load must not put a stale list back over a newer one that already landed.
+      // A newer load that failed does not count, so it cannot discard this one.
+      if (mine < appliedLoad.current) return;
+      appliedLoad.current = mine;
+      const schedulerRead = schedulerResponse.ok && isSchedulerStatusPayload(resScheduler);
+      // Cleared only here, so an older load that failed cannot leave its error over this one.
+      setError(schedulerRead ? null : resScheduler?.error || "Could not refresh the scheduler status.");
+      setStore({ jobs: resJobs.jobs, runs: Array.isArray(resJobs.runs) ? resJobs.runs : [] });
+      if (schedulerRead) setScheduler(resScheduler as SchedulerStatus);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
+      if (mine > appliedLoad.current) setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
   useEffect(() => {
     void loadData();
+    // Keeps the scheduler badge current: poll while the tab is visible, and catch up on focus.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void loadData(true);
+    }, 60_000);
+    const onFocus = () => void loadData(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
+    setActionError(null);
     const nextStatus = currentStatus === "active" ? "paused" : "active";
     try {
       await updateScheduledJobRequest(id, { status: nextStatus });
+      discardEarlierLoads();
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
+      setActionError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
     }
   };
 
   const handleDelete = async (id: string) => {
+    setActionError(null);
     if (!confirm("Are you sure you want to delete this scheduled scan?")) return;
     try {
       const response = await fetch(`/api/scheduled-jobs/${id}`, { method: "DELETE" });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        setError(body.error || "Could not delete scheduled scan.");
+        setActionError(body.error || "Could not delete scheduled scan.");
         return;
       }
+      discardEarlierLoads();
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");
+      setActionError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");
     }
   };
 
   const handleTriggerOsScheduler = async () => {
+    setActionError(null);
     setOsRunning(true);
     try {
       const response = await fetch("/api/scheduler", { method: "POST" });
@@ -109,7 +125,7 @@ export function ScheduledJobsView() {
       if (!response.ok) throw new Error(body.error || "Could not start scheduler.");
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not start scheduler.");
+      setActionError(cause instanceof Error ? cause.message : "Could not start scheduler.");
     } finally {
       setOsRunning(false);
     }
@@ -135,10 +151,8 @@ export function ScheduledJobsView() {
     });
 
   const totalRuns = store.runs.length;
-  const successRuns = store.runs.filter((r) => r.state === "success").length;
   const failedRuns = store.runs.filter((r) => r.state === "failed").length;
   const totalRolesFound = store.runs.reduce((acc, r) => acc + (r.rolesFound || 0), 0);
-  const successRate = scanSuccessLabel(totalRuns, successRuns);
 
   const osScheduler = scheduler ? osSchedulerFor(scheduler.platform) : undefined;
   const card = scheduler ? schedulerCardCopy(scheduler) : null;
@@ -167,7 +181,7 @@ export function ScheduledJobsView() {
           </button>
           <button
             type="button"
-            onClick={loadData}
+            onClick={() => void loadData()}
             disabled={loading}
             className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/60 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
             title="Refresh list"
@@ -177,13 +191,12 @@ export function ScheduledJobsView() {
         </div>}
       />
       {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</div>}
+      {actionError && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{actionError}</div>}
 
-      {/* Stats Cards */}
-      <div className="grid gap-3.5 sm:grid-cols-4">
-        <StatCard label="Active Scans" value={activeJobs.length} subtitle={`${jobsList.length} total jobs`} icon={<Zap className="size-4 text-emerald-500" />} />
-        <StatCard label="Executed Runs" value={totalRuns} subtitle={`${successRuns} successful`} icon={<Layers className="size-4 text-brand-text" />} />
-        <StatCard label="Roles Discovered" value={totalRolesFound} subtitle="Pushed to pipeline" icon={<Sparkles className="size-4 text-amber-500" />} />
-        <StatCard label="Success Rate" value={successRate} subtitle={`${failedRuns} failed runs`} icon={<CheckCircle2 className="size-4 text-emerald-500" />} />
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <StatTile value={activeJobs.length} label="active scans" />
+        <StatTile value={totalRuns} label={failedRuns ? `runs, ${failedRuns} failed` : "runs, none failed"} />
+        <StatTile value={totalRolesFound} label="roles found" />
       </div>
 
       {/* OS Task Scheduler Banner */}
@@ -273,7 +286,7 @@ export function ScheduledJobsView() {
       {filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-12 text-center">
           <CalendarClock className="mx-auto size-8 text-faint" />
-          <h2 className="mt-3 text-sm font-semibold text-foreground">No scheduled scans found</h2>
+          <h2 className="mt-3 text-base font-semibold text-foreground">No scheduled scans found</h2>
           <p className="mt-1 text-xs text-muted">Create a new scan to start automatically discovering matching jobs.</p>
           <button
             type="button"
@@ -320,30 +333,5 @@ export function ScheduledJobsView() {
         runs={store.runs}
       />
     </PageFrame>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  subtitle: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="co-rise flex items-center justify-between rounded-xl border border-border bg-surface/40 p-4 shadow-sm transition-all hover:border-brand/30 hover:shadow-md">
-      <div>
-        <span className="text-xs font-medium text-muted">{label}</span>
-        <div className="mt-1 text-2xl font-bold tracking-tight text-foreground">{value}</div>
-        <div className="mt-0.5 text-xs text-faint">{subtitle}</div>
-      </div>
-      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-text">
-        {icon}
-      </div>
-    </div>
   );
 }

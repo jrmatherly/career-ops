@@ -35,3 +35,33 @@ test("confidential entries sort by their human-facing label", () => {
   const ordered = [...rows].sort((a, b) => companyPresentation(a).label.localeCompare(companyPresentation(b).label));
   assert.deepEqual(ordered, [rows[1], rows[0]]);
 });
+
+test("displayCompany capitalizes slug names and leaves cased names alone", async () => {
+  const { displayCompany } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(displayCompany("acme"), "Acme");
+  assert.equal(displayCompany("example-labs"), "Example Labs");
+  assert.equal(displayCompany("example_labs inc"), "Example Labs Inc");
+  assert.equal(displayCompany("Initech"), "Initech");
+  assert.equal(displayCompany("OpenAI"), "OpenAI");
+});
+
+test("compactLocation drops country codes and repeated places", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("US - Seattle · Seattle · United States"), "Seattle, United States");
+  assert.equal(compactLocation("Remote"), "Remote");
+  assert.equal(compactLocation("A · B · C · D"), "A, B, C");
+  assert.equal(compactLocation("Austin · US"), "Austin, US", "a part inside another word is not a repeat");
+  assert.equal(compactLocation("Seattle, WA · seattle"), "Seattle, WA");
+});
+
+test("compactLocation reads a place holding regex characters as text", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("Remote (US · US"), "Remote (US");
+  assert.equal(compactLocation("C++ City · c++ city"), "C++ City");
+});
+
+test("compactLocation keeps the country on a remote role", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("US - Remote · GB - Remote"), "US - Remote, GB - Remote");
+  assert.equal(compactLocation("US - Seattle"), "Seattle");
+});

@@ -1,6 +1,6 @@
 /**
  * Home shows a short due list (the follow-ups API already caps it) and the
- * hero still prints the full due count. The gap between those two numbers is
+ * follow-ups tile still shows the full due count. The gap between those two numbers is
  * the rest of the queue, which lives on /followups.
  *
  * @param {number} shownCount cards actually rendered

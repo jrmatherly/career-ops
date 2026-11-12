@@ -1,9 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/page-frame";
 
 export default function ApplyLoading() {
   return (
     <div className="relative min-h-screen" aria-label="Loading application assistant">
-      <div className="relative z-10 mx-auto max-w-3xl px-6 py-8">
+      <PageFrame width="reading" className="relative z-10">
         <div className="flex items-center gap-3">
           <Skeleton className="size-6 rounded-full" />
           <Skeleton className="h-8 w-28" />
@@ -16,7 +17,7 @@ export default function ApplyLoading() {
           <Skeleton className="h-5 flex-1" />
           <Skeleton className="h-8 w-28 rounded-full" />
         </div>
-      </div>
+      </PageFrame>
     </div>
   );
 }

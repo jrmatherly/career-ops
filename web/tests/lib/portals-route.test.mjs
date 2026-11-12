@@ -93,3 +93,57 @@ test("a missing portals.yml is 409 and no file is created", async () => {
   assert.equal(status, 409);
   assert.deepEqual(readdirSync(dataRoot), []);
 });
+
+// GET /api/portals/verify runs the core's verify-portals.mjs. A stub checkout
+// stands in for it here, so the test makes no network request.
+async function verifyWith(stubSource) {
+  const stubRoot = mkdtempSync(join(tmpdir(), "co-portals-verify-"));
+  writeFileSync(join(stubRoot, "verify-portals.mjs"), stubSource);
+  process.env.CAREER_OPS_CODE_ROOT = stubRoot;
+  try {
+    const { GET } = await import("../../src/app/api/portals/verify/route.ts");
+    const res = await GET();
+    return await res.json();
+  } finally {
+    process.env.CAREER_OPS_CODE_ROOT = codeRoot;
+    rmSync(stubRoot, { recursive: true, force: true });
+  }
+}
+const healthFile = () => join(dataRoot, "data", "portal-health.json");
+
+test("a finished health check is kept in data/portal-health.json", async () => {
+  const body = await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\nconsole.log("  ❌ Globex — slug not found");\n');
+  assert.equal(body.configured, true);
+  const saved = JSON.parse(readFileSync(healthFile(), "utf8"));
+  assert.equal(saved.checkedAt, body.checkedAt);
+  assert.ok(!Number.isNaN(Date.parse(saved.checkedAt)));
+  assert.deepEqual(saved.companies, [
+    { name: "Acme", status: "live", detail: "ashby/acme · 4 jobs" },
+    { name: "Globex", status: "broken", detail: "slug not found" },
+  ]);
+  assert.deepEqual(readdirSync(join(dataRoot, "data")), ["portal-health.json"]);
+});
+
+test("a health check that did not finish leaves the last saved result alone", async () => {
+  await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  const before = readFileSync(healthFile(), "utf8");
+  const body = await verifyWith('console.error("verify-portals failed: boom");\nprocess.exit(1);\n');
+  assert.equal(body.error, "verify-portals failed: boom");
+  assert.equal(readFileSync(healthFile(), "utf8"), before);
+});
+
+test("a check that prints no company leaves the last saved result alone", async () => {
+  await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  const before = readFileSync(healthFile(), "utf8");
+  const body = await verifyWith('console.log("checked 0 companies");\n');
+  assert.deepEqual(body.companies, []);
+  assert.equal(readFileSync(healthFile(), "utf8"), before);
+});
+
+test("a check that cannot be saved still returns its result, with the reason", async () => {
+  writeFileSync(join(dataRoot, "data"), "not a directory");
+  const body = await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  assert.equal(body.configured, true);
+  assert.equal(body.companies.length, 1);
+  assert.equal(typeof body.saveError, "string");
+});

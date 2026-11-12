@@ -5,12 +5,17 @@ import Link from "next/link";
 import { Loader2, Radar, Wrench } from "lucide-react";
 import { CompanyLogo } from "@/components/company-logo";
 import { useJobs, type Job } from "@/components/jobs/job-store";
+import { Tabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/cn";
+import { formatWhen } from "@/lib/format-time.mjs";
+import { useHydrated } from "@/lib/use-hydrated";
 import type { WatchedCompany } from "@/lib/portals-config.mjs";
 import { showPortalsSetup } from "@/lib/portals-setup.mjs";
+import { filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
 
 type Company = { name: string; status: string; detail: string };
-type Result = { available: boolean; configured: boolean; companies: Company[]; error?: string };
+type Health = Record<string, { status: string; detail: string }>;
+type Result = { available: boolean; configured: boolean; companies: Company[]; error?: string; checkedAt?: string; saveError?: string };
 
 const TONE: Record<string, { dot: string; label: string; chip: string }> = {
   live: { dot: "bg-emerald-500", label: "live", chip: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400" },
@@ -18,21 +23,33 @@ const TONE: Record<string, { dot: string; label: string; chip: string }> = {
   broken: { dot: "bg-red-500", label: "broken", chip: "bg-red-500/15 text-red-700 dark:text-red-400" },
   skipped: { dot: "bg-zinc-400", label: "no ATS", chip: "bg-surface-hover text-muted" },
 };
-const ORDER: Record<string, number> = { broken: 0, empty: 1, live: 2, skipped: 3 };
 
 export function PortalsView({
   watched,
   missing = false,
   target = "portals.yml",
-  revision = "",
+  revision: loaded = "",
+  checkedAt: savedAt = null,
+  health: saved = {},
 }: {
   watched: WatchedCompany[];
   missing?: boolean;
   target?: string;
   revision?: string;
+  checkedAt?: string | null;
+  health?: Health;
 }) {
   const [res, setRes] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [health, setHealth] = useState(saved);
+  const [checkedAt, setCheckedAt] = useState(savedAt);
+  const [tab, setTab] = useState<PortalTab>("scanned");
+  const [query, setQuery] = useState("");
+  const [enabled, setEnabled] = useState(() => watched.map((c) => c.enabled));
+  const hydrated = useHydrated();
+  const [pending, setPending] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(loaded);
   const { jobs, startJob } = useJobs();
 
   // map the agentic "fix-portal" workers to the company they're repairing
@@ -46,19 +63,49 @@ export function PortalsView({
     return m;
   }, [jobs]);
 
+  const companies = useMemo(() => withUnlisted(withToggles(watched, enabled), health), [watched, enabled, health]);
+  const counts = portalCounts(companies, health);
+  const shown = filterPortals(companies, { query, tab, health });
+  const unchecked = uncheckedCount(companies, health);
+
   function check() {
     setLoading(true);
     fetch("/api/portals/verify")
       .then((r) => r.json())
-      .then(setRes)
-      .catch(() => setRes({ available: false, configured: false, companies: [] }))
+      .then((r: Result) => {
+        setRes(r);
+        // A run that printed no company keeps the last result on screen.
+        if (!r.configured || !r.checkedAt || r.companies.length === 0) return;
+        setHealth(Object.fromEntries(r.companies.map((c) => [c.name, { status: c.status, detail: c.detail }])));
+        setCheckedAt(r.checkedAt);
+      })
+      .catch((e) => setRes({ available: false, configured: false, companies: [], error: e instanceof Error ? e.message : String(e) }))
       .finally(() => setLoading(false));
   }
 
-  const companies = res?.companies ?? [];
-  const broken = companies.filter((c) => c.status === "broken");
-  const liveN = companies.filter((c) => c.status === "live" || c.status === "empty").length;
-  const sorted = [...companies].sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9));
+  async function toggle(index: number, name: string) {
+    if (pending) return;
+    const next = !enabled[index];
+    const set = (value: boolean) => setEnabled((all) => all.with(index, value));
+    set(next);
+    setPending(true);
+    setToggleError(null);
+    try {
+      const r = await fetch("/api/portals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: name, enabled: next, revision }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+      setRevision(body.revision);
+    } catch (e) {
+      set(!next);
+      setToggleError(`${name}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div>
@@ -74,8 +121,6 @@ export function PortalsView({
         {loading && <span className="text-xs text-faint">Probing each company&apos;s ATS… (~30–60s)</span>}
       </div>
 
-      {!res && watched.length > 0 && <WatchedList watched={watched} revision={revision} />}
-
       {res && !res.available && !res.error && (
         <p className="mt-4 rounded-xl border border-dashed border-border bg-surface/30 p-4 text-sm text-muted">
           <code className="text-foreground">verify-portals.mjs</code> not found — this needs a complete career-ops
@@ -85,9 +130,19 @@ export function PortalsView({
       {res && !res.available && res.error && (
         <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-muted">
           <span className="font-medium text-red-700 dark:text-red-400">The portal check did not finish</span> — no
-          portal was verified, so none is shown as healthy. Try again, or run{" "}
+          portal was verified this time, so any status below is from the last check that did. Try again, or run{" "}
           <code className="text-foreground">node verify-portals.mjs</code> to see why.{" "}
           <code className="break-all font-mono text-xs text-faint">{res.error}</code>
+        </p>
+      )}
+      {res?.available && res.configured && res.companies.length === 0 && (
+        <p role="alert" className="mt-4 rounded-xl border border-border bg-surface/30 p-4 text-sm text-muted">
+          The check ran but reported no companies, so any status below is from the last check that did.
+        </p>
+      )}
+      {res?.saveError && (
+        <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
+          This check finished but could not be saved, so the page will not show it after a reload: {res.saveError}
         </p>
       )}
       {showPortalsSetup(missing, res) && (
@@ -98,42 +153,80 @@ export function PortalsView({
         </p>
       )}
 
-      {res && res.configured && (
-        <div className="mt-5">
-          <p className="text-sm text-muted">
-            <span className="tabular-nums text-emerald-800 dark:text-emerald-400">{liveN}</span> live ·{" "}
-            <span className="tabular-nums text-red-700 dark:text-red-400">{broken.length}</span> broken ·{" "}
-            <span className="tabular-nums">{companies.length}</span> tracked
-          </p>
-          {broken.length > 0 && (
-            <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
-              <span className="font-medium text-red-700 dark:text-red-400">
-                {broken.length} {broken.length === 1 ? "company silently drops" : "companies silently drop"} from every
-                scan
-              </span>{" "}
-              <span className="text-muted">
-                — their careers link is broken. Fix the <code>careers_url</code> in <code>portals.yml</code> (or ask the
-                assistant to repair them).
-              </span>
-            </div>
+      {companies.length > 0 && (
+        <div className="mt-6">
+          <Tabs
+            ariaLabel="Companies"
+            value={tab}
+            onChange={setTab}
+            items={[
+              { id: "scanned", label: "Scanned", count: counts.scanned },
+              { id: "paused", label: "Paused", count: counts.paused },
+              { id: "attention", label: "Needs attention", count: counts.attention },
+            ]}
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search companies…"
+            aria-label="Search companies"
+            className="mt-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground placeholder:text-faint sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+          />
+          {toggleError && (
+            <p role="alert" className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
+              {toggleError}
+            </p>
           )}
-          <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
-            {sorted.map((c) => {
-              const t = TONE[c.status] ?? TONE.skipped;
-              return (
-                <li key={c.name} className="flex items-center gap-3 px-4 py-2.5">
-                  <CompanyLogo name={c.name} size={20} />
-                  <span className={cn("size-1.5 shrink-0 rounded-full", t.dot)} />
-                  <span className="shrink-0 text-sm font-medium">{c.name}</span>
-                  <span className="truncate font-mono text-xs text-faint">{c.detail}</span>
-                  <div className="ml-auto flex shrink-0 items-center gap-2">
-                    {c.status === "broken" && <FixAffordance company={c.name} job={fixByCompany.get(c.name)} onFix={() => startJob({ title: `Fix · ${c.name}`, subtitle: "repair portal slug", kind: "fix-portal", input: c.name, page: "/portals" })} />}
-                    <span className={cn("rounded px-1.5 py-0.5 text-xs font-semibold", t.chip)}>{t.label}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          {shown.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">
+              {query.trim() ? "No company matches that search." : tab === "attention" ? (checkedAt ? (unchecked ? `No broken boards in the last check. ${unchecked} scanned ${unchecked === 1 ? "company was" : "companies were"} not in it.` : "Every scanned board answered the last check.") : "Run a health check to see which boards still answer.") : "No companies here."}
+            </p>
+          ) : (
+            <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
+              {shown.map((c) => {
+                const h = healthOf(health, c.name);
+                const t = h ? (TONE[h.status] ?? TONE.skipped) : null;
+                return (
+                  <li key={"index" in c ? `${c.index}-${c.name}` : c.name} className="flex items-center gap-3 px-4 py-2.5">
+                    <div className={cn("flex min-w-0 items-center gap-3", !c.enabled && "opacity-60")}>
+                      <span title={t?.label} className={cn("size-1.5 shrink-0 rounded-full", t ? t.dot : "bg-border")} />
+                      <CompanyLogo name={c.name} size={20} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">
+                          <span className="font-medium">{c.name}</span>{" "}
+                          <span className="font-mono text-xs text-faint">{c.host}</span>
+                        </p>
+                        {h && (
+                          <p className="truncate text-xs text-faint">
+                            {h.detail}
+                            {hydrated && ` · checked ${formatWhen(checkedAt)}`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                      {h?.status === "broken" && <FixAffordance company={c.name} job={fixByCompany.get(c.name)} onFix={() => startJob({ title: `Fix · ${c.name}`, subtitle: "repair portal slug", kind: "fix-portal", input: c.name, page: "/portals" })} />}
+                      {"index" in c && (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={c.enabled}
+                        aria-label={`Scan ${c.name}`}
+                        // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
+                        aria-disabled={pending}
+                        onClick={() => toggle(c.index, c.name)}
+                        className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors aria-disabled:opacity-60", c.enabled ? "bg-brand" : "bg-surface-hover")}
+                      >
+                        <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", c.enabled ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
+                      </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>
@@ -143,13 +236,13 @@ export function PortalsView({
 function FixAffordance({ company, job, onFix }: { company: string; job?: Job; onFix: () => void }) {
   if (job?.status === "running")
     return (
-      <Link href={`/jobs/${job.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-brand-text">
+      <Link href={`/jobs/${job.id}`} className="inline-flex min-h-6 items-center gap-1 text-xs font-medium text-brand-text">
         <Loader2 className="size-3 animate-spin" /> Fixing…
       </Link>
     );
   if (job?.status === "done")
     return (
-      <Link href={`/jobs/${job.id}`} className="text-xs font-medium text-emerald-800 dark:text-emerald-400">
+      <Link href={`/jobs/${job.id}`} className="inline-flex min-h-6 items-center text-xs font-medium text-emerald-800 dark:text-emerald-400">
         repaired · re-check
       </Link>
     );
@@ -161,75 +254,5 @@ function FixAffordance({ company, job, onFix }: { company: string; job?: Job; on
     >
       <Wrench className="size-3" /> Fix
     </button>
-  );
-}
-
-function WatchedList({ watched, revision: loaded }: { watched: WatchedCompany[]; revision: string }) {
-  const [enabled, setEnabled] = useState(() => watched.map((c) => c.enabled));
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [revision, setRevision] = useState(loaded);
-  const scanned = enabled.filter(Boolean).length;
-
-  async function toggle(i: number) {
-    if (pending) return;
-    const next = !enabled[i];
-    const set = (value: boolean) => setEnabled((all) => all.map((v, n) => (n === i ? value : v)));
-    set(next);
-    setPending(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/portals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company: watched[i].name, enabled: next, revision }),
-      });
-      const body = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
-      setRevision(body.revision);
-    } catch (e) {
-      set(!next);
-      setError(`${watched[i].name}: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div className="mt-5">
-      <p className="text-sm text-muted">
-        <span className="tabular-nums text-foreground">{scanned}</span> scanned ·{" "}
-        <span className="tabular-nums">{watched.length - scanned}</span> paused · run a health check to see which boards
-        still answer
-      </p>
-      {error && (
-        <p role="alert" className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
-          {error}
-        </p>
-      )}
-      <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
-        {watched.map((c, i) => (
-          <li key={`${i}-${c.name}`} className="flex items-center gap-3 px-4 py-2.5">
-            <div className={cn("flex min-w-0 items-center gap-3", !enabled[i] && "opacity-60")}>
-              <CompanyLogo name={c.name} size={20} />
-              <span className="shrink-0 text-sm font-medium">{c.name}</span>
-              <span className="truncate font-mono text-xs text-faint">{c.host}</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={enabled[i]}
-              aria-label={`Scan ${c.name}`}
-              // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
-              aria-disabled={pending}
-              onClick={() => toggle(i)}
-              className={cn("relative ml-auto h-6 w-11 shrink-0 rounded-full transition-colors aria-disabled:opacity-60", enabled[i] ? "bg-brand" : "bg-surface-hover")}
-            >
-              <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", enabled[i] ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

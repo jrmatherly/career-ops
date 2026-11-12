@@ -111,6 +111,9 @@ export function isVerdictHeading(heading) {
 /** Public methodology apply/don't-apply line (career-ops.org + ReportView). */
 export const APPLY_LINE = 4.0;
 
+/** The label a score under APPLY_LINE gets; Today collapses the group that carries it. */
+export const BELOW_APPLY_LINE = "Below the apply line";
+
 /** @param {unknown} legitimacy */
 function flaggedPosting(legitimacy) {
   const s = String(legitimacy ?? "").toLowerCase();
@@ -133,7 +136,7 @@ export function applyLineLabel(score, legitimacy) {
   if (score == null || score === "") return null;
   const n = typeof score === "number" ? score : Number(String(score).match(/(\d+(?:\.\d+)?)/)?.[1]);
   if (!Number.isFinite(n)) return null;
-  if (n < APPLY_LINE) return "Below the apply line";
+  if (n < APPLY_LINE) return BELOW_APPLY_LINE;
   return flaggedPosting(legitimacy) ? "Check the posting first" : "Recommended";
 }
 

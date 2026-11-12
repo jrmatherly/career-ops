@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, CircleHelp, Sparkles, ArrowRight, Undo2, X } from "lucide-react";
-import { instrumentSerif } from "@/lib/fonts";
-import { HeroGlow } from "@/components/hero-glow";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
+import { StatTile } from "@/components/ui/stat-tile";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import type { DiscoveredOffer } from "@/lib/explore";
 import { DiscoveryCard } from "@/components/explore/discovery-card";
@@ -18,10 +17,12 @@ import { QuickEvaluate } from "@/components/quick-evaluate";
 import { LinkedInPaste } from "@/components/linkedin-paste";
 import { FollowupsDueSectionSkeleton } from "@/components/page-loading-skeletons";
 import { scoreNum } from "@/lib/format";
+import { APPLY_LINE, BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
 import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
-import { resolveHeroState, mayClaimAllClear, showsQueue, missingSourceLabel, displayCounts } from "@/lib/home/hero-state.mjs";
+import { useHydrated } from "@/lib/use-hydrated";
+import { resolveHeroState, mayClaimAllClear, missingSourceLabel, displayCounts, tileValue } from "@/lib/home/hero-state.mjs";
 import { homeFollowupRemainder } from "@/lib/home/followups-shown.mjs";
 
 // The retention "Today": a dual-loop action queue (the maintainer's
@@ -33,6 +34,7 @@ export function TodayDashboard({
   applications,
   reasons,
   legitimacy,
+  cvReady,
   inbox,
   inBetween,
 }: {
@@ -40,6 +42,8 @@ export function TodayDashboard({
   reasons: Record<string, CardReason>;
   /** Block-G legitimacy per report number, read by the page from each report. */
   legitimacy: Record<string, string>;
+  /** Whether each awaiting row's tailored CV exists, read as the report page's PDF button reads it. */
+  cvReady: Record<string, boolean>;
   inbox: Pick<InboxJob, "url" | "done">[];
   inBetween: boolean;
 }) {
@@ -53,9 +57,11 @@ export function TodayDashboard({
   const [freshCount, setFreshCount] = useState(0);
   const [freshLoading, setFreshLoading] = useState(true);
   const [freshError, setFreshError] = useState(false);
+  const [showBelow, setShowBelow] = useState(false);
   const [decisionUndo, setDecisionUndo] = useState<{ n: string; label: string; busy?: boolean; error?: string } | null>(null);
   const requestGeneration = useRef(0);
   const router = useRouter();
+  const hydrated = useHydrated();
   const dateLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }), []);
 
   const refetch = useCallback(() => {
@@ -140,10 +146,13 @@ export function TodayDashboard({
   // ordering lives in lib/home/awaiting.mjs so it can be tested — see the file
   // for why "first six in the array" was a bug waiting for #3529.
   const awaiting = useMemo(() => pickAwaitingDecision(applications, scoreNum), [applications]);
-  // With the legitimacy, a flagged posting is grouped as the report page
-  // labels it (#5300), so "Apply next" below never points at one.
+  // With the legitimacy, a flagged posting is grouped as the report page labels it (#5300).
   const awaitingGroups = useMemo(() => groupAwaiting(awaiting, (a) => legitimacy[a.n]), [awaiting, legitimacy]);
-  const recommended = awaitingGroups.find(([label]) => label === "Recommended")?.[1] ?? [];
+  // The tile counts every recommended role, not only the six cards the list shows.
+  const aboveLine = useMemo(
+    () => groupAwaiting(pickAwaitingDecision(applications, scoreNum, Infinity), (a) => legitimacy[a.n]).find(([label]) => label === "Recommended")?.[1].length ?? 0,
+    [applications, legitimacy],
+  );
 
   const newThisWeek = freshCount;
   const dataLoading = followupsLoading || freshLoading;
@@ -171,63 +180,34 @@ export function TodayDashboard({
 
   return (
     <PageFrame>
-      <PageHeader title="Today" description={dateLabel} />
-      <section className="dot-bg relative overflow-hidden rounded-2xl border border-border bg-surface/40 px-7 py-10 md:px-10 md:py-12">
-        <HeroGlow />
-        {/* Readability scrim between the animated glow (z-0) and the copy (z-10). */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-surface/55 backdrop-blur-[2px] dark:bg-background/45" />
-        <div className="relative z-10">
-          <h2 className={`${instrumentSerif.className} text-3xl leading-[1.05] text-landing`}>
-            {heroState === "loading" ? (
-              <>Your career queue is loading.</>
-            ) : heroState === "unavailable" ? (
-              <>Some updates are unavailable.</>
-            ) : allClear ? (
-              <>You&apos;re all caught up.</>
-            ) : showsQueue(heroState) ? (
-              <>
-                {shown.newThisWeek > 0 && (
-                  <>
-                    <span className="text-brand-text tabular-nums">{shown.newThisWeek}</span> new match{shown.newThisWeek === 1 ? "" : "es"} this week
-                  </>
-                )}
-                {shown.newThisWeek > 0 && shown.overdue > 0 && <span className="text-faint"> · </span>}
-                {shown.overdue > 0 && (
-                  <>
-                    <span className="text-brand-text tabular-nums">{shown.overdue}</span> follow-up{shown.overdue === 1 ? "" : "s"} due
-                  </>
-                )}
-                {/* queue-partial with work known only from the server snapshot:
-                    both loops are down but the pipeline still has decisions
-                    waiting, so the queue is real while neither count is. */}
-                {shown.newThisWeek === 0 && shown.overdue === 0 && <>Your queue is waiting.</>}
-              </>
-            ) : (
-              <>Your queue is waiting.</>
-            )}
-          </h2>
-          <p className="mt-4 max-w-xl text-sm text-muted">
-            {heroState === "unavailable"
-              ? "We couldn't load all of today's updates. Try again."
-              : heroState === "queue-partial"
-                ? `${missingSources} could not be read, so this may be missing work. What loaded is below.`
-                : allClear
-                  ? "I'll keep scanning the market in the background and surface anything that fits."
-                  : followupsEnabled
-                    ? "Your action queue for today — discovery and follow-ups, in one place."
-                    : "Your action queue for today, in one place."}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            <Link href="/explore" className="inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-brand-foreground transition hover:bg-brand-200 max-sm:min-h-[44px]">
+      <PageHeader
+        title="Today"
+        description={hydrated ? dateLabel : undefined}
+        actions={
+          <div className="flex flex-wrap gap-2.5">
+            <Link href="/explore" className="inline-flex min-h-6 items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-brand-foreground transition hover:bg-brand-200 max-sm:min-h-[44px]">
               Find new roles <ArrowRight className="size-4" />
             </Link>
-            <Link href="/pipeline" className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]">
+            <Link href="/pipeline" className="inline-flex min-h-6 items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]">
               Open pipeline
             </Link>
           </div>
-          {inBetween && <QuickEvaluate />}
-        </div>
-      </section>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatTile value={tileValue({ loading: freshLoading, error: freshError, count: shown.newThisWeek })} label={shown.newThisWeek === 1 ? "new match this week" : "new matches this week"} href="/explore?view=fresh" />
+        {followupsEnabled && (
+          <StatTile value={tileValue({ loading: followupsLoading, error: followupsError, count: shown.overdue })} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
+        )}
+        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} href={`/pipeline?tab=EVALUATED&min=${APPLY_LINE}`} />
+      </div>
+      {/* The tiles carry the counts; the states with no count to show still get said in words. */}
+      {(heroState === "loading" || heroState === "unavailable" || allClear) && (
+        <h2 className="mt-4 text-base font-semibold text-foreground">
+          {heroState === "loading" ? "Your career queue is loading." : heroState === "unavailable" ? "Some updates are unavailable." : "You're all caught up."}
+        </h2>
+      )}
+      {inBetween && <QuickEvaluate />}
 
       {dataError && !dataLoading && (
         <div role="alert" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface/40 px-5 py-4 text-sm text-muted">
@@ -281,16 +261,21 @@ export function TodayDashboard({
       {/* B. Awaiting your decision */}
       {awaiting.length > 0 && (
         <Section icon={CircleHelp} title="Awaiting your decision" hint="Best score first">
-          {recommended.length > 0 && (
-            <Link
-              href={`/pipeline/${recommended[0].n}`}
-              className="mb-3 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition hover:bg-brand-200 max-sm:min-h-[44px]"
-            >
-              Apply next · {companyPresentation(recommended[0]).label} {recommended[0].score} <ArrowRight className="size-4" />
-            </Link>
-          )}
           {awaitingGroups.map(([label, group]) => (
             <div key={label} className="mb-3">
+              {/* Stays mounted when it opens, so keyboard focus is not lost. */}
+              {label === BELOW_APPLY_LINE && (
+                <button
+                  type="button"
+                  aria-expanded={showBelow}
+                  onClick={() => setShowBelow((open) => !open)}
+                  className="mb-3 inline-flex min-h-6 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]"
+                >
+                  {showBelow ? "Hide" : "Show"} {group.length} {group.length === 1 ? "role" : "roles"} below the apply line
+                </button>
+              )}
+              {/* Hidden, not unmounted: a card keeps its in-flight decision guard across a collapse. */}
+              <div hidden={label === BELOW_APPLY_LINE && !showBelow}>
               <h3 className="mb-2 text-xs font-medium text-faint">{label}</h3>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {group.map((a) => (
@@ -298,12 +283,14 @@ export function TodayDashboard({
                     key={a.n}
                     app={a}
                     reason={reasons[a.n]}
+                    pdfReady={cvReady[a.n] ?? false}
                     onDecided={(status) => {
                       const company = companyPresentation(a).label;
                       setDecisionUndo({ n: a.n, label: status === "Applied" ? `Marked ${company} applied` : `Skipped ${company}` });
                     }}
                   />
                 ))}
+              </div>
               </div>
             </div>
           ))}
@@ -364,7 +351,7 @@ function Section({ icon: Icon, title, hint, children }: { icon: React.ComponentT
     <section className="mt-10">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="size-4 text-brand-text" />
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">{title}</h2>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
         <span className="text-xs text-faint">· {hint}</span>
       </div>
       {children}

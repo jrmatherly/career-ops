@@ -120,6 +120,9 @@ export function FilterBuilder({
 }) {
   const employer = filters.preset === CHINA_PRESET;
   const [advanced, setAdvanced] = useState(false);
+  const [editExclude, setEditExclude] = useState(false);
+  // The preset's employer checkboxes live in the disclosure, so it stays open while the preset is on.
+  const open = advanced || employer;
   const set = (patch: Partial<ExploreFilters>) => onChange({ ...filters, ...patch });
   const toggleAts = (a: AtsSource) => {
     const has = filters.ats.includes(a);
@@ -130,22 +133,6 @@ export function FilterBuilder({
   return (
     <fieldset disabled={disabled} className="space-y-4">
       <style>{STYLE}</style>
-      <fieldset>
-        <legend className="mb-1.5 text-[13px] font-medium">Discovery sources</legend>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <label className="inline-flex items-center gap-2"><input type="radio" name="explore-preset" checked={!employer} onChange={() => set({ preset: undefined })} />Public ATS network</label>
-          <label className="inline-flex items-center gap-2"><input type="radio" name="explore-preset" checked={employer} onChange={() => set({ preset: CHINA_PRESET, employers: [...CHINA_SOURCES] as EmployerSource[] })} />China employer preset</label>
-        </div>
-      </fieldset>
-      {employer && <fieldset aria-describedby="employer-scope employer-selection">
-        <legend className="mb-2 text-[13px] font-medium">Employers</legend>
-        <div className="flex flex-wrap gap-4">{CHINA_SOURCES.map(id => <label key={id} className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" className="size-6" checked={filters.employers?.includes(id as EmployerSource) ?? false} onChange={e => set({ employers: e.target.checked ? [...(filters.employers ?? []), id as EmployerSource] : (filters.employers ?? []).filter(x => x !== id) })} />{EMPLOYER_LABEL[id as keyof typeof EMPLOYER_LABEL]}
-        </label>)}</div>
-        <p id="employer-selection" className="mt-2 text-xs text-muted">{filters.employers?.length ? "Only selected employers will be scanned." : "Select at least one employer to start a scan."}</p>
-        <p id="employer-scope" className="mt-2 text-xs text-muted">Employer selection does not guarantee mainland-China, technical or experienced-hire eligibility. Check the original JD. Role and location terms are optional; unknown locations may remain, and remote titles may match. Locations are term filters, not eligibility checks. No posting-date cutoff applies. Other ATS filters are inactive for this preset. Coverage is limited to 10 pages per employer; limits or source problems are reported as incomplete.</p>
-      </fieldset>}
-
       {!hideLists && <div>
         <Label hint={filters.positive.length === 0 ? (employer ? "empty = all titles" : "empty = every fresh posting") : undefined}>Roles to find</Label>
         <KeywordField ariaLabel="Roles to find" values={filters.positive} tone="inc" placeholder="AI platform, ML infrastructure, staff engineer…" onChange={(v) => set({ positive: v })} />
@@ -156,7 +143,18 @@ export function FilterBuilder({
 
       {!employer && !hideLists && <div>
         <Label>Exclude</Label>
-        <KeywordField ariaLabel="Exclude" values={filters.negative} tone="exc" placeholder="manager, sales, contract…" onChange={(v) => set({ negative: v })} />
+        {editExclude || filters.negative.length === 0 ? (
+          // Typing the first chip must not collapse the field under the cursor.
+          <KeywordField ariaLabel="Exclude" values={filters.negative} tone="exc" placeholder="manager, sales, contract…" onChange={(v) => { setEditExclude(true); set({ negative: v }); }} />
+        ) : (
+          <div className="flex items-center gap-3 rounded-[.7rem] border border-border bg-surface/40 px-3 py-2 text-sm">
+            <span className="min-w-0 flex-1 truncate">
+              {filters.negative.length} {filters.negative.length === 1 ? "exclusion" : "exclusions"}{" "}
+              <span className="text-xs text-faint">{filters.negative.slice(0, 5).join(", ")}{filters.negative.length > 5 ? "…" : ""}</span>
+            </span>
+            <button type="button" aria-label="Edit exclusions" onClick={() => setEditExclude(true)} className="inline-flex min-h-6 min-w-6 items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-surface-hover max-sm:min-h-[44px]">Edit</button>
+          </div>
+        )}
       </div>}
 
       {!hideLists && <div>
@@ -221,18 +219,37 @@ export function FilterBuilder({
         </div>
       </div>}
 
-      {!employer && <button
+      <button
         type="button"
-        onClick={() => setAdvanced((v) => !v)}
+        aria-expanded={open}
+        // The preset holds the panel open, so the toggle has nothing to do then.
+        aria-disabled={employer}
+        onClick={() => { if (!employer) setAdvanced((v) => !v); }}
         className="inline-flex min-h-6 items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
       >
         <SlidersHorizontal className="size-3.5" />
-        {hideLists ? "Scan depth" : "More location controls & scan depth"}
-        <ChevronDown className={cn("size-3.5 transition-transform", advanced && "rotate-180")} />
-      </button>}
+        {hideLists ? "Discovery source & scan depth" : "Discovery source, location controls & scan depth"}
+        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+      </button>
 
-      {!employer && advanced && (
+      {open && (
         <div className="space-y-3 rounded-xl border border-border bg-surface/30 p-3">
+          <fieldset>
+            <legend className="mb-1.5 text-[13px] font-medium">Discovery sources</legend>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="inline-flex min-h-6 items-center gap-2"><input type="radio" name="explore-preset" checked={!employer} onChange={() => { setAdvanced(true); set({ preset: undefined }); }} />Public ATS network</label>
+              <label className="inline-flex min-h-6 items-center gap-2"><input type="radio" name="explore-preset" checked={employer} onChange={() => set({ preset: CHINA_PRESET, employers: [...CHINA_SOURCES] as EmployerSource[] })} />China employer preset</label>
+            </div>
+          </fieldset>
+          {employer && <fieldset aria-describedby="employer-scope employer-selection">
+            <legend className="mb-2 text-[13px] font-medium">Employers</legend>
+            <div className="flex flex-wrap gap-4">{CHINA_SOURCES.map(id => <label key={id} className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" className="size-6" checked={filters.employers?.includes(id as EmployerSource) ?? false} onChange={e => set({ employers: e.target.checked ? [...(filters.employers ?? []), id as EmployerSource] : (filters.employers ?? []).filter(x => x !== id) })} />{EMPLOYER_LABEL[id as keyof typeof EMPLOYER_LABEL]}
+            </label>)}</div>
+            <p id="employer-selection" className="mt-2 text-xs text-muted">{filters.employers?.length ? "Only selected employers will be scanned." : "Select at least one employer to start a scan."}</p>
+            <p id="employer-scope" className="mt-2 text-xs text-muted">Employer selection does not guarantee mainland-China, technical or experienced-hire eligibility. Check the original JD. Role and location terms are optional; unknown locations may remain, and remote titles may match. Locations are term filters, not eligibility checks. No posting-date cutoff applies. Other ATS filters are inactive for this preset. Coverage is limited to 10 pages per employer; limits or source problems are reported as incomplete.</p>
+          </fieldset>}
+          {!employer && <>
           {!hideLists && <>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -262,6 +279,7 @@ export function FilterBuilder({
               className="w-full accent-brand"
             />
           </div>
+          </>}
         </div>
       )}
     </fieldset>

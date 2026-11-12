@@ -73,3 +73,15 @@ test("pipelineTab falls back to INBOX and reads the first repeated value", () =>
     ["INBOX", "INBOX", "INBOX", "APPLIED", "INBOX", "INBOX"],
   );
 });
+
+test("splitTabs keeps the core tabs and non-empty stages, and moves the rest under More", async () => {
+  const { splitTabs } = await import("../../src/lib/pipeline-navigation.mjs");
+  const tabs = PIPELINE_TABS.map((id) => ({ id }));
+  const counts = { INBOX: 62, EVALUATED: 28, APPLIED: 3, RESPONDED: 0, DISCARDED: 20, SKIP: 16, OFFER: 0 };
+  const inbox = splitTabs(tabs, counts, "INBOX");
+  assert.deepEqual(inbox.shown.map((t) => t.id), ["INBOX", "EVALUATED", "APPLIED", "DISCARDED", "SKIP"]);
+  assert.equal(inbox.shown.length + inbox.more.length, tabs.length);
+  assert.ok(inbox.more.some((t) => t.id === "OFFER"));
+  assert.ok(splitTabs(tabs, counts, "OFFER").shown.some((t) => t.id === "OFFER"));
+  assert.deepEqual(splitTabs(tabs, {}, "INBOX").shown.map((t) => t.id), ["INBOX", "EVALUATED", "APPLIED"]);
+});

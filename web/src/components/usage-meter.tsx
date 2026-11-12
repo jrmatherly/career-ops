@@ -38,7 +38,12 @@ export function UsageMeter() {
       const cfg = localStorage.getItem("career-ops:config");
       setCli(cfg ? JSON.parse(cfg).cliId || null : null);
       const b = localStorage.getItem("career-ops:usage-budget");
-      if (b) setBudget({ ...DEFAULT_BUDGET, ...JSON.parse(b) });
+      if (b) {
+        // A stored zero or non-number would make every share read 0%, hiding the limit signal.
+        const stored = JSON.parse(b) ?? {};
+        const positive = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback);
+        setBudget({ w5: positive(stored.w5, DEFAULT_BUDGET.w5), w7: positive(stored.w7, DEFAULT_BUDGET.w7) });
+      }
     } catch {
       /* ignore */
     }
@@ -88,7 +93,7 @@ export function UsageMeter() {
 
   return (
     <div className="border-t border-border pt-2">
-      <FootSection label="Usage" icon={<Gauge className="size-3" />} summary={`${rows.map((r) => `${r.label} ${r.pct}%`).join(" · ")}${failed ? " · stale" : ""}`} alert={rows.some((r) => r.pct >= NEAR_LIMIT) ? "near the plan's limit" : undefined}>
+      <FootSection label="Usage" icon={<Gauge className="size-3" />} summary={failed ? "stale" : rows.map((r) => `${r.label} ${r.pct}%`).join(" · ")} alert={rows.some((r) => r.pct >= NEAR_LIMIT) ? "near the plan's limit" : undefined}>
       <div className="space-y-2 px-1">
         {rows.map((r) => {
           const pct = r.pct;

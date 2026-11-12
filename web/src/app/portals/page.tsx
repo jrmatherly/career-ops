@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
@@ -6,6 +7,7 @@ import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
 import { deploymentMode } from "@/lib/deployment.mjs";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { loadPortalsDocument, watchedCompanies, type WatchedCompany } from "@/lib/portals-config.mjs";
+import { parsePortalHealth } from "@/lib/portals-view-model.mjs";
 import { revisionOf } from "@/lib/settings-state.mjs";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +24,24 @@ function readWatched(): { watched: WatchedCompany[]; missing: boolean; error: st
   }
 }
 
+// The last finished health check. Missing means none yet; one that does not parse is reported as an error.
+function readHealth(): { saved: ReturnType<typeof parsePortalHealth>; error: string | null } {
+  try {
+    let text: string | null = null;
+    try {
+      text = fs.readFileSync(path.join(careerOpsRoot(), "data", "portal-health.json"), "utf8");
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    return { saved: parsePortalHealth(text), error: null };
+  } catch (e) {
+    return { saved: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export default function PortalsPage() {
   const { watched, missing, error, revision } = readWatched();
+  const { saved, error: healthError } = readHealth();
   // Name the file the page reads, which CAREER_OPS_PORTALS can move.
   const target = process.env.CAREER_OPS_PORTALS?.trim() ? portalsConfigPath(careerOpsRoot()) : "portals.yml";
   return (
@@ -44,8 +62,20 @@ export default function PortalsPage() {
           Could not read <code>portals.yml</code>: {error}
         </p>
       )}
+      {healthError && (
+        <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
+          Could not read the last health check in <code>data/portal-health.json</code>: {healthError}. Run a new check to replace it.
+        </p>
+      )}
       <div className="mt-6">
-        <PortalsView watched={watched} missing={missing} target={target} revision={revision} />
+        <PortalsView
+          watched={watched}
+          missing={missing}
+          target={target}
+          revision={revision}
+          checkedAt={saved?.checkedAt ?? null}
+          health={saved?.health ?? {}}
+        />
       </div>
     </PageFrame>
   );
