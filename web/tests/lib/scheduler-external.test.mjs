@@ -3,7 +3,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
@@ -93,6 +93,45 @@ test("POST /api/scheduler touches the tick so GET reports the run", async () => 
   assert.equal(body.task.lastRun, new Date(mtimeMs).toISOString());
 });
 
+test("POST /api/scheduler keeps the runner's stderr in scheduled-jobs.log, as the cron line does", async () => {
+  const log = join(dataRoot, "data", "scheduled-jobs.log");
+  rmSync(log, { force: true });
+  writeFileSync(stubRunner, 'process.stderr.write("drain: drained: 1 evaluated\\n");\n');
+  try {
+    const { POST } = await import("@/app/api/scheduler/route.ts");
+    assert.equal((await POST()).status, 202);
+    const read = () => (existsSync(log) ? readFileSync(log, "utf8") : "");
+    for (let i = 0; i < 100 && !read().includes("drain:"); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.match(read(), /^\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] tick\n(?:.*\n)*?drain: drained: 1 evaluated\n/);
+    assert.equal((await POST()).status, 202);
+    for (let i = 0; i < 100 && read().split("drain:").length < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(read().split("drain:").length, 3, "a second tick appends");
+  } finally {
+    writeFileSync(stubRunner, "process.exit(0);\n");
+  }
+});
+
+test("POST /api/scheduler still starts the runner when the log cannot be opened", async () => {
+  const log = join(dataRoot, "data", "scheduled-jobs.log");
+  rmSync(log, { force: true });
+  mkdirSync(log);
+  rmSync(tick, { force: true });
+  const warn = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args.join(" "));
+  try {
+    const { POST } = await import("@/app/api/scheduler/route.ts");
+    assert.equal((await POST()).status, 202);
+    assert.equal(existsSync(tick), true);
+    // Windows opens a directory for append and fails on the first write instead.
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /runner log/);
+  } finally {
+    console.warn = warn;
+    rmSync(log, { recursive: true, force: true });
+  }
+});
+
 test("the tick follows CAREER_OPS_SCHEDULED_JOBS_PATH, as the cron line does", async () => {
   const store = join(dataRoot, "elsewhere", "jobs.json");
   process.env.CAREER_OPS_SCHEDULED_JOBS_PATH = store;
@@ -100,6 +139,7 @@ test("the tick follows CAREER_OPS_SCHEDULED_JOBS_PATH, as the cron line does", a
   const { GET, POST } = await import("@/app/api/scheduler/route.ts");
   assert.equal(schedulerTickPath(dataRoot), `${store}.tick`);
   assert.equal((await POST()).status, 202);
+  assert.equal(existsSync(join(dataRoot, "elsewhere", "scheduled-jobs.log")), true, "the log sits beside the store");
   const mtimeMs = statSync(`${store}.tick`).mtimeMs;
   assert.equal((await (await GET()).json()).task.lastRun, new Date(mtimeMs).toISOString());
   process.env.CAREER_OPS_SCHEDULED_JOBS_PATH = "";

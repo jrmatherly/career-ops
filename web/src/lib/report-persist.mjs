@@ -21,6 +21,8 @@ import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./eva
 
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const YAML_FENCE = /^##\s*Machine Summary\s*\n+```(?:yaml|yml)?\s*\n([\s\S]*?)\n```/i;
+// final_decision's values in batch/batch-prompt.md, keyed in lower case.
+const DECISIONS = new Map(["Apply", "Consider", "Research first", "Skip"].map((value) => [value.toLowerCase(), value]));
 const TITLE_RE = /^#\s+Evaluation:\s+(.+?)\s+(?:—|--|–|-)\s+(.+)$/m;
 
 /**
@@ -75,7 +77,7 @@ export function evaluationOutcomeEvent(outcome, { tokens, costUsd } = {}) {
  * @returns {string|null}
  */
 export function yamlScalar(block, key) {
-  const m = String(block ?? "").match(new RegExp(`^${key}:\\s*(.*)$`, "m"));
+  const m = String(block ?? "").match(new RegExp(`^${key}:[^\\S\\n]*(.*)$`, "m"));
   if (!m) return null;
   let v = m[1].trim();
   if (!v || v === "null" || v === "~") return null;
@@ -105,7 +107,7 @@ export function formatScore(raw) {
  * `# Evaluation: Company — Role` title is the fallback for company/role.
  *
  * @param {string} markdown
- * @returns {{ok: true, company: string, role: string, score: string, via: string|null} | {ok: false, error: string}}
+ * @returns {{ok: true, company: string, role: string, score: string, via: string|null, decision: string|null} | {ok: false, error: string}}
  */
 const TSV_BREAK = /[\t\r\n]/;
 
@@ -132,7 +134,9 @@ export function parseReportMeta(markdown) {
       return { ok: false, error: `The report's Machine Summary has a tab or newline in ${field}, so the tracker row cannot be built.` };
     }
   }
-  return { ok: true, company, role, score, via };
+  // Notes only, so an unknown decision is left out and cannot fail the row.
+  const decision = DECISIONS.get(yamlScalar(fence, "final_decision")?.toLowerCase()) ?? null;
+  return { ok: true, company, role, score, via, decision };
 }
 
 /**
@@ -296,8 +300,16 @@ export async function persistEvaluation({ spawnFn, execPath, root, coreRoot = ro
   }
 
   const postingUrl = /^https?:\/\//i.test(String(url ?? "")) ? String(url) : "";
-  const notes = (ISO_DATE_RE.test(String(postedAt ?? "")) ? `; posted: ${postedAt}` : "")
-    + (!evaluation.full ? `; Focused evaluation: ${evaluation.sections.join(", ") || "fit score only"}` : "");
+  // Other tools read dates and requisition numbers out of this cell, so only the decision leads it,
+  // never the report's free text. The dashboard reads `posted:` only at the start of a line or after
+  // `;` or `|`, and a re-evaluation appends these notes after "Re-eval …: ", so notes that would
+  // start with `posted:` keep a leading `; `.
+  const segments = [
+    meta.decision,
+    !evaluation.full && `Focused evaluation: ${evaluation.sections.join(", ") || "fit score only"}`,
+    ISO_DATE_RE.test(String(postedAt ?? "")) && `posted: ${postedAt}`,
+  ].filter(Boolean);
+  const notes = (segments[0]?.startsWith("posted: ") ? "; " : "") + segments.join("; ");
 
   const written = await spawnScript({
     spawnFn, execPath, root: coreRoot, cwd: root,

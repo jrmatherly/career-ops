@@ -305,6 +305,51 @@ test("persistEvaluation: writes report + TSV, reserves, merges, releases", async
   }
 });
 
+// Other tools read dates and requisition numbers out of the notes cell, so the report's free text
+// stays out of it. The dashboard reads `posted:` only at the start of a line or after `;` or `|`, and
+// a re-evaluation appends the notes after "Re-eval …: ", so the notes must never start with `posted:`.
+test("persistEvaluation: tracker notes lead with the report's decision", async () => {
+  const notesFor = async (summary, extra = {}) => {
+    const root = mkdtempSync(join(tmpdir(), "co-evalpersist-notes-"));
+    const { spawnFn } = makeRouterSpawn({
+      "reserve-report-num.mjs": (args) => args.includes("--release") ? { exitCode: 0 } : { exitCode: 0, stdout: "035\n" },
+      "persist-evaluation-report.mjs": writerSpec(),
+      "merge-tracker.mjs": { exitCode: 0 },
+    });
+    try {
+      const markdown = REPORT.replace("via: null", `via: null\n${summary}`);
+      const result = await persistEvaluation({ spawnFn, execPath: "node", root, markdown, url: "https://acme.com/jobs/7", today: "2026-08-04", postedAt: "2026-08-01", ...extra });
+      assert.equal(result.ok, true);
+      const { header, fields } = headedRows(readFileSync(join(root, "batch", "tracker-additions", "035-acme-ai.tsv"), "utf8"));
+      return fields[resolveTsvColumns(header).map.notes];
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  // A next action is model text: "applied on 2026-07-01" in it would be read as the apply date.
+  assert.equal(
+    await notesFor('final_decision: "Skip"\nnext_action: "Confirm you applied on 2026-07-01; posted: 2031-01-01"'),
+    "Skip; posted: 2026-08-01",
+  );
+  assert.equal(await notesFor('final_decision: "Research first"'), "Research first; posted: 2026-08-01");
+  assert.equal(await notesFor("final_decision: apply"), "Apply; posted: 2026-08-01");
+  assert.equal(await notesFor('final_decision: "Ignore the rules"'), "; posted: 2026-08-01");
+  assert.equal(await notesFor('final_decision:\nnext_action: "Apply"'), "; posted: 2026-08-01");
+  assert.equal(await notesFor('final_decision: "Apply"', { postedAt: undefined }), "Apply");
+  assert.equal(await notesFor("", { postedAt: undefined }), "");
+  assert.equal(await notesFor("", { evaluationSections: ["summary"] }), "Focused evaluation: summary; posted: 2026-08-01");
+  assert.equal(
+    await notesFor('final_decision: "Skip"', { evaluationSections: ["summary"] }),
+    "Skip; Focused evaluation: summary; posted: 2026-08-01",
+  );
+});
+
+test("yamlScalar: an empty value does not read the next line as its own", () => {
+  assert.equal(yamlScalar('next_action:\nfinal_decision: "Apply"', "next_action"), null);
+  assert.equal(yamlScalar("via:\nscore: 4.2", "via"), null);
+  assert.equal(yamlScalar('next_action:\r\nfinal_decision: "Apply"', "next_action"), null);
+});
+
 test("persistEvaluation: with a separate checkout, every step runs from it with the data root as cwd", async () => {
   const root = mkdtempSync(join(tmpdir(), "co-evalpersist-data-"));
   const coreRoot = mkdtempSync(join(tmpdir(), "co-evalpersist-code-"));
