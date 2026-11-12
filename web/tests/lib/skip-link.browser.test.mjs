@@ -46,7 +46,7 @@ test("The first Tab offers a skip link that moves focus past the navigation", { 
       await page.keyboard.press("Tab");
       const next = await main.evaluate((el) => {
         const active = document.activeElement;
-        return { inMain: el !== active && el.contains(active), inNav: Boolean(active?.closest("nav")), label: active?.textContent?.trim().slice(0, 40) };
+        return { inMain: el !== active && el.contains(active), inNav: Boolean(active?.closest("nav")) && !el.contains(active.closest("nav")), label: active?.textContent?.trim().slice(0, 40) };
       });
       assert.equal(next.inMain, true, `${where}: the next Tab lands inside main, got ${next.label}`);
       assert.equal(next.inNav, false, `${where}: the next Tab skips the navigation links`);

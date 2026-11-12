@@ -81,7 +81,8 @@ export async function GET() {
   // Kept so the page shows the last result without a new check. Only a finished run is saved.
   const checkedAt = new Date().toISOString();
   let saveError: string | undefined;
-  try {
+  // A run that printed no company would wipe the last good result.
+  if (companies.length > 0) try {
     atomicWrite(path.join(root, "data", "portal-health.json"), JSON.stringify({ checkedAt, companies }, null, 2) + "\n");
   } catch (e) {
     saveError = e instanceof Error ? e.message : String(e);

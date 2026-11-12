@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { SETTINGS_SAVED_EVENT, dirtyChanges, formValue, parseFormValue } from "@/lib/settings-form.mjs";
+import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
 import type { SettingsGroup, SettingsResponse } from "@/lib/settings-form.mjs";
-import { pendingChanges } from "@/lib/settings-changes.mjs";
+import { pendingFromGroups, saveInOrder } from "@/lib/settings-changes.mjs";
 import { PluginStatus } from "./plugin-status";
 import { SettingRow } from "./setting-row";
 
@@ -110,23 +110,15 @@ export function SettingsView() {
     );
   }
 
-  const savedByGroup: Record<string, Record<string, unknown>> = {};
-  const draftByGroup: Record<string, Record<string, unknown>> = {};
-  for (const group of data.groups) {
-    const saved = Object.fromEntries(group.settings.filter((s) => s.editable).map((s) => [s.id, parseFormValue(s, formValue(s))]));
-    savedByGroup[group.id] = saved;
-    draftByGroup[group.id] = { ...saved, ...dirtyChanges(group.settings, form) };
-  }
-  const pending = pendingChanges(draftByGroup, savedByGroup);
+  const pending = pendingFromGroups(data.groups, form);
   const groups = data.groups;
 
   // In page order, stopping at the first failure: the groups after it stay pending.
-  async function saveAll() {
-    for (const { id, changes } of pending.groups) {
+  const saveAll = () =>
+    saveInOrder(pending.groups, async ({ id, changes }) => {
       const group = groups.find((g) => g.id === id);
-      if (!group || !(await send(group, changes, "Saved."))) return;
-    }
-  }
+      return group ? send(group, changes, "Saved.") : false;
+    });
 
   const rows = (group: SettingsGroup, states: SettingsGroup["settings"]) => {
     if (states.length === 0) return null;

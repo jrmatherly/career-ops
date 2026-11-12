@@ -222,7 +222,9 @@ export function FilterBuilder({
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setAdvanced((v) => !v)}
+        // The preset holds the panel open, so the toggle has nothing to do then.
+        aria-disabled={employer}
+        onClick={() => { if (!employer) setAdvanced((v) => !v); }}
         className="inline-flex min-h-6 items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
       >
         <SlidersHorizontal className="size-3.5" />
@@ -235,7 +237,7 @@ export function FilterBuilder({
           <fieldset>
             <legend className="mb-1.5 text-[13px] font-medium">Discovery sources</legend>
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="inline-flex min-h-6 items-center gap-2"><input type="radio" name="explore-preset" checked={!employer} onChange={() => set({ preset: undefined })} />Public ATS network</label>
+              <label className="inline-flex min-h-6 items-center gap-2"><input type="radio" name="explore-preset" checked={!employer} onChange={() => { setAdvanced(true); set({ preset: undefined }); }} />Public ATS network</label>
               <label className="inline-flex min-h-6 items-center gap-2"><input type="radio" name="explore-preset" checked={employer} onChange={() => set({ preset: CHINA_PRESET, employers: [...CHINA_SOURCES] as EmployerSource[] })} />China employer preset</label>
             </div>
           </fieldset>

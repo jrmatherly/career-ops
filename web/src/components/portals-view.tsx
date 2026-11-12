@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import { formatWhen } from "@/lib/format-time.mjs";
 import type { WatchedCompany } from "@/lib/portals-config.mjs";
 import { showPortalsSetup } from "@/lib/portals-setup.mjs";
-import { filterPortals, portalCounts, type PortalTab } from "@/lib/portals-view-model.mjs";
+import { filterPortals, healthOf, portalCounts, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
 
 type Company = { name: string; status: string; detail: string };
 type Health = Record<string, { status: string; detail: string }>;
@@ -61,7 +61,7 @@ export function PortalsView({
     return m;
   }, [jobs]);
 
-  const companies = useMemo(() => watched.map((c) => ({ ...c, enabled: enabled.get(c.name) ?? c.enabled })), [watched, enabled]);
+  const companies = useMemo(() => withUnlisted(watched.map((c) => ({ ...c, enabled: enabled.get(c.name) ?? c.enabled })), health), [watched, enabled, health]);
   const counts = portalCounts(companies, health);
   const shown = filterPortals(companies, { query, tab, health });
 
@@ -71,11 +71,12 @@ export function PortalsView({
       .then((r) => r.json())
       .then((r: Result) => {
         setRes(r);
-        if (!r.configured || !r.checkedAt) return;
+        // A run that printed no company keeps the last result on screen.
+        if (!r.configured || !r.checkedAt || r.companies.length === 0) return;
         setHealth(Object.fromEntries(r.companies.map((c) => [c.name, { status: c.status, detail: c.detail }])));
         setCheckedAt(r.checkedAt);
       })
-      .catch(() => setRes({ available: false, configured: false, companies: [] }))
+      .catch((e) => setRes({ available: false, configured: false, companies: [], error: e instanceof Error ? e.message : String(e) }))
       .finally(() => setLoading(false));
   }
 
@@ -132,7 +133,7 @@ export function PortalsView({
         </p>
       )}
       {res?.saveError && (
-        <p className="mt-4 text-xs text-faint">
+        <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
           This check finished but could not be saved, so the page will not show it after a reload: {res.saveError}
         </p>
       )}
@@ -176,7 +177,7 @@ export function PortalsView({
           ) : (
             <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
               {shown.map((c) => {
-                const h = health[c.name];
+                const h = healthOf(health, c.name);
                 const t = h ? (TONE[h.status] ?? TONE.skipped) : null;
                 return (
                   <li key={c.name} className="flex items-center gap-3 px-4 py-2.5">
@@ -197,6 +198,7 @@ export function PortalsView({
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">
                       {h?.status === "broken" && <FixAffordance company={c.name} job={fixByCompany.get(c.name)} onFix={() => startJob({ title: `Fix · ${c.name}`, subtitle: "repair portal slug", kind: "fix-portal", input: c.name, page: "/portals" })} />}
+                      {!("unlisted" in c) && (
                       <button
                         type="button"
                         role="switch"
@@ -209,6 +211,7 @@ export function PortalsView({
                       >
                         <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", c.enabled ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
                       </button>
+                      )}
                     </div>
                   </li>
                 );

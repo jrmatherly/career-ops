@@ -64,7 +64,8 @@ export function groupByColumn(rows, meta) {
 // A score cell ("4.0/5") as a number; -1 for an unscored row ("N/A", "—", blank).
 // Not report-persist.mjs's scoreValue: that module pulls node:fs into the client bundle.
 const scoreOf = (row) => {
-  const n = parseFloat(row.score ?? "");
+  // The first number in the cell, as applyLineLabel reads it, so a bold "**4.5/5**" still counts.
+  const n = Number(String(row.score ?? "").match(/(\d+(?:\.\d+)?)/)?.[1]);
   return Number.isFinite(n) ? n : -1;
 };
 // Array.prototype.sort is stable, so equal scores keep input order.

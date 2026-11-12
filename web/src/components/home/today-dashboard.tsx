@@ -17,6 +17,7 @@ import { QuickEvaluate } from "@/components/quick-evaluate";
 import { LinkedInPaste } from "@/components/linkedin-paste";
 import { FollowupsDueSectionSkeleton } from "@/components/page-loading-skeletons";
 import { scoreNum } from "@/lib/format";
+import { BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
 import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
@@ -145,7 +146,11 @@ export function TodayDashboard({
   const awaiting = useMemo(() => pickAwaitingDecision(applications, scoreNum), [applications]);
   // With the legitimacy, a flagged posting is grouped as the report page labels it (#5300).
   const awaitingGroups = useMemo(() => groupAwaiting(awaiting, (a) => legitimacy[a.n]), [awaiting, legitimacy]);
-  const recommended = awaitingGroups.find(([label]) => label === "Recommended")?.[1] ?? [];
+  // The tile counts every recommended role, not only the six cards the list shows.
+  const aboveLine = useMemo(
+    () => groupAwaiting(pickAwaitingDecision(applications, scoreNum, Infinity), (a) => legitimacy[a.n]).find(([label]) => label === "Recommended")?.[1].length ?? 0,
+    [applications, legitimacy],
+  );
 
   const newThisWeek = freshCount;
   const dataLoading = followupsLoading || freshLoading;
@@ -193,7 +198,7 @@ export function TodayDashboard({
         {followupsEnabled && (
           <StatTile value={followupsLoading ? "…" : followupsError ? "—" : shown.overdue} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
         )}
-        <StatTile value={recommended.length} label={recommended.length === 1 ? "role above the apply line" : "roles above the apply line"} />
+        <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} />
       </div>
       {/* The tiles carry the counts; the states with no count to show still get said in words. */}
       {(heroState === "loading" || heroState === "unavailable" || allClear) && (
@@ -255,7 +260,7 @@ export function TodayDashboard({
       {/* B. Awaiting your decision */}
       {awaiting.length > 0 && (
         <Section icon={CircleHelp} title="Awaiting your decision" hint="Best score first">
-          {awaitingGroups.map(([label, group]) => label === "Below the apply line" && !showBelow ? (
+          {awaitingGroups.map(([label, group]) => label === BELOW_APPLY_LINE && !showBelow ? (
             <button
               key={label}
               type="button"

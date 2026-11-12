@@ -46,6 +46,7 @@ test("splitAtApplyLine splits at the app's apply line, with unscored rows below"
   assert.deepEqual(above.map((r) => r.score), ["4.0/5"]);
   assert.deepEqual(below.map((r) => r.score), ["3.6/5", "2.0/5", "N/A"]);
   assert.deepEqual(splitAtApplyLine(rows, 3.5).above.map((r) => r.score), ["4.0/5", "3.6/5"]);
+  assert.equal(splitAtApplyLine([{ score: "**4.5/5**" }]).above.length, 1, "a bold score cell is still a score");
 });
 
 test("next-step labels", () => {

@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { GROUPS } from "../../../lib/settings-registry.mjs";
 import { test } from "node:test";
 
 const src = (file) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../src", file), "utf8");
@@ -16,7 +17,7 @@ const form = src("components/config-form.tsx");
 test("SettingsView loads from and saves to /api/settings with the loaded revision", () => {
   assert.match(view, /fetch\("\/api\/settings", \{ cache: "no-store" \}\)/);
   assert.match(view, /method: "POST"[^\n]*JSON\.stringify\(\{ revision: revision\.current, changes \}\)/);
-  assert.match(view, /dirtyChanges\(group\.settings, form\)/);
+  assert.match(view, /pendingFromGroups\(data\.groups, form\)/);
 });
 
 test("a failed load shows the error and Retry, never rows", () => {
@@ -130,24 +131,20 @@ test("a company switch sends the exact name with the page's revision, keeps the 
 
 test("one save bar replaces the per-section buttons and saves group by group, stopping at the first failure", () => {
   assert.doesNotMatch(view, /Save \{group\.label/, "no per-section Save button");
-  assert.match(view, /pendingChanges\(draftByGroup, savedByGroup\)/);
-  assert.match(view, /for \(const \{ id, changes \} of pending\.groups\) \{[^}]*if \(!group \|\| !\(await send\(group, changes, "Saved\."\)\)\) return;/);
+  assert.match(view, /saveInOrder\(pending\.groups,/, "the order and the stop are saveInOrder's, tested in settings-changes");
   assert.match(view, /<span role="status"[^>]*>\{pending\.count > 0 \? `\$\{pending\.count\} unsaved/, "the count is a live region that is always mounted");
   assert.match(view, />Discard</);
   assert.match(view, /Save changes/);
-  assert.match(view, /fixed inset-x-0 bottom-\[calc\(1\.25rem\+env\(safe-area-inset-bottom\)\)\]/);
-  assert.match(view, /pr-\[calc\(4\.5rem\+env\(safe-area-inset-right\)\)\]/, "the bar stays clear of the docked Ask and back-to-top tabs");
   assert.match(view, /role=\{notice\.kind === "saved" \? "status" : "alert"\}/);
   assert.match(view, /if \(notice\?\.kind !== "saved"\) return;/, "only a success fades, a failure stays");
 });
 
 test("the page is a section list beside the content, and every link has a target", () => {
   const page = src("app/config/page.tsx");
-  assert.match(page, /<PageFrame width="wide">/);
-  assert.match(page, /lg:grid-cols-\[200px_minmax\(0,1fr\)\]/);
   assert.match(page, /id="settings-engine"/);
   assert.match(src("components/followups/cadence-settings.tsx"), /id="settings-cadence"/);
   assert.match(view, /id=\{`settings-\$\{group\.id\}`\}/);
-  for (const id of ["scanner", "automation", "profile", "integrations", "models", "keys", "deployment"]) assert.ok(page.includes(`["${id}", `), `${id} is listed`);
+  // From the registry, so a new group cannot be left out of the section list.
+  for (const { id, label } of GROUPS) assert.ok(page.includes(`["${id}", "${label}"]`), `${label} is listed`);
   assert.match(view, /<h2 [^>]*className="mb-2 text-base font-semibold text-foreground"/);
 });

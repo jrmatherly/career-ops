@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { filterPortals, portalCounts, parsePortalHealth } from "../../src/lib/portals-view-model.mjs";
+import { filterPortals, healthOf, portalCounts, parsePortalHealth, withUnlisted } from "../../src/lib/portals-view-model.mjs";
 
 const companies = [
   { name: "Acme", enabled: true, host: "jobs.ashbyhq.com" },
@@ -47,4 +47,13 @@ test("a missing health file is no health; a broken one is an error", () => {
   assert.throws(() => parsePortalHealth("{ not json"));
   assert.throws(() => parsePortalHealth(JSON.stringify({ companies: "nope" })), /portal-health\.json/);
   assert.throws(() => parsePortalHealth("null"), /portal-health\.json/);
+});
+
+test("a checked board the list does not hold still gets a row, so a broken one is counted", () => {
+  const watched = [{ name: "Acme ", enabled: true, host: "jobs.example.com" }];
+  const health = { Acme: { status: "live", detail: "3 jobs" }, "Example Board": { status: "broken", detail: "404" } };
+  const rows = withUnlisted(watched, health);
+  assert.deepEqual(rows.map((c) => c.name), ["Acme ", "Example Board"]);
+  assert.equal(healthOf(health, "Acme ").status, "live", "a tracked name with stray whitespace finds its result");
+  assert.deepEqual(portalCounts(rows, health), { scanned: 2, paused: 0, attention: 1 });
 });

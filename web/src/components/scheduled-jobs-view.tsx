@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock, CalendarPlus, Clock, History, Loader2, RefreshCw, Search, Zap } from "lucide-react";
 import { CreateJobModal } from "./scheduled-scans/create-job-modal";
 import { EditJobModal } from "./scheduled-scans/edit-job-modal";
@@ -35,8 +35,12 @@ export function ScheduledJobsView() {
   const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null);
   const [osRunning, setOsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Apart from the load error, so a background refetch never clears a failed delete or pause.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const latestLoad = useRef(0);
 
   const loadData = async (quiet = false) => {
+    const mine = ++latestLoad.current;
     if (!quiet) setLoading(true);
     setError(null);
     try {
@@ -46,8 +50,10 @@ export function ScheduledJobsView() {
       ]);
       const resJobs = await jobsResponse.json().catch(() => ({}));
       const resScheduler = await schedulerResponse.json().catch(() => null);
+      // A slower, older load must not put a stale list back over a newer one.
+      if (mine !== latestLoad.current) return;
       if (!jobsResponse.ok) throw new Error(resJobs.error || "Could not load scheduled scans.");
-      if (!schedulerResponse.ok && resScheduler?.error) setError(resScheduler.error);
+      if (!schedulerResponse.ok) setError(resScheduler?.error || "Could not refresh the scheduler status.");
       setStore({
         jobs: Array.isArray(resJobs.jobs) ? resJobs.jobs : [],
         runs: Array.isArray(resJobs.runs) ? resJobs.runs : [],
@@ -56,7 +62,7 @@ export function ScheduledJobsView() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
     } finally {
-      setLoading(false);
+      if (mine === latestLoad.current) setLoading(false);
     }
   };
 
@@ -75,31 +81,34 @@ export function ScheduledJobsView() {
   }, []);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
+    setActionError(null);
     const nextStatus = currentStatus === "active" ? "paused" : "active";
     try {
       await updateScheduledJobRequest(id, { status: nextStatus });
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
+      setActionError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
     }
   };
 
   const handleDelete = async (id: string) => {
+    setActionError(null);
     if (!confirm("Are you sure you want to delete this scheduled scan?")) return;
     try {
       const response = await fetch(`/api/scheduled-jobs/${id}`, { method: "DELETE" });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        setError(body.error || "Could not delete scheduled scan.");
+        setActionError(body.error || "Could not delete scheduled scan.");
         return;
       }
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");
+      setActionError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");
     }
   };
 
   const handleTriggerOsScheduler = async () => {
+    setActionError(null);
     setOsRunning(true);
     try {
       const response = await fetch("/api/scheduler", { method: "POST" });
@@ -107,7 +116,7 @@ export function ScheduledJobsView() {
       if (!response.ok) throw new Error(body.error || "Could not start scheduler.");
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not start scheduler.");
+      setActionError(cause instanceof Error ? cause.message : "Could not start scheduler.");
     } finally {
       setOsRunning(false);
     }
@@ -173,6 +182,7 @@ export function ScheduledJobsView() {
         </div>}
       />
       {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</div>}
+      {actionError && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{actionError}</div>}
 
       <div className="grid gap-3.5 sm:grid-cols-3">
         <StatTile value={activeJobs.length} label="active scans" />

@@ -4,10 +4,24 @@
 /** @typedef {{ status: string, detail: string }} PortalHealth */
 /** @typedef {'scanned' | 'paused' | 'attention'} PortalTab */
 
+/** The check prints trimmed names, so a tracked "Acme " still finds its result. @param {Record<string, PortalHealth>} health @param {string} name */
+export const healthOf = (health, name) => health[name.trim()];
+
+/**
+ * The watched companies plus every checked board the list does not hold (the
+ * check also probes `job_boards`), so a broken one still gets a row and a count.
+ * @param {WatchedCompany[]} companies @param {Record<string, PortalHealth>} health
+ * @returns {(WatchedCompany & { unlisted?: true })[]}
+ */
+export function withUnlisted(companies, health) {
+  const listed = new Set(companies.map((c) => c.name.trim()));
+  return [...companies, ...Object.keys(health).filter((name) => !listed.has(name)).map((name) => ({ name, host: "", enabled: true, unlisted: /** @type {const} */ (true) }))];
+}
+
 /** @param {WatchedCompany} c @param {PortalTab} tab @param {Record<string, PortalHealth>} health */
 function inTab(c, tab, health) {
   if (tab === "paused") return !c.enabled;
-  if (tab === "attention") return c.enabled && health[c.name]?.status === "broken";
+  if (tab === "attention") return c.enabled && healthOf(health, c.name)?.status === "broken";
   return c.enabled;
 }
 
@@ -43,6 +57,6 @@ export function parsePortalHealth(text) {
   }
   /** @type {Record<string, PortalHealth>} */
   const health = {};
-  for (const c of saved.companies) health[c.name] = { status: c.status, detail: c.detail };
+  for (const c of saved.companies) if (typeof c.name === "string" && c.name.trim()) health[c.name.trim()] = { status: c.status, detail: c.detail };
   return { checkedAt: saved.checkedAt, health };
 }
