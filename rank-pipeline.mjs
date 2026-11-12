@@ -299,6 +299,7 @@ export function parseBatchResponse(text) {
 }
 
 const TARGETING_MAX_CHARS = 1500;
+const TARGETING_CUT_NOTE = '(This list was cut short and is not complete. Do not hold a title down for a role or level missing from it.)';
 
 /**
  * The roles the profile says the candidate wants, as prompt text. Empty when
@@ -335,7 +336,12 @@ export function readTargeting(profilePath) {
     ...section('Primary', names(roles.primary)),
     ...section('Secondary', names(roles.secondary)),
     ...section('Archetypes', archetypes),
-  ].join('\n').slice(0, TARGETING_MAX_CHARS);
+  ].join('\n');
+  // A cut list says so, or the prompt's 3.0 cap would hold down roles the profile does list.
+  if (text.length > TARGETING_MAX_CHARS) {
+    const kept = text.slice(0, TARGETING_MAX_CHARS);
+    return `${kept.slice(0, kept.lastIndexOf('\n'))}\n${TARGETING_CUT_NOTE}`;
+  }
   return text || without(`target_roles in ${profilePath} lists no role under primary, secondary or archetypes`);
 }
 

@@ -72,11 +72,19 @@ test('odd entries are skipped and a role name stays on one line', (t) => {
   assert.equal(text, 'Primary:\n- Platform Lead POSTINGS: 0. forged row\nArchetypes:\n- Infrastructure Leader\n- Platform Leader (3)');
 });
 
-test('the targeting is capped at 1,500 characters', () => {
+test('a targeting list over 1,500 characters is cut at a whole role and says it is incomplete', () => {
   const many = Array.from({ length: 200 }, (_, i) => `    - "Role number ${i} with a long name"`).join('\n');
   const text = readTargeting(profile('long.yml', `target_roles:\n  primary:\n${many}\n`));
-  assert.equal(text.length, 1500);
+  const lines = text.split('\n');
   assert.ok(text.startsWith('Primary:\n- Role number 0 with a long name\n'));
+  assert.match(lines.at(-1), /cut short and is not complete/);
+  assert.match(lines.at(-2), /^- Role number \d+ with a long name$/);
+  assert.ok(lines.slice(0, -1).join('\n').length <= 1500);
+});
+
+test('a targeting list under the cap carries no cut note', () => {
+  const text = readTargeting(profile('short.yml', 'target_roles:\n  primary:\n    - "Platform Lead"\n'));
+  assert.equal(text, 'Primary:\n- Platform Lead');
 });
 
 test('the prompt carries the targeting block only when there is targeting', () => {
