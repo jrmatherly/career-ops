@@ -65,3 +65,8 @@ test("compactLocation keeps the country on a remote role", async () => {
   assert.equal(compactLocation("US - Remote · GB - Remote"), "US - Remote, GB - Remote");
   assert.equal(compactLocation("US - Seattle"), "Seattle");
 });
+
+test("compactLocation keeps the country on a qualified remote role", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("US - Remote (Eastern Time)"), "US - Remote (Eastern Time)");
+});

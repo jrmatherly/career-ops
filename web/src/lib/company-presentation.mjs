@@ -52,7 +52,7 @@ export function compactLocation(location) {
   const parts = [];
   for (const raw of String(location).split(" · ")) {
     // "US - Remote" keeps its country: it says who may apply, which a city already does.
-    const part = raw.trim().replace(/^[A-Z]{2} - (?!remote$)/i, "");
+    const part = raw.trim().replace(/^[A-Z]{2} - (?!remote\b)/i, "");
     // Whole words only: "US" is not a repeat of "Austin".
     const repeat = new RegExp(`(^|[^\\p{L}])${part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\p{L}]|$)`, "iu");
     if (part && !parts.some((kept) => repeat.test(kept))) parts.push(part);

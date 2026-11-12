@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Radar, Wrench } from "lucide-react";
 import { CompanyLogo } from "@/components/company-logo";
@@ -83,10 +83,22 @@ export function PortalsView({
       .finally(() => setLoading(false));
   }
 
+  // A switch takes its row out of the tab it is on, so focus moves to the row that takes its place.
+  const view = useRef<HTMLDivElement>(null);
+  const refocusAt = useRef<number | null>(null);
+  useEffect(() => {
+    const at = refocusAt.current;
+    if (at === null) return;
+    refocusAt.current = null;
+    const switches = view.current?.querySelectorAll<HTMLElement>('[role="switch"]') ?? [];
+    (switches[at] ?? switches[at - 1] ?? view.current?.querySelector<HTMLElement>('[aria-pressed="true"]'))?.focus();
+  }, [enabled]);
+
   async function toggle(index: number, name: string) {
     if (pending) return;
     const next = !enabled[index];
     const set = (value: boolean) => setEnabled((all) => all.with(index, value));
+    if (view.current?.contains(document.activeElement)) refocusAt.current = shown.filter((c) => "index" in c).findIndex((c) => "index" in c && c.index === index);
     set(next);
     setPending(true);
     setToggleError(null);
@@ -108,7 +120,7 @@ export function PortalsView({
   }
 
   return (
-    <div>
+    <div ref={view}>
       <div className="flex items-center gap-3">
         <button
           onClick={check}
