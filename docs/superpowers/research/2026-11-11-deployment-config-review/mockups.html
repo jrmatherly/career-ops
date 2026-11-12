@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>career-ops layout mockups</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#0a0a0a;--surface:#141414;--hover:#1c1c1c;--border:#262626;--fg:#fafafa;--muted:#a1a1aa;--faint:#8b8b95;--brand:#dd7627;--brand-soft:rgba(221,118,39,.14);--ok:#34d399;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
+.display{font-family:"Instrument Serif",Georgia,serif;font-weight:400;letter-spacing:-.01em}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+/* sidebar */
+aside{width:224px;flex:none;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:20px;font-size:24px}
+.logo b{background:var(--brand);border-radius:6px;width:30px;height:30px;display:grid;place-items:center;font-weight:400;font-size:22px;color:#160b03}
+.group{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--faint);margin:16px 12px 4px}
+.nav{display:block;width:100%;text-align:left;padding:7px 12px;border-radius:6px;color:var(--muted)}
+.nav:hover{background:var(--hover);color:var(--fg)}
+.nav[aria-current]{background:var(--brand-soft);color:var(--brand)}
+.foot{margin-top:auto;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--faint)}
+/* shell */
+main{flex:1;min-width:0}
+.shell{margin:0 auto;padding:32px 24px 96px;max-width:1120px}
+.shell.reading{max-width:760px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.head h1{margin:0;font-size:30px;line-height:1.1}
+.head p{margin:6px 0 0;color:var(--muted);max-width:60ch}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-weight:500}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#160b03}
+.card{border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:16px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);min-height:52px}
+.row:last-child{border-bottom:0}
+.list{border:1px solid var(--border);border-radius:14px;background:var(--surface);overflow:hidden}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:9px 12px;font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.on{color:var(--fg);border-color:var(--brand)}
+.tab small,.count{color:var(--faint);font-size:12px;margin-left:4px}
+.chip{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--border);font-size:12px;color:var(--muted);margin:0 6px 6px 0}
+.chip.b{border-color:rgba(221,118,39,.4);background:var(--brand-soft);color:var(--brand)}
+.pill{font-size:12px;font-weight:600;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.pill.est{border:1px dashed rgba(221,118,39,.5);color:var(--brand)}
+.pill.hi{background:rgba(52,211,153,.15);color:var(--ok)}.pill.mid{background:rgba(251,191,36,.15);color:var(--warn)}.pill.lo{background:rgba(248,113,113,.15);color:var(--bad)}
+.pill.gate{background:rgba(248,113,113,.12);color:var(--bad);font-weight:500}
+.muted{color:var(--muted)}.faint{color:var(--faint);font-size:12px}.grow{flex:1;min-width:0}
+.box{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;flex:none}
+.input{flex:1;min-height:38px;border:1px solid var(--border);border-radius:8px;background:var(--bg);padding:0 12px;color:var(--faint);display:flex;align-items:center}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--ok)}.dot.off{background:var(--faint)}.dot.bad{background:var(--bad)}
+.toggle{width:40px;height:24px;border-radius:999px;background:var(--brand);position:relative;flex:none}.toggle:after{content:"";position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#fff}.toggle.off{background:var(--border)}.toggle.off:after{right:auto;left:3px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin:28px 0 10px;font-weight:600}
+.note{display:none;margin:0 0 16px;padding:10px 14px;border:1px solid rgba(221,118,39,.35);background:var(--brand-soft);border-radius:8px;font-size:13px}
+body.notes .note{display:block}
+.note b{color:var(--brand)}
+.bar{height:8px;border-radius:99px;background:var(--border);overflow:hidden;flex:1}.bar i{display:block;height:100%;background:var(--brand)}
+.pane{height:340px;overflow:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px}
+.savebar{position:sticky;bottom:16px;margin-top:24px;display:flex;justify-content:space-between;align-items:center;padding:10px 10px 10px 16px;border:1px solid rgba(221,118,39,.4);background:#1a120b;border-radius:14px}
+.toolbar{position:fixed;right:16px;top:12px;z-index:5}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
+.stat{border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:14px 16px}
+.stat b{display:block;font:400 40px/1 "Instrument Serif",Georgia,serif;color:var(--brand)}
+.stat span{color:var(--muted);font-size:13px}
+.badge{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border-radius:6px;font-size:12px;font-weight:600;background:var(--hover);color:var(--fg);border:1px solid var(--border)}
+.badge.b{background:var(--brand-soft);border-color:rgba(221,118,39,.4);color:var(--brand)}
+.badge.ok{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.35);color:var(--ok)}
+.kv{display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border)}
+.kv em{font-style:normal;color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.1em}
+.paper{background:#fff;color:#1a1a1a;max-width:640px;margin:0 auto;padding:48px 56px;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.6);font:13px/1.5 Georgia,serif}
+.paper h1{font-size:26px;margin:0}.paper h2{font-size:14px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #999;margin:18px 0 6px;color:#1a1a1a;font-weight:700}
+#pv h2{text-transform:none;letter-spacing:0;color:var(--fg);font-weight:400;margin:16px 0 8px}
+.banner{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 16px;margin-bottom:16px;border-radius:12px;border:1px solid rgba(251,191,36,.4);background:rgba(251,191,36,.1)}
+.bad-line{background:rgba(251,191,36,.18);display:block;margin:0 -16px;padding:0 16px}
+.cvtab{display:none}.cvtab.on{display:block}
+section{display:none}section.on{display:block}
+@media(max-width:820px){aside{display:none}.g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body class="notes">
+<aside>
+  <div class="logo display"><b>co</b>career-ops</div>
+  <div class="group">Daily</div>
+  <button class="nav" data-s="today">Today</button>
+  <button class="nav" data-s="pipeline">Pipeline</button>
+  <button class="nav" data-s="board">Board</button>
+  <button class="nav" data-s="today">Follow-ups</button>
+  <div class="group">Discover</div>
+  <button class="nav" data-s="explore">Explore</button>
+  <button class="nav" data-s="scans">Scheduled scans</button>
+  <button class="nav" data-s="portals">Portals</button>
+  <div class="group">Profile</div>
+  <button class="nav" data-s="cv">CV</button>
+  <button class="nav" data-s="docs">Documents</button>
+  <button class="nav" data-s="docs">Shares</button>
+  <div class="group">Insight</div>
+  <button class="nav" data-s="analytics">Analytics</button>
+  <div class="foot">
+    <button class="nav" data-s="settings">Settings</button>
+    <div style="padding:8px 12px">Hosted · career.matherly.net<br>web 1.1.3</div>
+  </div>
+</aside>
+
+<main>
+<div class="toolbar"><button class="btn" id="tog">Hide notes</button></div>
+
+<section id="today"><div class="shell">
+  <div class="note"><b>U1, U2, U24.</b> Same shell and header as every page. The counts are tiles with large numerals. The role card carries status badges. The "Apply next" button is gone, since the Recommended card already is that action. Roles under the apply line collapse to a count.</div>
+  <div class="head"><div><h1 class="display">Today</h1><p>Wednesday, Nov 11</p></div>
+    <div><button class="btn primary">Find new roles</button> <button class="btn">Open pipeline</button></div></div>
+  <div class="stats"><div class="stat"><b>68</b><span>new matches this week</span></div><div class="stat"><b>3</b><span>follow-ups due today</span></div><div class="stat"><b>1</b><span>role above the apply line</span></div></div>
+  <h2>Follow-ups due</h2>
+  <div class="list" id="fu"></div>
+  <h2>Awaiting your decision</h2>
+  <div class="card" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between"><b>Company A</b><span class="pill hi">4.0</span></div>
+    <div class="muted">Lead, AI Engineering &amp; SDLC Automation</div>
+    <div style="margin-top:10px"><span class="badge ok">● Evaluated today</span> <span class="badge">CV not made yet</span> <span class="badge">Posted Nov 11</span></div>
+    <p class="muted" style="margin:10px 0">+ Authored AI-assisted SDLC guidelines and rolled out managed Claude…<br>− Integrate AI capabilities into CI/CD pipelines…</p>
+    <button class="btn primary">Review and apply</button> <button class="btn">Skip</button>
+  </div>
+  <p style="margin-top:16px"><button class="btn">Show 27 roles below the apply line</button></p>
+</div></section>
+
+<section id="pipeline"><div class="shell">
+  <div class="note"><b>U8.</b> The LinkedIn paste box is a button, so the inbox starts at the top. <b>U12.</b> Empty statuses sit under "More". <b>U10.</b> A dashed pill is the ranker's estimate, a solid pill is a real score. <b>U11.</b> A gated role is marked and sorts last. <b>U6, U9.</b> 24px checkboxes, proper company names, one location.</div>
+  <div class="head"><div><h1 class="display">Pipeline</h1><p>62 in inbox · 67 tracked</p></div>
+    <div><button class="btn">Add from LinkedIn</button> <button class="btn">Save view</button></div></div>
+  <div class="tabs"><button class="tab on">Inbox<small>62</small></button><button class="tab">Evaluated<small>28</small></button><button class="tab">Applied<small>3</small></button><button class="tab">Discarded<small>20</small></button><button class="tab">Skip<small>16</small></button><button class="tab">More ▾</button></div>
+  <div style="display:flex;gap:10px;margin-bottom:12px"><div class="input">Filter by company or role…</div><button class="btn">Posted: any ▾</button><button class="btn">Source ▾</button><button class="btn">Level ▾</button></div>
+  <div class="faint" style="margin-bottom:8px">Estimate first, then newest · 62 of 62</div>
+  <div class="list" id="inbox"></div>
+</div></section>
+
+<section id="board"><div class="shell">
+  <div class="note"><b>U23.</b> Evaluated sorts by score and hides everything under the apply line behind a count. Cards drop the "Not applied" line the column already implies.</div>
+  <div class="head"><div><h1 class="display">Board</h1><p>67 tracked · drag a card, or focus it and press M</p></div></div>
+  <div class="grid g3" id="cols"></div>
+</div></section>
+
+<section id="explore"><div class="shell">
+  <div class="note"><b>U13.</b> The 56 exclusions collapse to one line, so the scan button is on the first screen. <b>U14.</b> The China preset moves under "More controls".</div>
+  <div class="head"><div><h1 class="display">Explore</h1><p>Scan public job boards for fresh postings. Free until you evaluate one.</p></div>
+    <div class="tabs" style="margin:0;border:0"><button class="tab on">Scan · free</button><button class="tab">AI search · uses tokens</button></div></div>
+  <div class="card">
+    <div class="faint" style="margin-bottom:8px">Roles to find · from portals.yml</div>
+    <div id="roles"></div><button class="chip">+ 20 more</button>
+    <div class="row" style="padding:12px 0;border-top:1px solid var(--border);margin-top:8px"><span class="grow">56 exclusions <span class="faint">Junior, Intern, .NET, Java, iOS…</span></span><button class="btn">Edit</button></div>
+    <div class="row" style="padding:12px 0"><span class="grow">Location <span class="chip b">United States</span><span class="chip b">Your city</span><span class="chip b">Remote</span></span></div>
+    <div class="row" style="padding:12px 0"><span class="grow">Posted within <span class="chip">24h</span><span class="chip">3d</span><span class="chip b">7d</span><span class="chip">14d</span><span class="chip">30d</span></span><span class="faint">More controls ▾</span></div>
+    <div style="margin-top:12px"><button class="btn primary">Scan now</button> <span class="faint">Greenhouse, Lever, Ashby, Workday</span></div>
+  </div>
+</div></section>
+
+<section id="scans"><div class="shell">
+  <div class="note"><b>C5.</b> The scheduler card names the real scheduler. <b>U15.</b> Keywords show as a count. <b>C6.</b> The queue shows company and role, with rank and result side by side. <b>U7.</b> Times carry a date. Totals are tiles, the schedule is a badge, the last run has its own line, and "Report 94" reads "View evaluation".</div>
+  <div class="head"><div><h1 class="display">Scheduled scans</h1><p>Scans that run on a schedule and evaluate what they find.</p></div>
+    <div><button class="btn">Run log</button> <button class="btn primary">New scan</button></div></div>
+  <div class="stats"><div class="stat"><b>2</b><span>active scans</span></div><div class="stat"><b>8</b><span>runs, none failed</span></div><div class="stat"><b>71</b><span>roles found</span></div></div>
+  <div class="card row" style="border-radius:14px;margin-bottom:16px"><span class="dot"></span><span class="grow"><b>Kubernetes CronJob</b> · career-ops-scan-tick, every 15 minutes<br><span class="faint">Last tick today 9:00 PM · next about 9:15 PM</span></span><button class="btn">Check due jobs now</button></div>
+  <div class="grid g2">
+    <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:16px">Tracked boards</b><span class="badge b">Daily · 7:00 AM Eastern</span></div><p class="muted" style="margin:8px 0">Auto-evaluate at 3.5 and above, 5 per run · 28 keywords</p><div class="kv"><span class="dot"></span><em>Last run</em><span class="grow">Today 7:00 AM</span><b>4 roles</b></div><p style="margin:12px 0 0"><button class="btn">Run now</button> <button class="btn">Pause</button> <button class="btn">Edit</button></p></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="font-size:16px">Public job-board sweep</b><span class="badge b">Weekly · Sat 11:18 PM Eastern</span></div><p class="muted" style="margin:8px 0">Auto-evaluate at 3.5 and above, 5 per run · 28 keywords</p><div class="kv"><span class="dot"></span><em>Last run</em><span class="grow">Today 8:27 PM</span><b>18 roles</b></div><p style="margin:12px 0 0"><button class="btn">Run now</button> <button class="btn">Pause</button> <button class="btn">Edit</button></p></div>
+  </div>
+  <h2>Evaluate queue</h2>
+  <div class="tabs"><button class="tab on">Evaluated<small>8</small></button><button class="tab">Gated<small>1</small></button><button class="tab">Skipped<small>13</small></button></div>
+  <div class="list" id="queue"></div>
+</div></section>
+
+<section id="portals"><div class="shell">
+  <div class="note"><b>U17.</b> Search, and tabs for the 72 scanned and 125 paused. Each row shows its last health result, so a broken board is visible without running a check.</div>
+  <div class="head"><div><h1 class="display">Portals</h1><p>The company boards the daily scan reads.</p></div>
+    <div><button class="btn">Add company</button> <button class="btn primary">Check health</button></div></div>
+  <div class="tabs"><button class="tab on">Scanned<small>72</small></button><button class="tab">Paused<small>125</small></button><button class="tab">Needs attention<small>2</small></button></div>
+  <div style="display:flex;gap:10px;margin-bottom:12px"><div class="input">Search companies…</div><button class="btn">Board type ▾</button></div>
+  <div class="list" id="plist"></div>
+</div></section>
+
+<section id="cv"><div class="shell">
+  <div class="note"><b>U4, U21, U22.</b> One page owns <code>cv.md</code>. Preview shows the CV as the PDF a recruiter gets, with Export for download or print. Edit holds the editor. A problem shows as a banner that opens the editor at the lines to fix.</div>
+  <div class="head"><div><h1 class="display">CV</h1><p>Your master CV. Every tailored CV is built from it.</p></div>
+    <div><button class="btn">Upload PDF or TeX</button> <button class="btn primary">Export ▾</button> <span class="faint">Download PDF · Print</span></div></div>
+  <button class="banner" data-cv="edit"><span style="color:var(--warn)">▲</span><span class="grow"><b>2 sections need attention.</b> <span class="muted">Education (line 68) and Volunteer (line 85) could not be read, so they may be missing from tailored CVs.</span></span><span class="btn">Fix in editor →</span></button>
+  <div class="tabs"><button class="tab on" data-cv="preview">Preview</button><button class="tab" data-cv="edit">Edit</button></div>
+  <div class="cvtab on" id="cv-preview">
+    <div class="faint" style="text-align:center;margin-bottom:10px">Page 1 of 2 · Letter · rendered from cv.md</div>
+    <div class="paper"><h1>Your Name</h1>City, ST · email · phone · linkedin<h2>Professional Summary</h2>Platform and infrastructure leader…<h2>Work Experience</h2><b>Company — City, ST</b><br><i>Title</i> · 2021 – Present<ul><li>Bullet</li><li>Bullet</li><li>Bullet</li></ul><b>Company — City, ST</b><br><i>Title</i> · 2015 – 2021<ul><li>Bullet</li><li>Bullet</li></ul><h2>Skills</h2>Platform engineering · Kubernetes · Networking</div>
+  </div>
+  <div class="cvtab" id="cv-edit">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span class="faint">Editing cv.md · the preview on the right updates as you type</span><span><span class="faint">Saved</span> <button class="btn primary">Save</button></span></div>
+    <div class="grid g2"><div class="pane mono" id="md"></div><div class="pane" id="pv"></div></div>
+  </div>
+</div></section>
+
+<section id="docs"><div class="shell">
+  <div class="note"><b>U20.</b> Cards are titled by company and role, newest first, and link to the tracker row. <b>U3.</b> Shares lives here as a tab, and its empty state offers a button in place of a CLI command.</div>
+  <div class="head"><div><h1 class="display">Documents</h1><p>Tailored CVs and cover letters.</p></div></div>
+  <div class="tabs"><button class="tab on">CVs<small>8</small></button><button class="tab">Cover letters<small>0</small></button><button class="tab">Shared links<small>0</small></button></div>
+  <div class="grid g3" id="dgrid"></div>
+</div></section>
+
+<section id="analytics"><div class="shell">
+  <div class="note"><b>U19.</b> Each stage shows how many roles ever reached it and how many are there now, so this page and Pipeline agree. Bars use the brand color.</div>
+  <div class="head"><div><h1 class="display">Analytics</h1><p>67 tracked · average score 3.1 · 3 active applications</p></div></div>
+  <div class="tabs"><button class="tab on">Progress</button><button class="tab">Insights</button><button class="tab">Scan stats</button></div>
+  <div class="card" id="funnel"><div class="row faint" style="padding:0 0 8px;min-height:0"><span style="width:110px">Stage</span><span class="grow"></span><span style="width:90px;text-align:right">Ever reached</span><span style="width:70px;text-align:right">There now</span></div></div>
+</div></section>
+
+<section id="settings"><div class="shell">
+  <div class="note"><b>C2, U3.</b> The heading says where this install runs. <b>U25.</b> Sections are a list on the left, and one save bar appears when something changed. CLIs that are not installed collapse to one line.</div>
+  <div class="head"><div><h1 class="display">Settings</h1><p>Hosted at career.matherly.net. Your data is in <span class="mono">/data</span> on this server.</p></div></div>
+  <div style="display:grid;grid-template-columns:200px 1fr;gap:32px">
+    <div id="snav"></div>
+    <div>
+      <h2 style="margin-top:0">Automation and evaluation</h2>
+      <div class="list" id="srows"></div>
+      <h2>AI engine</h2>
+      <div class="list"><div class="row"><span class="dot"></span><span class="grow"><b>Claude Code</b> <span class="faint mono">/usr/bin/claude</span></span><span class="faint">In use</span></div><div class="row"><span class="grow muted">10 other CLIs are supported and not installed on this server</span><button class="btn">Show</button></div></div>
+      <div class="savebar"><span>2 unsaved changes</span><span><button class="btn">Discard</button> <button class="btn primary">Save changes</button></span></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s), h=(t,c,x)=>`<${t} class="${c||''}">${x}</${t}>`;
+const pill=s=>`<span class="pill ${s>=4?'hi':s>=3?'mid':'lo'}">${s.toFixed(1)}</span>`;
+$('#fu').innerHTML=[['Northwind','Director, AI Platforms',4.6],['Contoso','Director, Internal AI Operations',4.4],['Fabrikam','Engineering Manager, Network Infrastructure',3.9]]
+ .map(r=>h('div','row',`<span class="grow"><b>${r[0]}</b> · <span class="muted">${r[1]}</span><br><span class="faint">Applied Nov 5 · 7 days ago</span></span>${pill(r[2])}<button class="btn">Log follow-up</button><button class="btn">Snooze</button>`)).join('');
+$('#inbox').innerHTML=[['Company J','Director, AI and Machine Learning','South San Francisco, CA','Workday','yesterday','3.4'],['Company K','Director of Engineering, Core AI Experience','San Francisco, CA','Gem','2 days ago','3.4'],['Company L','Software Engineer, AI/ML Platform Operations','Remote, Arizona','Workday','3 days ago','3.4'],['Company M','Director, Enterprise Architecture','Columbus, OH','Workday','4 days ago','3.3'],['Company H','Senior Software Engineer, Infrastructure AI','Seattle, WA','Ashby','3 weeks ago','gate']]
+ .map(r=>h('div','row',`<span class="box"></span><span class="grow"><b>${r[0]}</b> · ${r[1]}<br><span class="faint">${r[2]} · ${r[3]} · ${r[4]}</span></span>${r[5]=='gate'?'<span class="pill gate">Gated: dealbreaker</span>':`<span class="pill est">est. ${r[5]}</span>`}<button class="btn">Evaluate</button><button class="btn">Skip</button>`)).join('');
+const col=(t,n,cards,more)=>h('div','card',`<div class="faint" style="display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.1em"><span>${t}</span><span>${n}</span></div>`+cards.map(c=>`<div class="card" style="margin-top:10px;background:var(--bg)"><div style="display:flex;justify-content:space-between"><b>${c[0]}</b>${pill(c[2])}</div><div class="muted">${c[1]}</div><div class="faint" style="margin-top:6px">${c[3]}</div></div>`).join('')+(more?`<button class="btn" style="margin-top:10px;width:100%;justify-content:center">${more}</button>`:''));
+$('#cols').innerHTML=col('Evaluated',28,[['Company A','Lead, AI Engineering & SDLC Automation',4.0,'Today'],['Company B','Director of Platform Engineering',3.6,'Today']],'26 below the apply line')
+ +col('Applied',3,[['Northwind','Director, AI Platforms',4.6,'6 days · follow up Nov 12'],['Contoso','Director, Internal AI Operations',4.4,'6 days · follow up Nov 12'],['Fabrikam','Engineering Manager, Network Infrastructure',3.9,'6 days · follow up Nov 12']])
+ +col('Responded',0,[],'');
+$('#roles').innerHTML=['AI + platform','AI + infrastructure','AI + enablement','director + infrastructure','head + platform','Director of IT','SRE','Enterprise Architect'].map(x=>`<span class="chip b">${x} ×</span>`).join('');
+$('#queue').innerHTML=[['Company A','Lead, AI Engineering & SDLC Automation','4.3',4.0,94],['Company B','Director of Platform Engineering','3.6',3.6,98],['Company C','Sr. Software Engineer, AI Platform','3.6',3.1,99],['Company D','Senior AI Enablement Software Engineer','3.8',2.9,97],['Company E','Senior Software Engineer, Enterprise AI Platform','4.2',2.1,95]]
+ .map(r=>h('div','row',`<span class="grow"><b>${r[0]}</b> · ${r[1]}<br><span class="faint">Public job-board sweep · today 9:34 PM</span></span><span class="pill est">est. ${r[2]}</span><span class="faint">→</span>${pill(r[3])}<button class="btn">View evaluation</button>`)).join('');
+$('#plist').innerHTML=[['Anthropic','Greenhouse','ok','41 postings · checked today'],['OpenAI','Ashby','ok','212 postings · checked today'],['Company K','Gem','ok','18 postings · checked today'],['Hume AI','Greenhouse','bad','No response · checked today'],['Vercel','Greenhouse','ok','36 postings · checked today']]
+ .map(r=>h('div','row',`<span class="dot ${r[2]=='bad'?'bad':''}"></span><span class="grow"><b>${r[0]}</b> <span class="faint">${r[1]}</span><br><span class="faint">${r[3]}</span></span><span class="toggle"></span>`)).join('');
+$('#md').innerHTML='<span class="bad-line">### School — City, ST &nbsp; ← line 68, could not be read</span><br>'+('# Your Name\n\n**Location:** City, ST\n\n## Professional Summary\n\nPlatform and infrastructure leader…\n\n## Work Experience\n\n### Company — City, ST\n**Title**\n2021 – Present\n\n- Bullet\n- Bullet\n\n'.repeat(3)).replace(/\n/g,'<br>');
+$('#pv').innerHTML='<h1 class="display" style="margin:0 0 8px">Your Name</h1><b>Location:</b> City, ST<h2 class="display" style="font-size:20px;border-bottom:1px solid var(--border)">Professional Summary</h2><p class="muted">Platform and infrastructure leader…</p>'+'<h2 class="display" style="font-size:20px;border-bottom:1px solid var(--border)">Work Experience</h2><b>Company — City, ST</b><br>Title · 2021 – Present<ul><li>Bullet</li><li>Bullet</li></ul>'.repeat(3);
+$('#dgrid').innerHTML=[['Fabrikam','Engineering Manager, Network Infrastructure','Nov 5',42],['Contoso','Director, Internal AI Operations','Nov 4',14],['Northwind','Director, AI Platforms','Nov 4',12]]
+ .map(r=>h('div','card',`<b>${r[0]}</b><div class="muted">${r[1]}</div><div class="faint" style="margin:8px 0 12px">CV · ${r[2]} · tracker row ${r[3]}</div><button class="btn">Open PDF</button> <button class="btn">Open role</button>`)).join('');
+$('#funnel').innerHTML+=[['Tracked',67,67],['Applied',9,3],['Responded',3,0],['Interview',3,0],['Offer',0,0]]
+ .map(r=>h('div','row',`<span style="width:110px">${r[0]}</span><span class="bar"><i style="width:${r[1]/67*100}%"></i></span><span style="width:90px;text-align:right">${r[1]}</span><span style="width:70px;text-align:right" class="muted">${r[2]}</span>`)).join('');
+$('#snav').innerHTML=['AI engine','Scanner and filters','Automation and evaluation','Profile preferences','Follow-up cadence','Integrations','Model runners','Keys and tokens','Deployment'].map((x,i)=>`<button class="nav" ${i==2?'aria-current="true"':''}>${x}</button>`).join('');
+$('#srows').innerHTML=[['Automatic evaluations per day','The most evaluations unattended runs start in one UTC day.','30','Changed · was default 10'],['Score for an automatic CV','A role scoring at least this gets a tailored CV.','4.0','Changed · was default 3'],['Agent CLI','The CLI that runs evaluations.','claude','From environment · read-only']]
+ .map(r=>h('div','row',`<span class="grow"><b>${r[0]}</b><br><span class="faint">${r[1]}</span></span><span style="text-align:right"><span class="input" style="min-width:90px;color:var(--fg)">${r[2]}</span><span class="faint">${r[3]}</span></span>`)).join('');
+const show=id=>{document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==id));let hit=false;document.querySelectorAll('aside .nav').forEach(n=>{const on=!hit&&n.dataset.s==id;if(on)hit=true;on?n.setAttribute('aria-current','true'):n.removeAttribute('aria-current')});scrollTo(0,0)};
+document.querySelectorAll('aside .nav').forEach(n=>n.onclick=()=>show(n.dataset.s));
+document.querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>{const t=b.dataset.cv;document.querySelectorAll('.cvtab').forEach(c=>c.classList.toggle('on',c.id=='cv-'+t));document.querySelectorAll('.tab[data-cv]').forEach(x=>x.classList.toggle('on',x.dataset.cv==t))});
+$('#tog').onclick=e=>{const on=document.body.classList.toggle('notes');e.target.textContent=on?'Hide notes':'Show notes'};
+show(location.hash.slice(1)||'pipeline');
+</script>
+</body>
+</html>
