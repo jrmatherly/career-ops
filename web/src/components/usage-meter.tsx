@@ -38,7 +38,12 @@ export function UsageMeter() {
       const cfg = localStorage.getItem("career-ops:config");
       setCli(cfg ? JSON.parse(cfg).cliId || null : null);
       const b = localStorage.getItem("career-ops:usage-budget");
-      if (b) setBudget({ ...DEFAULT_BUDGET, ...JSON.parse(b) });
+      if (b) {
+        // A stored zero or non-number would make every share read 0%, hiding the limit signal.
+        const stored = JSON.parse(b) ?? {};
+        const positive = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : fallback);
+        setBudget({ w5: positive(stored.w5, DEFAULT_BUDGET.w5), w7: positive(stored.w7, DEFAULT_BUDGET.w7) });
+      }
     } catch {
       /* ignore */
     }
