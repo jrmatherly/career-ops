@@ -41,7 +41,8 @@ import { sanitizeMarkdownField } from './scan.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
 import { replaceUserFile } from './tracker-utils.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
-import { getCareerOpsRoot } from './path-resolver.mjs';
+import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
+import { loadYaml } from './lib/yaml-document.mjs';
 import { normalizeUrl } from './url-key.mjs';
 import { readRememberedCli } from './lib/agent-cli.mjs';
 import { resolveCliLaunch } from './lib/agent-launch.mjs';
@@ -297,7 +298,39 @@ export function parseBatchResponse(text) {
     .map(r => ({ id: r.id, score: r.score, reason: String(r.reason ?? '') }));
 }
 
-export function buildPrompt(entries, cvExcerpt) {
+const TARGETING_MAX_CHARS = 1500;
+
+/**
+ * The roles the profile says the candidate wants, as prompt text. Empty when
+ * the profile is missing, does not parse or lists no roles, so the ranker then
+ * scores from the CV excerpt alone, as it did before.
+ */
+export function readTargeting(profilePath) {
+  let roles;
+  try {
+    roles = loadYaml(readFileSync(profilePath, 'utf-8'))?.target_roles;
+  } catch {
+    return '';
+  }
+  if (!roles || typeof roles !== 'object') return '';
+  const line = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+  const list = v => (Array.isArray(v) ? v : []);
+  const names = v => list(v).filter(x => typeof x === 'string').map(line).filter(Boolean);
+  const archetypes = list(roles.archetypes)
+    .filter(a => a && typeof a === 'object' && line(a.name))
+    .map(a => {
+      const detail = [line(a.level), line(a.fit)].filter(Boolean).join(', ');
+      return detail ? `${line(a.name)} (${detail})` : line(a.name);
+    });
+  const section = (label, items) => (items.length ? [`${label}:`, ...items.map(i => `- ${i}`)] : []);
+  return [
+    ...section('Primary', names(roles.primary)),
+    ...section('Secondary', names(roles.secondary)),
+    ...section('Archetypes', archetypes),
+  ].join('\n').slice(0, TARGETING_MAX_CHARS);
+}
+
+export function buildPrompt(entries, cvExcerpt, targeting = '') {
   const rows = entries
     .map((e, i) => `${i}. company: ${e.company} | title: ${e.title} | url: ${e.url}`)
     .join('\n');
@@ -307,6 +340,9 @@ export function buildPrompt(entries, cvExcerpt) {
     'Score from the company, title and URL text shown here. Do not open the URLs or fetch anything. Use no tools, and answer in this one reply.',
     '',
     cvExcerpt ? `CANDIDATE PROFILE (excerpt):\n${cvExcerpt}\n` : '',
+    targeting
+      ? `CANDIDATE TARGETING (the roles this person wants):\n${targeting}\n\nScore the title's role family and level against this targeting first, and keyword overlap second. A title whose role family or level the targeting does not list scores at most 3.0, however many keywords it shares.\n`
+      : '',
     `POSTINGS:\n${rows}`,
     '',
     'Return ONLY a JSON array, no prose, no code fence:',
@@ -427,6 +463,7 @@ async function main(args) {
   }
   const selected = selectBatch(pending, limit);
   const cvExcerpt = existsSync(CV_PATH) ? readFileSync(CV_PATH, 'utf-8').slice(0, 2000) : '';
+  const targeting = readTargeting(getProfilePath());
 
   const timeout = resolveRankTimeoutMs();
   const started = Date.now();
@@ -449,7 +486,7 @@ async function main(args) {
     let response;
     attemptedCalls += 1;
     try {
-      response = callCli(cli, buildPrompt(batch, cvExcerpt), model, timeout);
+      response = callCli(cli, buildPrompt(batch, cvExcerpt, targeting), model, timeout);
     } catch (err) {
       console.error(`  ${label}: CLI call failed (${describeCliFailure(err, cli.bin, timeout)}), entries left un-annotated`);
       skippedBatches += 1;
