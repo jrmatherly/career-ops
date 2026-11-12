@@ -247,8 +247,10 @@ export function readSkipTiers(value) {
 export function salaryFilterProblem(value) {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) return 'salary_filter must be a mapping with min, max and currency';
-  const min = Number(value.min ?? 0);
-  const max = Number(value.max ?? 0);
+  // Number() reads false, '' and [] as 0, which would turn the filter off in silence.
+  const bound = (v) => (v === undefined || v === null ? 0 : typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN);
+  const min = bound(value.min);
+  const max = bound(value.max);
   if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0) return 'salary_filter.min and salary_filter.max must be numbers of 0 or more';
   if (max > 0 && min > max) return 'salary_filter.min cannot be above salary_filter.max';
   if (value.currency !== undefined && value.currency !== null && typeof value.currency !== 'string') return 'salary_filter.currency must be a currency code such as USD';
@@ -1602,9 +1604,13 @@ async function main() {
   // pass (workday), and date enrichment (icims). Closure over the filters and
   // counters so both passes update the same run totals.
   // A board that came back truncated is processed again by the retry pass, so
-  // a posting either filter drops is counted the first time only.
+  // a posting either filter drops is counted the first time only, by the
+  // identity the kept offers are deduplicated on.
   const countedDrops = new Set();
-  const firstDrop = (job) => !countedDrops.has(job.url) && Boolean(countedDrops.add(job.url));
+  const firstDrop = (job, provider) => {
+    const token = dedupTokenFor(job, provider);
+    return !countedDrops.has(token) && Boolean(countedDrops.add(token));
+  };
   const processJobs = async (jobs, sourceName, provider, companySlug, shouldContinue = () => true) => {
     for (const job of jobs) {
       if (!shouldContinue()) return;
@@ -1638,7 +1644,7 @@ async function main() {
       // Ahead of the undated drop: a skipped tier was not date-enriched, and
       // --include-undated would not keep it, so it is not an undated drop.
       if (tierSkipped && titleFilter(job.title, companySlug)) {
-        if (firstDrop(job)) {
+        if (firstDrop(job, provider)) {
           droppedTier++;
           // The board's postings were all added to the Workday no-date
           // breakdown, which the summary reports as part of droppedNoDate.
@@ -1653,7 +1659,7 @@ async function main() {
       // job.title so a title-stated remote role survives a city-only location.
       if (!locationFilter(job.location, job.url, job.title, job)) continue;
       if (!salaryFilter(job.salary)) {
-        if (firstDrop(job)) droppedSalary++;
+        if (firstDrop(job, provider)) droppedSalary++;
         continue;
       }
       if (!contentFilter(job.description, matchedTitleKeywords(job.title, fullTitleFilterConfig))) { droppedContent++; continue; }

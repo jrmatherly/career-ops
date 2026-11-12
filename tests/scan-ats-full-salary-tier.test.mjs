@@ -58,6 +58,7 @@ test('a salary_filter the scanner would turn off or choke on is named as a probl
   assert.match(salaryFilterProblem([100000]), /must be a mapping/);
   assert.match(salaryFilterProblem({ min: 'abc' }), /must be numbers of 0 or more/);
   assert.match(salaryFilterProblem({ min: -1 }), /must be numbers of 0 or more/);
+  for (const min of [false, true, [], '', ' ', {}]) assert.match(salaryFilterProblem({ min }), /must be numbers of 0 or more/, JSON.stringify(min));
   assert.match(salaryFilterProblem({ min: 200000, max: 150000 }), /min cannot be above/);
   assert.match(salaryFilterProblem({ min: 100000, currency: 1 }), /currency must be a currency code/);
 });
