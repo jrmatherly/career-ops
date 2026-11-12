@@ -1347,7 +1347,7 @@ the run would mix two configurations: different `--ats`, `--limit` or
 `--include-undated` flags, `--shuffle`, or a `portals.yml` filter edited since
 the checkpoint was written (`title_filter` / `title_filter_full`,
 `title_filter_overrides`, `location_filter`, `content_filter`,
-`domain_filter`). The error names the filter that changed; restore it to finish
+`domain_filter`, `salary_filter`, `skip_tiers`). The error names the filter that changed; restore it to finish
 the sweep, or delete the checkpoint to start fresh.
 
 ### DNS pacing

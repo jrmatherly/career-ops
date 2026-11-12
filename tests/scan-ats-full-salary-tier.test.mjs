@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passesFilters, filterFingerprints, changedFilterKeys, readSkipTiers } from '../scan-ats-full.mjs';
+import { passesFilters, filterFingerprints, changedFilterKeys, readSkipTiers, salaryFilterProblem } from '../scan-ats-full.mjs';
 import { buildSalaryFilter } from '../scan.mjs';
 
 const pass = () => true;
@@ -39,4 +39,25 @@ test('skip_tiers is read lowercased, and a bad value is refused', () => {
   assert.deepEqual(readSkipTiers(['Entry', 'intern']), ['entry', 'intern']);
   assert.throws(() => readSkipTiers(['junior']), /skip_tiers must be a list of intern, entry, mid, senior/);
   assert.throws(() => readSkipTiers('entry'), /skip_tiers must be a list/);
+});
+test('a refused skip_tiers value is named in the message', () => {
+  assert.throws(() => readSkipTiers(['junior']), /got \["junior"\]/);
+});
+test('a setting that filters nothing, or is only respelled, does not change the fingerprint', () => {
+  const unset = filterFingerprints({});
+  assert.deepEqual(changedFilterKeys({ filters: unset }, filterFingerprints({ skip_tiers: [], salary_filter: { min: 0, max: 0, currency: 'USD' } })), []);
+  const set = filterFingerprints({ skip_tiers: ['Senior', 'entry'], salary_filter: { min: 150000, currency: 'usd' } });
+  assert.deepEqual(changedFilterKeys({ filters: set }, filterFingerprints({ skip_tiers: ['entry', 'senior'], salary_filter: { currency: 'USD', min: 150000 } })), []);
+  assert.deepEqual(changedFilterKeys({ filters: set }, filterFingerprints({ skip_tiers: ['entry'], salary_filter: { min: 150000, currency: 'EUR' } })), ['salary_filter', 'skip_tiers']);
+});
+test('a salary_filter the scanner would turn off or choke on is named as a problem', () => {
+  for (const ok of [undefined, null, {}, { min: 150000 }, { min: '150000', max: 0, currency: 'USD' }, { currency: 'USD' }]) {
+    assert.equal(salaryFilterProblem(ok), null, JSON.stringify(ok));
+  }
+  assert.match(salaryFilterProblem('high'), /must be a mapping/);
+  assert.match(salaryFilterProblem([100000]), /must be a mapping/);
+  assert.match(salaryFilterProblem({ min: 'abc' }), /must be numbers of 0 or more/);
+  assert.match(salaryFilterProblem({ min: -1 }), /must be numbers of 0 or more/);
+  assert.match(salaryFilterProblem({ min: 200000, max: 150000 }), /min cannot be above/);
+  assert.match(salaryFilterProblem({ min: 100000, currency: 1 }), /currency must be a currency code/);
 });
