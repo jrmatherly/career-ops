@@ -8,7 +8,7 @@ const applications = [
   {
     n: "42",
     company: "Fabrikam",
-    role: "Engineering Manager - Network Infrastructure- US",
+    role: "Engineering Manager, Platform",
     report: "[42](../reports/042-fabrikam-2026-11-02.md)",
   },
 ];
@@ -17,7 +17,7 @@ test("a document with a tracked report is titled by company and role", () => {
   const doc = { filename: "cv-jane-042-fabrikam.pdf", reportId: "42" };
   assert.deepEqual(documentTitle(doc, applications), {
     title: "Fabrikam",
-    subtitle: "Engineering Manager - Network Infrastructure- US",
+    subtitle: "Engineering Manager, Platform",
     trackerN: "42",
   });
 });
