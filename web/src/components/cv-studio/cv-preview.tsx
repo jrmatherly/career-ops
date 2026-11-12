@@ -20,7 +20,7 @@ const MARKER_CSS = `
 [data-resume-pinned] { outline-width: 3px; outline-style: solid; background-color: rgba(37, 99, 235, 0.08); }
 `;
 
-export function CvPreview({ html, markers, pinned }: { html: string; markers?: PreviewMarker[]; pinned?: { path: string; seq: number } | null }) {
+export function CvPreview({ html, markers, pinned, caption }: { html: string; markers?: PreviewMarker[]; pinned?: { path: string; seq: number } | null; caption?: (pages: number) => React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(0.7);
@@ -97,10 +97,14 @@ export function CvPreview({ html, markers, pinned }: { html: string; markers?: P
 
   return (
     <section aria-label="Live preview" className="rounded-2xl border border-border bg-surface/40 p-3">
-      <div className="mb-2 flex items-center justify-between px-1 text-xs text-muted">
-        <span>Live preview</span>
-        <span>{pages} page{pages === 1 ? "" : "s"} (estimate)</span>
-      </div>
+      {caption ? (
+        <p className="mb-2 px-1 text-center text-xs text-faint">{caption(pages)}</p>
+      ) : (
+        <div className="mb-2 flex items-center justify-between px-1 text-xs text-muted">
+          <span>Live preview</span>
+          <span>{pages} page{pages === 1 ? "" : "s"} (estimate)</span>
+        </div>
+      )}
       <div ref={box} className="max-h-[80vh] overflow-auto rounded-lg bg-white shadow-sm">
         <div style={{ height: frameHeight * scale }}>
           <iframe
@@ -111,7 +115,8 @@ export function CvPreview({ html, markers, pinned }: { html: string; markers?: P
               measure();
               mark();
             }}
-            sandbox="allow-same-origin"
+            // allow-modals lets the parent call print() on this frame; with no allow-scripts the CV itself still runs nothing.
+            sandbox="allow-same-origin allow-modals"
             style={{ width: PAGE_WIDTH, height: frameHeight, transform: `scale(${scale})`, transformOrigin: "top left", border: 0 }}
           />
         </div>

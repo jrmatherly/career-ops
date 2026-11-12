@@ -72,7 +72,7 @@ export function GatePanel({ report, onResolved }: { report: Report | null; onRes
         <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted">
           {entries.map((e) => (
             <li key={e.id} className="break-words">
-              {entryText(e)} <code className="text-faint">{e.id}</code>
+              {entryText(e)}
             </li>
           ))}
         </ul>

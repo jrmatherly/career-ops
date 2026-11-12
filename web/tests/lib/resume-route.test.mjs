@@ -190,9 +190,10 @@ test("GET without cv.md is a 404", async () => {
 });
 
 // Read as text: importing nav-items.ts pulls in lucide-react, which the root test job does not install.
-test("the nav lists /resume", () => {
+test("the nav lists /cv and not /resume", () => {
   const source = readFileSync(join(codeRoot, "web", "src", "lib", "nav-items.ts"), "utf8");
   const items = source.slice(source.indexOf("NAV_ITEMS"), source.indexOf("];"));
   const entries = [...items.matchAll(/\{ href: "([^"]+)", label: "([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
-  assert.ok(entries.includes("/resume Resume"), entries.join(" | "));
+  assert.ok(entries.includes("/cv CV"), entries.join(" | "));
+  assert.ok(!entries.some((e) => e.startsWith("/resume ")), entries.join(" | "));
 });

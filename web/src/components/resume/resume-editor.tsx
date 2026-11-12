@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckPanel, type CheckReport, type Severity } from "@/components/resume/check-panel";
 import { DesignPanel } from "@/components/resume/design-panel";
-import { PageFrame } from "@/components/page-frame";
-import { PageHeader } from "@/components/page-header";
 import { GatePanel, type Report } from "@/components/resume/gate-panel";
 import { Field, SectionForm, type FieldKind, type ResumeDraft } from "@/components/resume/section-form";
 import { SELECT, TemplatePicker, type TemplateOption } from "@/components/resume/template-picker";
@@ -175,11 +173,10 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   };
 
   return (
-    <PageFrame>
-      <PageHeader
-        title="Resume"
-        description={<>Edit your CV as structured sections. Save writes <code className="text-foreground">cv.md</code>.</>}
-      />
+    <div>
+      <p className="text-sm text-muted">
+        Edit your CV as structured sections. Save writes <code className="text-foreground">cv.md</code>.
+      </p>
 
       {notice && (
         <p role="status" className="mt-4 text-sm text-foreground">
@@ -290,6 +287,6 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
           </div>
         </div>
       )}
-    </PageFrame>
+    </div>
   );
 }

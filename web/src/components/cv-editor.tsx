@@ -1,14 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { PageFrame } from "@/components/page-frame";
-import { PageHeader } from "@/components/page-header";
-import { SkillGaps } from "@/components/skill-gaps";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Loader2, Upload } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { CvIngest } from "@/components/cv/cv-ingest";
 import {
   cvSaveUsesKeepalive,
   draftChange,
@@ -34,7 +30,7 @@ function readDraft() {
   }
 }
 
-export function CvEditor() {
+export function useCvEditor() {
   const [state, dispatch] = useReducer(editorReducer, initialEditor());
   const [importing, setImporting] = useState(false);
   const [importSaving, setImportSaving] = useState(false);
@@ -161,29 +157,35 @@ export function CvEditor() {
     return () => clearTimeout(timer);
   }, [state, startSave, importing]);
 
-  const status = editorStatus(state);
+  return { state, dispatch, status: editorStatus(state), startSave, stateRef, importing, setImporting, importSaving, setImportSaving };
+}
 
+export type CvEditorModel = ReturnType<typeof useCvEditor>;
+
+// cv.md opens with `# Name`; under the page's h1 every markdown heading moves down one level.
+const shiftedHeadings: Components = {
+  h1: ({ node: _node, ...props }) => <h2 {...props} />,
+  h2: ({ node: _node, ...props }) => <h3 {...props} />,
+  h3: ({ node: _node, ...props }) => <h4 {...props} />,
+  h4: ({ node: _node, ...props }) => <h5 {...props} />,
+  h5: ({ node: _node, ...props }) => <h6 {...props} />,
+};
+
+/** cv.md rendered as markdown, one heading level below the page title. */
+export function CvMarkdown({ content }: { content: string }) {
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={shiftedHeadings}>{content}</ReactMarkdown>;
+}
+
+/** The Edit tab: the save bar, then the markdown editor beside its live preview. */
+export function CvMarkdownEditor({ editor, textareaRef }: { editor: CvEditorModel; textareaRef: React.Ref<HTMLTextAreaElement> }) {
+  const { state, dispatch, status, startSave, importing } = editor;
+  if (state.phase === "loading") return <div className="text-sm text-muted">Loading…</div>;
+  if (state.phase === "load-error") return null;
   return (
-    <PageFrame>
-      <PageHeader
-        title="CV"
-        description={<>
-          Edit <code className="text-foreground">cv.md</code> with live preview.
-          {state.phase === "ready" && !state.exists && state.content === "" && (
-            <span className="ml-1 text-faint">No cv.md yet — start typing to create it.</span>
-          )}
-        </>}
-        actions={<div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={state.phase !== "ready" || importSaving || state.inflight !== null || state.conflict}
-            aria-expanded={importing}
-            aria-controls="cv-import"
-            onClick={() => setImporting(!importing)}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-brand/40 hover:text-brand-text disabled:opacity-50 max-sm:min-h-[44px]"
-          >
-            <Upload className="size-4" /> {importing ? "Close upload" : "Upload PDF / TeX"}
-          </button>
+    <>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-faint">Editing cv.md. The preview on the right updates as you type.</p>
+        <div className="flex items-center gap-3">
           <p role="status" className="text-sm text-muted">
             {status.label}
           </p>
@@ -192,7 +194,7 @@ export function CvEditor() {
             onClick={() => startSave(false)}
             disabled={!status.canSave || importing}
             className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-colors max-sm:min-h-[44px]",
+              "inline-flex min-h-6 items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-colors max-sm:min-h-[44px]",
               status.canSave && !importing
                 ? "bg-brand text-brand-foreground hover:bg-brand-200"
                 : "border border-border bg-surface text-muted",
@@ -201,61 +203,23 @@ export function CvEditor() {
             {status.label === "Saving" ? <Loader2 className="size-4 animate-spin" /> : status.label === "Saved" ? <Check className="size-4" /> : null}
             Save
           </button>
-        </div>}
-      />
-
-      {state.error && (
-        <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">
-          {state.error}
-          {state.conflict && " Reloading drops this text, because the file changed."}
-        </p>
-      )}
-
-      {importing && state.phase === "ready" && !state.conflict && (
-        <section id="cv-import" aria-label="Import CV" className="mt-6">
-          <p className="mb-3 text-sm text-muted">
-            Upload your CV, review the conversion, then update cv.md.
-            {state.content !== state.saved && " Your unsaved edits stay in the editor until you update."}
-          </p>
-          <CvIngest
-            variant="editor"
-            onSavingChange={setImportSaving}
-            onSaved={(markdown) => {
-              if (stateRef.current.conflict) return;
-              dispatch({ type: "imported", content: markdown });
-              setImporting(false);
-              setImportSaving(false);
-            }}
-          />
-        </section>
-      )}
-
-      {state.phase === "loading" ? (
-        <div className="mt-6 text-sm text-muted">Loading…</div>
-      ) : state.phase === "load-error" ? null : (
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <textarea
-            aria-label="CV Markdown"
-            disabled={importing}
-            value={state.content}
-            onChange={(e) => dispatch({ type: "edit", content: e.target.value })}
-            spellCheck={false}
-            placeholder="# Your Name&#10;&#10;## Summary&#10;..."
-            className="min-h-[60vh] w-full resize-none rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
-          />
-          <article className="report-prose min-h-[60vh] [&_p]:whitespace-pre-line overflow-auto rounded-2xl border border-border bg-surface/30 p-5">
-            {state.content.trim() ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.content}</ReactMarkdown>
-            ) : (
-              <p className="text-muted">Preview appears here.</p>
-            )}
-          </article>
         </div>
-      )}
-
-      {/* Below the editor: the gaps are context for what to write next, and they
-          belong after the document rather than competing with it. */}
-      <SkillGaps />
-    </PageFrame>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <textarea
+          ref={textareaRef}
+          aria-label="CV Markdown"
+          disabled={importing}
+          value={state.content}
+          onChange={(e) => dispatch({ type: "edit", content: e.target.value })}
+          spellCheck={false}
+          placeholder="# Your Name&#10;&#10;## Summary&#10;..."
+          className="h-[calc(100vh-16rem)] w-full resize-none overflow-auto rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
+        />
+        <article aria-label="Markdown preview" className="report-prose h-[calc(100vh-16rem)] overflow-auto rounded-2xl border border-border bg-surface/30 p-5 [&_p]:whitespace-pre-line">
+          {state.content.trim() ? <CvMarkdown content={state.content} /> : <p className="text-muted">Preview appears here.</p>}
+        </article>
+      </div>
+    </>
   );
 }

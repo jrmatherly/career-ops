@@ -27,7 +27,7 @@ test("an edit to the CV stays on disk after leaving the page, and the status doe
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto(`${origin.origin}/cv`);
+  await page.goto(`${origin.origin}/cv?tab=edit`);
   const box = page.locator("textarea");
   await box.waitFor();
   const status = () => page.getByRole("status").filter({ hasText: /^(?:Unsaved|Saving|Saved)$/ });
@@ -57,7 +57,7 @@ test("an edit to the CV stays on disk after leaving the page, and the status doe
   const backupsAfterLeave = fs.readdirSync(root).filter((name) => name.startsWith("cv.md.bak-"));
   assert.ok(backupsAfterLeave.length <= 2, `backups ${backupsAfterLeave.length}`);
 
-  await page.goto(`${origin.origin}/cv`);
+  await page.goto(`${origin.origin}/cv?tab=edit`);
   await box.waitFor();
   await page.locator("textarea", { hasText: "Still editing." }).waitFor();
   assert.match(await box.inputValue(), /Still editing\./);
