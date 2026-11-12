@@ -19,11 +19,31 @@ import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
 import { useDeployment } from "@/components/deployment-context";
-import { visibleNavItems, isActivePath } from "@/lib/nav-items";
+import { navGroups, isActivePath, type NavItem } from "@/lib/nav-items";
 
 export function AppShell({ children, followupsEnabled }: { children: React.ReactNode; followupsEnabled: boolean }) {
   const pathname = usePathname();
   const { host } = useDeployment();
+  const groups = navGroups(followupsEnabled);
+  const main = groups.filter((g) => g.label !== "Pinned");
+  const pinned = groups.find((g) => g.label === "Pinned")?.items ?? [];
+  const navLink = ({ href, label, icon: Icon }: NavItem) => {
+    const active = isActivePath(href, pathname);
+    return (
+      <Link
+        key={href}
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+          active ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-hover hover:text-foreground",
+        )}
+      >
+        <Icon className="size-4" />
+        {label}
+      </Link>
+    );
+  };
   return (
     <JobsProvider>
       <PipelineProvider>
@@ -48,29 +68,12 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
           {/* At md-tall the fixed Ask button sits over the sidebar's foot and the footer reserves room for it, so the
               nav scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
           <nav className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
-            {visibleNavItems(followupsEnabled).map(({ href, label, icon: Icon, chip }) => {
-              const active = isActivePath(href, pathname);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
-                    active
-                      ? "bg-brand-soft text-brand-text"
-                      : "text-muted hover:bg-surface-hover hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {label}
-                  {chip && (
-                    <span className="ml-auto rounded-full border border-brand/30 bg-brand-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-text">
-                      {chip}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+            {main.map(({ label, items }) => (
+              <div key={label} className="flex flex-col gap-0.5">
+                <div className="px-3 pb-1 pt-4 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+                {items.map(navLink)}
+              </div>
+            ))}
           </nav>
 
           <WorkerPills />
@@ -83,6 +86,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
                 <span className="font-mono text-[10px] text-faint">THEME</span>
               </div>
               <ThemeToggle showLabel />
+              {pinned.map(navLink)}
               <div className="px-1">
                 <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
               </div>

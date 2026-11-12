@@ -54,9 +54,9 @@ test("next-step labels", () => {
 });
 
 // Read as text: importing nav-items.ts pulls in lucide-react, which the root test job does not install.
-test("the nav lists /board right after /resume, where PR-10 appended it", () => {
+test("the nav lists /board", () => {
   const source = readFileSync(new URL("../../src/lib/nav-items.ts", import.meta.url), "utf8");
   const items = source.slice(source.indexOf("NAV_ITEMS"), source.indexOf("];"));
   const entries = [...items.matchAll(/\{ href: "([^"]+)", label: "([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
-  assert.equal(entries[entries.indexOf("/resume Resume") + 1], "/board Board");
+  assert.ok(entries.includes("/board Board"), entries.join(" | "));
 });

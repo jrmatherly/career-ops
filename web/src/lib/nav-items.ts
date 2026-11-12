@@ -7,27 +7,34 @@ export type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
-  chip?: string;
+  group: "Daily" | "Discover" | "Profile" | "Insight" | "Pinned";
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Today", icon: LayoutDashboard },
-  { href: "/explore", label: "Explore", icon: Compass, chip: "New" },
-  { href: "/scheduled-scans", label: "Scheduled scans", icon: CalendarClock },
-  { href: "/pipeline", label: "Pipeline", icon: ListChecks },
-  { href: "/followups", label: "Follow-ups", icon: Send },
-  { href: "/portals", label: "Portals", icon: Radar },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/cv", label: "CV", icon: FileText },
-  { href: "/documents", label: "Documents", icon: Files },
-  { href: "/config", label: "Settings", icon: Settings },
-  { href: "/resume", label: "Resume", icon: IdCard },
-  { href: "/board", label: "Board", icon: SquareKanban },
-  { href: "/shares", label: "Shares", icon: Share2 },
+  { href: "/", label: "Today", icon: LayoutDashboard, group: "Daily" },
+  { href: "/pipeline", label: "Pipeline", icon: ListChecks, group: "Daily" },
+  { href: "/board", label: "Board", icon: SquareKanban, group: "Daily" },
+  { href: "/followups", label: "Follow-ups", icon: Send, group: "Daily" },
+  { href: "/explore", label: "Explore", icon: Compass, group: "Discover" },
+  { href: "/scheduled-scans", label: "Scheduled scans", icon: CalendarClock, group: "Discover" },
+  { href: "/portals", label: "Portals", icon: Radar, group: "Discover" },
+  { href: "/cv", label: "CV", icon: FileText, group: "Profile" },
+  { href: "/resume", label: "Resume", icon: IdCard, group: "Profile" },
+  { href: "/documents", label: "Documents", icon: Files, group: "Profile" },
+  { href: "/shares", label: "Shares", icon: Share2, group: "Profile" },
+  { href: "/analytics", label: "Analytics", icon: BarChart3, group: "Insight" },
+  { href: "/config", label: "Settings", icon: Settings, group: "Pinned" },
 ];
+
+const NAV_GROUPS: NavItem["group"][] = ["Daily", "Discover", "Profile", "Insight", "Pinned"];
 
 export function visibleNavItems(followupsEnabled: boolean): NavItem[] {
   return followupsEnabled ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.href !== "/followups");
+}
+
+export function navGroups(followupsEnabled: boolean): { label: string; items: NavItem[] }[] {
+  const items = visibleNavItems(followupsEnabled);
+  return NAV_GROUPS.map((label) => ({ label, items: items.filter((item) => item.group === label) }));
 }
 
 export function isActivePath(href: string, pathname: string): boolean {

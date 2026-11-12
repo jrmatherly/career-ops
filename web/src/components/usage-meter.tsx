@@ -60,8 +60,8 @@ export function UsageMeter() {
   if (!data) return null;
 
   const rows = [
-    { label: "5h", tokens: data.window5h?.tokens ?? 0, budget: budget.w5 },
-    { label: "7d", tokens: data.window7d?.tokens ?? 0, budget: budget.w7 },
+    { label: "5h", tokens: data.window5h?.tokens ?? 0, budget: budget.w5, title: "Tokens used in the last 5 hours, and the share of the plan's limit" },
+    { label: "7d", tokens: data.window7d?.tokens ?? 0, budget: budget.w7, title: "Tokens used in the last 7 days, and the share of the plan's limit" },
   ];
 
   return (
@@ -73,7 +73,7 @@ export function UsageMeter() {
         {rows.map((r) => {
           const pct = Math.min(100, Math.round((r.tokens / r.budget) * 100));
           return (
-            <div key={r.label} title={`${r.tokens.toLocaleString()} tokens in the last ${r.label}`}>
+            <div key={r.label} title={r.title}>
               <div className="flex items-center justify-between text-[10px] text-faint">
                 <span>{r.label}</span>
                 <span className="tabular-nums">
