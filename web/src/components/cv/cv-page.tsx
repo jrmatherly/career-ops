@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, TriangleAlert, Upload } from "lucide-react";
+import { ChevronDown, Loader2, TriangleAlert, Upload } from "lucide-react";
 import { CvMarkdown, CvMarkdownEditor, useCvEditor } from "@/components/cv-editor";
 import { CvIngest } from "@/components/cv/cv-ingest";
 import { CvPreview } from "@/components/cv-studio/cv-preview";
@@ -13,7 +13,7 @@ import type { TemplateOption } from "@/components/resume/template-picker";
 import { SkillGaps } from "@/components/skill-gaps";
 import { Tabs } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
-import { attentionSummary, attentionText, lineRange } from "@/lib/cv-attention.mjs";
+import { attentionSummary, attentionText, lineRange, lossyNotice } from "@/lib/cv-attention.mjs";
 import { cn } from "@/lib/cn";
 
 type Tab = "preview" | "edit";
@@ -26,7 +26,8 @@ type Absorb =
   | { kind: "loading" }
   | { kind: "missing" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; markdown: string; data: unknown; report: { unparsed?: { line: number; text: string }[] } | null; lossless: boolean };
+  | { kind: "ready"; markdown: string; data: unknown; report: Report; lossless: boolean };
+type Report = { unparsed?: { line: number; text: string }[]; orphans?: { company?: string; position?: string; name?: string; section?: string }[] };
 
 export function CvPage({ format, templates, templatesError }: { format: string | null; templates: TemplateOption[]; templatesError?: string }) {
   const editor = useCvEditor();
@@ -40,10 +41,20 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     window.history.replaceState(null, "", url);
   };
 
-  const [absorb, setAbsorb] = useState<Absorb>({ kind: "loading" });
+  const [absorbed, setAbsorb] = useState<Absorb>({ kind: "loading" });
+  // A cv.md the editor could not load is never absorbed, so the preview would wait on it forever.
+  const absorb: Absorb = state.phase === "load-error" ? { kind: "error", message: state.error ?? "cv.md could not be loaded" } : absorbed;
   const [html, setHtml] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [structured, setStructured] = useState(false);
+  // Mounted from its first opening on, so closing it hides unsaved edits instead of dropping them.
+  const [structuredMounted, setStructuredMounted] = useState(false);
+  const structuredHeading = useRef<HTMLHeadingElement>(null);
+  const [revealStructured, setRevealStructured] = useState(false);
+  const openStructured = (open: boolean) => {
+    setStructured(open);
+    if (open) setStructuredMounted(true);
+  };
   const textarea = useRef<HTMLTextAreaElement>(null);
   const [focusLine, setFocusLine] = useState<{ line: number } | null>(null);
 
@@ -58,6 +69,9 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         if (!live) return;
         if (res.status === 404) return setAbsorb({ kind: "missing" });
         if (!res.ok) return setAbsorb({ kind: "error", message: body.error ?? `HTTP ${res.status}` });
+        if (!body || typeof body !== "object" || !body.report || typeof body.report !== "object") {
+          return setAbsorb({ kind: "error", message: body?.error ?? "The CV reader answered without a report." });
+        }
         setAbsorb({ kind: "ready", markdown: saved, data: body.data, report: body.report, lossless: body.lossless === true });
       })
       .catch((err: Error) => live && setAbsorb({ kind: "error", message: err.message }));
@@ -69,6 +83,9 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   const lossless = absorb.kind === "ready" && absorb.lossless;
   const data = absorb.kind === "ready" ? absorb.data : null;
   useEffect(() => {
+    // A render or an error belongs to the absorbed data it came from.
+    setHtml(null);
+    setPreviewError(null);
     if (!lossless || !data) return;
     let live = true;
     fetch("/api/resume/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })
@@ -82,7 +99,11 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         setPreviewError(null);
         setHtml(body.html);
       })
-      .catch((err: Error) => live && setPreviewError(err.message));
+      .catch((err: Error) => {
+        if (!live) return;
+        setHtml(null);
+        setPreviewError(err.message);
+      });
     return () => {
       live = false;
     };
@@ -93,6 +114,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     () => (absorb.kind === "ready" ? attentionSummary(absorb.report, absorb.markdown) : { count: 0, sections: [], firstLine: null }),
     [absorb],
   );
+  const lossy = absorb.kind === "ready" && !absorb.lossless ? lossyNotice(absorb.report) : null;
 
   useEffect(() => {
     const el = textarea.current;
@@ -104,17 +126,63 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     setFocusLine(null);
   }, [focusLine, tab]);
 
+  useEffect(() => {
+    if (!revealStructured || tab !== "edit" || !structured) return;
+    structuredHeading.current?.scrollIntoView({ block: "start" });
+    structuredHeading.current?.focus();
+    setRevealStructured(false);
+  }, [revealStructured, tab, structured]);
+
   const previewBox = useRef<HTMLDivElement>(null);
   const showRendered = lossless && html !== null;
   const exportBlocked =
     absorb.kind === "loading" ? "Reading cv.md…"
     : absorb.kind === "missing" ? "There is no cv.md to export yet."
     : absorb.kind === "error" ? "cv.md could not be read, so there is nothing to export."
-    : !absorb.lossless ? "Export is off while cv.md has lines that could not be read. Fix them in the editor."
+    : !absorb.lossless ? (lossy?.blocked ?? "Export is off while cv.md has lines that could not be read back cleanly. Fix them in the editor.")
     : previewError ? "The preview failed to render, so there is nothing to print."
     : html === null ? "The preview is still rendering."
     : null;
-  const print = () => previewBox.current?.querySelector("iframe")?.contentWindow?.print();
+  const pdfBlocked = exportBlocked ?? (state.conflict ? "Download is off while this tab's text conflicts with cv.md on disk." : null);
+  const unsaved = state.phase === "ready" && (state.content !== state.saved || state.conflict);
+  const exportNote = unsaved && !exportBlocked ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null;
+
+  // A hidden frame has no layout to print, so Print from Edit shows the preview first.
+  const [printPending, setPrintPending] = useState(false);
+  useEffect(() => {
+    if (!printPending || tab !== "preview") return;
+    setPrintPending(false);
+    requestAnimationFrame(() => previewBox.current?.querySelector("iframe")?.contentWindow?.print());
+  }, [printPending, tab]);
+  const print = () => {
+    if (tab !== "preview") setTab("preview");
+    setPrintPending(true);
+  };
+
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const download = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch("/api/cv/pdf");
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "cv.pdf";
+      const url = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement("a"), { href: url, download: name });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      setDownloadError((err as Error).message);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <PageFrame>
@@ -137,7 +205,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
           >
             <Upload aria-hidden="true" className="size-4" /> {importing ? "Close upload" : "Upload PDF or TeX"}
           </button>
-          <ExportMenu pdfReady={lossless} printReady={showRendered} blocked={exportBlocked} onPrint={print} />
+          <ExportMenu pdfBlocked={pdfBlocked} printBlocked={exportBlocked} note={exportNote} downloading={downloading} onDownload={download} onPrint={print} />
         </div>}
       />
 
@@ -145,6 +213,12 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">
           {state.error}
           {state.conflict && " Reloading drops this text, because the file changed."}
+        </p>
+      )}
+
+      {downloadError && (
+        <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">
+          The PDF could not be downloaded: {downloadError}
         </p>
       )}
 
@@ -172,9 +246,22 @@ export function CvPage({ format, templates, templatesError }: { format: string |
       {attention.count > 0 && attention.firstLine !== null && (
         <AttentionBanner
           text={attentionText(attention)}
+          action="Fix in editor →"
           onFix={() => {
             setTab("edit");
             setFocusLine({ line: attention.firstLine! });
+          }}
+        />
+      )}
+
+      {lossy && (
+        <AttentionBanner
+          text={lossy}
+          action="Open structured editor →"
+          onFix={() => {
+            setTab("edit");
+            openStructured(true);
+            setRevealStructured(true);
           }}
         />
       )}
@@ -216,15 +303,15 @@ export function CvPage({ format, templates, templatesError }: { format: string |
             type="button"
             aria-expanded={structured}
             aria-controls="cv-structured"
-            onClick={() => setStructured(!structured)}
+            onClick={() => openStructured(!structured)}
             className="inline-flex min-h-6 items-center text-sm font-medium text-brand-text underline-offset-2 hover:underline max-sm:min-h-[44px]"
           >
             {structured ? "Close structured editor" : "Structured editor"}
           </button>
         </div>
-        {structured && (
-          <section id="cv-structured" aria-labelledby="cv-structured-heading" className="mt-4">
-            <h2 id="cv-structured-heading" className="font-display text-lg tracking-tight text-foreground">Structured editor</h2>
+        {structuredMounted && (
+          <section id="cv-structured" hidden={!structured} aria-labelledby="cv-structured-heading" className="mt-4">
+            <h2 id="cv-structured-heading" ref={structuredHeading} tabIndex={-1} className="font-display text-lg tracking-tight text-foreground focus-visible:outline-none">Structured editor</h2>
             <ResumeEditor templates={templates} templatesError={templatesError} />
           </section>
         )}
@@ -235,7 +322,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   );
 }
 
-function AttentionBanner({ text, onFix }: { text: { title: string; detail: string }; onFix: () => void }) {
+function AttentionBanner({ text, action, onFix }: { text: { title: string; detail: string }; action: string; onFix: () => void }) {
   return (
     <button
       type="button"
@@ -246,12 +333,14 @@ function AttentionBanner({ text, onFix }: { text: { title: string; detail: strin
       <span className="min-w-0 flex-1 basis-64">
         <span className="font-medium text-foreground">{text.title}</span> <span className="text-muted">{text.detail}</span>
       </span>
-      <span className="font-medium text-brand-text">Fix in editor →</span>
+      <span className="font-medium text-brand-text">{action}</span>
     </button>
   );
 }
 
-function ExportMenu({ pdfReady, printReady, blocked, onPrint }: { pdfReady: boolean; printReady: boolean; blocked: string | null; onPrint: () => void }) {
+type ExportProps = { pdfBlocked: string | null; printBlocked: string | null; note: string | null; downloading: boolean; onDownload: () => void; onPrint: () => void };
+
+function ExportMenu({ pdfBlocked, printBlocked, note, downloading, onDownload, onPrint }: ExportProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -293,6 +382,7 @@ function ExportMenu({ pdfReady, printReady, blocked, onPrint }: { pdfReady: bool
 
   const item = "flex min-h-6 w-full items-center rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover focus-visible:bg-surface-hover focus-visible:outline-none max-sm:min-h-[44px]";
   const off = "cursor-not-allowed text-faint hover:bg-transparent";
+  const hints = [...new Set([downloading ? "The PDF is being prepared." : pdfBlocked, printBlocked, note].filter((h): h is string => h !== null))];
 
   return (
     <div ref={root} className="relative" onKeyDown={open ? onKeyDown : undefined}>
@@ -311,41 +401,35 @@ function ExportMenu({ pdfReady, printReady, blocked, onPrint }: { pdfReady: bool
         }}
         className={cn(buttonVariants({ variant: "primary" }), "min-h-6")}
       >
-        Export <ChevronDown aria-hidden="true" className="size-4" />
+        {downloading ? <><Loader2 aria-hidden="true" className="size-4 animate-spin" /> Preparing PDF…</> : <>Export <ChevronDown aria-hidden="true" className="size-4" /></>}
       </button>
       {open && (
         <div id={menuId} role="menu" aria-label="Export" className="absolute right-0 z-20 mt-1 flex w-64 flex-col rounded-md border border-border bg-surface p-1 shadow-lg">
-          {pdfReady ? (
-            <a role="menuitem" tabIndex={-1} href="/api/cv/pdf" download onClick={() => close(true)} className={item}>
-              Download PDF
-            </a>
-          ) : (
-            <button type="button" role="menuitem" tabIndex={-1} aria-disabled="true" aria-describedby={hintId} className={cn(item, off)}>
-              Download PDF
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            tabIndex={-1}
-            aria-disabled={printReady ? undefined : "true"}
-            aria-describedby={printReady ? undefined : hintId}
-            onClick={() => {
-              if (!printReady) return;
-              close(true);
-              onPrint();
-            }}
-            className={cn(item, !printReady && off)}
-          >
-            Print
-          </button>
-          {blocked && (
+          <MenuItem label="Download PDF" blocked={downloading ? "The PDF is being prepared." : pdfBlocked} hintId={hintId} className={item} off={off} onSelect={() => { close(true); onDownload(); }} />
+          <MenuItem label="Print" blocked={printBlocked} hintId={hintId} className={item} off={off} onSelect={() => { close(true); onPrint(); }} />
+          {hints.length > 0 && (
             <p id={hintId} className="px-3 pb-2 pt-1 text-xs text-muted">
-              {blocked}
+              {hints.join(" ")}
             </p>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function MenuItem({ label, blocked, hintId, className, off, onSelect }: { label: string; blocked: string | null; hintId: string; className: string; off: string; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      tabIndex={-1}
+      aria-disabled={blocked ? "true" : undefined}
+      aria-describedby={blocked ? hintId : undefined}
+      onClick={() => !blocked && onSelect()}
+      className={cn(className, blocked && off)}
+    >
+      {label}
+    </button>
   );
 }

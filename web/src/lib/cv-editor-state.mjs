@@ -38,7 +38,8 @@ export function initialEditor() {
  *   | { type: 'save-start', content: string }
  *   | { type: 'save-ok', content: string }
  *   | { type: 'save-failed', content: string, error: string, conflict?: boolean }
- *   | { type: 'imported', content: string }} action
+ *   | { type: 'imported', content: string }
+ *   | { type: 'external', content: string | null }} action
  * @returns {EditorState}
  */
 export function editorReducer(state, action) {
@@ -96,6 +97,17 @@ export function editorReducer(state, action) {
         snapshotPrior: true,
         conflict: false,
       };
+    }
+    case "external": {
+      // cv.md was written elsewhere on this page; null means it could not be re-read.
+      if (state.phase !== "ready" || state.inflight !== null || action.content === state.saved) return state;
+      if (state.content === state.saved && !state.conflict && typeof action.content === "string") {
+        return { ...state, content: action.content, saved: action.content, exists: true, error: null, snapshotPrior: true };
+      }
+      const error = action.content === null
+        ? "cv.md changed in the structured editor and could not be re-read here."
+        : "cv.md changed in the structured editor. Your text here is kept but not saved.";
+      return { ...state, conflict: true, error };
     }
     case "save-failed":
       if (action.content !== state.inflight) return state;

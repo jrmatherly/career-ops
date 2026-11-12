@@ -1,5 +1,5 @@
 /**
- * Which cv.md sections hold lines the resume absorb could not read.
+ * Which cv.md sections hold lines the resume absorb could not read, or could not write back the same way.
  *
  * @param {{ unparsed?: { line: number }[] } | null | undefined} report  the absorb report from GET /api/resume
  * @param {string} cvMarkdown  cv.md as read
@@ -46,6 +46,34 @@ export function attentionText({ count, sections }) {
   const names = new Intl.ListFormat("en", { type: "conjunction" }).format(sections.map((s) => `${s.name} (line ${s.line})`));
   return {
     title: `${count} ${one ? "section needs" : "sections need"} attention.`,
-    detail: `${names} could not be read, so ${one ? "it" : "they"} may be missing from tailored CVs.`,
+    detail: `${names} could not be read back cleanly, so ${one ? "it" : "they"} may be missing from tailored CVs.`,
+  };
+}
+
+/** @param {{ company?: string, position?: string, name?: string, section?: string }} o */
+const orphanLabel = (o) => (o.company ? (o.position ? `${o.position} at ${o.company}` : o.company) : o.name || o.section || "an entry");
+
+/**
+ * The banner and Export hint for a lossy absorb that found no unreadable line:
+ * cv.md parsed, but rebuilding it from the structured data would differ.
+ * Null when there are unreadable lines, which attentionText reports instead.
+ *
+ * @param {{ unparsed?: unknown[], orphans?: { company?: string, position?: string, name?: string, section?: string }[] } | null | undefined} report
+ * @returns {{ title: string, detail: string, blocked: string } | null}
+ */
+export function lossyNotice(report) {
+  if (report?.unparsed?.length) return null;
+  const names = (report?.orphans ?? []).map(orphanLabel);
+  const title = "cv.md was read, but it would be rewritten differently.";
+  if (!names.length) {
+    const why = "Open the structured editor to see why.";
+    return { title, detail: `Rebuilding it from the structured editor would not give back the same file. ${why}`, blocked: `Export is off because cv.md would not be rebuilt exactly as written. ${why}` };
+  }
+  const one = names.length === 1;
+  const list = new Intl.ListFormat("en", { type: "conjunction" }).format(names);
+  return {
+    title,
+    detail: `The structured editor holds ${list}, which no longer ${one ? "matches" : "match"} cv.md. Open the structured editor to resolve ${one ? "it" : "them"}.`,
+    blocked: "Export is off until the structured editor's entries match cv.md.",
   };
 }

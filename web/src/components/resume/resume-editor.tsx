@@ -134,6 +134,21 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   };
 
   const dirty = state.data !== state.saved;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  // cv.md written by the markdown editor or an upload after this form loaded, while it held unsaved edits.
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      if ((e as CustomEvent<{ source?: string }>).detail?.source === "structured") return;
+      if (dirtyRef.current) return setStale(true);
+      setGeneration((g) => g + 1);
+    };
+    window.addEventListener("co-cv-saved", onSaved);
+    return () => window.removeEventListener("co-cv-saved", onSaved);
+  }, []);
+  useEffect(() => setStale(false), [generation]);
+
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -163,7 +178,10 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
     try {
       const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha }) });
       const body = await readBody(res);
-      if (res.ok) dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
+      if (res.ok) {
+        dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
+        window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
+      }
       // A 5xx from save (500, or 503 on timeout) may come after cv.md was written, so it locks like a conflict until reload.
       else if (res.status === 409 || res.status >= 500) dispatch({ type: "conflict", message: body.error ?? `HTTP ${res.status}` });
       else dispatch({ type: "invalid", message: body.error ?? `HTTP ${res.status}` });
@@ -181,6 +199,11 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
       {notice && (
         <p role="status" className="mt-4 text-sm text-foreground">
           {notice}
+        </p>
+      )}
+      {stale && (
+        <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-300">
+          cv.md changed in the markdown editor after this form loaded. Your edits here are kept, but saving them will be refused until you reload, which drops them.
         </p>
       )}
       {status.kind === "loading" && <p className="mt-6 text-sm text-muted">Loading…</p>}

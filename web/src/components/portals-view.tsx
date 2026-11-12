@@ -86,7 +86,15 @@ export function PortalsView({
   // A switch takes its row out of the tab it is on, so focus moves to the row that takes its place.
   const view = useRef<HTMLDivElement>(null);
   const refocusAt = useRef<number | null>(null);
+  // A failed toggle puts its row back, so focus goes back to that company's switch.
+  const refocusCompany = useRef<number | null>(null);
   useEffect(() => {
+    const company = refocusCompany.current;
+    refocusCompany.current = null;
+    if (company !== null) {
+      view.current?.querySelector<HTMLElement>(`[role="switch"][data-index="${company}"]`)?.focus();
+      return;
+    }
     const at = refocusAt.current;
     if (at === null) return;
     refocusAt.current = null;
@@ -113,6 +121,7 @@ export function PortalsView({
       setRevision(body.revision);
     } catch (e) {
       set(!next);
+      if (view.current?.contains(document.activeElement)) refocusCompany.current = index;
       setToggleError(`${name}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPending(false);
@@ -225,6 +234,7 @@ export function PortalsView({
                         role="switch"
                         aria-checked={c.enabled}
                         aria-label={`Scan ${c.name}`}
+                        data-index={c.index}
                         // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
                         aria-disabled={pending}
                         onClick={() => toggle(c.index, c.name)}

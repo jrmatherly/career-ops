@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attentionSummary, attentionText, lineRange } from "../../src/lib/cv-attention.mjs";
+import { attentionSummary, attentionText, lineRange, lossyNotice } from "../../src/lib/cv-attention.mjs";
 
 const cv = (headings) => {
   const lines = Array.from({ length: 100 }, (_, i) => `line ${i + 1}`);
@@ -42,10 +42,33 @@ test("lineRange spans one line of the text, without its newline", () => {
 test("the banner text names each section with its first unreadable line", () => {
   assert.deepEqual(attentionText({ count: 2, sections: [{ name: "Education", line: 68 }, { name: "Volunteer", line: 85 }], firstLine: 68 }), {
     title: "2 sections need attention.",
-    detail: "Education (line 68) and Volunteer (line 85) could not be read, so they may be missing from tailored CVs.",
+    detail: "Education (line 68) and Volunteer (line 85) could not be read back cleanly, so they may be missing from tailored CVs.",
   });
   assert.deepEqual(attentionText({ count: 1, sections: [{ name: "Header", line: 3 }], firstLine: 3 }), {
     title: "1 section needs attention.",
-    detail: "Header (line 3) could not be read, so it may be missing from tailored CVs.",
+    detail: "Header (line 3) could not be read back cleanly, so it may be missing from tailored CVs.",
   });
+});
+
+test("a lossy read with no unreadable line says cv.md would be rewritten, and never claims unreadable lines", () => {
+  const notice = lossyNotice({ unparsed: [], orphans: [] });
+  assert.deepEqual(notice, {
+    title: "cv.md was read, but it would be rewritten differently.",
+    detail: "Rebuilding it from the structured editor would not give back the same file. Open the structured editor to see why.",
+    blocked: "Export is off because cv.md would not be rebuilt exactly as written. Open the structured editor to see why.",
+  });
+  assert.deepEqual(lossyNotice({}), notice);
+  for (const text of Object.values(notice)) assert.doesNotMatch(text, /could not be read|unreadable/);
+});
+
+test("a lossy read names the orphaned entries", () => {
+  const one = lossyNotice({ unparsed: [], orphans: [{ id: "a", company: "DataStartup Inc", position: "ML Engineer", period: "2018-2020" }] });
+  assert.equal(one.detail, "The structured editor holds ML Engineer at DataStartup Inc, which no longer matches cv.md. Open the structured editor to resolve it.");
+  assert.equal(one.blocked, "Export is off until the structured editor's entries match cv.md.");
+  const two = lossyNotice({ orphans: [{ section: "projects", id: "p", name: "Side tool" }, { id: "b", company: "Acme" }] });
+  assert.equal(two.detail, "The structured editor holds Side tool and Acme, which no longer match cv.md. Open the structured editor to resolve them.");
+});
+
+test("unreadable lines leave the lossy notice to the attention banner", () => {
+  assert.equal(lossyNotice(unparsed(3)), null);
 });

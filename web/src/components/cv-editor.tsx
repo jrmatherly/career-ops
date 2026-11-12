@@ -79,7 +79,7 @@ export function useCvEditor() {
         }
         if (backup) snapshotPriorRef.current = false;
         dispatch({ type: "save-ok", content: snapshot });
-        window.dispatchEvent(new CustomEvent("co-cv-saved"));
+        window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "markdown" } }));
         const follow = saveFollowUp(stateRef.current, snapshot);
         if (follow) {
           pendingRef.current = followUpJob(job, pendingRef.current, follow.text);
@@ -129,6 +129,22 @@ export function useCvEditor() {
     return () => {
       live = false;
     };
+  }, []);
+
+  // The structured editor writes the same cv.md; re-read it so this text and the next save's expectation follow the file.
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      if ((e as CustomEvent<{ source?: string }>).detail?.source !== "structured") return;
+      fetch("/api/cv")
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const body = (await res.json()) as { content?: unknown };
+          dispatch({ type: "external", content: typeof body.content === "string" ? body.content : null });
+        })
+        .catch(() => dispatch({ type: "external", content: null }));
+    };
+    window.addEventListener("co-cv-saved", onSaved);
+    return () => window.removeEventListener("co-cv-saved", onSaved);
   }, []);
 
   useEffect(() => {

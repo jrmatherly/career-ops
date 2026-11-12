@@ -104,3 +104,61 @@ test("a render that outlives the deadline is killed and answers 504", async () =
   assert.deepEqual(out, { ok: false, status: 504, error: "PDF rendering timed out" });
   assert.equal(fs.existsSync(dir), false);
 });
+
+test("a render that exits cleanly without writing the PDF is a 500 with the renderer's output, not a rejection", async (t) => {
+  t.mock.method(console, "warn", () => {});
+  let dir;
+  const spawnPdf = async (args) => { dir = path.dirname(args.html); return { ok: true, stderr: "⚠️ page overflow" }; };
+  const out = await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", spawnPdf, spawnFn: () => {}, execPath: "node", coreRoot: "/code" });
+  assert.equal(out.ok, false);
+  assert.equal(out.status, 500);
+  assert.match(out.error, /page overflow/);
+  assert.equal(fs.existsSync(dir), false);
+});
+
+test("a child that ignores SIGTERM gets SIGKILL and the call still answers 504", { timeout: 5_000 }, async () => {
+  const signals = [];
+  let child;
+  const spawnFn = () => {
+    child = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = (signal) => {
+      signals.push(signal);
+      if (signal === "SIGKILL") setImmediate(() => child.emit("close", null));
+      return true;
+    };
+    return child;
+  };
+  const out = await renderMasterPdf({
+    lossless: true, renderHtml: html, format: "letter", spawnFn, execPath: "node", coreRoot: "/code", timeoutMs: 20, killGraceMs: 20,
+    spawnPdf: spawnGeneratePdf,
+  });
+  assert.deepEqual(signals, [undefined, "SIGKILL"]);
+  assert.deepEqual(out, { ok: false, status: 504, error: "PDF rendering timed out" });
+});
+
+test("a temp directory that cannot be removed is logged and the PDF still returns", { skip: process.getuid?.() === 0 ? "root ignores directory permissions" : false }, async (t) => {
+  const errors = t.mock.method(console, "error", () => {});
+  let dir;
+  const spawnPdf = async (args) => {
+    dir = path.dirname(args.html);
+    fs.writeFileSync(args.finalPdf, "%PDF-fake");
+    // A read-only directory keeps its entries, so the recursive rm fails.
+    fs.chmodSync(dir, 0o500);
+    return { ok: true, stderr: "" };
+  };
+  t.after(() => { fs.chmodSync(dir, 0o700); fs.rmSync(dir, { recursive: true, force: true }); });
+  const out = await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", spawnPdf, spawnFn: () => {}, execPath: "node", coreRoot: "/code" });
+  assert.equal(out.ok, true);
+  assert.equal(out.pdf.toString(), "%PDF-fake");
+  assert.equal(errors.mock.callCount(), 1);
+  assert.match(String(errors.mock.calls[0].arguments[0]), /could not remove/);
+});
+
+test("a clean render's advisories reach the server log", async (t) => {
+  const warns = t.mock.method(console, "warn", () => {});
+  const { spawnPdf } = recordingSpawnPdf({ ok: true, stderr: "⚠️ 2 pages, budget 1" });
+  const out = await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", spawnPdf, spawnFn: () => {}, execPath: "node", coreRoot: "/code" });
+  assert.equal(out.ok, true);
+  assert.match(String(warns.mock.calls[0]?.arguments[0]), /2 pages, budget 1/);
+});

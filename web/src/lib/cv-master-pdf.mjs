@@ -25,17 +25,23 @@ const ROOT_ENV = ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER"
  *   renderHtml: () => Promise<{ok: true, html: string} | {ok: false, status: number, error: string}>,
  *   format: "letter"|"a4",
  *   spawnFn: Function, execPath: string, coreRoot: string,
- *   spawnPdf?: typeof spawnGeneratePdf, timeoutMs?: number,
+ *   spawnPdf?: typeof spawnGeneratePdf, timeoutMs?: number, killGraceMs?: number,
  * }} args
- * @returns {Promise<{ok: true, pdf: Buffer} | {ok: false, status: number, error: string}>}
+ * @returns {Promise<{ok: true, pdf: Buffer} | {ok: false, status: number, error: string}>} Never rejects.
  */
-export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000 }) {
+export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000, killGraceMs = 5_000 }) {
   if (!lossless) return { ok: false, status: 409, error: "cv.md could not be read cleanly" };
   const rendered = await renderHtml();
   if (!rendered.ok) return rendered;
 
-  const dir = await mkdtemp(path.join(os.tmpdir(), "cv-master-pdf-"));
+  let dir;
+  try {
+    dir = await mkdtemp(path.join(os.tmpdir(), "cv-master-pdf-"));
+  } catch (err) {
+    return { ok: false, status: 500, error: `Could not create a temp directory for the PDF: ${err.message}` };
+  }
   let timer;
+  let killTimer;
   let timedOut = false;
   try {
     const html = path.join(dir, "cv.html");
@@ -45,15 +51,36 @@ export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, e
       const env = { ...opts.env };
       for (const k of ROOT_ENV) delete env[k];
       const child = spawnFn(cmd, args, { ...opts, windowsHide: true, env: { ...env, CAREER_OPS_ROOT: dir } });
-      timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
+      timer = setTimeout(() => {
+        timedOut = true;
+        child.kill();
+        // A child that ignores SIGTERM would hold the request open.
+        killTimer = setTimeout(() => child.kill("SIGKILL"), killGraceMs);
+      }, timeoutMs);
       return child;
     };
     const r = await spawnPdf({ spawnFn: isolatedSpawn, execPath, coreRoot, html, finalPdf, format });
     if (timedOut) return { ok: false, status: 504, error: "PDF rendering timed out" };
     if (!r.ok) return { ok: false, status: 500, error: `PDF rendering failed: ${r.stderr.slice(-500)}` };
-    return { ok: true, pdf: await readFile(finalPdf) };
+    let pdf;
+    try {
+      pdf = await readFile(finalPdf);
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+      return { ok: false, status: 500, error: `PDF rendering exited cleanly but wrote no PDF: ${r.stderr.slice(-500) || "no output"}` };
+    }
+    // The page-overflow warning arrives here on a successful render.
+    if (r.stderr) console.warn(`cv pdf: ${r.stderr}`);
+    return { ok: true, pdf };
+  } catch (err) {
+    return { ok: false, status: 500, error: `PDF rendering failed: ${err.message}` };
   } finally {
     clearTimeout(timer);
-    await rm(dir, { recursive: true, force: true });
+    clearTimeout(killTimer);
+    try {
+      await rm(dir, { recursive: true, force: true });
+    } catch (err) {
+      console.error(`cv pdf: could not remove ${dir}: ${err.message}`);
+    }
   }
 }

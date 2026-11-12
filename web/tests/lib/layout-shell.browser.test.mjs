@@ -133,7 +133,7 @@ test("every page sits in one shell under one header, with readable text and reac
   await t.test("a lossy cv.md shows the banner, which opens Edit at the first unreadable line", async () => {
     await open("/cv");
     const banner = page.getByRole("button", { name: /needs? attention/ });
-    assert.match(await banner.textContent(), /^1 section needs attention\. Header \(line 3\) could not be read, so it may be missing from tailored CVs\.Fix in editor →$/);
+    assert.match(await banner.textContent(), /^1 section needs attention\. Header \(line 3\) could not be read back cleanly, so it may be missing from tailored CVs\.Fix in editor →$/);
     await banner.click();
     await tabBecomes("Edit");
     await page.waitForFunction(() => document.activeElement instanceof HTMLTextAreaElement);
@@ -163,7 +163,7 @@ test("every page sits in one shell under one header, with readable text and reac
     assert.equal(await page.getByRole("menu").count(), 0);
   });
 
-  await t.test("a lossless cv.md renders the CV with its caption, a live Download PDF and a printable frame", async () => {
+  await t.test("a lossless cv.md renders the CV with its caption, an enabled Download PDF and a printable frame", async () => {
     const scratch = mkdtempSync(path.join(tmpdir(), "layout-shell-cv-"));
     t.after(() => rmSync(scratch, { recursive: true, force: true }));
     const codeRoot = fileURLToPath(new URL("../../../", import.meta.url));
@@ -184,7 +184,8 @@ test("every page sits in one shell under one header, with readable text and reac
       assert.match(await page.locator("section[aria-label='Live preview'] p").first().textContent(), /^Page 1 of \d+ · (Letter|A4) · rendered from cv\.md$/);
       assert.deepEqual(skips(await headingLevels(frame.locator("body"))), []);
       await page.getByRole("button", { name: "Export" }).click();
-      assert.equal(await page.getByRole("menuitem", { name: "Download PDF" }).getAttribute("href"), "/api/cv/pdf");
+      assert.equal(await page.getByRole("menuitem", { name: "Download PDF" }).getAttribute("aria-disabled"), null);
+      // cv-page.browser.test.mjs asserts that print() runs; this checks Chrome did not refuse it.
       await page.getByRole("menuitem", { name: "Print" }).click();
       await page.waitForTimeout(500);
       assert.deepEqual(blocked, []);
