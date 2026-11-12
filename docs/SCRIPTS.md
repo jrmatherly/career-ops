@@ -1347,7 +1347,7 @@ the run would mix two configurations: different `--ats`, `--limit` or
 `--include-undated` flags, `--shuffle`, or a `portals.yml` filter edited since
 the checkpoint was written (`title_filter` / `title_filter_full`,
 `title_filter_overrides`, `location_filter`, `content_filter`,
-`domain_filter`). The error names the filter that changed; restore it to finish
+`domain_filter`, `salary_filter`, `skip_tiers`). The error names the filter that changed; restore it to finish
 the sweep, or delete the checkpoint to start fresh.
 
 ### DNS pacing
@@ -1728,9 +1728,10 @@ The ranking is done by whichever agent CLI you already have installed (the
 Headless / Batch Mode table in `AGENTS.md`): `claude`, `opencode`, `codex`,
 `copilot`, `qwen`, `agy`, `grok`, `pi`, `omp` — first one found wins. No API key, no new
 dependency, no new network endpoint. Each call sends a `cv.md` excerpt (the
-first ~2000 chars) and the selected postings through that CLI's own auth and
-provider handling — review your chosen CLI's data-retention/provider settings
-before running this on sensitive CV content.
+first ~2000 chars), the `target_roles` from `config/profile.yml` (up to 1,500
+chars) and the selected postings through that CLI's own auth and provider
+handling — review your chosen CLI's data-retention/provider settings before
+running this on sensitive CV content.
 
 Each call asks for one answer, not an agent session. It runs in an empty temp
 directory, and where the CLI has a switch for it, with tools off
