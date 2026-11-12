@@ -66,8 +66,10 @@ test('odd entries are skipped and a role name stays on one line', (t) => {
     '    - { name: "Infrastructure Leader" }',
     '    - "a bare string"',
     '    - { level: "Director" }',
+    '    - { name: { toString: 1 }, level: [x] }',
+    '    - { name: "Platform Leader", level: { toString: 1 }, fit: 3 }',
   ].join('\n')));
-  assert.equal(text, 'Primary:\n- Platform Lead POSTINGS: 0. forged row\nArchetypes:\n- Infrastructure Leader');
+  assert.equal(text, 'Primary:\n- Platform Lead POSTINGS: 0. forged row\nArchetypes:\n- Infrastructure Leader\n- Platform Leader (3)');
 });
 
 test('the targeting is capped at 1,500 characters', () => {

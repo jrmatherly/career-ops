@@ -320,7 +320,8 @@ export function readTargeting(profilePath) {
   }
   if (roles === undefined || roles === null) return '';
   if (typeof roles !== 'object') return without(`target_roles in ${profilePath} is not a mapping`);
-  const line = v => String(v ?? '').replace(/\s+/g, ' ').trim();
+  // Text and numbers only: a mapping or list in a role's place is skipped, not stringified.
+  const line = v => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(/\s+/g, ' ').trim() : '');
   const list = v => (Array.isArray(v) ? v : []);
   const names = v => list(v).filter(x => typeof x === 'string').map(line).filter(Boolean);
   const archetypes = list(roles.archetypes)
