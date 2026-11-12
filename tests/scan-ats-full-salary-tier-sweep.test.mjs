@@ -37,7 +37,7 @@ globalThis.fetch = async () => { throw new Error('Unexpected network request'); 
 `);
   const run = (extra = []) => spawnSync(NODE, ['--import', pathToFileURL(preload).href, join(ROOT, 'scan-ats-full.mjs'), '--ats', 'greenhouse', ...extra], {
     cwd: dir, encoding: 'utf-8', timeout: 120_000,
-    env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PORTALS: '', CAREER_OPS_DNS_LOOKUPS_PER_MIN: '0' },
+    env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PORTALS: '', CAREER_OPS_PIPELINE: '', CAREER_OPS_SCAN_HISTORY: '', CAREER_OPS_DNS_LOOKUPS_PER_MIN: '0' },
   });
   return { dir, run };
 }
