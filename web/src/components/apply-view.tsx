@@ -153,7 +153,7 @@ export function ApplyView() {
                 <span className="ml-auto text-faint">{a.prefillLog.length} steps</span>
               </summary>
               <div className="max-h-52 overflow-y-auto border-t border-border px-3 py-2">
-                <ol className="space-y-0.5 font-mono text-[11px] leading-relaxed text-muted">
+                <ol className="space-y-0.5 font-mono text-xs leading-relaxed text-muted">
                   {a.prefillLog.map((l, i) => (
                     <li key={i} className={l.startsWith("✗") ? "text-amber-800 dark:text-amber-400" : ""}>
                       {l}
@@ -219,7 +219,7 @@ export function ApplyView() {
                     ) : (
                       <div className="flex h-24 w-36 items-center justify-center rounded-md border border-dashed border-border text-faint">…</div>
                     )}
-                    <figcaption className={cn("mt-1 w-36 truncate text-[10px]", s.ok ? "text-faint" : "text-amber-500")}>{s.label || "field"}</figcaption>
+                    <figcaption className={cn("mt-1 w-36 truncate text-xs", s.ok ? "text-faint" : "text-amber-500")}>{s.label || "field"}</figcaption>
                   </figure>
                 ))}
               </div>
@@ -388,7 +388,7 @@ function DrivePanel({ steps, filling }: { steps: DriveStep[]; filling?: boolean 
         <ol className="mt-3 space-y-1.5 rounded-xl border border-border/70 bg-surface/70 p-3 backdrop-blur-sm">
           {steps.map((s, i) => (
             <li key={i} className={cn("flex items-center gap-2 text-xs", i === steps.length - 1 ? "text-foreground" : "text-muted")}>
-              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-[10px] font-semibold text-brand-text">{s.turn}</span>
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-text">{s.turn}</span>
               <span className="shrink-0 font-medium">{DRIVE_VERB[s.action] ?? s.action}</span>
               <span className="truncate text-faint">{s.detail}</span>
               {/* `submit-control` is the guard doing its job (good news, distinct
@@ -586,7 +586,7 @@ function FieldRow({
           <label htmlFor={controlId} className={f.label ? undefined : "text-faint"}>{labelText}</label>
         )}
         {f.required && <Asterisk aria-hidden="true" className="size-3 text-brand-text" />}
-        {needs && <span id={confirmationId} className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-400">you confirm</span>}
+        {needs && <span id={confirmationId} className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-400">you confirm</span>}
       </div>
       {writing ? (
         <div className={cn("co-skel", f.type === "textarea" ? "h-[68px]" : "h-9")} />
@@ -603,7 +603,7 @@ function FieldRow({
         </select>
       ) : f.type === "checkbox" ? (
         <label className="flex items-center gap-2 text-sm text-muted">
-          <input {...controlProps} type="checkbox" checked={value === "true" || value === "yes"} onChange={(e) => onChange(e.target.checked ? "true" : "")} className="size-4 accent-brand" /> {f.label || "Yes"}
+          <input {...controlProps} type="checkbox" checked={value === "true" || value === "yes"} onChange={(e) => onChange(e.target.checked ? "true" : "")} className="size-6 accent-brand" /> {f.label || "Yes"}
         </label>
       ) : f.type === "file" ? (
         isResumeLabel(f.label) ? (

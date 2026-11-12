@@ -22,6 +22,7 @@ function emptyBranch(source) {
 
 test("the empty Documents page has the page title and a next step", () => {
   const empty = emptyBranch(src);
-  assert.match(empty, /<h1[^>]*>\s*Documents\s*<\/h1>/);
+  assert.match(src, /const header = <PageHeader title="Documents"/);
+  assert.match(empty, /\{header\}/);
   assert.match(empty, /Generate tailored CV \(PDF\)/);
 });

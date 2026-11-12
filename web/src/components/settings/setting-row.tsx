@@ -82,7 +82,7 @@ function Control({ state, current, labelId, helpId, invalid, busy, onChange }: {
       <div role="group" aria-labelledby={labelId} aria-describedby={helpId} className="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end">
         {state.values.map((v) => (
           <label key={v} className="inline-flex items-center gap-1.5 text-sm text-foreground max-sm:min-h-[44px]">
-            <input type="checkbox" name={state.id} value={v} checked={picked.includes(v)} disabled={busy}
+            <input type="checkbox" className="size-6" name={state.id} value={v} checked={picked.includes(v)} disabled={busy}
               onChange={(e) => onChange((state.values ?? []).filter((x) => (x === v ? e.target.checked : picked.includes(x))))} />
             {v}
           </label>

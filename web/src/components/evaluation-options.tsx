@@ -44,13 +44,13 @@ export function EvaluationOptions({ sections, onChange }: { sections: string[]; 
       <div className="grid gap-2 sm:grid-cols-2">
         {EVALUATION_OPTIONS.map((option) => (
           <label key={option.id} className="flex cursor-pointer items-start gap-2 rounded-lg p-2 hover:bg-surface-hover">
-            <input type="checkbox" checked={sections.includes(option.id)} onChange={(event) => onChange(event.target.checked ? [...sections, option.id] : sections.filter((id) => id !== option.id))} className="mt-0.5 size-4 shrink-0 accent-brand" />
-            <span><span className="block text-xs font-medium">{option.label}</span><span className="mt-0.5 block text-[11px] text-muted">{option.description}</span></span>
+            <input type="checkbox" checked={sections.includes(option.id)} onChange={(event) => onChange(event.target.checked ? [...sections, option.id] : sections.filter((id) => id !== option.id))} className="size-6 shrink-0 accent-brand" />
+            <span><span className="block text-xs font-medium">{option.label}</span><span className="mt-0.5 block text-xs text-muted">{option.description}</span></span>
           </label>
         ))}
       </div>
-      <p className="mt-3 text-[11px] text-muted">Your choice is remembered on this browser. Unchecked work is excluded from the AI request. Fewer sections usually use fewer tokens; reading the posting and your profile still has a cost.</p>
-      {!sections.includes("research") && <p className="mt-2 text-[11px] text-muted">Salary and company research is off. The score will flag evidence it could not verify.</p>}
+      <p className="mt-3 text-xs text-muted">Your choice is remembered on this browser. Unchecked work is excluded from the AI request. Fewer sections usually use fewer tokens; reading the posting and your profile still has a cost.</p>
+      {!sections.includes("research") && <p className="mt-2 text-xs text-muted">Salary and company research is off. The score will flag evidence it could not verify.</p>}
     </fieldset>
   );
 }

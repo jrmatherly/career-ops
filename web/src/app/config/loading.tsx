@@ -1,8 +1,9 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ConfigLoading() {
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10" aria-label="Loading configuration">
+    <PageFrame width="reading" aria-label="Loading configuration">
       <Skeleton className="h-8 w-28" />
       <Skeleton className="mt-2 h-4 w-96 max-w-full" />
 
@@ -44,6 +45,6 @@ export default function ConfigLoading() {
         <Skeleton className="h-10 w-28 rounded-full" />
         <Skeleton className="h-3 w-40" />
       </div>
-    </div>
+    </PageFrame>
   );
 }

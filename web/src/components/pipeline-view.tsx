@@ -17,6 +17,7 @@ import { PipelineTableRowsSkeleton } from "@/components/page-loading-skeletons";
 import { startRouteProgress } from "@/components/route-progress";
 import { sortRows } from "@/lib/core/pipeline-sort.mjs";
 import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { PIPELINE_TABS, pipelineQuery, pipelineTab, rowOnPipelineTab } from "@/lib/pipeline-navigation.mjs";
 import { isSearchOnlyWrite, queryWithLiveSearch } from "@/lib/list-search-sync.mjs";
 import { useListSearch } from "@/lib/use-list-search";
@@ -533,16 +534,14 @@ export function PipelineView({
 
   return (
     <PageFrame>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Pipeline</h1>
-          <p className="mt-1 text-sm text-muted">
-            <span className="tabular-nums">{inboxCount}</span> in inbox ·{" "}
-            <span className="tabular-nums">{visibleApplications.length}</span> tracked
-          </p>
-        </div>
-        {/* the tracker has its own search; the inbox brings its own facet filters */}
-        {visibleTab !== "INBOX" && (
+      <PageHeader
+        title="Pipeline"
+        description={<>
+          <span className="tabular-nums">{inboxCount}</span> in inbox ·{" "}
+          <span className="tabular-nums">{visibleApplications.length}</span> tracked
+        </>}
+        // the tracker has its own search; the inbox brings its own facet filters
+        actions={visibleTab !== "INBOX" && (
           <div className="flex items-center gap-2">
             <div className="relative w-64 max-w-[40vw]">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -584,7 +583,7 @@ export function PipelineView({
             </button>
           </div>
         )}
-      </div>
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {visibleTab !== "INBOX" && <label className="inline-flex items-center gap-2 text-xs text-muted">
@@ -788,6 +787,7 @@ export function PipelineView({
                 <th className="w-8 px-3 py-2.5">
                   <input
                     type="checkbox"
+                    className="size-6"
                     aria-label="Select all shown applications"
                     checked={allSelected}
                     onChange={() => setSelected(allSelected ? new Set() : new Set(filteredKeys))}
@@ -804,7 +804,7 @@ export function PipelineView({
                   >
                     <button
                       type="button"
-                      className="inline-flex cursor-pointer select-none items-center gap-1 uppercase tracking-wide hover:text-foreground"
+                      className="inline-flex min-h-6 cursor-pointer select-none items-center gap-1 uppercase tracking-wide hover:text-foreground"
                       onClick={() => setParams({ sort: k, dir: sort.key === k ? sort.dir * -1 : -1 })}
                     >
                       {k}
@@ -835,6 +835,7 @@ export function PipelineView({
                     <td className="w-8 px-3 py-3">
                       <input
                         type="checkbox"
+                        className="size-6"
                         aria-label={`Select ${company.label}, ${r.role} (#${r.n})`}
                         checked={selected.has(key)}
                         onChange={(event) => {
@@ -844,26 +845,26 @@ export function PipelineView({
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium tabular-nums">
-                      <Link href={detailHref} tabIndex={-1} onClick={syncTypedSearch} className="transition-colors group-hover:text-brand-text">
+                      <Link href={detailHref} tabIndex={-1} onClick={syncTypedSearch} className="inline-flex min-h-6 min-w-6 items-center transition-colors group-hover:text-brand-text">
                         #{r.n}
                       </Link>
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      <Link href={detailHref} onClick={syncTypedSearch} className="flex items-center gap-2.5 transition-colors group-hover:text-brand-text">
+                      <Link href={detailHref} onClick={syncTypedSearch} className="flex items-center gap-2.5 min-h-6 transition-colors group-hover:text-brand-text">
                         <CompanyLogo name={company.logoName} size={20} />
                         <span className="block max-w-64 truncate" title={company.label}>{company.label}</span>
                       </Link>
                     </td>
                   <td className="px-4 py-3 text-muted">
                     <div className="flex items-center gap-2">
-                      <Link href={detailHref} tabIndex={-1} onClick={syncTypedSearch} className="block max-w-72 truncate" title={r.role}>{r.role}</Link>
+                      <Link href={detailHref} tabIndex={-1} onClick={syncTypedSearch} className="block max-w-72 truncate leading-6" title={r.role}>{r.role}</Link>
                       {posting && (
                         <a
                           href={posting}
                           target="_blank"
                           rel="noreferrer"
                           title={posting}
-                          className="inline-flex shrink-0 items-center gap-1 text-xs text-brand-text hover:underline"
+                          className="inline-flex min-h-6 shrink-0 items-center gap-1 text-xs text-brand-text hover:underline"
                         >
                           {postingLabel(posting)}
                           <ExternalLink className="size-3" />

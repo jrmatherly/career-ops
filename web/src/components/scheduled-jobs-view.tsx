@@ -21,7 +21,8 @@ import { JobCard } from "./scheduled-scans/job-card";
 import { RunHistoryDrawer } from "./scheduled-scans/run-history-drawer";
 import { EvaluateQueuePanel } from "./scheduled-scans/evaluate-queue-panel";
 import type { ScheduledJob, JobRun } from "@/lib/scheduled-jobs";
-import { instrumentSerif } from "@/lib/fonts";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 import { isSchedulerStatusPayload, osSchedulerFor, schedulerCardCopy } from "@/lib/scheduled-scheduler-status.mjs";
 
@@ -143,20 +144,11 @@ export function ScheduledJobsView() {
   const card = scheduler ? schedulerCardCopy(scheduler) : null;
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 space-y-8">
-      {/* Header matching Explore & Portals format */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <CalendarClock className="size-6 text-brand-text" />
-            <h1 className={`${instrumentSerif.className} text-3xl text-foreground`}>Scheduled Scans</h1>
-          </div>
-          <p className="mt-1.5 max-w-2xl text-sm text-muted">
-            Persistent, automated crawler jobs supporting Zero-Token and Full ATS Dataset sweeps.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
+    <PageFrame className="space-y-8">
+      <PageHeader
+        title="Scheduled scans"
+        description="Persistent, automated crawler jobs supporting Zero-Token and Full ATS Dataset sweeps."
+        actions={<div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
@@ -182,8 +174,8 @@ export function ScheduledJobsView() {
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin text-brand-text" : ""}`} />
           </button>
-        </div>
-      </div>
+        </div>}
+      />
       {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</div>}
 
       {/* Stats Cards */}
@@ -208,8 +200,8 @@ export function ScheduledJobsView() {
                   <span
                     className={
                       card?.healthy
-                        ? "rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-400"
-                        : "rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
+                        ? "rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-400"
+                        : "rounded bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
                     }
                   >
                     {card?.badge}
@@ -327,7 +319,7 @@ export function ScheduledJobsView() {
         onClose={() => setHistoryDrawerOpen(false)}
         runs={store.runs}
       />
-    </div>
+    </PageFrame>
   );
 }
 
@@ -347,7 +339,7 @@ function StatCard({
       <div>
         <span className="text-xs font-medium text-muted">{label}</span>
         <div className="mt-1 text-2xl font-bold tracking-tight text-foreground">{value}</div>
-        <div className="mt-0.5 text-[11px] text-faint">{subtitle}</div>
+        <div className="mt-0.5 text-xs text-faint">{subtitle}</div>
       </div>
       <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-text">
         {icon}

@@ -309,7 +309,7 @@ export function CvIngest({ onSaved, onSavingChange, variant = "onboarding" }: { 
               e.target.value = "";
               if (file) ingestFile(file);
             }} />
-            <span className="inline-flex items-center gap-1 text-[11px] text-faint">
+            <span className="inline-flex items-center gap-1 text-xs text-faint">
               <Lock className="size-3" /> Converted with your configured AI CLI.
             </span>
             <button
@@ -391,7 +391,7 @@ export function CvIngest({ onSaved, onSavingChange, variant = "onboarding" }: { 
               <span className={`${instrumentSerif.className} text-lg text-foreground`}>{trace || "Reading your CV…"}</span>
             </div>
             <p className="mt-3 text-xs text-muted">Converting to Markdown with your configured AI CLI…</p>
-            {md && <div className="co-cvtrace mt-4 max-h-40 overflow-hidden rounded-lg border border-border bg-surface/40 p-3 text-[11px] text-faint">{md.slice(0, 400)}…</div>}
+            {md && <div className="co-cvtrace mt-4 max-h-40 overflow-hidden rounded-lg border border-border bg-surface/40 p-3 text-xs text-faint">{md.slice(0, 400)}…</div>}
           </>
         )}
       </div>
@@ -408,7 +408,7 @@ export function CvIngest({ onSaved, onSavingChange, variant = "onboarding" }: { 
         {readiness && (
           <span
             className={cn(
-              "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+              "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
               readiness.scoreable ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400" : "bg-amber-500/10 text-amber-800 dark:text-amber-400",
             )}
           >
@@ -464,7 +464,7 @@ export function CvIngest({ onSaved, onSavingChange, variant = "onboarding" }: { 
         >
           <RotateCcw className="size-3.5" /> Start over
         </button>
-        <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-faint">
+        <span className="ml-auto inline-flex items-center gap-1 text-xs text-faint">
           <Lock className="size-3" /> {variant === "editor" ? "Save updates cv.md and backs up the previous version" : "Nothing is saved until you click Save."}
         </span>
       </div>

@@ -106,7 +106,7 @@ export function ShortlistTray({
           </div>
 
           {/* cost line — always visible on mobile (where it doesn't fit in the button) */}
-          <div className="flex items-center gap-2 border-t border-border/60 px-3 py-1.5 text-[11px] text-muted sm:hidden">
+          <div className="flex items-center gap-2 border-t border-border/60 px-3 py-1.5 text-xs text-muted sm:hidden">
             <CostBadge kind="spend" size="xs" />
             <span>{costText} — the only step that spends</span>
           </div>
@@ -144,7 +144,7 @@ function ConfirmScore({
   }
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden items-center gap-1 text-[11px] text-muted sm:inline-flex">
+      <span className="hidden items-center gap-1 text-xs text-muted sm:inline-flex">
         <Coins className="size-3.5 text-brand-text" /> {costText}
       </span>
       <button

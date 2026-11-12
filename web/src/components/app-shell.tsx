@@ -82,8 +82,8 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
             <UsageMeter />
             <div className="space-y-1.5">
               <div className="flex items-center justify-between px-1">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">Appearance</span>
-                <span className="font-mono text-[10px] text-faint">THEME</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-faint">Appearance</span>
+                <span className="font-mono text-xs text-faint">THEME</span>
               </div>
               <ThemeToggle showLabel />
               {pinned.map(navLink)}

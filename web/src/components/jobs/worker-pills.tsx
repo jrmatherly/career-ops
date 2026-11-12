@@ -23,13 +23,13 @@ export function WorkerPills() {
   return (
     <div className="mt-4 border-t border-border pt-3">
       <div className="mb-2 flex items-center gap-2 px-1">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">Workers</span>
-        {running > 0 && <span className="text-[10px] tabular-nums text-brand-text">{running} running</span>}
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-faint">Workers</span>
+        {running > 0 && <span className="text-xs tabular-nums text-brand-text">{running} running</span>}
         <Link href="/jobs" className="ml-auto text-faint transition-colors hover:text-foreground" title="History" aria-label="Worker history">
           <History className="size-3.5" />
         </Link>
         {finished > 0 && (
-          <button onClick={clearFinished} className="text-[10px] text-faint transition-colors hover:text-foreground" title="Clear finished">
+          <button onClick={clearFinished} className="text-xs text-faint transition-colors hover:text-foreground" title="Clear finished">
             clear
           </button>
         )}

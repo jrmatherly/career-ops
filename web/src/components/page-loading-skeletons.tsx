@@ -1,3 +1,4 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function FollowupsDueSectionSkeleton({ rows = 3 }: { rows?: number }) {
@@ -35,7 +36,7 @@ export function PipelineTableRowsSkeleton({ rows = 8, trackerColumn = false }: {
     <>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={i}>
-          {trackerColumn && <td className="w-8 px-3 py-3"><Skeleton className="size-4" /></td>}
+          {trackerColumn && <td className="w-8 px-3 py-3"><Skeleton className="size-6" /></td>}
           {trackerColumn && <td className="px-4 py-3"><Skeleton className="h-4 w-8" /></td>}
           <td className="px-4 py-3">
             <div className="flex items-center gap-2.5">
@@ -61,7 +62,7 @@ export function PipelineTableRowsSkeleton({ rows = 8, trackerColumn = false }: {
 
 export function PipelinePageSkeleton() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 max-sm:pb-24" aria-label="Loading pipeline">
+    <PageFrame aria-label="Loading pipeline">
       <div className="flex items-end justify-between gap-4">
         <div>
           <Skeleton className="h-8 w-36" />
@@ -92,7 +93,7 @@ export function PipelinePageSkeleton() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageFrame>
   );
 }
 
@@ -120,7 +121,7 @@ export function FollowupsTableRowsSkeleton({ rows = 6 }: { rows?: number }) {
 
 export function FollowupsPageSkeleton() {
   return (
-    <div className="mx-auto max-w-none px-6 py-8" aria-label="Loading follow-ups">
+    <PageFrame aria-label="Loading follow-ups">
       <div className="flex items-end justify-between gap-4">
         <div>
           <Skeleton className="h-8 w-48" />
@@ -150,13 +151,13 @@ export function FollowupsPageSkeleton() {
           </tbody>
         </table>
       </div>
-    </div>
+    </PageFrame>
   );
 }
 
 export function AnalyticsPageSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10" aria-label="Loading analytics">
+    <PageFrame aria-label="Loading analytics">
       <Skeleton className="h-8 w-32" />
       <Skeleton className="mt-2 h-4 w-64" />
 
@@ -183,13 +184,13 @@ export function AnalyticsPageSkeleton() {
           </div>
         </section>
       ))}
-    </div>
+    </PageFrame>
   );
 }
 
 export function DocumentsPageSkeleton() {
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <PageFrame className="space-y-6" aria-label="Loading documents">
       <div>
         <Skeleton className="h-8 w-48" />
         <Skeleton className="mt-2 h-4 w-64" />
@@ -211,6 +212,6 @@ export function DocumentsPageSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </PageFrame>
   );
 }

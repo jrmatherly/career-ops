@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { ExternalLink, FileText, File, Calendar, Loader2 } from "lucide-react";
 
 type DocumentItem = {
@@ -49,17 +51,24 @@ export default function DocumentsPage() {
   }, [refetch]);
 
 
+  const header = <PageHeader title="Documents" description="Browse your generated CVs and cover letters." />;
+
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center text-muted">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <PageFrame>
+        {header}
+        <div className="flex h-64 items-center justify-center text-muted">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </PageFrame>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center">
+      <PageFrame>
+        {header}
+        <div className="flex flex-col items-center justify-center p-8 text-center">
         <div className="mb-4 rounded-full bg-red-500/10 p-3 text-red-500">
           <File className="h-6 w-6" />
         </div>
@@ -72,21 +81,15 @@ export default function DocumentsPage() {
         >
           Try again
         </Button>
-      </div>
+        </div>
+      </PageFrame>
     );
   }
 
   if (documents.length === 0) {
     return (
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Documents
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Browse your generated CVs and cover letters.
-          </p>
-        </div>
+      <PageFrame>
+        {header}
         <div className="flex flex-col items-center justify-center p-8 text-center">
           <div className="mb-4 rounded-full bg-surface-hover p-3 text-muted">
             <FileText className="h-6 w-6" />
@@ -96,20 +99,13 @@ export default function DocumentsPage() {
             Open a report and choose Generate tailored CV (PDF). The file shows up here.
           </p>
         </div>
-      </div>
+      </PageFrame>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Documents
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Browse your generated CVs and cover letters.
-        </p>
-      </div>
+    <PageFrame>
+      {header}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {documents.map((doc) => (
@@ -163,6 +159,6 @@ export default function DocumentsPage() {
           </Card>
         ))}
       </div>
-    </div>
+    </PageFrame>
   );
 }

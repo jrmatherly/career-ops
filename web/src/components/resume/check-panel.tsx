@@ -77,7 +77,7 @@ export function CheckPanel({ report, error, pinned, onPin, onIgnore }: Props) {
                     <button type="button" aria-pressed={pinned === f.key} onClick={() => onPin(f.key)} className={`min-w-0 flex-1 rounded-md border px-2 py-1 text-left ${pinned === f.key ? "border-brand/60 bg-brand-soft" : "border-transparent hover:border-border"} ${FOCUS}`}>
                       <span className={`mr-2 text-xs font-medium ${SEVERITY[f.severity].className}`}>{SEVERITY[f.severity].label}</span>
                       <span className="text-foreground">{f.message}</span>
-                      <span className="block truncate font-mono text-[11px] text-muted">{f.path}</span>
+                      <span className="block truncate font-mono text-xs text-muted">{f.path}</span>
                     </button>
                     <button type="button" aria-label={`Ignore: ${f.message}`} onClick={() => onIgnore(f.key)} className={`shrink-0 rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground ${FOCUS}`}>
                       Ignore

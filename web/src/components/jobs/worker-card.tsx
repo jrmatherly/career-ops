@@ -117,7 +117,7 @@ export function WorkerCard({
           <span
             className={cn(
               "ml-auto shrink-0 rounded px-1 py-0.5 font-semibold tabular-nums",
-              inline ? "text-xs" : "text-[10px]",
+              inline ? "text-xs" : "text-xs",
               tone.chip,
             )}
           >
@@ -128,7 +128,7 @@ export function WorkerCard({
           <span className={cn("shrink-0", hasScore ? "ml-1" : "ml-auto")}>{trailing}</span>
         )}
       </div>
-      <div className={cn("mt-1 text-muted", inline ? "text-xs" : "text-[10px]")}>
+      <div className={cn("mt-1 text-muted", inline ? "text-xs" : "text-xs")}>
         {job.subtitle && <span>{job.subtitle} · </span>}{jobStateLabel(job)}
       </div>
       <div className={cn("mt-1.5 w-full overflow-hidden rounded-full bg-surface-hover", inline ? "h-1.5" : "h-1")}>
@@ -139,22 +139,22 @@ export function WorkerCard({
         )}
       </div>
       {(bottom || running) && (
-        <div className={cn("mt-1 truncate text-faint", inline ? "text-xs" : "text-[10px]")}>
+        <div className={cn("mt-1 truncate text-faint", inline ? "text-xs" : "text-xs")}>
           {running ? `${last ?? "Working"} · ${fmtElapsed(elapsed)}` : bottom}
         </div>
       )}
       {errorHint && (
-        <div className={cn("mt-1 text-amber-800 dark:text-amber-400", inline ? "text-xs" : "text-[10px]")}>
+        <div className={cn("mt-1 text-amber-800 dark:text-amber-400", inline ? "text-xs" : "text-xs")}>
           {errorHint.text}
         </div>
       )}
       {fencing && (
-        <div className={cn("mt-1 text-amber-800 dark:text-amber-400", inline ? "text-xs" : "text-[10px]")}>
+        <div className={cn("mt-1 text-amber-800 dark:text-amber-400", inline ? "text-xs" : "text-xs")}>
           {fencing}
         </div>
       )}
       {tokens > 0 && (
-        <div className={cn("mt-1 text-faint tabular-nums", inline ? "text-xs" : "text-[10px]")}>
+        <div className={cn("mt-1 text-faint tabular-nums", inline ? "text-xs" : "text-xs")}>
           {fmtTokens(tokens)} tokens{job.cost?.usd != null ? ` · $${job.cost.usd.toFixed(2)}` : ""}
         </div>
       )}

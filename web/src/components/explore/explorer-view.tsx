@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Compass, ChevronDown, RotateCcw, AlertTriangle, Sparkles, Settings } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { instrumentSerif } from "@/lib/fonts";
 import { normalizeTextKey } from "@/lib/core/normalize-text-key.mjs";
 import { paramsToFilters, paramsToAi, type ExploreFilters } from "@/lib/explore";
@@ -116,30 +118,19 @@ export function ExplorerView({
   if (running && isAi) return <AiHuntView cliName={cli.name} />;
 
   return (
-    <div className={scanRunning ? undefined : "mx-auto max-w-5xl px-5 py-8 md:px-8"}>
+    // One element whether or not a scan runs, so ResultsList stays mounted; the running scan is full-bleed.
+    <PageFrame className={scanRunning ? "max-w-none p-0 sm:p-0 max-sm:pb-0" : undefined}>
       <p role="status" aria-live="polite" aria-atomic="true" className="mb-4 text-sm text-muted">{!isAi && (employerOutcome?.message || (employer && running ? "Scanning selected employers…" : ""))}</p>
       {scanRunning && <DiscoveringState />}
       {!scanRunning && (
         <>
-      <header className="mb-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <Compass className="size-6 text-brand-text" />
-            <h1 className={`${instrumentSerif.className} text-3xl text-foreground`}>Explore</h1>
-            <span className="rounded-full border border-brand/30 bg-brand-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-text">New</span>
-          </div>
-          <div className="w-full sm:ml-auto sm:w-auto">
-            <ExploreModeToggle mode={mode} onChange={setMode} cliConfigured={!!cli.id} />
-          </div>
-        </div>
-        {!isResults && (
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
-            {isAi
-              ? "Describe the role in plain language — an AI hunts the open web for it, on your own AI. Candidates are unverified until you evaluate."
-              : employer ? "Scan selected employer sites using your role and location terms, zero tokens. Open an original JD to check its details." : "Scan the public ATS network — Greenhouse, Lever, Ashby, Workday. Fresh postings matched to you, zero tokens. You only spend when you choose to evaluate one."}
-          </p>
-        )}
-      </header>
+      <PageHeader
+        title="Explore"
+        description={!isResults && (isAi
+          ? "Describe the role in plain language — an AI hunts the open web for it, on your own AI. Candidates are unverified until you evaluate."
+          : employer ? "Scan selected employer sites using your role and location terms, zero tokens. Open an original JD to check its details." : "Scan the public ATS network — Greenhouse, Lever, Ashby, Workday. Fresh postings matched to you, zero tokens. You only spend when you choose to evaluate one.")}
+        actions={<div className="w-full sm:w-auto"><ExploreModeToggle mode={mode} onChange={setMode} cliConfigured={!!cli.id} /></div>}
+      />
 
       {!rootExists && (
         <div className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
@@ -215,7 +206,7 @@ export function ExplorerView({
       )}
 
       {showScanList && (
-        <div className={scanRunning ? "relative z-[1] mx-auto max-w-5xl px-5 pb-10 md:px-8" : undefined}>
+        <div className={scanRunning ? "relative z-[1] mx-auto max-w-6xl px-4 pb-10 sm:px-6" : undefined}>
           <ResultsList offers={enriched} />
         </div>
       )}
@@ -261,7 +252,7 @@ export function ExplorerView({
           {!employerOutcome && phase === "failed" && <FailedCard msg={error || status} scannerMissing={scannerMissing} onRetry={() => void discover()} />}
         </>
       )}
-    </div>
+    </PageFrame>
   );
 }
 

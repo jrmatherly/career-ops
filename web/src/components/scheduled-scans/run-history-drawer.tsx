@@ -73,12 +73,12 @@ export function RunHistoryDrawer({
                         {isSuccess ? "Success" : isRunning ? "Running" : isQueued ? "Queued" : isCancelled ? "Cancelled" : "Failed"}
                       </span>
                       {run.engine && (
-                        <span className="rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-faint uppercase font-mono">
+                        <span className="rounded bg-surface-hover px-1.5 py-0.5 text-xs text-faint uppercase font-mono">
                           {run.engine}
                         </span>
                       )}
                     </div>
-                    <span className="flex items-center gap-1 text-[11px] text-faint">
+                    <span className="flex items-center gap-1 text-xs text-faint">
                       <Clock className="size-3" />
                       {formatWhen(run.at)}
                     </span>
@@ -90,7 +90,7 @@ export function RunHistoryDrawer({
                   {run.drainMessage && <p className="mt-1 text-muted leading-relaxed break-words">{run.drainMessage}</p>}
 
                   {typeof run.rolesFound === "number" && (
-                    <div className="mt-2 flex items-center justify-end text-[11px] border-t border-border/40 pt-1.5">
+                    <div className="mt-2 flex items-center justify-end text-xs border-t border-border/40 pt-1.5">
                       <span className="font-semibold text-foreground">{run.rolesFound} roles found</span>
                     </div>
                   )}

@@ -83,7 +83,7 @@ function StarCards({ header, rows }: { header: string[]; rows: string[][] }) {
                   if (!value) return null;
                   return (
                     <div key={f.label} className={f.label === "Reflection" ? "sm:col-span-2" : undefined}>
-                      <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">{f.label}</dt>
+                      <dt className="font-mono text-xs uppercase tracking-[0.14em] text-faint">{f.label}</dt>
                       <dd className="mt-1 text-sm text-foreground">{value}</dd>
                     </div>
                   );

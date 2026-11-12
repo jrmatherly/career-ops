@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { SkillGaps } from "@/components/skill-gaps";
 import remarkGfm from "remark-gfm";
 import { Check, Loader2, Upload } from "lucide-react";
@@ -162,18 +164,16 @@ export function CvEditor() {
   const status = editorStatus(state);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">CV editor</h1>
-          <p className="mt-1 text-sm text-muted">
-            Edit <code className="text-foreground">cv.md</code> with live preview.
-            {state.phase === "ready" && !state.exists && state.content === "" && (
-              <span className="ml-1 text-faint">No cv.md yet — start typing to create it.</span>
-            )}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <PageFrame>
+      <PageHeader
+        title="CV"
+        description={<>
+          Edit <code className="text-foreground">cv.md</code> with live preview.
+          {state.phase === "ready" && !state.exists && state.content === "" && (
+            <span className="ml-1 text-faint">No cv.md yet — start typing to create it.</span>
+          )}
+        </>}
+        actions={<div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={state.phase !== "ready" || importSaving || state.inflight !== null || state.conflict}
@@ -201,8 +201,8 @@ export function CvEditor() {
             {status.label === "Saving" ? <Loader2 className="size-4 animate-spin" /> : status.label === "Saved" ? <Check className="size-4" /> : null}
             Save
           </button>
-        </div>
-      </div>
+        </div>}
+      />
 
       {state.error && (
         <p role="alert" className="mt-3 text-sm text-red-700 dark:text-red-300">
@@ -256,6 +256,6 @@ export function CvEditor() {
       {/* Below the editor: the gaps are context for what to write next, and they
           belong after the document rather than competing with it. */}
       <SkillGaps />
-    </div>
+    </PageFrame>
   );
 }

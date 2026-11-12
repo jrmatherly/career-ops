@@ -1,8 +1,11 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10 max-sm:pb-24" aria-label="Loading today">
+    <PageFrame aria-label="Loading today">
+      <Skeleton className="h-9 w-24" />
+      <Skeleton className="mb-6 mt-1.5 h-5 w-32" />
       <section className="dot-bg relative overflow-hidden rounded-2xl border border-border bg-surface/40 px-7 py-10 md:px-10 md:py-12">
         <div className="relative z-10">
           <Skeleton className="h-3 w-44" />
@@ -37,6 +40,6 @@ export default function Loading() {
           ))}
         </div>
       </section>
-    </div>
+    </PageFrame>
   );
 }

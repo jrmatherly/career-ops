@@ -1,5 +1,6 @@
-import { Radar } from "lucide-react";
 import path from "node:path";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { PortalsView } from "@/components/portals-view";
 import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
 import { deploymentMode } from "@/lib/deployment.mjs";
@@ -26,16 +27,12 @@ export default function PortalsPage() {
   // Name the file the page reads, which CAREER_OPS_PORTALS can move.
   const target = process.env.CAREER_OPS_PORTALS?.trim() ? portalsConfigPath(careerOpsRoot()) : "portals.yml";
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
-      <div className="flex items-center gap-3">
-        <Radar className="size-6 text-brand-text" />
-        <h1 className="font-display text-2xl tracking-tight text-landing">Portals</h1>
-      </div>
-      <p className="mt-1.5 max-w-xl text-sm text-muted">
-        The companies career-ops watches for new roles. Run a health check to catch company boards that have quietly
-        broken — a broken link means that company silently disappears from every future scan.
-      </p>
-      <p className="mt-1.5 text-xs text-faint">
+    <PageFrame width="reading">
+      <PageHeader
+        title="Portals"
+        description="The companies career-ops watches for new roles. Run a health check to catch company boards that have quietly broken — a broken link means that company silently disappears from every future scan."
+      />
+      <p className="text-xs text-faint">
         {deploymentMode().hosted ? (
           <>Backed by <code className="text-muted">portals.yml</code> on this server.</>
         ) : (
@@ -50,6 +47,6 @@ export default function PortalsPage() {
       <div className="mt-6">
         <PortalsView watched={watched} missing={missing} target={target} revision={revision} />
       </div>
-    </div>
+    </PageFrame>
   );
 }

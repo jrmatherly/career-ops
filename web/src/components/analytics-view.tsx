@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, BarChart3, BriefcaseBusiness, CircleDollarSign, MapPin, Sparkles, Target } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import { funnelBarModel } from "@/lib/analytics-metrics.mjs";
 
 type ProgressMetrics = {
@@ -36,21 +37,16 @@ export function AnalyticsShell({ total, view, children }: {
 }) {
   return (
     <PageFrame>
-      <header className="flex flex-col gap-5 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-text">Operations / Analytics</p>
-          <h1 className="mt-2 font-display text-3xl tracking-tight text-landing sm:text-4xl">Search intelligence</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-            A read on the roles you are pursuing, the funnel they move through, and the patterns worth acting on.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-faint">
+      <PageHeader
+        title="Analytics"
+        description="A read on the roles you are pursuing, the funnel they move through, and the patterns worth acting on."
+        actions={<div className="flex items-center gap-2 text-xs text-faint">
           <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
           <span className="tabular-nums">{total}</span> tracked evaluation{total === 1 ? "" : "s"}
-        </div>
-      </header>
+        </div>}
+      />
 
-      <nav aria-label="Analytics views" className="mt-5 -mb-px flex gap-1 overflow-x-auto border-b border-border">
+      <nav aria-label="Analytics views" className="-mb-px flex gap-1 overflow-x-auto border-b border-border">
         <AnalyticsTab href="/analytics" active={view === "progress"} icon={<BarChart3 className="size-3.5" />}>
           Search progress
         </AnalyticsTab>
@@ -175,7 +171,7 @@ export function StatsPanel({ metrics, insights }: { metrics: StatsMetrics; insig
             <PayStat label="Data points" value={metrics.pay.count} />
             <PayStat label="Posted / est." value={`${metrics.pay.postedCount} / ${metrics.pay.estimatedCount}`} />
           </div>
-          <div className="mt-6 border-t border-border pt-5"><p className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Salary band distribution</p><div className="mt-4 space-y-3">{metrics.payHistogram.map((row, index) => <BarRow key={row.label} label={row.label} count={row.count} pct={row.pct} widthPct={row.pct} tone={BAR_TONES[index]} />)}</div></div>
+          <div className="mt-6 border-t border-border pt-5"><p className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-muted">Salary band distribution</p><div className="mt-4 space-y-3">{metrics.payHistogram.map((row, index) => <BarRow key={row.label} label={row.label} count={row.count} pct={row.pct} widthPct={row.pct} tone={BAR_TONES[index]} />)}</div></div>
         </> : <EmptyData label="No USD compensation data" detail="Pay appears when tracker notes contain a USD-denominated posted or estimated range." />}
       </Panel>
     </div>
@@ -183,11 +179,11 @@ export function StatsPanel({ metrics, insights }: { metrics: StatsMetrics; insig
 }
 
 function Panel({ eyebrow, title, description, icon, children }: { eyebrow: string; title: string; description?: string; icon?: React.ReactNode; children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-border bg-surface/55 p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.17em] text-brand-text">{icon}{eyebrow}</p><h2 className="mt-2 font-display text-xl tracking-tight text-landing">{title}</h2>{description && <p className="mt-1 max-w-xl text-xs leading-5 text-muted">{description}</p>}</div></div>{children}</section>;
+  return <section className="rounded-2xl border border-border bg-surface/55 p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-[0.17em] text-brand-text">{icon}{eyebrow}</p><h2 className="mt-2 font-display text-xl tracking-tight text-landing">{title}</h2>{description && <p className="mt-1 max-w-xl text-xs leading-5 text-muted">{description}</p>}</div></div>{children}</section>;
 }
 
 function MetricCard({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {
-  return <div className="rounded-xl border border-border bg-surface/45 p-4"><div className="flex items-center justify-between text-brand-text"><span className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted">{label}</span>{icon}</div><div className="mt-3 font-display text-3xl tracking-tight text-landing tabular-nums">{value}</div></div>;
+  return <div className="rounded-xl border border-border bg-surface/45 p-4"><div className="flex items-center justify-between text-brand-text"><span className="font-mono text-xs font-semibold uppercase tracking-[0.15em] text-muted">{label}</span>{icon}</div><div className="mt-3 font-display text-3xl tracking-tight text-landing tabular-nums">{value}</div></div>;
 }
 
 const NO_RATE_EXPLANATION = "No applications sent yet, so this rate has nothing to measure";
@@ -211,9 +207,9 @@ function Distribution({ rows, emptyLabel = "No distribution data" }: { rows: { l
 
 function BreakdownList({ rows, icon, emptyLabel }: { rows: { label: string; count: number; pct: number }[]; icon: React.ReactNode; emptyLabel: string }) {
   if (!rows.length) return <EmptyData label={emptyLabel} detail="Add an explicit work mode or location to the tracker notes to populate this dimension." />;
-  return <div className="mt-4 space-y-3">{rows.map((row, index) => <div key={row.label} className="flex items-center gap-2 text-sm"><span className="text-brand-text">{icon}</span><span className="min-w-0 flex-1 break-words text-muted">{row.label}</span><span className="font-mono text-xs tabular-nums text-foreground">{row.count}</span><span className="w-12 text-right font-mono text-[11px] tabular-nums text-faint">{Math.round(row.pct)}%</span></div>)}</div>;
+  return <div className="mt-4 space-y-3">{rows.map((row, index) => <div key={row.label} className="flex items-center gap-2 text-sm"><span className="text-brand-text">{icon}</span><span className="min-w-0 flex-1 break-words text-muted">{row.label}</span><span className="font-mono text-xs tabular-nums text-foreground">{row.count}</span><span className="w-12 text-right font-mono text-xs tabular-nums text-faint">{Math.round(row.pct)}%</span></div>)}</div>;
 }
 
-function PayStat({ label, value }: { label: string; value: string | number }) { return <div><p className="text-[11px] text-faint">{label}</p><p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{value}</p></div>; }
+function PayStat({ label, value }: { label: string; value: string | number }) { return <div><p className="text-xs text-faint">{label}</p><p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{value}</p></div>; }
 function EmptyData({ label, detail }: { label: string; detail: string }) { return <div className="mt-4 rounded-xl border border-dashed border-border bg-surface/30 px-4 py-6 text-center"><p className="font-display text-lg text-landing">{label}</p><p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted">{detail}</p></div>; }
 function money(value: number) { return value ? `$${Math.round(value / 1000)}K` : "—"; }

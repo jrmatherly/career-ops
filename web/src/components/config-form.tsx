@@ -15,6 +15,8 @@ import { persistCliId, readSavedCliId } from "@/lib/saved-cli";
 import { keepIfInstalled, pickDefaultInstalled } from "@/lib/cli-pick.mjs";
 import { CONFIG_KEY as STORAGE_KEY, writeConfig } from "@/lib/config-events.mjs";
 import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
+import { PageFrame } from "@/components/page-frame";
+import { PageHeader } from "@/components/page-header";
 import type { SettingsResponse } from "@/lib/settings-form.mjs";
 
 type Cli = {
@@ -133,16 +135,16 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
   const listedClis = hosted && !showOtherClis ? installed : clis ?? [];
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
-      <h1 className="font-display text-2xl tracking-tight text-landing">Settings</h1>
-      <p className="mt-1 text-sm text-muted">
-        {hosted
+    <div className="pb-10">
+      <PageHeader
+        title="Settings"
+        description={hosted
           ? `Hosted at ${host}. Your data is in ${dataRoot} on this server.`
           : "Run career-ops on your own AI, right on your computer. Your CV and data never leave your machine."}
-      </p>
+      />
 
       {/* Engine mode */}
-      <label className="mt-8 mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+      <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-muted">
         AI Engine
       </label>
       <div>
@@ -218,7 +220,7 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
                       <button
                         type="button"
                         disabled
-                        className="flex flex-1 items-center gap-2 text-left max-sm:min-h-[44px] cursor-default"
+                        className="flex min-h-6 flex-1 items-center gap-2 text-left max-sm:min-h-[44px] cursor-default"
                       >
                         <span className="font-medium text-muted">
                           {c.name}
@@ -229,7 +231,7 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
                         href={c.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex shrink-0 items-center justify-center gap-1 text-xs text-brand-text hover:underline max-sm:min-h-[44px]"
+                        className="inline-flex min-h-6 shrink-0 items-center justify-center gap-1 text-xs text-brand-text hover:underline max-sm:min-h-[44px]"
                       >
                         Install <ExternalLink className="size-3" />
                       </a>
@@ -254,7 +256,7 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
                     No supported CLI found on your PATH. Install one (e.g. Claude Code, Gemini CLI, OpenCode) to get started.
                   </p>
                 )}
-                <p className="mt-2 text-[11px] leading-relaxed text-faint">
+                <p className="mt-2 text-xs leading-relaxed text-faint">
                   Best on <span className="text-muted">Claude Code</span> (live progress, the agentic apply + AI search,
                   reliable evaluation persistence). Other CLIs work for the core flows with reduced features.
                 </p>

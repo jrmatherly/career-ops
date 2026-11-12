@@ -99,7 +99,7 @@ function Label({ children, hint }: { children: React.ReactNode; hint?: string })
   return (
     <div className="mb-1.5 flex items-baseline justify-between gap-4">
       <span className="text-[13px] font-medium text-foreground">{children}</span>
-      {hint && <span className="ml-4 text-right text-[11px] text-faint">{hint}</span>}
+      {hint && <span className="ml-4 text-right text-xs text-faint">{hint}</span>}
     </div>
   );
 }
@@ -140,7 +140,7 @@ export function FilterBuilder({
       {employer && <fieldset aria-describedby="employer-scope employer-selection">
         <legend className="mb-2 text-[13px] font-medium">Employers</legend>
         <div className="flex flex-wrap gap-4">{CHINA_SOURCES.map(id => <label key={id} className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={filters.employers?.includes(id as EmployerSource) ?? false} onChange={e => set({ employers: e.target.checked ? [...(filters.employers ?? []), id as EmployerSource] : (filters.employers ?? []).filter(x => x !== id) })} />{EMPLOYER_LABEL[id as keyof typeof EMPLOYER_LABEL]}
+          <input type="checkbox" className="size-6" checked={filters.employers?.includes(id as EmployerSource) ?? false} onChange={e => set({ employers: e.target.checked ? [...(filters.employers ?? []), id as EmployerSource] : (filters.employers ?? []).filter(x => x !== id) })} />{EMPLOYER_LABEL[id as keyof typeof EMPLOYER_LABEL]}
         </label>)}</div>
         <p id="employer-selection" className="mt-2 text-xs text-muted">{filters.employers?.length ? "Only selected employers will be scanned." : "Select at least one employer to start a scan."}</p>
         <p id="employer-scope" className="mt-2 text-xs text-muted">Employer selection does not guarantee mainland-China, technical or experienced-hire eligibility. Check the original JD. Role and location terms are optional; unknown locations may remain, and remote titles may match. Locations are term filters, not eligibility checks. No posting-date cutoff applies. Other ATS filters are inactive for this preset. Coverage is limited to 10 pages per employer; limits or source problems are reported as incomplete.</p>
@@ -150,7 +150,7 @@ export function FilterBuilder({
         <Label hint={filters.positive.length === 0 ? (employer ? "empty = all titles" : "empty = every fresh posting") : undefined}>Roles to find</Label>
         <KeywordField ariaLabel="Roles to find" values={filters.positive} tone="inc" placeholder="AI platform, ML infrastructure, staff engineer…" onChange={(v) => set({ positive: v })} />
         {!employer && seededFrom.length > 0 && filters.positive.length > 0 && (
-          <p className="mt-1 text-[11px] text-faint">Seeded from your {seededFrom.join(" + ")} — edit freely.</p>
+          <p className="mt-1 text-xs text-faint">Seeded from your {seededFrom.join(" + ")} — edit freely.</p>
         )}
       </div>}
 
@@ -224,7 +224,7 @@ export function FilterBuilder({
       {!employer && <button
         type="button"
         onClick={() => setAdvanced((v) => !v)}
-        className="inline-flex items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
+        className="inline-flex min-h-6 items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
       >
         <SlidersHorizontal className="size-3.5" />
         {hideLists ? "Scan depth" : "More location controls & scan depth"}

@@ -46,6 +46,10 @@ test("The in-page back link returns to the list where it was left", { skip: live
   }
   assert.equal(mountedCompany, true, "Fixture Company 60 mounts when the list is scrolled");
   await company.scrollIntoViewIfNeeded();
+  // A large jump remounts the window, and a click that finds the row still
+  // moving retries with its own scroll alignment. Let that happen before the
+  // position is read, so `before` is where the page is when the click lands.
+  await company.click({ trial: true });
   const before = await page.evaluate(() => window.scrollY);
   assert.ok(before > 1000, `the list scrolled to row 60 (scrollY ${before})`);
   const listKey = await entryKey();

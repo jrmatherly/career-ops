@@ -1,8 +1,9 @@
+import { PageFrame } from "@/components/page-frame";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ResumeLoading() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6" aria-label="Loading resume editor">
+    <PageFrame aria-label="Loading resume editor">
       <div className="space-y-2">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-80 max-w-full" />
@@ -15,6 +16,6 @@ export default function ResumeLoading() {
         </div>
         <Skeleton className="min-h-[60vh] w-full rounded-2xl" />
       </div>
-    </div>
+    </PageFrame>
   );
 }

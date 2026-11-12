@@ -33,6 +33,8 @@ test("loading transitions keep context and only latest requests settle Today", {
   page.on("pageerror", (error) => errors.push(error.message));
   const tab = (label) => page.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
   const heading = page.getByRole("heading", { level: 1 });
+  // Today's h1 is the page title; its status line is the first h2.
+  const hero = page.getByRole("heading", { level: 2 }).first();
   const updatesAlert = page.getByRole("alert").filter({ hasText: "could not be loaded." });
   async function until(check) {
     const started = Date.now();
@@ -100,7 +102,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     });
     await page.getByRole("button", { name: /^Company/ }).click();
     await until(() => held);
-    assert.equal(await heading.innerText(), "Follow-up Tracker");
+    assert.equal(await heading.innerText(), "Follow-ups");
     assert.equal(await page.getByPlaceholder("Search company or role…").isVisible(), true);
     assert.equal(await tab("ALL").isVisible(), true);
     assert.equal(await page.locator('tbody[aria-busy="true"]').count(), 1);
@@ -126,14 +128,14 @@ test("loading transitions keep context and only latest requests settle Today", {
     });
     await settled(page, () => page.goto(origin.origin));
     await page.getByRole("button", { name: "Retry updates" }).waitFor();
-    assert.equal(await heading.innerText(), "Some updates are unavailable.");
+    assert.equal(await hero.innerText(), "Some updates are unavailable.");
     assert.equal(await updatesAlert.isVisible(), true);
     assert.equal(await page.getByText("You're all caught up.", { exact: true }).count(), 0);
     retry = true;
     seen.clear();
     await page.getByRole("button", { name: "Retry updates" }).click();
     await until(() => seen.size === 2);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
+    assert.equal(await hero.innerText(), "Your career queue is loading.");
     await page.getByRole("region", { name: "Loading follow-ups due" }).waitFor();
     pending.release();
     await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
@@ -149,7 +151,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     }));
     await settled(page, () => page.goto(origin.origin));
     await page.getByRole("button", { name: "Retry updates" }).waitFor();
-    assert.equal(await heading.innerText(), "Some updates are unavailable.");
+    assert.equal(await hero.innerText(), "Some updates are unavailable.");
     assert.match(await updatesAlert.innerText(), /Follow-ups could not be loaded/);
     assert.equal(await page.getByText("You're all caught up.", { exact: true }).count(), 0);
   });
@@ -184,10 +186,10 @@ test("loading transitions keep context and only latest requests settle Today", {
     release(2);
     await until(() => completed === 4);
     await page.waitForTimeout(100);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
+    assert.equal(await hero.innerText(), "Your career queue is loading.");
     gates.get("3:/api/whats-new").release();
     await until(() => completed === 5);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
+    assert.equal(await hero.innerText(), "Your career queue is loading.");
     gates.get("3:/api/followups").release();
     await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
     await refetch(); await started(4);
@@ -197,7 +199,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     release(4);
     await until(() => completed === 10);
     await page.waitForTimeout(100);
-    assert.equal(await heading.innerText(), "You're all caught up.");
+    assert.equal(await hero.innerText(), "You're all caught up.");
     assert.equal(await updatesAlert.count(), 0);
   });
 

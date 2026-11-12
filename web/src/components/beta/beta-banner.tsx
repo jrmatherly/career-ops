@@ -134,7 +134,7 @@ export function BetaBanner() {
             )}
             <details className="mt-3 rounded-lg border border-border bg-surface/40">
               <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-muted">Exactly what gets attached — review before sending ↓</summary>
-              <pre className="max-h-52 overflow-auto whitespace-pre-wrap border-t border-border px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">{issueBody(diag, desc)}</pre>
+              <pre className="max-h-52 overflow-auto whitespace-pre-wrap border-t border-border px-3 py-2 font-mono text-xs leading-relaxed text-muted">{issueBody(diag, desc)}</pre>
             </details>
             {similar.length > 0 && (
               <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
@@ -151,7 +151,7 @@ export function BetaBanner() {
                 </ul>
               </div>
             )}
-            <p className="mt-2 flex items-start gap-1.5 text-[11px] text-faint">
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-faint">
               <ShieldCheck className="mt-px size-3.5 shrink-0 text-emerald-500" /> Opens a GitHub issue you confirm — nothing is sent until you click. NEVER includes your CV, profile, application answers, or job URLs.
             </p>
             <div className="mt-4 flex justify-end gap-2">

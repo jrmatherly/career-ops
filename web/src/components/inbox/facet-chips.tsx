@@ -118,7 +118,7 @@ export function FacetChips({
           as the tray's "spend" cue (mobile + desktop) — never desktop-only. */}
       <div className="flex items-center gap-1.5">
         <CostBadge kind="free" size="xs" />
-        <span className="text-[11px] text-faint">Filtering is free — only scoring uses tokens.</span>
+        <span className="text-xs text-faint">Filtering is free — only scoring uses tokens.</span>
       </div>
     </div>
   );
