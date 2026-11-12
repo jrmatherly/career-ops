@@ -73,7 +73,7 @@ export function UsageMeter() {
         {rows.map((r) => {
           const pct = Math.min(100, Math.round((r.tokens / r.budget) * 100));
           return (
-            <div key={r.label} title={r.title}>
+            <div key={r.label} title={`${r.title} (${r.tokens.toLocaleString()} tokens)`}>
               <div className="flex items-center justify-between text-xs text-faint">
                 <span>{r.label}</span>
                 <span className="tabular-nums">

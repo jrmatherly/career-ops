@@ -1,4 +1,4 @@
-/** The one page title: nav label, a one-line description, actions on the right. */
+/** The one page title: the nav label, a short description, actions on the right. */
 export function PageHeader({ title, description, actions }: { title: string; description?: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">

@@ -13,7 +13,7 @@ test("formatWhen names today and yesterday in the viewer's zone, otherwise the d
 });
 
 test("formatWhen reads the calendar day in the given zone, not UTC", () => {
-  // 02:00Z on the 12th is still the evening of the 11th in New York.
+  // 01:30Z on the 12th is still the evening of the 11th in New York.
   assert.equal(formatWhen("2026-11-12T01:30:00Z", opts), "Today 8:30 PM");
 });
 

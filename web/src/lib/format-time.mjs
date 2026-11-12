@@ -22,7 +22,7 @@ export function formatDay(isoDate, now = new Date()) {
 const dayKey = (at, timeZone) => at.toLocaleDateString("en-CA", { timeZone });
 
 /**
- * A moment as "Today 7:00 AM", "Yesterday 7:00 AM" or "Nov 5, 7:00 AM" in the viewer's zone.
+ * A moment as "Today 7:00 AM", "Yesterday 7:00 AM" or "Nov 5, 7:00 AM" in `timeZone` (the runtime's zone when omitted).
  * @param {string | null} iso
  * @param {{ now?: Date, timeZone?: string }} [options]
  */

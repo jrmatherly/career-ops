@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
-// Unlike StatCard, every tile's numeral is serif: a row of these is the page's
-// headline counts, and several on one page is intended.
+// Every numeral is serif, unlike ui/stat-card.tsx (one serif number per row of
+// cards): tiles are a page's headline counts, and several on one page is intended.
 export function StatTile({ value, label, href }: { value: number | string; label: string; href?: string }) {
   const frame = "block rounded-2xl border border-border bg-surface px-4 py-3.5";
   const body = (

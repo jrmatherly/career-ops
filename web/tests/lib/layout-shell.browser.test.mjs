@@ -8,7 +8,7 @@ import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
 // /pipeline opens on the inbox, which this fixture leaves empty; ?tab=ALL is the tracker table.
-const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab=ALL", "/followups", "/portals", "/analytics", "/cv", "/documents", "/config", "/board", "/shares"];
+const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab=ALL", "/followups", "/portals", "/analytics", "/cv", "/resume", "/documents", "/config", "/board", "/shares"];
 
 const url = process.env.LAYOUT_SHELL_TEST_URL;
 test("every page sits in one shell under one header, with readable text and reachable targets", { skip: liveServerSkip("LAYOUT_SHELL_TEST_URL"), timeout: 300_000 }, async (t) => {

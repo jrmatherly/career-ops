@@ -67,10 +67,10 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
           <CommandPalette followupsEnabled={followupsEnabled} />
           {/* At md-tall the fixed Ask button sits over the sidebar's foot and the footer reserves room for it, so the
               nav scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
-          <nav className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
+          <nav aria-label="Main" className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
             {main.map(({ label, items }) => (
-              <div key={label} className="flex flex-col gap-0.5">
-                <div className="px-3 pb-1 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+              <div key={label} role="group" aria-labelledby={`nav-group-${label}`} className="flex flex-col gap-0.5">
+                <div id={`nav-group-${label}`} className="px-3 pb-1 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
                 {items.map(navLink)}
               </div>
             ))}
@@ -86,7 +86,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
                 <span className="font-mono text-xs text-faint">THEME</span>
               </div>
               <ThemeToggle showLabel />
-              {pinned.map(navLink)}
+              <nav aria-label="Pinned">{pinned.map(navLink)}</nav>
               <div className="px-1">
                 <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
               </div>

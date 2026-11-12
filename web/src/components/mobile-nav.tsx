@@ -186,10 +186,10 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3">
+        <nav aria-label="Main" className="flex flex-col gap-1 px-3">
           {main.map(({ label, items }) => (
-            <div key={label} className="flex flex-col gap-1">
-              <div className="px-3 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+            <div key={label} role="group" aria-labelledby={`drawer-nav-group-${label}`} className="flex flex-col gap-1">
+              <div id={`drawer-nav-group-${label}`} className="px-3 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
               {items.map(navLink)}
             </div>
           ))}
@@ -201,7 +201,7 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
 
         <div className="co-msafe mt-auto space-y-3 border-t border-border px-4 pt-4">
           <UsageMeter />
-          <div className="-mx-3">{pinned.map(navLink)}</div>
+          <nav aria-label="Pinned" className="-mx-3">{pinned.map(navLink)}</nav>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
