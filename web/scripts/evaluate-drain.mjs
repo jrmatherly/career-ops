@@ -170,6 +170,13 @@ function cvFailure(response) {
   return String(terminal?.msg ?? terminal?.message ?? "the stream ended with no terminal event");
 }
 
+/** The render and tracker warnings the pdf route sends as `⚠️ ` text events before its terminal event. */
+function cvWarnings(response) {
+  return streamEvents(response.text ?? "")
+    .filter((event) => event?.type === "text" && typeof event.text === "string" && event.text.startsWith("⚠️ "))
+    .map((event) => event.text.trim());
+}
+
 /**
  * Drain every auto job's queued rows, one evaluation at a time. Only inside a
  * Kubernetes pod, or on a host that opts in with CAREER_OPS_AUTO_EVALUATE_LOCAL=1:
@@ -327,10 +334,12 @@ export async function runDrain({
         else if (outcome.state !== "queued") note.drainMessage = undefined;
         // A CV is extra to the evaluation, so it changes no ledger row, counts toward no limit and stops nothing.
         if (outcome.state === "evaluated" && outcome.reportN && outcome.score !== null && outcome.score >= cvThreshold) {
-          const failure = cvFailure(await request(baseUrl, "/api/run", {
+          const response = await request(baseUrl, "/api/run", {
             body: { kind: "pdf", input: String(outcome.reportN), cliId: "claude", unattended: true },
             timeoutMs: runTimeoutMs,
-          }));
+          });
+          const failure = cvFailure(response);
+          for (const warning of cvWarnings(response)) log(`cv for report ${outcome.reportN}: ${warning}`);
           log(`cv for report ${outcome.reportN}: ${failure === null ? "ready" : `failed (${failure})`}`);
         }
         if (outcome.stop) {

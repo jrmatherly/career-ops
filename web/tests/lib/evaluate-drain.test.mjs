@@ -709,6 +709,16 @@ test("an evaluation under the score, or with no readable score or report, starts
   }
 });
 
+test("a CV run's warnings reach the run log beside its result", async (t) => {
+  const cv = [{ type: "text", text: "Tailoring the summary." }, { type: "text", text: "⚠️ The tracker row was not marked.\n" }, { type: "done" }];
+  const { root, drain, stderr } = await withDrainRoot(t, { urls: [url(1)], answer: (body) => (body.kind === "pdf" ? cv : scored(94, 4)) });
+  cvThreshold(root, 4);
+  await drain();
+  const log = stderr.join("");
+  assert.match(log, /cv for report 94: ⚠️ The tracker row was not marked\.\n.*cv for report 94: ready/s);
+  assert.doesNotMatch(log, /Tailoring the summary/);
+});
+
 test("a threshold of 0 starts a CV run for every scored evaluation, a score of 0 included", async (t) => {
   const { root, drain, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: (body) => (body.kind === "pdf" ? [{ type: "done" }] : scored(body.input === url(1) ? 5 : 6, body.input === url(1) ? 0 : 1.2)) });
   cvThreshold(root, 0);
