@@ -302,17 +302,24 @@ const TARGETING_MAX_CHARS = 1500;
 
 /**
  * The roles the profile says the candidate wants, as prompt text. Empty when
- * the profile is missing, does not parse or lists no roles, so the ranker then
- * scores from the CV excerpt alone, as it did before.
+ * the profile is missing, does not parse or lists no roles: the ranker then
+ * scores from the CV excerpt alone. It never throws, and says so on stderr
+ * when a profile that is there could not be used.
  */
 export function readTargeting(profilePath) {
+  const without = why => {
+    console.error(`rank-pipeline: ${why}; ranking without the profile's target roles`);
+    return '';
+  };
   let roles;
   try {
     roles = loadYaml(readFileSync(profilePath, 'utf-8'))?.target_roles;
-  } catch {
-    return '';
+  } catch (err) {
+    if (err?.code === 'ENOENT') return '';
+    return without(`${profilePath} could not be read (${String(err?.message ?? err).split('\n')[0]})`);
   }
-  if (!roles || typeof roles !== 'object') return '';
+  if (roles === undefined || roles === null) return '';
+  if (typeof roles !== 'object') return without(`target_roles in ${profilePath} is not a mapping`);
   const line = v => String(v ?? '').replace(/\s+/g, ' ').trim();
   const list = v => (Array.isArray(v) ? v : []);
   const names = v => list(v).filter(x => typeof x === 'string').map(line).filter(Boolean);
@@ -323,11 +330,12 @@ export function readTargeting(profilePath) {
       return detail ? `${line(a.name)} (${detail})` : line(a.name);
     });
   const section = (label, items) => (items.length ? [`${label}:`, ...items.map(i => `- ${i}`)] : []);
-  return [
+  const text = [
     ...section('Primary', names(roles.primary)),
     ...section('Secondary', names(roles.secondary)),
     ...section('Archetypes', archetypes),
   ].join('\n').slice(0, TARGETING_MAX_CHARS);
+  return text || without(`target_roles in ${profilePath} lists no role under primary, secondary or archetypes`);
 }
 
 export function buildPrompt(entries, cvExcerpt, targeting = '') {
@@ -391,7 +399,7 @@ const ANSI = /\x1b\[[0-9;]*m/g;
 /**
  * One line saying why a CLI call failed. err.message from execFileSync starts
  * with "Command failed: <bin> <args>", and the args are the whole prompt (CV
- * excerpt plus postings), so it is never shown.
+ * excerpt, targeting and postings), so it is never shown.
  */
 export function describeCliFailure(err, bin, timeoutMs) {
   if (err?.code === 'ETIMEDOUT') {
