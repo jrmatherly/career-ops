@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
+import { useDeployment } from "@/components/deployment-context";
 import { visibleNavItems, isActivePath } from "@/lib/nav-items";
 import { useJobs } from "@/components/jobs/job-store";
 
@@ -42,6 +43,7 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   const { jobs } = useJobs();
+  const { host } = useDeployment();
   const running = jobs.filter((j) => j.status === "running").length;
 
   // Close on route change.
@@ -197,7 +199,7 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
           <UsageMeter />
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className={`${instrumentSerif.className} text-sm text-faint`}>local-first · v0</span>
+              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
               <span className="font-mono text-[10px] text-faint">THEME</span>
             </div>
             <ThemeToggle showLabel className="bg-surface-hover/40" />

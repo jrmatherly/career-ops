@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ExternalLink, Loader2, RefreshCw, X } from "lucide-react";
 import { PageFrame } from "@/components/page-frame";
+import { useDeployment } from "@/components/deployment-context";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import type { PullResponse, Share } from "@/lib/shares";
@@ -14,6 +15,7 @@ const PUBLISH_CMD = "node publish/share.mjs publish --slug <name> --from-resume"
 const pulledLabel = (at: string) => (Number.isNaN(Date.parse(at)) ? at : `${at.slice(0, 16).replace("T", " ")} UTC`);
 
 export function SharesView({ shares, error, accountUrl }: { shares: Share[]; error: string | null; accountUrl: string | null }) {
+  const { hosted } = useDeployment();
   const router = useRouter();
   // Which pull is in flight: one slug, or every share from Pull all.
   const [pulling, setPulling] = useState<{ slug: string } | { all: true } | null>(null);
@@ -87,7 +89,11 @@ export function SharesView({ shares, error, accountUrl }: { shares: Share[]; err
 
       {!error && shares.length === 0 && (
         <div className="mt-6 rounded-2xl border border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">No shares yet. Publishing stays in the CLI, and the web app never uses the service key:</p>
+          <p className="text-sm text-muted">
+            {hosted
+              ? "No shares yet. Publishing runs from a shell on this server, not from this page:"
+              : "No shares yet. Publishing stays in the CLI, and the web app never uses the service key:"}
+          </p>
           <code className="mt-3 inline-block rounded-md bg-surface-hover px-3 py-1.5 font-mono text-xs text-foreground">{PUBLISH_CMD}</code>
         </div>
       )}

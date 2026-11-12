@@ -9,6 +9,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useDeployment } from "@/components/deployment-context";
 import { CadenceSettings } from "@/components/followups/cadence-settings";
 import { persistCliId, readSavedCliId } from "@/lib/saved-cli";
 import { keepIfInstalled, pickDefaultInstalled } from "@/lib/cli-pick.mjs";
@@ -57,7 +58,9 @@ async function saveCliForScripts(cliId: string): Promise<void> {
   window.dispatchEvent(new Event(SETTINGS_SAVED_EVENT));
 }
 
-export function ConfigForm() {
+export function ConfigForm({ dataRoot }: { dataRoot: string }) {
+  const { hosted, host } = useDeployment();
+  const [showOtherClis, setShowOtherClis] = useState(false);
   const [mode, setMode] = useState<Mode>("cli");
   const [clis, setClis] = useState<Cli[] | null>(null);
   const [cliId, setCliId] = useState<string>("");
@@ -126,12 +129,16 @@ export function ConfigForm() {
   }
 
   const installed = clis?.filter((c) => c.installed) ?? [];
+  const otherClis = (clis?.length ?? 0) - installed.length;
+  const listedClis = hosted && !showOtherClis ? installed : clis ?? [];
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
       <h1 className="font-display text-2xl tracking-tight text-landing">Settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Run career-ops on your own AI, right on your computer. Your CV and data never leave your machine.
+        {hosted
+          ? `Hosted at ${host}. Your data is in ${dataRoot} on this server.`
+          : "Run career-ops on your own AI, right on your computer. Your CV and data never leave your machine."}
       </p>
 
       {/* Engine mode */}
@@ -168,7 +175,7 @@ export function ConfigForm() {
               </div>
             ) : (
               <div className="space-y-2">
-                {clis.map((c) => {
+                {listedClis.map((c) => {
                   const selected = c.id === cliId;
                   const rowClassName = cn(
                     "flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors",
@@ -229,6 +236,19 @@ export function ConfigForm() {
                     </div>
                   );
                 })}
+                {hosted && !showOtherClis && otherClis > 0 && (
+                  <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-surface/20 px-4 py-3 text-sm text-muted">
+                    <CircleDashed className="size-4 shrink-0 text-faint" />
+                    <span className="flex-1">{otherClis === 1 ? "1 other CLI is" : `${otherClis} other CLIs are`} supported and not installed on this server</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowOtherClis(true)}
+                      className="inline-flex min-h-6 shrink-0 items-center text-xs text-brand-text hover:underline max-sm:min-h-[44px]"
+                    >
+                      Show
+                    </button>
+                  </div>
+                )}
                 {installed.length === 0 && (
                   <p className="rounded-xl border border-dashed border-border bg-surface/30 p-4 text-xs text-muted">
                     No supported CLI found on your PATH. Install one (e.g. Claude Code, Gemini CLI, OpenCode) to get started.
@@ -340,7 +360,7 @@ export function ConfigForm() {
           <span role="alert" className="text-xs text-red-500 dark:text-red-400">
             Saved in this browser. The AI tool was not saved for scheduled and terminal runs: {cliSaveError}.
           </span>
-        ) : (
+        ) : hosted ? null : (
           <span className="text-xs text-faint">Local-first · on our roadmap</span>
         )}
       </div>

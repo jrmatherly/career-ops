@@ -2,6 +2,7 @@ import { Radar } from "lucide-react";
 import path from "node:path";
 import { PortalsView } from "@/components/portals-view";
 import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
+import { deploymentMode } from "@/lib/deployment.mjs";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { loadPortalsDocument, watchedCompanies, type WatchedCompany } from "@/lib/portals-config.mjs";
 import { revisionOf } from "@/lib/settings-state.mjs";
@@ -35,7 +36,11 @@ export default function PortalsPage() {
         broken — a broken link means that company silently disappears from every future scan.
       </p>
       <p className="mt-1.5 text-xs text-faint">
-        Backed by <code className="text-muted">portals.yml</code> — edit it directly or ask the assistant.
+        {deploymentMode().hosted ? (
+          <>Backed by <code className="text-muted">portals.yml</code> on this server.</>
+        ) : (
+          <>Backed by <code className="text-muted">portals.yml</code> — edit it directly or ask the assistant.</>
+        )}
       </p>
       {error && (
         <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">

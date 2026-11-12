@@ -5,8 +5,10 @@ import { AppShell } from "@/components/app-shell";
 import { RouteProgressHost } from "@/components/route-progress-host";
 import { ThemeProvider } from "@/components/theme-provider";
 import { DataRootRefused } from "@/components/data-root-refused";
+import { DeploymentProvider } from "@/components/deployment-context";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { dataRootRefusal } from "@/lib/core/data-root.mjs";
+import { deploymentMode } from "@/lib/deployment.mjs";
 import { readFollowupsEnabled } from "@/lib/followups-server";
 import "./globals.css";
 
@@ -47,11 +49,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <RouteProgressHost />
         <ThemeProvider>
-          {refusal ? (
-            <DataRootRefused message={refusal.message} source={refusal.source} />
-          ) : (
-            <AppShell followupsEnabled={readFollowupsEnabled()}>{children}</AppShell>
-          )}
+          <DeploymentProvider value={deploymentMode()}>
+            {refusal ? (
+              <DataRootRefused message={refusal.message} source={refusal.source} />
+            ) : (
+              <AppShell followupsEnabled={readFollowupsEnabled()}>{children}</AppShell>
+            )}
+          </DeploymentProvider>
         </ThemeProvider>
       </body>
     </html>

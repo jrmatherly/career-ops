@@ -9,6 +9,7 @@ import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
 import "../helpers/next-server-stub.mjs";
 import { externalScheduleStatus } from "../../src/lib/scheduled-os-schedule.mjs";
+import { schedulerCardCopy } from "../../src/lib/scheduled-scheduler-status.mjs";
 
 const dataRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-data-"));
 const codeRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-code-"));
@@ -174,4 +175,41 @@ test("without the env the status is the OS schedule and a manual POST leaves las
   } finally {
     process.env.CAREER_OPS_SCHEDULER = ENV.CAREER_OPS_SCHEDULER;
   }
+});
+
+test("the scheduler card names an external scheduler and its last tick, never an OS check", () => {
+  const copy = schedulerCardCopy({
+    source: "external",
+    description: "CronJob career-ops-scan-tick, every 15 minutes",
+    task: { exists: true, enabled: true, lastRun: "2026-11-12T02:00:00Z", nextRun: null },
+  });
+  assert.equal(copy.title, "CronJob career-ops-scan-tick, every 15 minutes");
+  assert.equal(copy.badge, "Running");
+  assert.match(copy.subline, /^Last tick /);
+  assert.doesNotMatch(copy.subline, /Next OS check/);
+});
+
+test("an external scheduler with no description or tick says so", () => {
+  const copy = schedulerCardCopy({ source: "external", description: null, task: { exists: true, enabled: true, lastRun: null, nextRun: null } });
+  assert.equal(copy.title, "External scheduler");
+  assert.equal(copy.subline, "No tick recorded yet");
+});
+
+test("the OS scheduler card keeps its platform copy", () => {
+  const task = { exists: true, enabled: true, lastRun: null, nextRun: null };
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "linux", task }), {
+    title: "Linux cron Integration",
+    badge: "Task enabled",
+    subline: "Next OS check: Not reported · Last OS check: Not reported",
+  });
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "darwin", task: { ...task, exists: false } }), {
+    title: "macOS launchd Integration",
+    badge: "Task not installed",
+    subline: "Install with sh web/scripts/install-scan-schedule.sh to run due jobs automatically.",
+  });
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "aix", task }), {
+    title: "Manual scans",
+    badge: "No automatic schedule",
+    subline: "Automatic scheduling is not available on this platform.",
+  });
 });
