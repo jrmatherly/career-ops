@@ -37,10 +37,11 @@ export function ScheduledJobsView() {
   const [error, setError] = useState<string | null>(null);
   // Apart from the load error, so a background refetch never clears a failed delete or pause.
   const [actionError, setActionError] = useState<string | null>(null);
-  const latestLoad = useRef(0);
+  const loadSeq = useRef(0);
+  const appliedLoad = useRef(0);
 
   const loadData = async (quiet = false) => {
-    const mine = ++latestLoad.current;
+    const mine = ++loadSeq.current;
     if (!quiet) setLoading(true);
     setError(null);
     try {
@@ -50,9 +51,11 @@ export function ScheduledJobsView() {
       ]);
       const resJobs = await jobsResponse.json().catch(() => ({}));
       const resScheduler = await schedulerResponse.json().catch(() => null);
-      // A slower, older load must not put a stale list back over a newer one.
-      if (mine !== latestLoad.current) return;
       if (!jobsResponse.ok) throw new Error(resJobs.error || "Could not load scheduled scans.");
+      // A slower, older load must not put a stale list back over a newer one that already landed.
+      // A newer load that failed does not count, so it cannot discard this one.
+      if (mine < appliedLoad.current) return;
+      appliedLoad.current = mine;
       if (!schedulerResponse.ok) setError(resScheduler?.error || "Could not refresh the scheduler status.");
       setStore({
         jobs: Array.isArray(resJobs.jobs) ? resJobs.jobs : [],
@@ -60,9 +63,9 @@ export function ScheduledJobsView() {
       });
       if (schedulerResponse.ok && isSchedulerStatusPayload(resScheduler)) setScheduler(resScheduler as SchedulerStatus);
     } catch (cause) {
-      if (mine === latestLoad.current) setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
+      if (mine > appliedLoad.current) setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
     } finally {
-      if (mine === latestLoad.current) setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 

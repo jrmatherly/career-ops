@@ -127,7 +127,7 @@ export function PortalsView({
       {res && !res.available && res.error && (
         <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-muted">
           <span className="font-medium text-red-700 dark:text-red-400">The portal check did not finish</span> — no
-          portal was verified, so none is shown as healthy. Try again, or run{" "}
+          portal was verified this time, so any status below is from the last check that did. Try again, or run{" "}
           <code className="text-foreground">node verify-portals.mjs</code> to see why.{" "}
           <code className="break-all font-mono text-xs text-faint">{res.error}</code>
         </p>
@@ -145,7 +145,7 @@ export function PortalsView({
         </p>
       )}
 
-      {watched.length > 0 && (
+      {companies.length > 0 && (
         <div className="mt-6">
           <Tabs
             ariaLabel="Companies"

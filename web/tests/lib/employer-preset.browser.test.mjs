@@ -61,7 +61,7 @@ test(
       `scan button must sit on the first 1280x900 screen, bottom edge at ${scanBox && scanBox.y + scanBox.height}`,
     );
     await page
-      .getByRole("button", { name: "More location controls & scan depth", exact: true })
+      .getByRole("button", { name: "Discovery source, location controls & scan depth", exact: true })
       .click();
     const preset = page.getByRole("radio", {
       name: "Public ATS network",
@@ -342,7 +342,7 @@ test(
       });
       await page.goto(`${new URL(base).origin}/explore`);
       await page
-        .getByRole("button", { name: "More location controls & scan depth", exact: true })
+        .getByRole("button", { name: "Discovery source, location controls & scan depth", exact: true })
         .click();
       const preset = page.getByRole("radio", {
         name: "Public ATS network",

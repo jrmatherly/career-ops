@@ -228,7 +228,7 @@ export function FilterBuilder({
         className="inline-flex min-h-6 items-center gap-1.5 text-[12px] text-muted hover:text-foreground transition-colors max-sm:min-h-[44px]"
       >
         <SlidersHorizontal className="size-3.5" />
-        {hideLists ? "Discovery source & scan depth" : "More location controls & scan depth"}
+        {hideLists ? "Discovery source & scan depth" : "Discovery source, location controls & scan depth"}
         <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
       </button>
 
