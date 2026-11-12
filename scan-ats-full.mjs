@@ -264,15 +264,16 @@ function sortKeys(v) {
 }
 
 // A checkpoint written before filters were recorded carries no fingerprints, so
-// there is nothing to compare and it resumes as it did before. One written
-// before salary_filter and skip_tiers were recorded swept with neither applied,
-// so a missing key there reads as the unset value.
+// the older filters have nothing to compare against. One written before
+// salary_filter and skip_tiers were recorded swept with neither applied, so a
+// missing key there reads as the unset value, with or without fingerprints.
 const KEYS_ADDED_LATER = ['salary_filter', 'skip_tiers'];
 export function changedFilterKeys(cp, fingerprints) {
-  if (!cp?.filters) return [];
+  if (!cp) return [];
   const unset = filterFingerprints({});
-  const stored = (k) => cp.filters[k] ?? (KEYS_ADDED_LATER.includes(k) ? unset[k] : undefined);
-  return Object.keys(fingerprints).filter((k) => stored(k) !== fingerprints[k]);
+  const stored = (k) => cp.filters?.[k] ?? (KEYS_ADDED_LATER.includes(k) ? unset[k] : undefined);
+  const keys = cp.filters ? Object.keys(fingerprints) : KEYS_ADDED_LATER;
+  return keys.filter((k) => stored(k) !== fingerprints[k]);
 }
 
 // Never throws: this runs from parallelEach's `finally`, so an escaping error

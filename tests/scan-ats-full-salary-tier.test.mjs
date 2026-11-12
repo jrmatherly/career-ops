@@ -71,3 +71,9 @@ test('onDrop names the stage that dropped a posting, and stays quiet for a title
   passesFilters({ title: 'Engineer I' }, { ...opts, titleFilter: () => false });
   assert.deepEqual(stages, ['tier', 'salary', 'content']);
 });
+test('a checkpoint with no recorded filters resumes unless one of the two settings is now on', () => {
+  assert.deepEqual(changedFilterKeys({}, filterFingerprints({ title_filter: { positive: ['x'] } })), []);
+  assert.deepEqual(changedFilterKeys(null, filterFingerprints({ skip_tiers: ['entry'] })), []);
+  assert.deepEqual(changedFilterKeys({}, filterFingerprints({ skip_tiers: ['entry'] })), ['skip_tiers']);
+  assert.deepEqual(changedFilterKeys({}, filterFingerprints({ salary_filter: { min: 150000 } })), ['salary_filter']);
+});
