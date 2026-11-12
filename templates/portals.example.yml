@@ -517,6 +517,7 @@
 # skip_tiers: [intern, entry]  # optional: skip listings by seniority tier (note: unrecognized/plain titles fall back to 'mid')
 #   A tracked_companies / job_boards entry can set its own skip_tiers, which replaces this list for
 #   that entry; skip_tiers: [] turns the tier filter off for it.
+#   scan-ats-full.mjs reads only this global list.
 
 title_filter:
   # A `positive` entry is matched case-insensitively as a substring — except a
@@ -738,7 +739,7 @@ title_filter:
     - "Kundenbetreuung"
   # Read only by an agent running modes/scan.md by hand. scan.mjs and
   # scan-ats-full.mjs ignore it. Filter by seniority with positive keywords,
-  # or with skip_tiers for scan.mjs.
+  # or with skip_tiers.
   seniority_boost:
     - "Senior"
     - "Staff"

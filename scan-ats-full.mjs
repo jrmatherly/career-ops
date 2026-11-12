@@ -71,7 +71,8 @@ import paylocity, { boardUrl as paylocityBoardUrl } from './providers/paylocity.
 import join, { parseCompanySitemap } from './providers/join.mjs';
 import { openProviderIdCache, PROVIDER_ID_CACHE_DIR } from './provider-id-cache.mjs';
 import { decodeEntities } from './providers/_html-entities.mjs';
-import { buildTitleFilter, buildTitleFilterOverrides, buildTitleFilterWithOverrides, buildLocationFilter, buildContentFilterOrExit, matchedTitleKeywords, loadSeenUrls, seenJobKey, appendToPipeline, appendToScanHistory, findBlacklistEntry, loadBlacklist, parseSinceDays, BROWSER_PROCESS_ENV, DATA_ROOT as SCAN_DATA_ROOT, PORTALS_PATH, PIPELINE_PATH, SCAN_HISTORY_PATH } from './scan.mjs';
+import { buildTitleFilter, buildTitleFilterOverrides, buildTitleFilterWithOverrides, buildLocationFilter, buildContentFilterOrExit, buildSalaryFilter, matchedTitleKeywords, loadSeenUrls, seenJobKey, appendToPipeline, appendToScanHistory, findBlacklistEntry, loadBlacklist, parseSinceDays, BROWSER_PROCESS_ENV, DATA_ROOT as SCAN_DATA_ROOT, PORTALS_PATH, PIPELINE_PATH, SCAN_HISTORY_PATH } from './scan.mjs';
+import { classifyTier } from './classify-tier.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { printScanSummaryHeader } from './lib/scan-summary-marker.mjs';
 import { SEED_SOURCES, toPortalEntry } from './seeds/vc-portfolios.mjs';
@@ -201,7 +202,59 @@ export function filterFingerprints(config) {
     location_filter: fp(config?.location_filter),
     content_filter: fp(config?.content_filter),
     domain_filter: fp(config?.domain_filter),
+    salary_filter: settingFingerprint(effectiveSalaryFilter(config?.salary_filter)),
+    skip_tiers: settingFingerprint(effectiveSkipTiers(config?.skip_tiers)),
   };
+}
+
+// What the two settings come to once read, so a value that filters nothing
+// (`skip_tiers: []`, a salary_filter with no bound) and a respelling
+// (`[Senior]`) fingerprint as the same setting and do not refuse a --resume.
+function effectiveSkipTiers(value) {
+  if (!Array.isArray(value)) return null;
+  const tiers = [...new Set(value.filter((t) => typeof t === 'string').map((t) => t.toLowerCase()))].sort();
+  return tiers.length ? tiers : null;
+}
+
+function effectiveSalaryFilter(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const min = Number(value.min ?? 0);
+  const max = Number(value.max ?? 0);
+  if (!(min > 0) && !(max > 0)) return null;
+  return { min, max, currency: String(value.currency ?? '').trim().toUpperCase() };
+}
+
+function settingFingerprint(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
+}
+
+const TIERS = ['intern', 'entry', 'mid', 'senior'];
+
+// The global skip_tiers list only: no board the sweep reads is a portals.yml
+// entry, so there is no per-entry list to honor. Stricter than scan.mjs, which
+// reads a malformed global list as no filter and says nothing.
+export function readSkipTiers(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.some((t) => typeof t !== 'string' || !TIERS.includes(t.toLowerCase()))) {
+    throw new Error(`skip_tiers must be a list of ${TIERS.join(', ')}, or [] to turn the tier filter off; got ${JSON.stringify(value)}`);
+  }
+  return value.map((t) => t.toLowerCase());
+}
+
+// Why buildSalaryFilter would turn itself off, or throw, for this value. It
+// only warns on stderr, which a scheduled run that exits 0 never shows, so the
+// sweep refuses to start instead of reporting a filter it did not apply.
+export function salaryFilterProblem(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return 'salary_filter must be a mapping with min, max and currency';
+  // Number() reads false, '' and [] as 0, which would turn the filter off in silence.
+  const bound = (v) => (v === undefined || v === null ? 0 : typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Number(v) : NaN);
+  const min = bound(value.min);
+  const max = bound(value.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0) return 'salary_filter.min and salary_filter.max must be numbers of 0 or more';
+  if (max > 0 && min > max) return 'salary_filter.min cannot be above salary_filter.max';
+  if (value.currency !== undefined && value.currency !== null && typeof value.currency !== 'string') return 'salary_filter.currency must be a currency code such as USD';
+  return null;
 }
 
 function sortKeys(v) {
@@ -213,10 +266,16 @@ function sortKeys(v) {
 }
 
 // A checkpoint written before filters were recorded carries no fingerprints, so
-// there is nothing to compare and it resumes as it did before.
+// the older filters have nothing to compare against. One written before
+// salary_filter and skip_tiers were recorded swept with neither applied, so a
+// missing key there reads as the unset value, with or without fingerprints.
+const KEYS_ADDED_LATER = ['salary_filter', 'skip_tiers'];
 export function changedFilterKeys(cp, fingerprints) {
-  if (!cp?.filters) return [];
-  return Object.keys(fingerprints).filter((k) => cp.filters[k] !== fingerprints[k]);
+  if (!cp) return [];
+  const unset = filterFingerprints({});
+  const stored = (k) => cp.filters?.[k] ?? (KEYS_ADDED_LATER.includes(k) ? unset[k] : undefined);
+  const keys = cp.filters ? Object.keys(fingerprints) : KEYS_ADDED_LATER;
+  return keys.filter((k) => stored(k) !== fingerprints[k]);
 }
 
 // Never throws: this runs from parallelEach's `finally`, so an escaping error
@@ -818,19 +877,22 @@ export function retryGateDecision(jobs, domainFilter, wasDeferred) {
   return boardGateDecision(jobs, domainFilter) === 'gate' ? 'gate' : 'process';
 }
 
-// Title/location/content filter chain for one posting, used by runSeedScan().
-// The main ATS-directory loop below inlines the same three checks (it tracks
-// a droppedContent counter per stage for the run summary), but this shared,
+// Title/tier/location/salary/content filter chain for one posting, used by
+// runSeedScan(). processJobs() below inlines the same five checks in the same
+// order and counts the tier, salary and content drops for the run summary;
+// `onDrop(stage)` gives runSeedScan() the same three counts. This shared,
 // pure, exported helper keeps the content_filter.by_title_keyword wiring
-// (#1846) unit-testable without mocking providers or duplicating the rule
-// order in two places for the caller that doesn't need per-stage counts.
-export function passesFilters(job, { titleFilter, locationFilter, contentFilter, titleFilterConfig, companySlug }) {
+// (#1846) unit-testable without mocking providers.
+export function passesFilters(job, { titleFilter, locationFilter, contentFilter, titleFilterConfig, companySlug, salaryFilter = () => true, skipTiers = [], onDrop = () => {} }) {
+  const dropped = (stage) => { onDrop(stage); return false; };
   if (!titleFilter(job.title, companySlug)) return false;
+  if (skipTiers.length && skipTiers.includes(classifyTier(job.title))) return dropped('tier');
   // job.url is passed so the location filter can fall back to the URL's own
   // location segment when the provider reports a rolled-up "N Locations" string;
   // job.title so a title-stated remote role survives a city-only location.
   if (!locationFilter(job.location, job.url, job.title, job)) return false;
-  if (contentFilter && !contentFilter(job.description, matchedTitleKeywords(job.title, titleFilterConfig))) return false;
+  if (!salaryFilter(job.salary)) return dropped('salary');
+  if (contentFilter && !contentFilter(job.description, matchedTitleKeywords(job.title, titleFilterConfig))) return dropped('content');
   return true;
 }
 
@@ -960,6 +1022,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
 
   const cutoff = Date.now() - opts.sinceDays * 86_400_000;
   const offers = [];
+  const dropped = { tier: 0, salary: 0, content: 0 };
   let errors = 0;
 
   await parallelEach(capped, CONCURRENCY, async (company) => {
@@ -994,6 +1057,9 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
         titleFilter: opts.titleFilter,
         locationFilter: opts.locationFilter,
         contentFilter: opts.contentFilter,
+        salaryFilter: opts.salaryFilter,
+        skipTiers: opts.skipTiers,
+        onDrop: (stage) => { dropped[stage] += 1; },
         companySlug: entry.name,
         titleFilterConfig: opts.titleFilterConfig,
       })) continue;
@@ -1008,7 +1074,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
     }
   });
 
-  return { offers, errors, total: capped.length };
+  return { offers, errors, total: capped.length, dropped };
 }
 
 /**
@@ -1295,6 +1361,19 @@ async function main() {
   // see #1846. Built once here from the same portals.yml config.
   const contentFilter = buildContentFilterOrExit(config?.content_filter);
   warnRescueTitleMissesIgnored(contentFilter);
+  const salaryProblem = salaryFilterProblem(config?.salary_filter);
+  if (salaryProblem) {
+    console.error(`Error: portals.yml ${salaryProblem}; got ${JSON.stringify(config.salary_filter)}`);
+    process.exit(1);
+  }
+  const salaryFilter = buildSalaryFilter(config?.salary_filter);
+  let skipTiers;
+  try {
+    skipTiers = readSkipTiers(config?.skip_tiers);
+  } catch (err) {
+    console.error(`Error: portals.yml ${err.message}`);
+    process.exit(1);
+  }
   // Opt-in, and the opt-in IS the key: `domain_filter` does not exist in any
   // portals.yml written before this feature, so every existing install keeps
   // its exact behaviour and nobody loses a board without having asked for the
@@ -1323,6 +1402,8 @@ async function main() {
   opts.titleFilter = titleFilter;
   opts.locationFilter = locationFilter;
   opts.contentFilter = contentFilter;
+  opts.salaryFilter = salaryFilter;
+  opts.skipTiers = skipTiers;
   // Raw title_filter config, needed by matchedTitleKeywords() to scope
   // content_filter.by_title_keyword the same way scan.mjs does.
   opts.titleFilterConfig = fullTitleFilterConfig;
@@ -1422,6 +1503,8 @@ async function main() {
   let totalRetiredBoardsSkipped = cc.totalRetiredBoardsSkipped || 0;
   let droppedNoDate = cc.droppedNoDate || 0;
   let droppedContent = cc.droppedContent || 0;
+  let droppedTier = cc.droppedTier || 0;
+  let droppedSalary = cc.droppedSalary || 0;
   let capHit = false;
   // Aggregated from providers/workday.mjs's jobs.workdayNoDateSkip tag — see
   // there for why this is a counter instead of a per-company console.error
@@ -1484,6 +1567,8 @@ async function main() {
           datasetStatus,
           postingsKept: partial.length,
           postingsDroppedNoDate: droppedNoDate,
+          postingsDroppedTier: droppedTier,
+          postingsDroppedSalary: droppedSalary,
           unreachableBoards: totalErrors + curErrors,
           domainFilterActive: Boolean(domainFilter),
           domainGatedBoards,
@@ -1499,7 +1584,7 @@ async function main() {
 
   const snapshotCounters = () => ({
     totalCompaniesScanned, totalErrors, totalRetiredBoardsSkipped,
-    droppedNoDate, droppedContent,
+    droppedNoDate, droppedContent, droppedTier, droppedSalary,
     noDateSkipCompanies, noDateSkipJobs, cappedBoards,
     domainGatedBoards, domainGatedPostings,
   });
@@ -1518,6 +1603,14 @@ async function main() {
   // Per-job filter chain, shared by the parallel sweep, the truncation retry
   // pass (workday), and date enrichment (icims). Closure over the filters and
   // counters so both passes update the same run totals.
+  // A board that came back truncated is processed again by the retry pass, so
+  // a posting either filter drops is counted the first time only, by the
+  // identity the kept offers are deduplicated on.
+  const countedDrops = new Set();
+  const firstDrop = (job, provider) => {
+    const token = dedupTokenFor(job, provider);
+    return !countedDrops.has(token) && Boolean(countedDrops.add(token));
+  };
   const processJobs = async (jobs, sourceName, provider, companySlug, shouldContinue = () => true) => {
     for (const job of jobs) {
       if (!shouldContinue()) return;
@@ -1538,20 +1631,37 @@ async function main() {
       // !includeUndated meant --include-undated left every icims posting
       // undated, and since classifyPostingDate can never call an undated
       // posting stale, --since was silently ignored for the entire source.
-      // Enrich first, then let the undated policy decide.
-      if (dateClass === 'undated' && provider.enrichDate
+      // Enrich first, then let the undated policy decide. A skipped tier is
+      // dropped whatever its date, so it never pays for the request either.
+      const tierSkipped = skipTiers.length > 0 && skipTiers.includes(classifyTier(job.title));
+      if (dateClass === 'undated' && provider.enrichDate && !tierSkipped
           && titleFilter(job.title, companySlug) && locationFilter(job.location, job.url, job.title, job)) {
         try { await provider.enrichDate(job, ctx); } catch { /* stays undated */ }
         if (!shouldContinue()) return;
         dateClass = classifyPostingDate(job, cutoff);
       }
       if (dateClass === 'stale') continue;
+      // Ahead of the undated drop: a skipped tier was not date-enriched, and
+      // --include-undated would not keep it, so it is not an undated drop.
+      if (tierSkipped && titleFilter(job.title, companySlug)) {
+        if (firstDrop(job, provider)) {
+          droppedTier++;
+          // The board's postings were all added to the Workday no-date
+          // breakdown, which the summary reports as part of droppedNoDate.
+          if (jobs.workdayNoDateSkip && noDateSkipJobs > 0) noDateSkipJobs--;
+        }
+        continue;
+      }
       if (dateClass === 'undated' && !opts.includeUndated) { droppedNoDate++; continue; }
       if (!titleFilter(job.title, companySlug)) continue;
       // job.url is passed so the location filter can fall back to the URL's own
       // location segment when the provider reports a rolled-up "N Locations" string;
       // job.title so a title-stated remote role survives a city-only location.
       if (!locationFilter(job.location, job.url, job.title, job)) continue;
+      if (!salaryFilter(job.salary)) {
+        if (firstDrop(job, provider)) droppedSalary++;
+        continue;
+      }
       if (!contentFilter(job.description, matchedTitleKeywords(job.title, fullTitleFilterConfig))) { droppedContent++; continue; }
       const dedupToken = dedupTokenFor(job, provider);
       if (seenUrls.has(dedupToken)) continue;
@@ -1867,6 +1977,9 @@ async function main() {
     if (result && result.offers) {
       totalCompaniesScanned += result.total || 0;
       totalErrors += result.errors || 0;
+      droppedTier += result.dropped?.tier || 0;
+      droppedSalary += result.dropped?.salary || 0;
+      droppedContent += result.dropped?.content || 0;
       newOffers.push(...result.offers);
       log(`  done — ${result.total} companies probed, ${result.offers.length} matches (${result.errors} errors)`);
     }
@@ -1913,6 +2026,8 @@ async function main() {
       log(`Blacklisted:      ${blacklistResult.filteredBlacklist} skipped (blacklist)`);
     }
   }
+  if (droppedTier) log(`Tier-filtered:      ${droppedTier}`);
+  if (droppedSalary) log(`Salary-filtered:    ${droppedSalary}`);
   if (droppedContent) log(`Content-filtered:   ${droppedContent}`);
   log(`New matches:        ${offers.length}`);
 
@@ -1987,6 +2102,8 @@ async function main() {
       postingsFilteredBlacklist: blacklistResult.filteredBlacklist,
       postingsAnnotatedBlacklisted: blacklistResult.annotatedBlacklisted,
       postingsDroppedContent: droppedContent,
+      postingsDroppedTier: droppedTier,
+      postingsDroppedSalary: droppedSalary,
       unreachableBoards: totalErrors,
       retiredBoardsSkipped: totalRetiredBoardsSkipped,
       cappedBoards,
