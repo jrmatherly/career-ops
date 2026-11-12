@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
-import { SETTINGS_SAVED_EVENT, dirtyChanges } from "@/lib/settings-form.mjs";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { SETTINGS_SAVED_EVENT, dirtyChanges, formValue, parseFormValue } from "@/lib/settings-form.mjs";
 import type { SettingsGroup, SettingsResponse } from "@/lib/settings-form.mjs";
+import { pendingChanges } from "@/lib/settings-changes.mjs";
 import { PluginStatus } from "./plugin-status";
 import { SettingRow } from "./setting-row";
 
 type Form = Record<string, string | boolean | string[]>;
-type Notice = { group: string; kind: "saved" | "conflict" | "error"; text: string };
+type Notice = { kind: "saved" | "conflict" | "error"; text: string };
 
 const BUTTON = "inline-flex items-center justify-center gap-2 rounded-full bg-brand px-5 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200 disabled:opacity-60 max-sm:min-h-[44px]";
-const QUIET = "rounded-full border border-border px-4 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-hover max-sm:min-h-[44px]";
+const QUIET = "rounded-full border border-border px-4 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-hover disabled:opacity-60 max-sm:min-h-[44px]";
 const BANNER = "mb-6 rounded-xl border border-border bg-surface/40 p-4 text-sm text-muted";
 
 export function SettingsView() {
@@ -21,6 +22,8 @@ export function SettingsView() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Saving several groups in a row needs each save's new revision before React re-renders with it.
+  const revision = useRef<SettingsResponse["revision"] | null>(null);
 
   // keepEdits: a save made elsewhere on the page changes the revision, not what the user has typed here.
   const load = useCallback(async (keepEdits = false) => {
@@ -29,6 +32,7 @@ export function SettingsView() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? `The server answered ${res.status}.`);
       setData(body);
+      revision.current = body.revision;
       setLoadError(null);
       if (!keepEdits) {
         setForm({});
@@ -48,28 +52,41 @@ export function SettingsView() {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, reload);
   }, [load]);
 
+  // Only "Saved." fades; a failure stays until the next save, edit-discard or reload.
+  useEffect(() => {
+    if (notice?.kind !== "saved") return;
+    const timer = setTimeout(() => setNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  /** Resolves true when the server saved the changes. */
   async function send(group: SettingsGroup, changes: Record<string, unknown>, done: string) {
-    if (!data || Object.keys(changes).length === 0) return;
+    if (!data || Object.keys(changes).length === 0) return true;
     setBusy(group.id);
     setNotice(null);
     try {
-      const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: data.revision, changes }) });
+      const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: revision.current, changes }) });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setData(body);
+        revision.current = body.revision;
         setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !Object.hasOwn(changes, id))));
         setErrors({});
-        setNotice({ group: group.id, kind: "saved", text: done });
-      } else if (res.status === 400 && body.errors) {
+        setNotice({ kind: "saved", text: done });
+        return true;
+      }
+      if (res.status === 400 && body.errors) {
         setErrors(body.errors);
-        setNotice({ group: group.id, kind: "error", text: "Nothing was saved. Fix the marked settings and save again." });
+        setNotice({ kind: "error", text: `${group.label} was not saved. Fix the marked settings and save again.` });
       } else {
         // A later file failed after an earlier one was written: say which, since "not saved" would be false for it.
         const written = Array.isArray(body.written) && body.written.length ? ` Already saved: ${body.written.join(", ")}. Reload the page before saving again.` : "";
-        setNotice({ group: group.id, kind: res.status === 409 ? "conflict" : "error", text: (body.error ?? `The server answered ${res.status}.`) + written });
+        setNotice({ kind: res.status === 409 ? "conflict" : "error", text: `${group.label}: ${body.error ?? `The server answered ${res.status}.`}${written}` });
       }
+      return false;
     } catch {
-      setNotice({ group: group.id, kind: "error", text: "The server could not be reached. Nothing was saved." });
+      setNotice({ kind: "error", text: `The server could not be reached. ${group.label} was not saved.` });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -93,6 +110,24 @@ export function SettingsView() {
     );
   }
 
+  const savedByGroup: Record<string, Record<string, unknown>> = {};
+  const draftByGroup: Record<string, Record<string, unknown>> = {};
+  for (const group of data.groups) {
+    const saved = Object.fromEntries(group.settings.filter((s) => s.editable).map((s) => [s.id, parseFormValue(s, formValue(s))]));
+    savedByGroup[group.id] = saved;
+    draftByGroup[group.id] = { ...saved, ...dirtyChanges(group.settings, form) };
+  }
+  const pending = pendingChanges(draftByGroup, savedByGroup);
+  const groups = data.groups;
+
+  // In page order, stopping at the first failure: the groups after it stay pending.
+  async function saveAll() {
+    for (const { id, changes } of pending.groups) {
+      const group = groups.find((g) => g.id === id);
+      if (!group || !(await send(group, changes, "Saved."))) return;
+    }
+  }
+
   const rows = (group: SettingsGroup, states: SettingsGroup["settings"]) => {
     if (states.length === 0) return null;
     return (
@@ -112,6 +147,7 @@ export function SettingsView() {
     );
   };
 
+  const barShown = pending.count > 0 || notice !== null;
   return (
     <div className="pb-16">
       {data.overlayDisabled && (
@@ -131,20 +167,11 @@ export function SettingsView() {
         </p>
       )}
 
-      <nav aria-label="Settings sections" className="mb-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-6 text-sm">
-        {data.groups.map((g) => (
-          <a key={g.id} href={`#settings-${g.id}`} className="inline-flex min-h-6 items-center text-brand-text hover:underline max-sm:min-h-[44px]">{g.label}</a>
-        ))}
-      </nav>
-
       {data.groups.map((group) => {
-        const changes = dirtyChanges(group.settings, form);
-        const canSave = group.settings.some((s) => s.editable);
-        const note = notice?.group === group.id ? notice : null;
         const fileRows = group.settings.filter((s) => s.kind === "portals");
         return (
           <section key={group.id} id={`settings-${group.id}`} aria-labelledby={`settings-${group.id}-heading`} className="mt-8 scroll-mt-6">
-            <h2 id={`settings-${group.id}-heading`} className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">{group.label}</h2>
+            <h2 id={`settings-${group.id}-heading`} className="mb-2 text-base font-semibold text-foreground">{group.label}</h2>
             {group.id === "profile" && <p className="mb-2 text-xs text-faint">Saved to config/profile.yml. Comments in the file are kept.</p>}
             {rows(group, group.settings.filter((s) => s.kind !== "portals"))}
             {fileRows.length > 0 && (
@@ -153,20 +180,37 @@ export function SettingsView() {
                 {rows(group, fileRows)}
               </>
             )}
-            {canSave && (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button type="button" onClick={() => void send(group, changes, "Saved.")} disabled={busy !== null || Object.keys(changes).length === 0} className={BUTTON}>
-                  {busy === group.id ? <Loader2 className="size-4 animate-spin" /> : note?.kind === "saved" ? <Check className="size-4" /> : null}
-                  Save {group.label.toLowerCase()}
-                </button>
-                {note && <span role={note.kind === "saved" ? "status" : "alert"} className="text-xs text-muted">{note.text}</span>}
-                {note?.kind === "conflict" && <button type="button" onClick={() => void load()} className={QUIET}>Reload</button>}
-              </div>
-            )}
             {group.id === "integrations" && <PluginStatus />}
           </section>
         );
       })}
+
+      {/* Fixed, not sticky: <main> sets overflow-x-hidden, which defeats sticky against the window.
+          The wrapper repeats the page's frame and grid so the bar spans the content column, and its
+          right padding keeps the bar clear of the Ask and back-to-top tabs docked on the right edge.
+          The bar stays mounted while empty so its live region exists before the first change. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-30 md:left-60">
+        <div className="mx-auto max-w-6xl pl-4 pr-[calc(4.5rem+env(safe-area-inset-right))] sm:pl-6 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8 2xl:pr-6">
+          <div className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-brand/40 bg-surface py-2.5 pl-4 pr-2.5 text-sm shadow-lg transition-opacity lg:col-start-2 ${barShown ? "pointer-events-auto" : "opacity-0"}`}>
+            <span className="flex min-w-0 flex-col">
+              <span role="status" className="font-medium text-foreground">{pending.count > 0 ? `${pending.count} unsaved ${pending.count === 1 ? "change" : "changes"}` : ""}</span>
+              {notice && <span role={notice.kind === "saved" ? "status" : "alert"} className={`text-xs ${notice.kind === "saved" ? "text-muted" : "text-red-700 dark:text-red-400"}`}>{notice.text}</span>}
+            </span>
+            <span className="flex flex-wrap items-center gap-2">
+              {notice?.kind === "conflict" && <button type="button" onClick={() => void load()} className={QUIET}>Reload</button>}
+              {pending.count > 0 && (
+                <>
+                  <button type="button" onClick={() => { setForm({}); setErrors({}); setNotice(null); }} disabled={busy !== null} className={QUIET}>Discard</button>
+                  <button type="button" onClick={() => void saveAll()} disabled={busy !== null} className={BUTTON}>
+                    {busy !== null && <Loader2 className="size-4 animate-spin" />}
+                    Save changes
+                  </button>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

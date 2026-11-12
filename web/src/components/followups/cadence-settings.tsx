@@ -129,7 +129,7 @@ export function CadenceSettings() {
   };
 
   return (
-    <div>
+    <div id="settings-cadence" className="scroll-mt-6">
       <label className="mt-8 mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-muted">
         Follow-up cadence
       </label>
