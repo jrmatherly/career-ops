@@ -600,9 +600,9 @@ export async function POST(req: Request) {
           sendWarnings(result.warnings);
           const reportN = Number(result.num);
           if (Number.isFinite(reportN)) {
-            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, reportN });
+            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, reportN, score: result.score });
           } else {
-            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd });
+            send({ type: "done", tokens: lastTokens, costUsd: lastCostUsd, score: result.score });
           }
         } catch (e) {
           send({ type: "error", msg: `Evaluation persist crashed unexpectedly: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200) });

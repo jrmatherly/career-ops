@@ -102,6 +102,12 @@ export function formatScore(raw) {
   return `${n.toFixed(1)}/5`;
 }
 
+/** A score cell ("4.0/5") as a number from 0 to 5, or null when it is not one. */
+export function scoreValue(cell) {
+  const n = parseFloat(cell);
+  return Number.isFinite(n) && n >= 0 && n <= 5 ? n : null;
+}
+
 /**
  * Company, role, score, via from the report. Machine Summary wins; the
  * `# Evaluation: Company — Role` title is the fallback for company/role.
@@ -220,7 +226,7 @@ function spawnScript({ spawnFn, execPath, root, cwd = root, script, args = [], i
  * honesty gate as every other evaluate failure.
  *
  * @param {{spawnFn: Function, execPath: string, root: string, coreRoot?: string, markdown: string, url: string, today: string, postedAt?: string, evaluationSections?: string[]}} args
- * @returns {Promise<{ok: true, num: string, reportFile: string, warnings: string[]} | {ok: false, error: string}>}
+ * @returns {Promise<{ok: true, num: string, reportFile: string, score: number|null, warnings: string[]} | {ok: false, error: string}>}
  */
 export async function persistEvaluation({ spawnFn, execPath, root, coreRoot = root, markdown, url, today, postedAt, evaluationSections = undefined }) {
   const evaluation = parseEvaluationOptions(evaluationSections);
@@ -358,5 +364,5 @@ export async function persistEvaluation({ spawnFn, execPath, root, coreRoot = ro
       warnings.push("Evaluation saved, but the inbox checkbox could not be updated.");
     }
   }
-  return { ok: true, num, reportFile, warnings };
+  return { ok: true, num, reportFile, score: scoreValue(meta.score), warnings };
 }
