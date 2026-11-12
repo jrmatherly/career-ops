@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   addedLink,
   clampEvaluate,
+  enrichLedger,
   evaluateBody,
   evaluateFieldsVisible,
   evaluateForm,
@@ -107,4 +108,39 @@ test("the panel links a ledger URL only when it is http(s)", () => {
   assert.equal(postingHref("javascript:alert(1)"), null);
   assert.equal(postingHref("local:jds/posting.md"), null);
   assert.equal(postingHref(""), null);
+});
+
+test("a ledger entry takes company, role, score and tracker number from its tracker row, else company and role from the inbox", () => {
+  const entries = [
+    { key: "k1", url: "https://jobs.example.com/a/1?utm_source=x", state: "evaluated", reason: "report 7" },
+    { key: "k2", url: "https://jobs.example.com/b/2", state: "queued", reason: "" },
+    { key: "k3", url: "https://jobs.example.com/c/3", state: "queued", reason: "" },
+    { key: "k4", url: "https://jobs.example.com/d/4", state: "queued", reason: "" },
+  ];
+  const inbox = [
+    { url: "https://jobs.example.com/a/1", company: "Inbox Name", role: "Inbox Role", done: true },
+    { url: "https://jobs.example.com/b/2", company: "Company B", role: "Data Engineer", done: false },
+    { url: "https://jobs.example.com/d/4", company: "", role: "", done: false },
+  ];
+  const applications = [{ n: "94", company: "Company A", role: "Platform Engineer", score: "4.0/5", url: "[ashby](https://jobs.example.com/a/1)" }];
+  const [a, b, c, d] = enrichLedger(entries, inbox, applications);
+  assert.deepEqual(a, { ...entries[0], company: "Company A", role: "Platform Engineer", score: "4.0/5", trackerN: "94" }, "the tracker row wins over the inbox, and a markdown-link URL cell still matches");
+  assert.deepEqual(b, { ...entries[1], company: "Company B", role: "Data Engineer" }, "the inbox supplies company and role only");
+  assert.deepEqual(c, entries[2], "no match leaves the entry as it was, URL intact");
+  assert.deepEqual(d, entries[3], "an inbox row with blank cells adds nothing");
+});
+
+test("rows with no URL key never lend their name, and a score sentinel is not shown as a score", () => {
+  const entries = [{ url: "local:jds/x.md" }, { url: "" }, { url: "https://jobs.example.com/e/5" }];
+  const inbox = [{ url: "", company: "Inbox Blank", role: "r" }];
+  const applications = [
+    { n: "1", company: "No Url", role: "R", score: "3/5", url: "" },
+    { n: "2", company: "Dash", role: "R", score: "3/5", url: "—" },
+    { n: "3", company: "Backfilled", role: "R", score: "N/A", url: "https://jobs.example.com/e/5" },
+  ];
+  assert.deepEqual(enrichLedger(entries, inbox, applications), [
+    entries[0],
+    entries[1],
+    { ...entries[2], company: "Backfilled", role: "R", trackerN: "3" },
+  ]);
 });

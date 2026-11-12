@@ -1175,7 +1175,12 @@ function resolveActiveCli() {
   return resolveCliFromPath();
 }
 
-function checkPlaywrightMcp(root, activeCli) {
+function checkPlaywrightMcp(root, activeCli, env = process.env) {
+  // doctor runs outside the web process and cannot see how the page is
+  // served, so it keys on the scheduler and Kubernetes variables.
+  if (env.KUBERNETES_SERVICE_HOST || String(env.CAREER_OPS_SCHEDULER ?? '').trim().toLowerCase() === 'external') {
+    return { pass: true, notNeeded: true, label: "Playwright MCP not needed here (hosted install: the web's read-only workers load no MCP servers)" };
+  }
   // Unknown CLI (typo / not in AGENT_CLIS), or several CLIs on PATH and no
   // selection yet. Neither has a config to scan, and neither should be handed
   // another CLI's install command.
@@ -2088,7 +2093,7 @@ function onboardingState(root) {
   ];
 
   const playwrightMcp = activeCli !== 'unknown' && activeCli !== 'unset' && MCP_CONFIGS.find((c) => c.cli === activeCli)
-    ? { [activeCli]: mcpCheck?.pass === true }
+    ? { [activeCli]: mcpCheck?.pass === true && !mcpCheck.notNeeded }
     : {};
 
   let plugins = [];

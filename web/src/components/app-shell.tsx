@@ -18,10 +18,12 @@ import { BetaBanner } from "@/components/beta/beta-banner";
 import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
 import { instrumentSerif } from "@/lib/fonts";
+import { useDeployment } from "@/components/deployment-context";
 import { visibleNavItems, isActivePath } from "@/lib/nav-items";
 
 export function AppShell({ children, followupsEnabled }: { children: React.ReactNode; followupsEnabled: boolean }) {
   const pathname = usePathname();
+  const { host } = useDeployment();
   return (
     <JobsProvider>
       <PipelineProvider>
@@ -82,7 +84,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
               </div>
               <ThemeToggle showLabel />
               <div className="px-1">
-                <span className={`${instrumentSerif.className} text-sm text-faint`}>local-first · v0</span>
+                <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
               </div>
             </div>
           </div>

@@ -49,6 +49,8 @@ function hostEnv() {
     OPENCODE_CONFIG_DIR: _openCodeConfigDir,
     XDG_CONFIG_HOME: _xdgConfigHome,
     PATH: _path,
+    KUBERNETES_SERVICE_HOST: _kubernetesHost,
+    CAREER_OPS_SCHEDULER: _scheduler,
     ...rest
   } = process.env;
   return { ...rest, PATH: EMPTY_PATH_DIR };
@@ -1226,6 +1228,40 @@ try {
       }
     } finally {
       rmSync(home, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // On a hosted install every non-writing web worker runs with --strict-mcp-config,
+  // so the warning would ask for something the evaluation workers cannot use.
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'co-mcp-hosted-'));
+    try {
+      for (const [name, env] of [
+        ['CAREER_OPS_SCHEDULER=external', { CAREER_OPS_SCHEDULER: 'external' }],
+        ['CAREER_OPS_SCHEDULER= External ', { CAREER_OPS_SCHEDULER: ' External ' }],
+        ['KUBERNETES_SERVICE_HOST set', { KUBERNETES_SERVICE_HOST: '10.0.0.1' }],
+      ]) {
+        const state = runDoctor(dir, [], env);
+        if (!state._error && !state.warnings.some((w) => PLAYWRIGHT_RE.test(w)) && state.playwright_mcp?.claude === false) {
+          pass(`hosted install (${name}) gets no Playwright MCP warning and is not reported as configured`);
+        } else {
+          fail(`hosted install (${name}) still warns: ${JSON.stringify(state)}`);
+        }
+      }
+      const human = runDoctorHuman(dir, { CAREER_OPS_SCHEDULER: 'external' });
+      if (/Playwright MCP not needed here \(hosted install/.test(human)) {
+        pass('human doctor output says Playwright MCP is not needed on a hosted install');
+      } else {
+        fail(`human doctor output lacks the hosted line: ${human}`);
+      }
+      const local = runDoctor(dir, [], {});
+      if (!local._error && local.warnings.some((w) => /Playwright MCP tools not detected/.test(w))) {
+        pass('local install with no MCP config keeps the Playwright MCP warning');
+      } else {
+        fail(`local install lost the warning: ${JSON.stringify(local)}`);
+      }
+    } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }

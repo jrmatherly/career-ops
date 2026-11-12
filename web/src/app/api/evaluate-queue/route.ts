@@ -1,11 +1,13 @@
 import fs from "node:fs";
-import { rootScript } from "@/lib/career-ops";
+import { readApplications, readInbox, rootScript } from "@/lib/career-ops";
 import { runCoreCli } from "@/lib/core-cli";
+import { enrichLedger } from "@/lib/evaluate-settings.mjs";
 
 export const runtime = "nodejs"; // delegates to the core CLI via child_process
 export const dynamic = "force-dynamic";
 
 export const SKIPPED_HEADER = "X-Evaluate-Queue-Skipped";
+export const UNNAMED_HEADER = "X-Evaluate-Queue-Unnamed";
 
 // The auto-mode ledger, data/evaluate-queue.tsv, as `evaluate-queue.mjs dump --json`
 // prints it. Read-only. The CLI's stderr names absolute paths, so it is logged, never returned.
@@ -33,5 +35,15 @@ export async function GET() {
   if (!Array.isArray(entries)) return unreadable("stdout is not a JSON array");
   // The CLI exits 0 and counts the rows it could not parse on stderr; the count rides a header so the dump keeps its shape.
   const skipped = /^warning: (\d+) malformed row/m.exec(stderr)?.[1];
-  return Response.json(entries, skipped ? { headers: { [SKIPPED_HEADER]: skipped } } : undefined);
+  const headers: Record<string, string> = skipped ? { [SKIPPED_HEADER]: skipped } : {};
+  // Names are a convenience: an unreadable tracker or inbox leaves the rows as URLs rather than
+  // hiding the queue, and the header lets the panel say so. The cause names absolute paths, so it is logged only.
+  try {
+    const applications = readApplications();
+    entries = enrichLedger(entries, readInbox(applications), applications);
+  } catch (cause) {
+    console.error("/api/evaluate-queue: the rows are not named:", cause);
+    headers[UNNAMED_HEADER] = "1";
+  }
+  return Response.json(entries, { headers });
 }

@@ -67,7 +67,7 @@ test("saving the AI engine also saves CAREER_OPS_CLI, and the sections reload af
 
 test("the page renders both parts and the nav calls it Settings", () => {
   const page = src("app/config/page.tsx");
-  assert.match(page, /<ConfigForm \/>\s*<SettingsView \/>/);
+  assert.match(page, /<ConfigForm [^>]*\/>\s*<SettingsView \/>/);
   assert.match(src("lib/nav-items.ts"), /href: "\/config", label: "Settings"/);
   assert.match(form, />Settings<\/h1>/);
 });

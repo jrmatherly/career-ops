@@ -23,26 +23,16 @@ import { EvaluateQueuePanel } from "./scheduled-scans/evaluate-queue-panel";
 import type { ScheduledJob, JobRun } from "@/lib/scheduled-jobs";
 import { instrumentSerif } from "@/lib/fonts";
 import { updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
-import { isSchedulerStatusPayload } from "@/lib/scheduled-scheduler-status.mjs";
+import { isSchedulerStatusPayload, osSchedulerFor, schedulerCardCopy } from "@/lib/scheduled-scheduler-status.mjs";
 
 type Store = { jobs: ScheduledJob[]; runs: JobRun[] };
 type SchedulerStatus = {
   platform: "win32" | "darwin" | "linux" | string;
   available: boolean;
   running: boolean;
+  source: "os" | "external";
+  description: string | null;
   task: { exists: boolean; enabled: boolean; nextRun: string | null; lastRun: string | null };
-};
-
-function formatTaskTime(value: string | null) {
-  if (!value) return "Not reported";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-}
-
-const OS_SCHEDULERS: Record<string, { title: string; install: string } | undefined> = {
-  win32: { title: "Windows Task Scheduler Integration", install: "web/scripts/install-scan-schedule.ps1" },
-  darwin: { title: "macOS launchd Integration", install: "sh web/scripts/install-scan-schedule.sh" },
-  linux: { title: "Linux cron Integration", install: "sh web/scripts/install-scan-schedule.sh" },
 };
 
 export function ScheduledJobsView() {
@@ -149,7 +139,8 @@ export function ScheduledJobsView() {
   const totalRolesFound = store.runs.reduce((acc, r) => acc + (r.rolesFound || 0), 0);
   const successRate = scanSuccessLabel(totalRuns, successRuns);
 
-  const osScheduler = scheduler ? OS_SCHEDULERS[scheduler.platform] : undefined;
+  const osScheduler = scheduler ? osSchedulerFor(scheduler.platform) : undefined;
+  const card = scheduler ? schedulerCardCopy(scheduler) : null;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 md:px-8 space-y-8">
@@ -213,31 +204,23 @@ export function ScheduledJobsView() {
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  {osScheduler?.title ?? "Manual scans"}
+                  {card?.title}
                   <span
                     className={
-                      scheduler.task.exists && scheduler.task.enabled
+                      card?.healthy
                         ? "rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:text-emerald-400"
                         : "rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300"
                     }
                   >
-                    {!osScheduler
-                      ? "No automatic schedule"
-                      : scheduler.task.exists
-                        ? scheduler.task.enabled ? "Task enabled" : "Task disabled"
-                        : "Task not installed"}
+                    {card?.badge}
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted">
-                  {!osScheduler
-                    ? "Automatic scheduling is not available on this platform."
-                    : scheduler.task.exists
-                      ? "Next OS check: " + formatTaskTime(scheduler.task.nextRun) + " · Last OS check: " + formatTaskTime(scheduler.task.lastRun)
-                      : `Install with ${osScheduler.install} to run due jobs automatically.`}
+                  {card?.subline}
                 </div>
               </div>
             </div>
-            {osScheduler && <button
+            {(osScheduler || scheduler.source === "external") && <button
               type="button"
               onClick={handleTriggerOsScheduler}
               disabled={osRunning || scheduler.running || !scheduler.available}

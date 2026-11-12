@@ -9,6 +9,7 @@ import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
 import "../helpers/next-server-stub.mjs";
 import { externalScheduleStatus } from "../../src/lib/scheduled-os-schedule.mjs";
+import { isSchedulerStatusPayload, schedulerCardCopy } from "../../src/lib/scheduled-scheduler-status.mjs";
 
 const dataRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-data-"));
 const codeRoot = mkdtempSync(join(tmpdir(), "co-sched-ext-code-"));
@@ -174,4 +175,64 @@ test("without the env the status is the OS schedule and a manual POST leaves las
   } finally {
     process.env.CAREER_OPS_SCHEDULER = ENV.CAREER_OPS_SCHEDULER;
   }
+});
+
+test("the scheduler card names an external scheduler and its last tick, never an OS check", () => {
+  const copy = schedulerCardCopy({
+    source: "external",
+    description: "CronJob career-ops-scan-tick, every 15 minutes",
+    task: { exists: true, enabled: true, lastRun: "2026-11-12T02:00:00Z", nextRun: null },
+  }, Date.parse("2026-11-12T02:20:00Z"));
+  assert.equal(copy.title, "CronJob career-ops-scan-tick, every 15 minutes");
+  assert.equal(copy.badge, "Running");
+  assert.equal(copy.healthy, true);
+  assert.match(copy.subline, /^Last tick /);
+  assert.doesNotMatch(copy.subline, /Next OS check/);
+});
+
+test("an external scheduler with no description or tick says so", () => {
+  const copy = schedulerCardCopy({ source: "external", description: null, task: { exists: true, enabled: true, lastRun: null, nextRun: null } });
+  assert.equal(copy.title, "External scheduler");
+  assert.equal(copy.subline, "No tick recorded yet");
+  assert.equal(copy.badge, "Waiting for first tick");
+  assert.equal(copy.healthy, false);
+});
+
+test("an external scheduler whose last tick is over an hour old is not called running", () => {
+  const task = { exists: true, enabled: true, lastRun: "2026-11-12T02:00:00Z", nextRun: null };
+  const copy = schedulerCardCopy({ source: "external", description: null, task }, Date.parse("2026-11-12T03:00:01Z"));
+  assert.equal(copy.badge, "No recent tick");
+  assert.equal(copy.healthy, false);
+  assert.match(copy.subline, /^Last tick /);
+});
+
+test("the client guard takes the external status the server builds, and refuses a wrong source or description", () => {
+  const task = externalScheduleStatus({ description: "CronJob x", tickMtimeMs: undefined });
+  assert.equal(isSchedulerStatusPayload({ source: "external", description: "CronJob x", task }), true);
+  assert.equal(isSchedulerStatusPayload({ source: "external", description: null, task }), true);
+  assert.equal(isSchedulerStatusPayload({ source: "os", task }), true);
+  assert.equal(isSchedulerStatusPayload({ source: "k8s", task }), false);
+  assert.equal(isSchedulerStatusPayload({ source: "external", description: 42, task }), false);
+});
+
+test("the OS scheduler card keeps its platform copy", () => {
+  const task = { exists: true, enabled: true, lastRun: null, nextRun: null };
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "linux", task }), {
+    title: "Linux cron Integration",
+    badge: "Task enabled",
+    healthy: true,
+    subline: "Next OS check: Not reported · Last OS check: Not reported",
+  });
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "darwin", task: { ...task, exists: false } }), {
+    title: "macOS launchd Integration",
+    badge: "Task not installed",
+    healthy: false,
+    subline: "Install with sh web/scripts/install-scan-schedule.sh to run due jobs automatically.",
+  });
+  assert.deepEqual(schedulerCardCopy({ source: "os", platform: "aix", task }), {
+    title: "Manual scans",
+    badge: "No automatic schedule",
+    healthy: false,
+    subline: "Automatic scheduling is not available on this platform.",
+  });
 });
