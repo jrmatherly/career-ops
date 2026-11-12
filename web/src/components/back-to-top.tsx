@@ -35,7 +35,7 @@ export function BackToTop() {
       tabIndex={visible ? 0 : -1}
       className={cn(
         // The last block's pb-32 lets content scroll clear of this tab and Ask below it.
-        "fixed bottom-[4.5rem] right-[env(safe-area-inset-right)] z-40 flex h-11 w-9 items-center justify-center rounded-l-full",
+        "fixed bottom-[4.5rem] right-0 z-40 box-content flex h-11 w-9 items-center pr-[env(safe-area-inset-right)] justify-center rounded-l-full",
         "border border-r-0 border-border bg-surface/90 text-muted shadow-lg backdrop-blur",
         "transition-[opacity,transform,color,background-color] duration-200",
         "hover:bg-surface-hover hover:text-foreground",

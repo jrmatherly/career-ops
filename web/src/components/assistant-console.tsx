@@ -829,7 +829,7 @@ export function AssistantConsole() {
           onPointerEnter={loadMarkdown}
           onFocus={loadMarkdown}
           aria-label="Ask the assistant"
-          className="group fixed bottom-5 right-[env(safe-area-inset-right)] z-50 flex items-center justify-center rounded-l-full border border-r-0 border-border bg-surface/90 py-1.5 pl-1.5 pr-1 shadow-lg backdrop-blur transition-colors hover:bg-surface-hover max-sm:min-h-[44px] max-sm:pr-3 pointer-coarse:min-h-[44px] pointer-coarse:pr-3"
+          className="group fixed bottom-5 right-0 z-50 box-content flex items-center justify-center rounded-l-full border border-r-0 border-border bg-surface/90 py-1.5 pl-1.5 pr-[max(0.25rem,env(safe-area-inset-right))] shadow-lg backdrop-blur transition-colors hover:bg-surface-hover max-sm:min-h-[44px] max-sm:pr-[max(0.75rem,env(safe-area-inset-right))] pointer-coarse:min-h-[44px] pointer-coarse:pr-[max(0.75rem,env(safe-area-inset-right))]"
         >
           <CoMark size={26} />
           <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-[max-width,opacity,padding] duration-200 group-hover:max-w-16 group-hover:pl-2 group-hover:pr-2.5 group-hover:opacity-100 group-focus-visible:max-w-16 group-focus-visible:pl-2 group-focus-visible:pr-2.5 group-focus-visible:opacity-100 motion-reduce:transition-none max-sm:max-w-16 max-sm:pl-2 max-sm:opacity-100 pointer-coarse:max-w-16 pointer-coarse:pl-2 pointer-coarse:opacity-100">Ask</span>
