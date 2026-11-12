@@ -234,7 +234,7 @@ Copy, exact:
 
 | Place | Hosted | Local |
 |---|---|---|
-| Sidebar and mobile nav footer | `Hosted · {host}` | `local-first · v0` (unchanged) |
+| Sidebar and mobile nav footer | `Hosted · {host}` | nothing (the `local-first · v0` line was removed in phase 5) |
 | Settings description | `Hosted at {host}. Your data is in {dataRoot} on this server.` | unchanged |
 | Settings CLI list | installed CLIs as rows, then one row `{n} other CLIs are supported and not installed on this server` with a `Show` button | unchanged |
 | Settings stray line `Local-first · on our roadmap` | not rendered | unchanged |

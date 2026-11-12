@@ -35,3 +35,8 @@ test("agoLabel counts days, then weeks, then months", () => {
   assert.equal(agoLabel(90), "3 months ago");
   assert.equal(agoLabel(null), "");
 });
+
+test("agoLabel shows nothing for a day count that is not a number", () => {
+  assert.equal(agoLabel(Number.NaN), "");
+  assert.equal(agoLabel(Infinity), "");
+});

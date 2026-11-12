@@ -67,6 +67,7 @@ test("every page sits in one shell under one header, with readable text and reac
       // main clips its own overflow, so the document alone would never show it.
       scrollWidth: Math.max(document.documentElement.scrollWidth, window.innerWidth - main.clientWidth + main.scrollWidth),
       innerWidth: window.innerWidth,
+      lastPad: parseFloat(getComputedStyle(main.lastElementChild).paddingBottom),
       smallText: [...new Set(smallText)],
       smallTargets: [...new Set(smallTargets)],
     };
@@ -85,6 +86,10 @@ test("every page sits in one shell under one header, with readable text and reac
     });
     await t.test(`${route}: no horizontal overflow at 1280`, () => {
       assert.ok(m.scrollWidth <= m.innerWidth, `content is ${m.scrollWidth}px wide in a ${m.innerWidth}px window`);
+    });
+    // Ask and back to top are docked on the right edge; their stack ends 116px above the bottom.
+    await t.test(`${route}: the last block scrolls clear of the docked tabs`, () => {
+      assert.ok(m.lastPad >= 116, `main's last block pads ${m.lastPad}px at the bottom`);
     });
     await t.test(`${route}: no text under 12px`, () => {
       assert.deepEqual(m.smallText, []);

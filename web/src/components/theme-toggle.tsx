@@ -15,7 +15,7 @@ export function ThemeToggle({ className, showLabel = false }: { className?: stri
       size={showLabel ? "default" : "icon"}
       type="button"
       onClick={toggleTheme}
-      aria-label="Toggle theme"
+      aria-label={`Toggle theme, currently ${dark ? "dark" : "light"}`}
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
       className={cn("text-muted", showLabel && "w-full justify-start px-2 text-xs", className)}
     >

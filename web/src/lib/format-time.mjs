@@ -1,6 +1,6 @@
 /** @param {number | null} days */
 export function agoLabel(days) {
-  if (days == null) return "";
+  if (days == null || !Number.isFinite(days)) return "";
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 14) return `${days} days ago`;

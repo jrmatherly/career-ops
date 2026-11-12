@@ -47,7 +47,10 @@ test("the version pill stays in the sidebar and the page scrolls clear of Ask at
   assert.equal(overlapSize(pillBox, settings), null, "version pill covers the Settings section");
   assert.ok(1440 - (askBox.x + askBox.width) <= 40 && 900 - (askBox.y + askBox.height) <= 40, `Ask is not in the bottom-right corner: ${JSON.stringify(askBox)}`);
   const framePad = await page.locator("main > .mx-auto").last().evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
-  assert.ok(framePad >= 900 - askBox.y, `the page frame's ${framePad}px bottom padding cannot scroll content clear of Ask at y=${askBox.y}`);
+  // Back to top sits above Ask and is laid out even while hidden, 8px lower than where it shows.
+  const topBox = await page.getByRole("button", { name: "Back to top", includeHidden: true }).boundingBox();
+  assert.ok(topBox);
+  assert.ok(framePad >= 900 - (topBox.y - 8), `the page frame's ${framePad}px bottom padding cannot scroll content clear of the tabs, whose top is at y=${topBox.y - 8}`);
 
   const hits = await page.evaluate(() => {
     const labelAt = (x, y) => {

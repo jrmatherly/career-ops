@@ -9,9 +9,7 @@ import { shouldShowBackToTop, scrollBehaviorFor } from "@/lib/scroll-to-top.mjs"
 // once from the app shell. The window is the scroll container here (main has no
 // own overflow-y), so it listens on window scroll and calls window.scrollTo.
 //
-// It sits one row above bottom-5 right-5, which the assistant launcher owns on
-// narrow or short windows (on tall desktop windows the launcher moves into the
-// sidebar). A lower z-index lets an open assistant panel cover it. When hidden it's removed from the tab order
+// It is docked on the right edge one row above the Ask tab. A lower z-index lets an open assistant panel cover it. When hidden it's removed from the tab order
 // and hidden from assistive tech, so there's nothing to land on until it shows.
 export function BackToTop() {
   const [visible, setVisible] = useState(false);
@@ -36,8 +34,8 @@ export function BackToTop() {
       aria-hidden={!visible}
       tabIndex={visible ? 0 : -1}
       className={cn(
-        // Docked above the Ask tab, so the pair covers only the page gutter.
-        "fixed bottom-[4.5rem] right-0 z-40 flex h-11 w-9 items-center justify-center rounded-l-full",
+        // The last block's pb-32 lets content scroll clear of this tab and Ask below it.
+        "fixed bottom-[4.5rem] right-[env(safe-area-inset-right)] z-40 flex h-11 w-9 items-center justify-center rounded-l-full",
         "border border-r-0 border-border bg-surface/90 text-muted shadow-lg backdrop-blur",
         "transition-[opacity,transform,color,background-color] duration-200",
         "hover:bg-surface-hover hover:text-foreground",

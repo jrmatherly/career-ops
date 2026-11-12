@@ -521,7 +521,8 @@ export function PipelineView({
     cursorScrollPending.current = true;
     const top = body.getBoundingClientRect().top + window.scrollY + cursor * rowPx;
     if (top < window.scrollY) window.scrollTo({ top });
-    else window.scrollTo({ top: top + rowPx - window.innerHeight });
+    // scrollIntoView honours the page's scroll-padding-bottom, so aim there or the row moves twice.
+    else window.scrollTo({ top: top + rowPx - window.innerHeight + (parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0) });
     // Not keyed on rowPx: a new measurement must not move the page.
   }, [cursor, visibleTab]);
   useLayoutEffect(() => {

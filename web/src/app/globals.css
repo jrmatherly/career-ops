@@ -53,7 +53,7 @@
   --border: hsl(40 9% 86%);
   --fg: hsl(30 10% 11%); /* warm near-black, high legibility */
   --muted: hsl(35 9% 34%); /* darker than before for readable body text */
-  --faint: hsl(35 7% 38%); /* AA with margin on the cream surfaces: 42% measured 4.79:1 there, 0.3 above the floor */
+  --faint: hsl(35 7% 38%); /* AA with margin on the cream surfaces: 5.58:1 on #f7f6f3 */
   --landing: #59592a; /* olive editorial headline */
   --brand-text: hsl(26 80% 36%); /* darkened brand for small text: 5.5 white / 5.1 cream / 4.7 surface-hover */
   --dot: 40 8% 42% / 0.09;
