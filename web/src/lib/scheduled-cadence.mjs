@@ -61,3 +61,27 @@ export function nextScheduledRun(startAt, every, unit, nowMs = Date.now(), timez
   const steps = Math.floor((nowMs - first) / interval) + 1;
   return new Date(first + steps * interval).toISOString();
 }
+
+const ZONE_NAMES = { ET: "Eastern", CT: "Central", MT: "Mountain", PT: "Pacific", "GMT+0": "UTC", GMT: "UTC" };
+
+export function cadenceLabel({ unit, every, timezone = "UTC", startAt }) {
+  const when = new Date(startAt);
+  const weekly = unit === "days" && Number(every) === 7;
+  const interval = `Every ${every} ${Number(every) === 1 ? String(unit).replace(/s$/, "") : unit}`;
+  let parts;
+  try {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      ...(weekly ? { weekday: "short" } : {}),
+      hour: "numeric", minute: "2-digit", timeZoneName: "shortGeneric",
+    }).formatToParts(when);
+  } catch {
+    return interval;
+  }
+  const pick = (type) => parts.find((part) => part.type === type)?.value;
+  const zone = pick("timeZoneName");
+  const time = `${pick("hour")}:${pick("minute")} ${pick("dayPeriod")} ${ZONE_NAMES[zone] ?? zone}`;
+  if (weekly) return `Weekly · ${pick("weekday")} ${time}`;
+  if (unit === "days" && Number(every) === 1) return `Daily · ${time}`;
+  return `${interval} · ${time}`;
+}

@@ -1,20 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  CalendarClock,
-  CalendarPlus,
-  CheckCircle2,
-  Clock,
-  History,
-  Layers,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  Zap,
-} from "lucide-react";
-import { scanSuccessLabel } from "@/lib/scan-success.mjs";
+import { CalendarClock, CalendarPlus, Clock, History, Loader2, RefreshCw, Search, Zap } from "lucide-react";
 import { CreateJobModal } from "./scheduled-scans/create-job-modal";
 import { EditJobModal } from "./scheduled-scans/edit-job-modal";
 import { JobCard } from "./scheduled-scans/job-card";
@@ -23,6 +10,7 @@ import { EvaluateQueuePanel } from "./scheduled-scans/evaluate-queue-panel";
 import type { ScheduledJob, JobRun } from "@/lib/scheduled-jobs";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
+import { StatTile } from "@/components/ui/stat-tile";
 import { updateScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
 import { isSchedulerStatusPayload, osSchedulerFor, schedulerCardCopy } from "@/lib/scheduled-scheduler-status.mjs";
 
@@ -48,8 +36,8 @@ export function ScheduledJobsView() {
   const [osRunning, setOsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (quiet = false) => {
+    if (!quiet) setLoading(true);
     setError(null);
     try {
       const [jobsResponse, schedulerResponse] = await Promise.all([
@@ -74,6 +62,16 @@ export function ScheduledJobsView() {
 
   useEffect(() => {
     void loadData();
+    // Keeps the scheduler badge current: poll while the tab is visible, and catch up on focus.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void loadData(true);
+    }, 60_000);
+    const onFocus = () => void loadData(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
@@ -135,10 +133,8 @@ export function ScheduledJobsView() {
     });
 
   const totalRuns = store.runs.length;
-  const successRuns = store.runs.filter((r) => r.state === "success").length;
   const failedRuns = store.runs.filter((r) => r.state === "failed").length;
   const totalRolesFound = store.runs.reduce((acc, r) => acc + (r.rolesFound || 0), 0);
-  const successRate = scanSuccessLabel(totalRuns, successRuns);
 
   const osScheduler = scheduler ? osSchedulerFor(scheduler.platform) : undefined;
   const card = scheduler ? schedulerCardCopy(scheduler) : null;
@@ -167,7 +163,7 @@ export function ScheduledJobsView() {
           </button>
           <button
             type="button"
-            onClick={loadData}
+            onClick={() => void loadData()}
             disabled={loading}
             className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/60 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
             title="Refresh list"
@@ -178,12 +174,10 @@ export function ScheduledJobsView() {
       />
       {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">{error}</div>}
 
-      {/* Stats Cards */}
-      <div className="grid gap-3.5 sm:grid-cols-4">
-        <StatCard label="Active Scans" value={activeJobs.length} subtitle={`${jobsList.length} total jobs`} icon={<Zap className="size-4 text-emerald-500" />} />
-        <StatCard label="Executed Runs" value={totalRuns} subtitle={`${successRuns} successful`} icon={<Layers className="size-4 text-brand-text" />} />
-        <StatCard label="Roles Discovered" value={totalRolesFound} subtitle="Pushed to pipeline" icon={<Sparkles className="size-4 text-amber-500" />} />
-        <StatCard label="Success Rate" value={successRate} subtitle={`${failedRuns} failed runs`} icon={<CheckCircle2 className="size-4 text-emerald-500" />} />
+      <div className="grid gap-3.5 sm:grid-cols-3">
+        <StatTile value={activeJobs.length} label="active scans" />
+        <StatTile value={totalRuns} label={failedRuns ? `runs, ${failedRuns} failed` : "runs, none failed"} />
+        <StatTile value={totalRolesFound} label="roles found" />
       </div>
 
       {/* OS Task Scheduler Banner */}
@@ -273,7 +267,7 @@ export function ScheduledJobsView() {
       {filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-12 text-center">
           <CalendarClock className="mx-auto size-8 text-faint" />
-          <h2 className="mt-3 text-sm font-semibold text-foreground">No scheduled scans found</h2>
+          <h2 className="mt-3 text-base font-semibold text-foreground">No scheduled scans found</h2>
           <p className="mt-1 text-xs text-muted">Create a new scan to start automatically discovering matching jobs.</p>
           <button
             type="button"
@@ -320,30 +314,5 @@ export function ScheduledJobsView() {
         runs={store.runs}
       />
     </PageFrame>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  subtitle: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className="co-rise flex items-center justify-between rounded-xl border border-border bg-surface/40 p-4 shadow-sm transition-all hover:border-brand/30 hover:shadow-md">
-      <div>
-        <span className="text-xs font-medium text-muted">{label}</span>
-        <div className="mt-1 text-2xl font-bold tracking-tight text-foreground">{value}</div>
-        <div className="mt-0.5 text-xs text-faint">{subtitle}</div>
-      </div>
-      <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand-text">
-        {icon}
-      </div>
-    </div>
   );
 }
