@@ -93,7 +93,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                           → <Badge tone={scoreTone(entry.score)}>{entry.score}</Badge>
                         </span>
                       )}
-                      {entry.reason && !/^report \d+$/.test(entry.reason) && <span className="text-muted">{entry.reason}</span>}
+                      {entry.reason && !(entry.trackerN && /^report \d+$/.test(entry.reason)) &&<span className="text-muted">{entry.reason}</span>}
                       <span className="text-faint">{names.get(entry.jobId) ?? entry.jobId}</span>
                       {link && (
                         <Link
