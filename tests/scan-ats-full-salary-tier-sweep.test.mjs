@@ -34,7 +34,7 @@ provider.fetch = async (entry) => {
   const n = Number(String(entry.name).replace('sandbox-co-', ''));
   idBase = entry.name === 'other-co' ? 100 : Number.isInteger(n) ? 1000 * n : 0;
   if (process.env.STUB_REPLAY) {
-    if (n < 5) return [job(1, 'Platform Engineer I')];
+    if (n < 5) return Object.assign([job(1, 'Platform Engineer I', { postedAt: undefined }), job(2, 'Principal Engineer', { postedAt: undefined })], { workdayNoDateSkip: true });
     if (process.env.STUB_REPLAY === 'outage') throw resolverDown();
     return [];
   }
@@ -129,9 +129,12 @@ test('a resumed sweep does not count again the drops of boards it replays', (t) 
   // drops from boards past resumeAt, which the resumed run fetches again.
   checkpoint.current.resumeAt = 0;
   writeFileSync(file, JSON.stringify(checkpoint));
-  const resumed = run(['--json', '--resume'], { STUB_REPLAY: 'clean' });
+  const resumed = run(['--resume'], { STUB_REPLAY: 'clean' });
   assert.equal(resumed.status, 0, resumed.stderr.slice(-800));
-  assert.equal(JSON.parse(resumed.stdout.trim().split('\n').at(-1)).postingsDroppedTier, 5);
+  const out = resumed.stdout + resumed.stderr;
+  assert.match(out, /Tier-filtered:\s+5/);
+  const [, undated, fromNoDateBoards] = out.match(/Undated dropped: (\d+) \(incl\. (\d+) from/);
+  assert.equal(fromNoDateBoards, undated, 'every board here is a no-date board, and a replayed tier drop is not among its undated postings');
 });
 
 test('a tier drop on a history board leaves the directory boards\' no-date breakdown alone', (t) => {

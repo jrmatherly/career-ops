@@ -1650,12 +1650,11 @@ async function main() {
       // Ahead of the undated drop: a skipped tier was not date-enriched, and
       // --include-undated would not keep it, so it is not an undated drop.
       if (tierSkipped && titleFilter(job.title, companySlug)) {
-        if (firstDrop(job, provider)) {
-          droppedTier++;
-          // The board's postings were all added to the Workday no-date
-          // breakdown, which the summary reports as part of droppedNoDate.
-          if (noDateSkipBoards.has(jobs)) noDateSkipJobs--;
-        }
+        // The board's postings were all added to the Workday no-date
+        // breakdown, which the summary reports as part of droppedNoDate. On
+        // every pass, a resume's replay included: each pass adds them again.
+        if (noDateSkipBoards.has(jobs)) noDateSkipJobs--;
+        if (firstDrop(job, provider)) droppedTier++;
         continue;
       }
       if (dateClass === 'undated' && !opts.includeUndated) { droppedNoDate++; continue; }
