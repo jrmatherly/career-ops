@@ -41,7 +41,8 @@ import { sanitizeMarkdownField } from './scan.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
 import { replaceUserFile } from './tracker-utils.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
-import { getCareerOpsRoot } from './path-resolver.mjs';
+import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
+import { loadYaml } from './lib/yaml-document.mjs';
 import { normalizeUrl } from './url-key.mjs';
 import { readRememberedCli } from './lib/agent-cli.mjs';
 import { resolveCliLaunch } from './lib/agent-launch.mjs';
@@ -297,7 +298,54 @@ export function parseBatchResponse(text) {
     .map(r => ({ id: r.id, score: r.score, reason: String(r.reason ?? '') }));
 }
 
-export function buildPrompt(entries, cvExcerpt) {
+const TARGETING_MAX_CHARS = 1500;
+const TARGETING_CUT_NOTE = '(This list was cut short and is not complete. Do not hold a title down for a role or level missing from it.)';
+
+/**
+ * The roles the profile says the candidate wants, as prompt text. Empty when
+ * the profile is missing, does not parse or lists no roles: the ranker then
+ * scores from the CV excerpt alone. It never throws, and says so on stderr
+ * when a profile that is there could not be used.
+ */
+export function readTargeting(profilePath) {
+  const without = why => {
+    console.error(`rank-pipeline: ${why}; ranking without the profile's target roles`);
+    return '';
+  };
+  let roles;
+  try {
+    roles = loadYaml(readFileSync(profilePath, 'utf-8'))?.target_roles;
+  } catch (err) {
+    if (err?.code === 'ENOENT') return '';
+    return without(`${profilePath} could not be read (${String(err?.message ?? err).split('\n')[0]})`);
+  }
+  if (roles === undefined || roles === null) return '';
+  if (typeof roles !== 'object') return without(`target_roles in ${profilePath} is not a mapping`);
+  // Text and numbers only: a mapping or list in a role's place is skipped, not stringified.
+  const line = v => (typeof v === 'string' || typeof v === 'number' ? String(v).replace(/\s+/g, ' ').trim() : '');
+  const list = v => (Array.isArray(v) ? v : []);
+  const names = v => list(v).filter(x => typeof x === 'string').map(line).filter(Boolean);
+  const archetypes = list(roles.archetypes)
+    .filter(a => a && typeof a === 'object' && line(a.name))
+    .map(a => {
+      const detail = [line(a.level), line(a.fit)].filter(Boolean).join(', ');
+      return detail ? `${line(a.name)} (${detail})` : line(a.name);
+    });
+  const section = (label, items) => (items.length ? [`${label}:`, ...items.map(i => `- ${i}`)] : []);
+  const text = [
+    ...section('Primary', names(roles.primary)),
+    ...section('Secondary', names(roles.secondary)),
+    ...section('Archetypes', archetypes),
+  ].join('\n');
+  // A cut list says so, or the prompt's 3.0 cap would hold down roles the profile does list.
+  if (text.length > TARGETING_MAX_CHARS) {
+    const kept = text.slice(0, TARGETING_MAX_CHARS);
+    return `${kept.slice(0, kept.lastIndexOf('\n'))}\n${TARGETING_CUT_NOTE}`;
+  }
+  return text || without(`target_roles in ${profilePath} lists no role under primary, secondary or archetypes`);
+}
+
+export function buildPrompt(entries, cvExcerpt, targeting = '') {
   const rows = entries
     .map((e, i) => `${i}. company: ${e.company} | title: ${e.title} | url: ${e.url}`)
     .join('\n');
@@ -307,6 +355,9 @@ export function buildPrompt(entries, cvExcerpt) {
     'Score from the company, title and URL text shown here. Do not open the URLs or fetch anything. Use no tools, and answer in this one reply.',
     '',
     cvExcerpt ? `CANDIDATE PROFILE (excerpt):\n${cvExcerpt}\n` : '',
+    targeting
+      ? `CANDIDATE TARGETING (the roles this person wants):\n${targeting}\n\nScore the title's role family and level against this targeting first, and keyword overlap second. A title whose role family or level the targeting does not list scores at most 3.0, however many keywords it shares.\n`
+      : '',
     `POSTINGS:\n${rows}`,
     '',
     'Return ONLY a JSON array, no prose, no code fence:',
@@ -355,7 +406,7 @@ const ANSI = /\x1b\[[0-9;]*m/g;
 /**
  * One line saying why a CLI call failed. err.message from execFileSync starts
  * with "Command failed: <bin> <args>", and the args are the whole prompt (CV
- * excerpt plus postings), so it is never shown.
+ * excerpt, targeting and postings), so it is never shown.
  */
 export function describeCliFailure(err, bin, timeoutMs) {
   if (err?.code === 'ETIMEDOUT') {
@@ -427,6 +478,7 @@ async function main(args) {
   }
   const selected = selectBatch(pending, limit);
   const cvExcerpt = existsSync(CV_PATH) ? readFileSync(CV_PATH, 'utf-8').slice(0, 2000) : '';
+  const targeting = readTargeting(getProfilePath());
 
   const timeout = resolveRankTimeoutMs();
   const started = Date.now();
@@ -449,7 +501,7 @@ async function main(args) {
     let response;
     attemptedCalls += 1;
     try {
-      response = callCli(cli, buildPrompt(batch, cvExcerpt), model, timeout);
+      response = callCli(cli, buildPrompt(batch, cvExcerpt, targeting), model, timeout);
     } catch (err) {
       console.error(`  ${label}: CLI call failed (${describeCliFailure(err, cli.bin, timeout)}), entries left un-annotated`);
       skippedBatches += 1;

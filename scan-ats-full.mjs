@@ -1001,7 +1001,7 @@ const SEED_PROVIDERS = [greenhouse, lever, ashby];
  * @param {object}   [idCaches]  Store from openProviderIdCache(); each provider gets its slice as ctx.idCache.
  * @returns {Promise<object[]>}  New job offers (same shape as ATS scan offers).
  */
-export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) {
+export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches, onDrop = () => {}) {
   const source = SEED_SOURCES[seedId];
   if (!source) throw new Error(`runSeedScan: unknown seed "${seedId}"`);
 
@@ -1059,7 +1059,7 @@ export async function runSeedScan(seedId, opts, ctx, seenUrls, label, idCaches) 
         contentFilter: opts.contentFilter,
         salaryFilter: opts.salaryFilter,
         skipTiers: opts.skipTiers,
-        onDrop: (stage) => { dropped[stage] += 1; },
+        onDrop: (stage) => { dropped[stage] += 1; onDrop(stage); },
         companySlug: entry.name,
         titleFilterConfig: opts.titleFilterConfig,
       })) continue;
@@ -1596,6 +1596,7 @@ async function main() {
     includeUndated: opts.includeUndated,
     filters,
     completedSources: [...completedSources],
+    countedDrops: [...countedDrops],
     offers: newOffers,
     savedAt: new Date().toISOString(),
   });
@@ -1606,7 +1607,12 @@ async function main() {
   // A board that came back truncated is processed again by the retry pass, so
   // a posting either filter drops is counted the first time only, by the
   // identity the kept offers are deduplicated on.
-  const countedDrops = new Set();
+  // Saved with the counters: a checkpoint can hold drops from boards past its
+  // resumeAt, and the resumed run replays those boards.
+  const countedDrops = new Set(Array.isArray(checkpoint?.countedDrops) ? checkpoint.countedDrops : []);
+  // Board arrays whose postings went into the Workday no-date breakdown. The
+  // history and retry passes never add theirs, so they never subtract either.
+  const noDateSkipBoards = new WeakSet();
   const firstDrop = (job, provider) => {
     const token = dedupTokenFor(job, provider);
     return !countedDrops.has(token) && Boolean(countedDrops.add(token));
@@ -1644,12 +1650,11 @@ async function main() {
       // Ahead of the undated drop: a skipped tier was not date-enriched, and
       // --include-undated would not keep it, so it is not an undated drop.
       if (tierSkipped && titleFilter(job.title, companySlug)) {
-        if (firstDrop(job, provider)) {
-          droppedTier++;
-          // The board's postings were all added to the Workday no-date
-          // breakdown, which the summary reports as part of droppedNoDate.
-          if (jobs.workdayNoDateSkip && noDateSkipJobs > 0) noDateSkipJobs--;
-        }
+        // The board's postings were all added to the Workday no-date
+        // breakdown, which the summary reports as part of droppedNoDate. On
+        // every pass, a resume's replay included: each pass adds them again.
+        if (noDateSkipBoards.has(jobs)) noDateSkipJobs--;
+        if (firstDrop(job, provider)) droppedTier++;
         continue;
       }
       if (dateClass === 'undated' && !opts.includeUndated) { droppedNoDate++; continue; }
@@ -1797,7 +1802,7 @@ async function main() {
             cappedBoards++;
             if (opts.verbose) console.error(`  ⚠ ${name}/${entry.name}: hit the page cap — later postings not scanned`);
           }
-          if (jobs.workdayNoDateSkip) { noDateSkipCompanies++; noDateSkipJobs += jobs.length; }
+          if (jobs.workdayNoDateSkip) { noDateSkipCompanies++; noDateSkipJobs += jobs.length; noDateSkipBoards.add(jobs); }
           await processJobs(jobs, name, source.provider, entry.name);
         });
       } catch (err) {
@@ -1973,13 +1978,15 @@ async function main() {
   for (const seedId of opts.seeds) {
     const seedSource = SEED_SOURCES[seedId];
     log(`\n🌱 ${seedSource.label} (${seedId}-seed) — fetching portfolio...`);
-    const result = await runSeedScan(seedId, opts, ctx, seenUrls, seedSource.label, idCaches);
+    // Counted as each drop happens, so a run stopped mid-seed still reports them.
+    const result = await runSeedScan(seedId, opts, ctx, seenUrls, seedSource.label, idCaches, (stage) => {
+      if (stage === 'tier') droppedTier++;
+      else if (stage === 'salary') droppedSalary++;
+      else if (stage === 'content') droppedContent++;
+    });
     if (result && result.offers) {
       totalCompaniesScanned += result.total || 0;
       totalErrors += result.errors || 0;
-      droppedTier += result.dropped?.tier || 0;
-      droppedSalary += result.dropped?.salary || 0;
-      droppedContent += result.dropped?.content || 0;
       newOffers.push(...result.offers);
       log(`  done — ${result.total} companies probed, ${result.offers.length} matches (${result.errors} errors)`);
     }

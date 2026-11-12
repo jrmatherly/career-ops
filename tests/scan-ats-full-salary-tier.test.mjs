@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passesFilters, filterFingerprints, changedFilterKeys, readSkipTiers, salaryFilterProblem } from '../scan-ats-full.mjs';
+import { passesFilters, filterFingerprints, changedFilterKeys, readSkipTiers, salaryFilterProblem, runSeedScan } from '../scan-ats-full.mjs';
+import { SEED_SOURCES } from '../seeds/vc-portfolios.mjs';
+import greenhouse from '../providers/greenhouse.mjs';
 import { buildSalaryFilter } from '../scan.mjs';
 
 const pass = () => true;
@@ -77,4 +79,23 @@ test('a checkpoint with no recorded filters resumes unless one of the two settin
   assert.deepEqual(changedFilterKeys(null, filterFingerprints({ skip_tiers: ['entry'] })), []);
   assert.deepEqual(changedFilterKeys({}, filterFingerprints({ skip_tiers: ['entry'] })), ['skip_tiers']);
   assert.deepEqual(changedFilterKeys({}, filterFingerprints({ salary_filter: { min: 150000 } })), ['salary_filter']);
+});
+
+test('a seed scan reports each drop to its caller as it happens, before the scan returns', async (t) => {
+  const realFetch = greenhouse.fetch;
+  t.after(() => { greenhouse.fetch = realFetch; delete SEED_SOURCES.testseed; });
+  SEED_SOURCES.testseed = { label: 'Test', fetch: async () => [{ name: 'Seed Co', ats: 'greenhouse', ats_id: 'seed-co' }] };
+  const stages = [];
+  let seenBeforeReturn = null;
+  greenhouse.fetch = async () => [
+    { title: 'Platform Engineer I', url: 'https://job-boards.greenhouse.io/seed-co/jobs/1', postedAt: Date.now() },
+    { title: 'Director', url: 'https://job-boards.greenhouse.io/seed-co/jobs/2', postedAt: Date.now(), salary: { max: 120000, currency: 'USD' } },
+    { title: 'Director', url: 'https://job-boards.greenhouse.io/seed-co/jobs/3', postedAt: Date.now(), get description() { seenBeforeReturn = [...stages]; return ''; } },
+  ];
+  const opts = { ...base, salaryFilter, skipTiers: ['entry'], contentFilter: (d) => d !== undefined, limit: Infinity, sinceDays: 30, blacklist: new Map(), json: false };
+  const result = await runSeedScan('testseed', opts, {}, new Set(), 'Test', undefined, (stage) => stages.push(stage));
+  assert.deepEqual(stages, ['tier', 'salary']);
+  assert.deepEqual(seenBeforeReturn, ['tier', 'salary'], 'the caller had both drops while the scan was still running');
+  assert.deepEqual(result.dropped, { tier: 1, salary: 1, content: 0 });
+  assert.equal(result.offers.length, 1);
 });
