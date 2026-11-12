@@ -115,12 +115,13 @@ export function PipelineView({
   // tiles' deep links AND the assistant's filterPipeline/navigate actions drive
   // the table identically (no useState mirror → no desync).
   const tab: Tab = pipelineTab(params.get("tab"));
+  const visibleTab = isPending && pendingTab ? pendingTab : tab;
+  // On visibleTab: the picked tab joins the row while the navigation is still pending.
   useEffect(() => {
     if (!refocusTab.current) return;
     refocusTab.current = false;
     activeTab.current?.focus();
-  }, [tab]);
-  const visibleTab = isPending && pendingTab ? pendingTab : tab;
+  }, [visibleTab]);
   const pMin = parseFloat(params.get("min") ?? "");
   const minFilter: number | null = Number.isFinite(pMin) ? pMin : null;
   const pSort = params.get("sort") ?? "";
@@ -694,7 +695,7 @@ export function PipelineView({
             <button
               key={t}
               type="button"
-              ref={tab === t ? activeTab : undefined}
+              ref={visibleTab === t ? activeTab : undefined}
               aria-pressed={visibleTab === t}
               onClick={() => {
                 if (inMenu && moreMenu.current) moreMenu.current.open = false;

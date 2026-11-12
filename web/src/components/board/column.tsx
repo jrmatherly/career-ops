@@ -59,7 +59,13 @@ export function Column({
                 <button
                   type="button"
                   aria-expanded={showBelow}
-                  onClick={() => setOpenLanes((open) => new Set(open).symmetricDifference(new Set([laneKey])))}
+                  onClick={() =>
+                    setOpenLanes((open) => {
+                      const next = new Set(open);
+                      if (!next.delete(laneKey)) next.add(laneKey);
+                      return next;
+                    })
+                  }
                   className="min-h-8 rounded-lg border border-border px-3 py-1.5 text-xs text-muted hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 >
                   {below.length} below the apply line{unscored && " or not scored"}
