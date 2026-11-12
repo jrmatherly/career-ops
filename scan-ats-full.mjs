@@ -1638,7 +1638,12 @@ async function main() {
       // Ahead of the undated drop: a skipped tier was not date-enriched, and
       // --include-undated would not keep it, so it is not an undated drop.
       if (tierSkipped && titleFilter(job.title, companySlug)) {
-        if (firstDrop(job)) droppedTier++;
+        if (firstDrop(job)) {
+          droppedTier++;
+          // The board's postings were all added to the Workday no-date
+          // breakdown, which the summary reports as part of droppedNoDate.
+          if (jobs.workdayNoDateSkip && noDateSkipJobs > 0) noDateSkipJobs--;
+        }
         continue;
       }
       if (dateClass === 'undated' && !opts.includeUndated) { droppedNoDate++; continue; }

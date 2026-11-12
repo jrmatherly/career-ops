@@ -24,7 +24,11 @@ import provider from ${JSON.stringify(pathToFileURL(join(ROOT, 'providers', 'gre
 const job = (id, title, extra = {}) => ({ title, url: 'https://job-boards.greenhouse.io/sandbox-co/jobs/' + id,
   company: 'sandbox-co', location: 'Remote', postedAt: Date.now(), description: '', ...extra });
 provider.fetchListing = undefined;
-provider.fetch = async () => [
+provider.fetch = async () => process.env.STUB_NO_DATE_BOARD ? Object.assign([
+  job(7, 'Platform Engineer I', { postedAt: undefined }),
+  job(8, 'Principal Engineer', { postedAt: undefined }),
+  job(9, 'Sales Associate', { postedAt: undefined }),
+], { workdayNoDateSkip: true }) : [
   job(1, 'Director of Engineering'),
   job(2, 'Infrastructure Engineer I'),
   job(3, 'Staff Engineer', { salary: { min: 90000, max: 120000, currency: 'USD' } }),
@@ -35,9 +39,9 @@ provider.fetch = async () => [
 provider.enrichDate = async (j) => { process.stderr.write('ENRICHED ' + j.title + '\\n'); };
 globalThis.fetch = async () => { throw new Error('Unexpected network request'); };
 `);
-  const run = (extra = []) => spawnSync(NODE, ['--import', pathToFileURL(preload).href, join(ROOT, 'scan-ats-full.mjs'), '--ats', 'greenhouse', ...extra], {
+  const run = (extra = [], env = {}) => spawnSync(NODE, ['--import', pathToFileURL(preload).href, join(ROOT, 'scan-ats-full.mjs'), '--ats', 'greenhouse', ...extra], {
     cwd: dir, encoding: 'utf-8', timeout: 120_000,
-    env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PORTALS: '', CAREER_OPS_PIPELINE: '', CAREER_OPS_SCAN_HISTORY: '', CAREER_OPS_DNS_LOOKUPS_PER_MIN: '0' },
+    env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PORTALS: '', CAREER_OPS_PIPELINE: '', CAREER_OPS_SCAN_HISTORY: '', CAREER_OPS_DNS_LOOKUPS_PER_MIN: '0', ...env },
   });
   return { dir, run };
 }
@@ -87,4 +91,13 @@ test('a bad skip_tiers or salary_filter stops the sweep with the value named', (
     assert.equal(result.status, 1, yaml);
     assert.match(result.stderr, message);
   }
+});
+
+test('a tier drop is not also reported in the no-date breakdown of its board', (t) => {
+  const { run } = sweepRoot(t, `${TITLES}skip_tiers: [entry]\n`);
+  const result = run(['--dry-run'], { STUB_NO_DATE_BOARD: '1' });
+  assert.equal(result.status, 0, result.stderr.slice(-800));
+  const out = result.stdout + result.stderr;
+  assert.match(out, /Tier-filtered:\s+1/);
+  assert.match(out, /Undated dropped: 2 \(incl\. 2 from 1 workday/);
 });
