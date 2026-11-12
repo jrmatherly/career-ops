@@ -9,7 +9,7 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import childProcess, { execFileSync } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import "../helpers/web-ts-alias-loader.mjs";
@@ -117,6 +117,8 @@ test("each entry carries its tracker row's company, role, score and number, else
     .map((url) => ({ ...DUMP[0], key: url, url }));
   standIn(`console.log(${JSON.stringify(JSON.stringify(dump))});`);
   mkdirSync(join(dataRoot, "data"), { recursive: true });
+  // readApplications finds the checkout's aliases one level above the cwd, which holds only from web/.
+  writeFileSync(join(dataRoot, "tracker-aliases.json"), readFileSync(join(import.meta.dirname, "..", "..", "..", "tracker-aliases.json")));
   writeFileSync(join(dataRoot, "data", "applications.md"), [
     "# Applications Tracker", "",
     "| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |",
@@ -135,6 +137,7 @@ test("each entry carries its tracker row's company, role, score and number, else
   } finally {
     rmSync(join(dataRoot, "data", "applications.md"), { force: true });
     rmSync(join(dataRoot, "data", "pipeline.md"), { force: true });
+    rmSync(join(dataRoot, "tracker-aliases.json"), { force: true });
   }
 });
 
