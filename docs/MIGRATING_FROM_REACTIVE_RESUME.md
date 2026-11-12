@@ -65,7 +65,8 @@ Open the dashboard (`npm run ui`, or your deployed URL) and walk the pages the i
 
 - **CV** (`/cv`) shows the imported CV. Its Edit tab holds the structured editor with its Check score.
 - **Board** (`/board`) shows the imported applications in their columns, and **Pipeline** holds the saved ones.
-- **Generate a PDF** from a report. The file appears under `output/` in the data root (`/data/output` in a pod).
+- **Download the CV as a PDF** from **CV** → **Export** → **Download PDF**. The browser saves the imported master CV as a PDF.
+- **Generate a tailored PDF** from a report. The file appears under `output/` in the data root (`/data/output` in a pod).
 - **Publish a share** from `/shares` and open its link from a phone off your network. The page renders and the view counter moves.
 - **Plugin install:** run `/career-ops:career-ops` in Claude Code. The command menu lists the modes.
 

@@ -185,6 +185,98 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
     }
   });
 
+  await t.test("a preview that loads on Edit is measured once Preview shows it", async () => {
+    const long = `<!doctype html><html><body><div class="page"><h1>Long CV</h1>${"<p>A line of the CV.</p>".repeat(150)}</div></body></html>`;
+    await page.route("**/api/resume", lossless);
+    await page.route("**/api/resume/preview", (route) => route.fulfill({ json: { html: long } }));
+    try {
+      await open("/cv?tab=edit");
+      await page.waitForFunction(() => document.querySelector('iframe[title="Tailored CV preview"]')?.contentDocument?.querySelector("h1"));
+      await page.getByRole("button", { name: "Preview", exact: true }).click();
+      await tabBecomes("Preview");
+      const caption = () => page.evaluate(() => document.querySelector('section[aria-label="Live preview"] > p')?.textContent ?? "");
+      await page.waitForFunction(() => /^Page 1 of [2-9]/.test(document.querySelector('section[aria-label="Live preview"] > p')?.textContent ?? ""), null, { timeout: 5_000 }).catch(() => {});
+      assert.match(await caption(), /^Page 1 of [2-9]/);
+      const height = Number.parseFloat(await frame().evaluate((el) => el.style.height));
+      assert.ok(height > 1056, `the frame is ${height}px tall, one page is 1056px`);
+    } finally {
+      await page.unroute("**/api/resume/preview");
+      await page.unroute("**/api/resume");
+    }
+  });
+
+  await t.test("Print is off while the markdown editor conflicts with cv.md", async () => {
+    await page.route("**/api/resume", lossless);
+    await page.route("**/api/cv", (route) => (route.request().method() === "POST" ? route.fulfill({ status: 409, json: { error: "cv.md changed on disk." } }) : route.continue()));
+    try {
+      await open("/cv?tab=edit");
+      await frame().waitFor({ state: "attached" });
+      await markdown().focus();
+      await page.keyboard.type("x");
+      await page.locator("main").getByRole("alert").filter({ hasText: "cv.md changed on disk." }).waitFor({ timeout: 10_000 });
+      const menu = await exportMenu();
+      const print = menu.getByRole("menuitem", { name: "Print" });
+      assert.equal(await print.getAttribute("aria-disabled"), "true");
+      const hint = await print.evaluate((el) => document.getElementById(el.getAttribute("aria-describedby")).textContent);
+      assert.match(hint, /conflicts with cv\.md on disk/);
+      await page.keyboard.press("Escape");
+    } finally {
+      await page.unroute("**/api/cv");
+      await page.unroute("**/api/resume");
+    }
+  });
+
+  await t.test("an older /api/cv re-read that answers last does not replace a newer one", async () => {
+    await open("/cv?tab=edit");
+    await page.waitForFunction(() => document.querySelector('textarea[aria-label="CV Markdown"]')?.value.length > 0);
+    let reads = 0;
+    await page.route("**/api/cv", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const n = ++reads;
+      if (n === 1) await new Promise((resolve) => setTimeout(resolve, 1_000));
+      await route.fulfill({ json: { content: n === 1 ? "# Older read\n" : "# Newer read\n", exists: true } });
+    });
+    try {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
+        setTimeout(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } })), 100);
+      });
+      await page.waitForFunction(() => document.querySelector('textarea[aria-label="CV Markdown"]')?.value === "# Newer read\n", null, { timeout: 5_000 });
+      await page.waitForTimeout(1_500);
+      assert.equal(reads, 2);
+      assert.equal(await markdown().inputValue(), "# Newer read\n");
+    } finally {
+      await page.unroute("**/api/cv");
+    }
+  });
+
+  await t.test("an edit made while the structured editor reloads is kept", async () => {
+    await page.route("**/api/resume", lossless);
+    try {
+      await open("/cv?tab=edit");
+      await page.getByRole("button", { name: "Structured editor" }).click();
+      const headline = page.getByLabel("Headline");
+      await headline.waitFor();
+      let release;
+      const held = new Promise((resolve) => (release = resolve));
+      await page.unroute("**/api/resume");
+      await page.route("**/api/resume", async (route) => {
+        if (route.request().method() !== "GET") return route.continue();
+        await held;
+        await lossless(route);
+      });
+      const reload = page.waitForRequest((r) => new URL(r.url()).pathname === "/api/resume" && r.method() === "GET");
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "markdown" } })));
+      await reload;
+      await headline.fill("Typed during the reload");
+      release();
+      await page.locator("main").getByRole("alert").filter({ hasText: "cv.md changed in the markdown editor" }).waitFor({ timeout: 5_000 });
+      assert.equal(await headline.inputValue(), "Typed during the reload");
+    } finally {
+      await page.unroute("**/api/resume");
+    }
+  });
+
   // The stub records the frame's body height when print() runs: a frame with no layout prints a blank page.
   const stubPrint = () => frame().evaluate((el) => {
     window.__prints = [];

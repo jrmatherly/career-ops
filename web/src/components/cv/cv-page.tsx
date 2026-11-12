@@ -143,7 +143,9 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     : previewError ? "The preview failed to render, so there is nothing to print."
     : html === null ? "The preview is still rendering."
     : null;
-  const pdfBlocked = exportBlocked ?? (state.conflict ? "Download is off while this tab's text conflicts with cv.md on disk." : null);
+  const conflictBlocked = state.conflict ? "Download and Print are off while this tab's text conflicts with cv.md on disk." : null;
+  const pdfBlocked = exportBlocked ?? conflictBlocked;
+  const printBlocked = exportBlocked ?? conflictBlocked;
   const unsaved = state.phase === "ready" && (state.content !== state.saved || state.conflict);
   const exportNote = unsaved && !exportBlocked ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null;
 
@@ -205,7 +207,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
           >
             <Upload aria-hidden="true" className="size-4" /> {importing ? "Close upload" : "Upload PDF or TeX"}
           </button>
-          <ExportMenu pdfBlocked={pdfBlocked} printBlocked={exportBlocked} note={exportNote} downloading={downloading} onDownload={download} onPrint={print} />
+          <ExportMenu pdfBlocked={pdfBlocked} printBlocked={printBlocked} note={exportNote} downloading={downloading} onDownload={download} onPrint={print} />
         </div>}
       />
 

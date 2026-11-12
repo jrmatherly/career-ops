@@ -50,6 +50,8 @@ const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }
 
 export function ResumeEditor({ templates, templatesError }: { templates: TemplateOption[]; templatesError?: string }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
+  const dataRef = useRef(state.data);
+  dataRef.current = state.data;
   const [html, setHtml] = useState("");
   // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
   const [omitted, setOmitted] = useState<{ unmapped: string[]; warnings: string[] }>({ unmapped: [], warnings: [] });
@@ -67,14 +69,21 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
 
   useEffect(() => {
     let live = true;
+    // The form stays editable while a reload is pending; an edit made in that window outranks the reload.
+    const before = dataRef.current;
+    const editedSince = () => {
+      if (dataRef.current === before) return false;
+      setStale(true);
+      return true;
+    };
     fetch("/api/resume")
       .then(async (res) => {
         const body = await readBody(res);
-        if (!live) return;
+        if (!live || editedSince()) return;
         if (!res.ok) return dispatch({ type: "failed", message: body.error ?? `HTTP ${res.status}` });
         dispatch({ type: "loaded", data: body.data, cvMdSha: body.cvMdSha, report: body.report, lossless: body.lossless });
       })
-      .catch((err: Error) => live && dispatch({ type: "failed", message: err.message }));
+      .catch((err: Error) => live && !editedSince() && dispatch({ type: "failed", message: err.message }));
     return () => {
       live = false;
     };

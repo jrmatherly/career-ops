@@ -31,7 +31,14 @@ export function CvPreview({ html, markers, pinned, caption }: { html: string; ma
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => setScale(Math.min(1, e.contentRect.width / PAGE_WIDTH)));
+    let width = -1;
+    const ro = new ResizeObserver(([e]) => {
+      const next = e.contentRect.width;
+      setScale(Math.min(1, next / PAGE_WIDTH));
+      // A frame that loaded while hidden measured no layout; measure it again once it shows.
+      if (width === 0 && next > 0) measureRef.current();
+      width = next;
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -51,6 +58,8 @@ export function CvPreview({ html, markers, pinned, caption }: { html: string; ma
     if (content > 0) setContentPx(content);
     if (nextFrame > 0) setFramePx(nextFrame);
   };
+  const measureRef = useRef(measure);
+  measureRef.current = measure;
 
   const mark = () => {
     const doc = frame.current?.contentDocument;

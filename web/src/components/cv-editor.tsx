@@ -133,15 +133,18 @@ export function useCvEditor() {
 
   // The structured editor writes the same cv.md; re-read it so this text and the next save's expectation follow the file.
   useEffect(() => {
+    let latest = 0;
     const onSaved = (e: Event) => {
       if ((e as CustomEvent<{ source?: string }>).detail?.source !== "structured") return;
+      // Only the newest re-read may land; an older one answering last would put older text back.
+      const n = ++latest;
       fetch("/api/cv")
         .then(async (res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const body = (await res.json()) as { content?: unknown };
-          dispatch({ type: "external", content: typeof body.content === "string" ? body.content : null });
+          if (n === latest) dispatch({ type: "external", content: typeof body.content === "string" ? body.content : null });
         })
-        .catch(() => dispatch({ type: "external", content: null }));
+        .catch(() => n === latest && dispatch({ type: "external", content: null }));
     };
     window.addEventListener("co-cv-saved", onSaved);
     return () => window.removeEventListener("co-cv-saved", onSaved);

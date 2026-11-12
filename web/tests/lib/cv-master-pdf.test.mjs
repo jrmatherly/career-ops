@@ -137,7 +137,7 @@ test("a child that ignores SIGTERM gets SIGKILL and the call still answers 504",
   assert.deepEqual(out, { ok: false, status: 504, error: "PDF rendering timed out" });
 });
 
-test("a temp directory that cannot be removed is logged and the PDF still returns", { skip: process.getuid?.() === 0 ? "root ignores directory permissions" : false }, async (t) => {
+test("a temp directory that cannot be removed is logged and the PDF still returns", { skip: process.platform === "win32" ? "chmod does not make a Windows directory unremovable" : process.getuid?.() === 0 ? "root ignores directory permissions" : false }, async (t) => {
   const errors = t.mock.method(console, "error", () => {});
   let dir;
   const spawnPdf = async (args) => {
