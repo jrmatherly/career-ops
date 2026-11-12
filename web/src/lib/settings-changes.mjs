@@ -1,4 +1,4 @@
-import { dirtyChanges, formValue, parseFormValue } from "./settings-form.mjs";
+import { dirtyChanges } from "./settings-form.mjs";
 
 const same = (a, b) => (Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every((item, i) => item === b[i]) : a === b);
 
@@ -31,13 +31,9 @@ export function pendingChanges(draftByGroup, savedByGroup) {
  * @param {Record<string, unknown>} form
  */
 export function pendingFromGroups(groups, form) {
-  const saved = {};
-  const draft = {};
-  for (const group of groups) {
-    saved[group.id] = Object.fromEntries(group.settings.filter((s) => s.editable).map((s) => [s.id, parseFormValue(s, formValue(s))]));
-    draft[group.id] = { ...saved[group.id], ...dirtyChanges(group.settings, form) };
-  }
-  return pendingChanges(draft, saved);
+  // dirtyChanges already knows a reset (null) from no change, so its answer is used as it is.
+  const pending = groups.map((group) => ({ id: group.id, changes: dirtyChanges(group.settings, form) })).filter((g) => Object.keys(g.changes).length > 0);
+  return { count: pending.reduce((n, g) => n + Object.keys(g.changes).length, 0), groups: pending };
 }
 
 /**

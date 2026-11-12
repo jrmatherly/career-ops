@@ -92,22 +92,23 @@ export function ProgressPanel({ metrics }: { metrics: ProgressMetrics }) {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.85fr)]">
         <Panel eyebrow="Funnel" title="Pipeline progress" description="How many roles ever reached each stage, and how many are there now. Each bar is the first count out of everything tracked.">
           <div className="mt-5 space-y-3.5">
-            <div className="grid grid-cols-[minmax(94px,0.45fr)_minmax(80px,1fr)_auto_auto] gap-3 text-xs text-faint">
+            {/* Fixed count columns: the header lines up with the rows and the grid fits a 390px phone. */}
+            <div className="grid grid-cols-[minmax(72px,0.45fr)_minmax(40px,1fr)_5rem_4.5rem] gap-3 text-xs text-faint">
               <span>Stage</span>
               <span />
-              <span className="min-w-16 text-right">Ever reached</span>
-              <span className="min-w-16 text-right">There now</span>
+              <span className="text-right">Ever reached</span>
+              <span className="text-right">There now</span>
             </div>
             {metrics.funnel.map((stage) => {
               const bar = funnelBarModel(stage, metrics.tracked);
               return (
-                <div key={stage.label} className="grid grid-cols-[minmax(94px,0.45fr)_minmax(80px,1fr)_auto_auto] items-center gap-3">
+                <div key={stage.label} className="grid grid-cols-[minmax(72px,0.45fr)_minmax(40px,1fr)_5rem_4.5rem] items-center gap-3">
                   <span className="break-words text-xs text-muted">{stage.label}</span>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-hover" role="img" aria-label={`${stage.label}: ${bar.count}`}>
                     <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${Math.min(100, Math.max(0, bar.widthPct))}%` }} />
                   </div>
-                  <span className="min-w-16 text-right font-mono text-xs tabular-nums text-foreground">{bar.count}</span>
-                  <span className="min-w-16 text-right font-mono text-xs tabular-nums text-muted">{bar.now}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-foreground">{bar.count}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-muted">{bar.now}</span>
                 </div>
               );
             })}

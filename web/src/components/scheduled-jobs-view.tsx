@@ -60,7 +60,7 @@ export function ScheduledJobsView() {
       });
       if (schedulerResponse.ok && isSchedulerStatusPayload(resScheduler)) setScheduler(resScheduler as SchedulerStatus);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
+      if (mine === latestLoad.current) setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
     } finally {
       if (mine === latestLoad.current) setLoading(false);
     }

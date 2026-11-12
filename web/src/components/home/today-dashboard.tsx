@@ -260,18 +260,21 @@ export function TodayDashboard({
       {/* B. Awaiting your decision */}
       {awaiting.length > 0 && (
         <Section icon={CircleHelp} title="Awaiting your decision" hint="Best score first">
-          {awaitingGroups.map(([label, group]) => label === BELOW_APPLY_LINE && !showBelow ? (
-            <button
-              key={label}
-              type="button"
-              aria-expanded={false}
-              onClick={() => setShowBelow(true)}
-              className="mb-3 inline-flex min-h-6 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]"
-            >
-              Show {group.length} {group.length === 1 ? "role" : "roles"} below the apply line
-            </button>
-          ) : (
+          {awaitingGroups.map(([label, group]) => (
             <div key={label} className="mb-3">
+              {/* Stays mounted when it opens, so keyboard focus is not lost. */}
+              {label === BELOW_APPLY_LINE && (
+                <button
+                  type="button"
+                  aria-expanded={showBelow}
+                  onClick={() => setShowBelow((open) => !open)}
+                  className="mb-3 inline-flex min-h-6 items-center rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]"
+                >
+                  {showBelow ? "Hide" : "Show"} {group.length} {group.length === 1 ? "role" : "roles"} below the apply line
+                </button>
+              )}
+              {(label !== BELOW_APPLY_LINE || showBelow) && (
+                <>
               <h3 className="mb-2 text-xs font-medium text-faint">{label}</h3>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {group.map((a) => (
@@ -287,6 +290,8 @@ export function TodayDashboard({
                   />
                 ))}
               </div>
+                </>
+              )}
             </div>
           ))}
         </Section>

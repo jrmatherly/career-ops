@@ -89,6 +89,8 @@ export function PipelineView({
   const omittedWhileRejected = useRef(new Set<string>());
   const pendingWhileRejected = useRef(new Set<string>());
   const activeTab = useRef<HTMLButtonElement>(null);
+  // A tab picked from More moves into the row, which unmounts the focused menu button.
+  const refocusTab = useRef(false);
   const anchor = useRef<string | null>(null);
   const busyRef = useRef(false);
 
@@ -96,6 +98,11 @@ export function PipelineView({
   // tiles' deep links AND the assistant's filterPipeline/navigate actions drive
   // the table identically (no useState mirror → no desync).
   const tab: Tab = pipelineTab(params.get("tab"));
+  useEffect(() => {
+    if (!refocusTab.current) return;
+    refocusTab.current = false;
+    activeTab.current?.focus();
+  }, [tab]);
   const visibleTab = isPending && pendingTab ? pendingTab : tab;
   const pMin = parseFloat(params.get("min") ?? "");
   const minFilter: number | null = Number.isFinite(pMin) ? pMin : null;
@@ -674,6 +681,7 @@ export function PipelineView({
               aria-pressed={visibleTab === t}
               onClick={() => {
                 if (inMenu && moreMenu.current) moreMenu.current.open = false;
+                refocusTab.current = inMenu;
                 setParams({ tab: t === "INBOX" ? null : t });
               }}
               className={cn(
@@ -803,7 +811,8 @@ export function PipelineView({
             </div>
           ) : (
             <>
-              {showPaste && <LinkedInPaste />}
+              {/* Hidden, not unmounted: closing the panel keeps unsent text and an import in flight. */}
+              <div hidden={!showPaste}><LinkedInPaste /></div>
               <InboxTriage inbox={inbox} scanDates={scanDates} />
               {inbox.length === 0 && <InboxEmpty tracked={visibleApplications.length} />}
             </>

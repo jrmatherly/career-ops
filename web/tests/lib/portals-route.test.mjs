@@ -125,7 +125,9 @@ test("a finished health check is kept in data/portal-health.json", async () => {
 });
 
 test("a health check that did not finish leaves the last saved result alone", async () => {
+  await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  const before = readFileSync(healthFile(), "utf8");
   const body = await verifyWith('console.error("verify-portals failed: boom");\nprocess.exit(1);\n');
   assert.equal(body.error, "verify-portals failed: boom");
-  assert.throws(() => readFileSync(healthFile()), { code: "ENOENT" });
+  assert.equal(readFileSync(healthFile(), "utf8"), before);
 });

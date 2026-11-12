@@ -97,7 +97,7 @@ export function TriageRow({
           ) : rankLabel && (
             // Dashed, never solid: the N/5 Badge is the evaluation score; this is rank-pipeline.mjs's cheap prior.
             // An opaque bg-surface keeps brand-text at AA whatever hover or selected tint the row adds beneath it.
-            <span title="Estimated from the title and company. Not an evaluation." className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-brand/50 bg-surface px-2 py-px font-medium tabular-nums text-brand-text">
+            <span title={`Estimated from the title and company. Not an evaluation.${job.rankReason ? ` ${job.rankReason}` : ""}`} className="shrink-0 whitespace-nowrap rounded-full border border-dashed border-brand/50 bg-surface px-2 py-px font-medium tabular-nums text-brand-text">
               {rankLabel}
             </span>
           )}

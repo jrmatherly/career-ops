@@ -163,7 +163,7 @@ export function PortalsView({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search companies…"
             aria-label="Search companies"
-            className="mt-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            className="mt-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground placeholder:text-faint sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
           />
           {toggleError && (
             <p role="alert" className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">

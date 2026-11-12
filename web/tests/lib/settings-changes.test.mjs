@@ -56,3 +56,8 @@ test("saving stops at the first group the server refuses, so the later ones are 
   assert.deepEqual(sent, ["one", "two"]);
   assert.equal(await saveInOrder(["one", "three"], send), true);
 });
+
+test("emptying a saved row whose value is already empty is still sent as a reset", () => {
+  const saved = [{ id: "one", label: "One", settings: [setting({ id: "E", type: "string", value: "" })] }];
+  assert.deepEqual(pendingFromGroups(saved, { E: "" }), { count: 1, groups: [{ id: "one", changes: { E: null } }] });
+});
