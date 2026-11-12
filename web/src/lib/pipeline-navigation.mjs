@@ -69,3 +69,24 @@ export function pipelineTab(raw) {
   const value = String((Array.isArray(raw) ? raw[0] : raw) ?? "").toUpperCase();
   return PIPELINE_TABS.find((t) => t === value) ?? "INBOX";
 }
+
+const ALWAYS_SHOWN = new Set(["INBOX", "EVALUATED", "APPLIED"]);
+
+/**
+ * Which tabs sit in the row and which go under More: the core three always
+ * show, any other tab shows when it has rows or is the one selected.
+ * @template {{ id: string }} T
+ * @param {T[]} tabs
+ * @param {Record<string, number | undefined>} counts
+ * @param {string} active
+ * @returns {{ shown: T[], more: T[] }}
+ */
+export function splitTabs(tabs, counts, active) {
+  const shown = [];
+  const more = [];
+  for (const tab of tabs) {
+    const show = ALWAYS_SHOWN.has(tab.id) || tab.id === active || (counts[tab.id] ?? 0) > 0;
+    (show ? shown : more).push(tab);
+  }
+  return { shown, more };
+}

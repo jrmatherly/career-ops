@@ -3,6 +3,9 @@ import path from "node:path";
 
 import { parsePdfManifestRows } from "./apply/cv-selection.mjs";
 import { inlineDisposition } from "./content-disposition.mjs";
+import { documentTitle } from "./document-titles.mjs";
+
+type TrackerRowForTitle = { n: string; company: string; role: string; report: string };
 
 export type DocumentKind = "cv" | "cover" | "unknown";
 
@@ -166,6 +169,7 @@ export async function handleDocumentsRequest(
   root: string,
   manifestPath: string | null,
   isRegularContainedFile: (absPath: string, root: string) => boolean,
+  applications: TrackerRowForTitle[] = [],
 ) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
@@ -239,6 +243,7 @@ export async function handleDocumentsRequest(
     reportId: doc.reportId,
     format: doc.format,
     mtimeMs: doc.mtimeMs,
+    ...documentTitle(doc, applications),
   }));
 
   return Response.json(payload, {

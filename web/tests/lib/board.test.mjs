@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { BOARD_COLUMNS, columnOf, columnStatus, groupByColumn, nextStepLabel } from "../../src/lib/board.mjs";
+import { BOARD_COLUMNS, columnOf, columnStatus, groupByColumn, nextStepLabel, splitAtApplyLine } from "../../src/lib/board.mjs";
 
 const row = (n, status) => ({ n: String(n), status });
 
@@ -32,6 +32,21 @@ test("lanes become sub-groups in name order with unlaned rows last; no lanes mea
   const applied = groupByColumn(rows, meta).find((c) => c.tab === "APPLIED");
   assert.deepEqual(applied.lanes.map((l) => l.lane), [null]);
   assert.deepEqual(groupByColumn([], meta)[0].lanes, []);
+});
+
+test("rows in a lane sort by score, highest first, unscored last, ties in input order", () => {
+  const rows = ["2.0/5", "4.0/5", "N/A", "3.6/5", "4.0/5"].map((score, i) => ({ ...row(i + 1, "Evaluated"), score }));
+  const [evaluated] = groupByColumn(rows, new Map());
+  assert.deepEqual(evaluated.lanes[0].rows.map((r) => `${r.n}:${r.score}`), ["2:4.0/5", "5:4.0/5", "4:3.6/5", "1:2.0/5", "3:N/A"]);
+});
+
+test("splitAtApplyLine splits at the app's apply line, with unscored rows below", () => {
+  const rows = ["4.0/5", "3.6/5", "2.0/5", "N/A"].map((score, i) => ({ ...row(i + 1, "Evaluated"), score }));
+  const { above, below } = splitAtApplyLine(rows);
+  assert.deepEqual(above.map((r) => r.score), ["4.0/5"]);
+  assert.deepEqual(below.map((r) => r.score), ["3.6/5", "2.0/5", "N/A"]);
+  assert.deepEqual(splitAtApplyLine(rows, 3.5).above.map((r) => r.score), ["4.0/5", "3.6/5"]);
+  assert.equal(splitAtApplyLine([{ score: "**4.5/5**" }]).above.length, 1, "a bold score cell is still a score");
 });
 
 test("next-step labels", () => {

@@ -11,6 +11,7 @@ import { BackLink } from "@/components/back-link";
 import { pipelineQuery } from "@/lib/pipeline-navigation.mjs";
 import { HeroGlow } from "@/components/hero-glow";
 import { Badge } from "@/components/ui/badge";
+import { PageFrame } from "@/components/page-frame";
 
 export default function JobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -21,21 +22,21 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
 
   if (!job) {
     return (
-      <div className="mx-auto max-w-3xl px-6 py-10">
+      <PageFrame width="reading">
         <BackLink href={pipelineHref} className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand-text">
           <ArrowLeft className="size-4" /> Pipeline
         </BackLink>
         <p className="mt-8 text-sm text-muted">
           This worker is no longer in memory (it finished earlier or the page was reloaded).
         </p>
-      </div>
+      </PageFrame>
     );
   }
 
   const gate = evaluationGateForJob(job);
   const displayOutput = jobOutputForDisplay(job);
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
+    <PageFrame width="reading">
       <BackLink href={pipelineHref} className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand-text">
         <ArrowLeft className="size-4" /> Pipeline
       </BackLink>
@@ -120,6 +121,6 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           )}
         </div>
       )}
-    </div>
+    </PageFrame>
   );
 }

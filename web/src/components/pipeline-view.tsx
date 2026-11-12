@@ -3,7 +3,7 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useOptimistic, useRef, useState, useTransition, type MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText } from "lucide-react";
+import { Search, ChevronDown, ChevronsUpDown, X, Compass, ArrowRight, ExternalLink, Download, FileText } from "lucide-react";
 import type { Application, InboxJob } from "@/lib/career-ops";
 import { Badge } from "@/components/ui/badge";
 import { CompanyLogo } from "@/components/company-logo";
@@ -18,7 +18,7 @@ import { startRouteProgress } from "@/components/route-progress";
 import { sortRows } from "@/lib/core/pipeline-sort.mjs";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
-import { PIPELINE_TABS, pipelineQuery, pipelineTab, rowOnPipelineTab } from "@/lib/pipeline-navigation.mjs";
+import { PIPELINE_TABS, pipelineQuery, pipelineTab, rowOnPipelineTab, splitTabs } from "@/lib/pipeline-navigation.mjs";
 import { isSearchOnlyWrite, queryWithLiveSearch } from "@/lib/list-search-sync.mjs";
 import { useListSearch } from "@/lib/use-list-search";
 import { COMPARE_MAX } from "@/lib/pipeline-compare.mjs";
@@ -65,6 +65,8 @@ export function PipelineView({
   const pathname = usePathname();
   const [isPending, startNavigation] = useTransition();
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
+  const [showPaste, setShowPaste] = useState(false);
+  const moreMenu = useRef<HTMLDetailsElement>(null);
   // Starts AFTER the POST succeeds. React replays the confirmed save over
   // intervening snapshots and discards it when the refresh transition settles.
   const [visibleApplications, showSavedStatus] = useOptimistic(applications, applySavedStatus<Application>);
@@ -87,6 +89,25 @@ export function PipelineView({
   const omittedWhileRejected = useRef(new Set<string>());
   const pendingWhileRejected = useRef(new Set<string>());
   const activeTab = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const close = (event: KeyboardEvent | PointerEvent) => {
+      const menu = moreMenu.current;
+      if (!menu?.open) return;
+      if (event instanceof KeyboardEvent) {
+        if (event.key !== "Escape") return;
+        menu.querySelector("summary")?.focus();
+      } else if (menu.contains(event.target as Node)) return;
+      menu.open = false;
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, []);
+  // A tab picked from More moves into the row, which unmounts the focused menu button.
+  const refocusTab = useRef(false);
   const anchor = useRef<string | null>(null);
   const busyRef = useRef(false);
 
@@ -95,6 +116,12 @@ export function PipelineView({
   // the table identically (no useState mirror → no desync).
   const tab: Tab = pipelineTab(params.get("tab"));
   const visibleTab = isPending && pendingTab ? pendingTab : tab;
+  // On visibleTab: the picked tab joins the row while the navigation is still pending.
+  useEffect(() => {
+    if (!refocusTab.current) return;
+    refocusTab.current = false;
+    activeTab.current?.focus();
+  }, [visibleTab]);
   const pMin = parseFloat(params.get("min") ?? "");
   const minFilter: number | null = Number.isFinite(pMin) ? pMin : null;
   const pSort = params.get("sort") ?? "";
@@ -542,7 +569,16 @@ export function PipelineView({
           <span className="tabular-nums">{visibleApplications.length}</span> tracked
         </>}
         // the tracker has its own search; the inbox brings its own facet filters
-        actions={visibleTab !== "INBOX" && (
+        actions={visibleTab === "INBOX" ? (
+          <button
+            type="button"
+            aria-expanded={showPaste}
+            onClick={() => setShowPaste((open) => !open)}
+            className="inline-flex items-center whitespace-nowrap rounded-md border border-border bg-surface/60 px-3 py-2 text-sm text-muted transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand/40 max-sm:min-h-[44px]"
+          >
+            Add from LinkedIn
+          </button>
+        ) : (
           <div className="flex items-center gap-2">
             <div className="relative w-64 max-w-[40vw]">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
@@ -644,36 +680,60 @@ export function PipelineView({
         {removalWarning && <span role="alert" className="text-xs text-red-500">{removalWarning}</span>}
       </div>
 
-      {/* tabs */}
-      <div className="mt-6 flex flex-wrap gap-1 border-b border-border">
-        {PIPELINE_TABS.map((t) => {
-          const count =
+      {/* tabs: empty stages wait under More so the row stays short */}
+      <div className="mt-6 flex flex-wrap items-end gap-1 border-b border-border">
+        {(() => {
+          const counts = Object.fromEntries(PIPELINE_TABS.map((t) => [t,
             t === "INBOX"
               ? inboxCount
               : t === "ALL"
                 ? visibleApplications.length
-                : visibleApplications.filter((r) => rowOnPipelineTab(r.status, t)).length;
-          if (t === "OTHER" && count === 0 && visibleTab !== "OTHER") return null;
-          return (
+                : visibleApplications.filter((r) => rowOnPipelineTab(r.status, t)).length,
+          ]));
+          const { shown, more } = splitTabs(PIPELINE_TABS.map((id) => ({ id })), counts, visibleTab);
+          const tabButton = (t: Tab, inMenu: boolean) => (
             <button
               key={t}
               type="button"
-              ref={tab === t ? activeTab : undefined}
+              ref={visibleTab === t ? activeTab : undefined}
               aria-pressed={visibleTab === t}
-              onClick={() => setParams({ tab: t === "INBOX" ? null : t })}
+              onClick={() => {
+                if (inMenu && moreMenu.current) moreMenu.current.open = false;
+                refocusTab.current = inMenu;
+                setParams({ tab: t === "INBOX" ? null : t });
+              }}
               className={cn(
                 // gap-1, not a whitespace text node: flex containers drop
                 // whitespace-only anonymous items, which rendered "INBOX0".
-                "-mb-px inline-flex items-center justify-center gap-1 border-b-2 px-3 py-2 text-xs font-medium transition-colors max-sm:min-h-[44px]",
+                "inline-flex items-center gap-1 px-3 py-2 text-xs font-medium transition-colors max-sm:min-h-[44px]",
+                inMenu
+                  ? "w-full justify-between rounded-md text-left hover:bg-surface-hover"
+                  : "-mb-px justify-center border-b-2",
                 visibleTab === t
                   ? "border-brand text-foreground"
                   : "border-transparent text-muted hover:text-foreground",
               )}
             >
-              {t} <span className="text-faint tabular-nums">{count}</span>
+              {t} <span className="text-faint tabular-nums">{counts[t]}</span>
             </button>
           );
-        })}
+          return (
+            <>
+              {shown.map(({ id }) => tabButton(id, false))}
+              {more.length > 0 && (
+                <details ref={moreMenu} className="relative">
+                  <summary className="-mb-px inline-flex min-h-6 cursor-pointer list-none items-center gap-1 border-b-2 border-transparent px-3 py-2 text-xs font-medium text-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px] [&::-webkit-details-marker]:hidden">
+                    More <ChevronDown aria-hidden="true" className="size-3.5" />
+                  </summary>
+                  <div className="absolute left-0 z-20 mt-1 flex min-w-40 flex-col rounded-md border border-border bg-surface p-1 shadow-lg"
+                  >
+                    {more.map(({ id }) => tabButton(id, true))}
+                  </div>
+                </details>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <p role="status" className="sr-only">{announcement}</p>
@@ -769,7 +829,8 @@ export function PipelineView({
             </div>
           ) : (
             <>
-              <LinkedInPaste />
+              {/* Hidden, not unmounted: closing the panel keeps unsent text and an import in flight. */}
+              <div hidden={!showPaste}><LinkedInPaste /></div>
               <InboxTriage inbox={inbox} scanDates={scanDates} />
               {inbox.length === 0 && <InboxEmpty tracked={visibleApplications.length} />}
             </>
@@ -940,7 +1001,7 @@ export function PipelineView({
         </div>
       ) : trackerEmptyMessage({ shape: trackerShape, query, min: minFilter, tab }).kind === "filtered" ? (
         <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center">
-          <h2 className="font-display text-lg">{empty?.heading}</h2>
+          <h2 className="text-base font-semibold text-foreground">{empty?.heading}</h2>
           {empty && empty.actions.length > 0 && (
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {empty.actions.map(({ label, run }, i) => (

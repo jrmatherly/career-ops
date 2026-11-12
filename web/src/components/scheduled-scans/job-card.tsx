@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Clock, Edit3, Globe, Loader2, MoreVertical, Pause, Play, Sparkles, Trash2, Zap } from "lucide-react";
+import { AlertCircle, Edit3, Globe, Loader2, MoreVertical, Pause, Play, Sparkles, Trash2, Zap } from "lucide-react";
 import type { ScheduledJob } from "@/lib/scheduled-jobs";
 import { evaluateModeLabel } from "@/lib/evaluate-settings.mjs";
 import { cn } from "@/lib/cn";
-import { instrumentSerif } from "@/lib/fonts";
 import { formatWhen } from "@/lib/format-time.mjs";
+import { cadenceLabel } from "@/lib/scheduled-cadence.mjs";
 
 export function JobCard({
   job,
@@ -24,6 +24,7 @@ export function JobCard({
   const [running, setRunning] = useState(false);
   const [runMessage, setRunMessage] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showKeywords, setShowKeywords] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,25 +67,17 @@ export function JobCard({
   const isFull = job.engine === "full";
   const isActive = job.status === "active";
   const positiveList = job.filters?.positive || [];
-  const letter = (job.name || "S").trim().charAt(0).toUpperCase();
   const modeLabel = evaluateModeLabel(job.evaluate);
 
   return (
     <div className="co-rise group flex min-w-0 flex-col justify-between h-full gap-2.5 rounded-xl border border-border bg-surface/40 p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-sm">
       <div className="space-y-2.5">
-        {/* Top Header: Logo + Title + 3-Dots Menu */}
         <div className="flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-sm font-semibold text-brand-text">
-            {letter}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className={`${instrumentSerif.className} truncate text-[17px] leading-tight text-foreground transition-colors group-hover:text-brand-text`}>
-              {job.name}
-            </h2>
-            <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-muted">
-              <Clock className="size-3.5 text-faint" />
-              Every {job.every} {job.unit} · {job.timezone}
-            </p>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+            <h2 className="truncate text-base font-semibold text-foreground">{job.name}</h2>
+            <span className="shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-text">
+              {cadenceLabel(job)}
+            </span>
           </div>
 
           {/* 3-Dots Dropdown Menu */}
@@ -95,7 +88,7 @@ export function JobCard({
               aria-label={`Options for ${job.name}`}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="rounded p-1 text-faint transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="grid size-7 place-items-center rounded text-faint transition-colors hover:bg-surface-hover hover:text-foreground"
               title="Options"
             >
               <MoreVertical className="size-4" />
@@ -162,38 +155,46 @@ export function JobCard({
           )}
         </div>
 
-        {/* Keywords clamped to max 2 lines */}
         {job.filtersFrom === "file" ? (
           <p className="text-xs text-faint">uses portals.yml</p>
         ) : positiveList.length > 0 && (
-          <div className="max-h-12 overflow-hidden flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-faint shrink-0">matched:</span>
-            {positiveList.map((kw, i) => (
-              <span key={i} className="rounded border border-border px-1.5 py-0.5 font-medium text-muted truncate max-w-[140px]">
-                {kw}
-              </span>
-            ))}
+          <div className="space-y-1.5 text-xs">
+            <p className="flex items-center gap-2 text-muted">
+              {positiveList.length} {positiveList.length === 1 ? "keyword" : "keywords"}
+              <button
+                type="button"
+                onClick={() => setShowKeywords((v) => !v)}
+                aria-expanded={showKeywords}
+                className="min-h-6 rounded px-1.5 font-medium text-brand-text hover:bg-brand-soft"
+              >
+                {showKeywords ? "Hide" : "Show"}
+              </button>
+            </p>
+            {showKeywords && (
+              <div className="flex flex-wrap gap-1.5">
+                {positiveList.map((kw, i) => (
+                  <span key={i} className="max-w-[140px] truncate rounded border border-border px-1.5 py-0.5 font-medium text-muted">
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Last Run & Status Message */}
-        <div className="text-[12px]">
-          {job.lastError ? (
-            <p className="flex items-start gap-1.5 text-rose-500">
-              <AlertCircle className="mt-0.5 size-3 shrink-0" />
-              <span className="truncate">Last error: {job.lastError}</span>
-            </p>
-          ) : job.lastRunAt ? (
-            <p className="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400">
-              <CheckCircle2 className="size-3.5 shrink-0" />
-              Last run {formatWhen(job.lastRunAt)} ·{" "}
-              {job.rolesFoundCount || 0} roles found
-            </p>
-          ) : (
-            <p className="text-faint">No runs recorded yet</p>
-          )}
-          {runMessage && <p className="mt-1 font-medium text-brand-text">{runMessage}</p>}
+        <div className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2 text-xs">
+          <span className={cn("size-2 shrink-0 rounded-full", job.lastError ? "bg-rose-500" : job.lastRunAt ? "bg-emerald-500" : "bg-zinc-400")} />
+          <span className="font-semibold uppercase tracking-wide text-faint">Last run</span>
+          <span className="min-w-0 flex-1 truncate text-muted">{job.lastRunAt ? formatWhen(job.lastRunAt) : "Never"}</span>
+          {job.lastRunAt && <b className="shrink-0 text-foreground">{job.rolesFoundCount || 0} roles</b>}
         </div>
+        {job.lastError && (
+          <p className="flex items-start gap-1.5 text-xs text-rose-600 dark:text-rose-400">
+            <AlertCircle className="mt-0.5 size-3 shrink-0" />
+            <span className="truncate">Last error: {job.lastError}</span>
+          </p>
+        )}
+        {runMessage && <p className="text-xs font-medium text-brand-text">{runMessage}</p>}
       </div>
 
       {/* Action Buttons Row pinned to bottom */}

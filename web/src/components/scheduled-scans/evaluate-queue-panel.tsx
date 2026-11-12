@@ -51,7 +51,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
   return (
     <section aria-labelledby="evaluate-queue-title" className="rounded-2xl border border-border bg-surface/40 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 id="evaluate-queue-title" className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <h2 id="evaluate-queue-title" className="flex items-center gap-2 text-base font-semibold text-foreground">
           <ListChecks className="size-4 text-brand-text" /> Evaluate queue
         </h2>
         <button

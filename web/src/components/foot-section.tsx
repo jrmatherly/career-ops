@@ -26,7 +26,7 @@ export function FootSection({ label, icon, summary, alert, defaultOpen = false, 
       <summary className="flex min-h-7 max-sm:min-h-[44px] cursor-pointer list-none items-center gap-1.5 rounded-md px-1 text-xs font-semibold uppercase tracking-[0.14em] text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 [&::-webkit-details-marker]:hidden">
         {icon}
         <span>{label}</span>
-        <span className={cn("ml-auto inline-flex items-center gap-1 whitespace-nowrap font-normal normal-case tracking-normal tabular-nums", alert && "font-medium text-red-700 dark:text-red-400")}>
+        <span className={cn("ml-auto inline-flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap font-normal normal-case tracking-normal tabular-nums", alert && "font-medium text-red-700 dark:text-red-400")}>
           {alert && <TriangleAlert aria-hidden className="size-3 shrink-0" />}
           {summary}
           {alert && <span className="sr-only">, {alert}</span>}

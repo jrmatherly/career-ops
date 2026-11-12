@@ -2,6 +2,7 @@
 // the column whose tab would list it. INBOX, ALL and OTHER are not stages.
 
 import { PIPELINE_TABS, rowOnPipelineTab } from "./pipeline-navigation.mjs";
+import { APPLY_LINE } from "./report-sections.mjs";
 
 const NOT_STAGES = new Set(["INBOX", "ALL", "OTHER"]);
 
@@ -36,8 +37,9 @@ export const columnOf = (status) => BOARD_COLUMNS.find((tab) => rowOnPipelineTab
 /**
  * Rows grouped into the ten columns, each split into lane sub-groups when any
  * of its rows has a lane: named lanes in name order, then the unlaned rows.
- * Rows keep their input order inside a group.
- * @template {{ n: string, status: string }} T
+ * Inside a group rows sort by score, highest first, with unscored rows last
+ * and input order kept on ties.
+ * @template {{ n: string, status: string, score?: string }} T
  * @param {readonly T[]} rows
  * @param {ReadonlyMap<number, { lane?: string }>} meta
  * @returns {{ tab: string, status: string, count: number, lanes: { lane: string | null, rows: T[] }[] }[]}
@@ -54,9 +56,33 @@ export function groupByColumn(rows, meta) {
   return BOARD_COLUMNS.map((tab) => {
     const byLane = byColumn.get(tab);
     const named = [...byLane.keys()].filter((l) => l !== null).sort((a, b) => a.localeCompare(b));
-    const lanes = [...named, ...(byLane.has(null) ? [null] : [])].map((lane) => ({ lane, rows: byLane.get(lane) }));
+    const lanes = [...named, ...(byLane.has(null) ? [null] : [])].map((lane) => ({ lane, rows: byLane.get(lane).sort(byScore) }));
     return { tab, status: COLUMN_STATUS[tab], count: lanes.reduce((n, l) => n + l.rows.length, 0), lanes };
   });
+}
+
+// A score cell ("4.0/5") as a number; -1 for an unscored row ("N/A", "—", blank).
+// Not report-persist.mjs's scoreValue: that module pulls node:fs into the client bundle.
+const scoreOf = (row) => {
+  // The first number in the cell, as applyLineLabel reads it, so a bold "**4.5/5**" still counts.
+  const n = Number(String(row.score ?? "").match(/(\d+(?:\.\d+)?)/)?.[1]);
+  return Number.isFinite(n) ? n : -1;
+};
+// Array.prototype.sort is stable, so equal scores keep input order.
+const byScore = (a, b) => scoreOf(b) - scoreOf(a);
+
+/**
+ * The Evaluated column's split at the same apply line Today and the report use:
+ * rows at or above it, then the rest (unscored rows included), each in input order.
+ * @template {{ score?: string }} T
+ * @param {readonly T[]} rows
+ * @returns {{ above: T[], below: T[] }}
+ */
+export function splitAtApplyLine(rows, threshold = APPLY_LINE) {
+  return {
+    above: rows.filter((row) => scoreOf(row) >= threshold),
+    below: rows.filter((row) => scoreOf(row) < threshold),
+  };
 }
 
 /**

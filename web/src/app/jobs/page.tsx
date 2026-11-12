@@ -6,6 +6,7 @@ import { useJobs } from "@/components/jobs/job-store";
 import { evaluationGateForJob, jobStateLabel } from "@/lib/job-gate.mjs";
 import { pillTone } from "@/components/jobs/worker-pills";
 import { cn } from "@/lib/cn";
+import { PageFrame } from "@/components/page-frame";
 
 const TONE_CHIP = {
   good: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400",
@@ -18,7 +19,7 @@ export default function JobsHistory() {
   const { jobs, clearFinished } = useJobs();
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <PageFrame>
       <div className="flex items-end justify-between">
         <div>
           <h1 className="font-display text-2xl tracking-tight text-landing">Workers</h1>
@@ -82,6 +83,6 @@ export default function JobsHistory() {
           })}
         </ul>
       )}
-    </div>
+    </PageFrame>
   );
 }

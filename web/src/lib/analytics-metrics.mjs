@@ -72,13 +72,15 @@ export function computeProgressMetrics(applications = [], achievements) {
   const interview = achievements?.interviews ?? count("INTERVIEW") + count("OFFER") + count("HIRED");
   const offer = achievements?.offers ?? count("OFFER") + count("HIRED");
   const funnelCounts = [tracked, applied, responded, interview, offer];
+  // Rows sitting in each stage today. Every tracked row is "in" Tracked.
+  const nowCounts = [tracked, count("APPLIED"), count("RESPONDED"), count("INTERVIEW"), count("OFFER")];
 
   const funnel = STAGE_ORDER.map((label, index) => {
     const stageCount = funnelCounts[index];
     // TUI semantics: Tracked and Applied are measured against all tracker rows;
     // downstream stages use Applied as the denominator.
     const denominator = index <= 1 ? tracked : applied;
-    return { label: label[0] + label.slice(1).toLowerCase(), count: stageCount, pct: percentage(stageCount, denominator) };
+    return { label: label[0] + label.slice(1).toLowerCase(), count: stageCount, now: nowCounts[index], pct: percentage(stageCount, denominator) };
   });
 
   const scoreDistribution = SCORE_BUCKETS.map((bucket) => ({
@@ -128,8 +130,9 @@ export function computeProgressMetrics(applications = [], achievements) {
 }
 
 /**
- * Width of one funnel bar. The count is cumulative. The width is that count
- * out of everything tracked. The conversion rate stays on the rates card.
+ * Width of one funnel bar. The count is cumulative and `now` is the rows in
+ * that stage today. The width is the cumulative count out of everything
+ * tracked. The conversion rate stays on the rates card.
  * Printing the rate here made 15 roles read as 38% of the pipeline.
  */
 export function funnelBarModel(stage, tracked) {
@@ -137,6 +140,7 @@ export function funnelBarModel(stage, tracked) {
   const whole = Number(tracked) || 0;
   return {
     count,
+    now: Number(stage?.now) || 0,
     widthPct: whole > 0 ? (count / whole) * 100 : 0,
   };
 }

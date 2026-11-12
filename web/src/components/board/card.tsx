@@ -12,12 +12,14 @@ export function Card({
   card,
   cardKey,
   saving,
+  hideNextStep = false,
   onOpen,
   onMove,
 }: {
   card: BoardCard;
   cardKey: string;
   saving: boolean;
+  hideNextStep?: boolean;
   onOpen: () => void;
   onMove: (tab: string) => void;
 }) {
@@ -56,10 +58,12 @@ export function Card({
           {card.score && <Badge tone={scoreTone(card.score)}>{card.score}</Badge>}
         </div>
         <p className="mt-0.5 text-muted">{card.role}</p>
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-faint">
-          {card.stageDays !== null && <span className="tabular-nums">{card.stageDays}d in stage</span>}
-          <span>{saving ? "Saving…" : card.nextStep}</span>
-        </p>
+        {(card.stageDays !== null || saving || !hideNextStep) && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-faint">
+            {card.stageDays !== null && <span className="tabular-nums">{card.stageDays}d in stage</span>}
+            {saving ? <span>Saving…</span> : !hideNextStep && <span>{card.nextStep}</span>}
+          </p>
+        )}
         {card.detail.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {card.detail.tags.map((tag) => (
@@ -71,7 +75,7 @@ export function Card({
         )}
       </div>
       <Modal isOpen={choosing} onClose={() => setChoosing(false)} labelledBy={titleId} panelClassName="max-w-xs p-4">
-        <h2 id={titleId} className="text-sm font-semibold text-foreground">
+        <h2 id={titleId} className="text-base font-semibold text-foreground">
           Move {card.company} to
         </h2>
         <div className="mt-3 grid grid-cols-2 gap-2">

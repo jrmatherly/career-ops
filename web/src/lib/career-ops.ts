@@ -269,6 +269,21 @@ function pdfIndexTarget(n: string): number | null {
   return Number.parseInt(trimmed, 10);
 }
 
+// PDFs in output/, by the same filter /api/cv-pdf applies, so a directory or a
+// symlink out of output/ never marks a CV ready that the View link would refuse.
+export function outputPdfNames(): string[] {
+  const dir = path.join(careerOpsRoot(), "output");
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((name) => name.toLowerCase().endsWith(".pdf"))
+      .filter((name) => isRegularContainedFile(path.join(dir, name), dir));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw e;
+  }
+}
+
 export async function pdfReadyForReport(n: string): Promise<boolean> {
   return (await pdfPathForReport(n)) !== null;
 }

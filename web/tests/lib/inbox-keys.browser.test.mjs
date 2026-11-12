@@ -140,7 +140,7 @@ test("an unscored needs-review row keeps its review link and row-level Skip", { 
   await settled(page, () => page.goto(`${origin.origin}/pipeline`));
   const row = page.locator("li").filter({ hasText: "Fixture Alpha" });
   await row.getByRole("link", { name: "Needs review", exact: true }).waitFor();
-  assert.match(await row.innerText(), /not scored/);
+  assert.doesNotMatch(await row.innerText(), /\d\/5/, "an unscored row shows no score badge");
   assert.equal(await row.locator('a[href="/jobs/review-fixture"]').count(), 1);
   const skip = row.getByRole("button", { name: /Skip Fixture Alpha/ });
   assert.equal(await skip.count(), 1, "an unscored review row keeps its Skip button");

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { careerOpsRoot, portalsConfigPath, rootScript } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
+import { atomicWrite } from "@/lib/core/safe-write";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,5 +78,14 @@ export async function GET() {
     const m = line.match(/^\s*(✅|🟡|❌|➖)\s+(.+?)\s+—\s+(.*)$/);
     if (m) companies.push({ name: m[2].trim(), status: STATUS[m[1]] ?? "unknown", detail: m[3].trim() });
   }
-  return Response.json({ available: true, configured: true, companies });
+  // Kept so the page shows the last result without a new check. Only a finished run is saved.
+  const checkedAt = new Date().toISOString();
+  let saveError: string | undefined;
+  // A run that printed no company would wipe the last good result.
+  if (companies.length > 0) try {
+    atomicWrite(path.join(root, "data", "portal-health.json"), JSON.stringify({ checkedAt, companies }, null, 2) + "\n");
+  } catch (e) {
+    saveError = e instanceof Error ? e.message : String(e);
+  }
+  return Response.json({ available: true, configured: true, companies, checkedAt, saveError });
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { funnelBarModel } from "../../src/lib/analytics-metrics.mjs";
+import { computeProgressMetrics, funnelBarModel } from "../../src/lib/analytics-metrics.mjs";
 
 test("the funnel bar is the share of tracked roles, not the conversion rate", () => {
   const bar = funnelBarModel({ count: 15, pct: (15 / 39) * 100 }, 400);
@@ -8,4 +8,14 @@ test("the funnel bar is the share of tracked roles, not the conversion rate", ()
   assert.ok(Math.abs(bar.widthPct - (15 / 400) * 100) < 1e-9);
   assert.equal(Object.hasOwn(bar, "pct"), false);
   assert.equal(funnelBarModel({ count: 15, pct: 38 }, 0).widthPct, 0);
+});
+
+test("each funnel row carries how many roles ever reached it and how many are there now", () => {
+  const statuses = ["Applied", "Applied", "Applied", "Responded", "Responded", "Interview", "Interview", "Offer", "Rejected", "Evaluated"];
+  const metrics = computeProgressMetrics(statuses.map((status, i) => ({ n: String(i + 1), status, score: "4.0/5" })));
+  const bars = Object.fromEntries(metrics.funnel.map((stage) => [stage.label, funnelBarModel(stage, metrics.tracked)]));
+  assert.equal(bars.Applied.count, 9);
+  assert.equal(bars.Applied.now, 3);
+  assert.equal(bars.Tracked.now, 10);
+  assert.deepEqual(["Responded", "Interview", "Offer"].map((l) => bars[l].now), [2, 2, 1]);
 });

@@ -12,7 +12,7 @@ type ProgressMetrics = {
   responseRate: number | null;
   interviewRate: number | null;
   offerRate: number | null;
-  funnel: { label: string; count: number; pct: number }[];
+  funnel: { label: string; count: number; now: number; pct: number }[];
   scoreDistribution: { label: string; count: number; pct: number }[];
   weeklyActivity: { week: string; shortWeek: string; count: number }[];
 };
@@ -90,11 +90,27 @@ export function ProgressPanel({ metrics }: { metrics: ProgressMetrics }) {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.85fr)]">
-        <Panel eyebrow="Funnel" title="Pipeline progress" description="Cumulative roles that reached each stage. Each bar is that count out of everything tracked.">
+        <Panel eyebrow="Funnel" title="Pipeline progress" description="How many roles ever reached each stage, and how many are there now. Each bar is the first count out of everything tracked.">
           <div className="mt-5 space-y-3.5">
-            {metrics.funnel.map((stage, index) => {
+            {/* Fixed count columns: the header lines up with the rows and the grid fits a 320px phone. */}
+            <div className="grid grid-cols-[minmax(64px,0.45fr)_minmax(0,1fr)_5rem_4.5rem] gap-3 text-xs text-faint">
+              <span>Stage</span>
+              <span />
+              <span className="text-right">Ever reached</span>
+              <span className="text-right">There now</span>
+            </div>
+            {metrics.funnel.map((stage) => {
               const bar = funnelBarModel(stage, metrics.tracked);
-              return <BarRow key={stage.label} label={stage.label} count={bar.count} widthPct={bar.widthPct} tone={index === metrics.funnel.length - 1 ? "bg-brand" : "bg-sky-400"} />;
+              return (
+                <div key={stage.label} className="grid grid-cols-[minmax(64px,0.45fr)_minmax(0,1fr)_5rem_4.5rem] items-center gap-3">
+                  <span className="break-words text-xs text-muted">{stage.label}</span>
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-hover" role="img" aria-label={`${stage.label}: ${bar.count}`}>
+                    <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${Math.min(100, Math.max(0, bar.widthPct))}%` }} />
+                  </div>
+                  <span className="text-right font-mono text-xs tabular-nums text-foreground">{bar.count}</span>
+                  <span className="text-right font-mono text-xs tabular-nums text-muted">{bar.now}</span>
+                </div>
+              );
             })}
           </div>
         </Panel>
@@ -179,7 +195,7 @@ export function StatsPanel({ metrics, insights }: { metrics: StatsMetrics; insig
 }
 
 function Panel({ eyebrow, title, description, icon, children }: { eyebrow: string; title: string; description?: string; icon?: React.ReactNode; children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-border bg-surface/55 p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-[0.17em] text-brand-text">{icon}{eyebrow}</p><h2 className="mt-2 font-display text-xl tracking-tight text-landing">{title}</h2>{description && <p className="mt-1 max-w-xl text-xs leading-5 text-muted">{description}</p>}</div></div>{children}</section>;
+  return <section className="rounded-2xl border border-border bg-surface/55 p-4 sm:p-5"><div className="flex items-start justify-between gap-4"><div><p className="flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-[0.17em] text-brand-text">{icon}{eyebrow}</p><h2 className="mt-2 text-base font-semibold text-foreground">{title}</h2>{description && <p className="mt-1 max-w-xl text-xs leading-5 text-muted">{description}</p>}</div></div>{children}</section>;
 }
 
 function MetricCard({ label, value, icon }: { label: string; value: string | number; icon: React.ReactNode }) {

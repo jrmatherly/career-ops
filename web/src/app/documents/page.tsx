@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PageFrame } from "@/components/page-frame";
 import { PageHeader } from "@/components/page-header";
-import { ExternalLink, FileText, File, Calendar, Loader2 } from "lucide-react";
+import { ExternalLink, FileText, File, Loader2 } from "lucide-react";
+import { formatDay } from "@/lib/format-time.mjs";
 
 type DocumentItem = {
   id: string;
@@ -16,7 +17,12 @@ type DocumentItem = {
   reportId: string | null;
   format: string | null;
   mtimeMs: number;
+  title: string;
+  subtitle: string;
+  trackerN: string | null;
 };
+
+const KIND_LABEL: Record<DocumentItem["kind"], string> = { cv: "CV", cover: "Cover letter", unknown: "Document" };
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -72,7 +78,7 @@ export default function DocumentsPage() {
         <div className="mb-4 rounded-full bg-red-500/10 p-3 text-red-500">
           <File className="h-6 w-6" />
         </div>
-        <h2 className="text-lg font-medium text-foreground">Failed to load</h2>
+        <h2 className="text-base font-semibold text-foreground">Failed to load</h2>
         <p className="mt-1 text-sm text-muted">{error}</p>
         <Button
           variant="outline"
@@ -94,7 +100,7 @@ export default function DocumentsPage() {
           <div className="mb-4 rounded-full bg-surface-hover p-3 text-muted">
             <FileText className="h-6 w-6" />
           </div>
-          <h2 className="text-lg font-medium text-foreground">No documents found</h2>
+          <h2 className="text-base font-semibold text-foreground">No documents found</h2>
           <p className="mt-1 max-w-md text-sm text-muted">
             Open a report and choose Generate tailored CV (PDF). The file shows up here.
           </p>
@@ -110,51 +116,30 @@ export default function DocumentsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {documents.map((doc) => (
           <Card key={doc.id} className="flex flex-col justify-between p-4">
-            <div>
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded bg-brand/10 text-brand-text">
-                    {doc.kind === "cv" ? (
-                      <FileText className="h-4 w-4" />
-                    ) : (
-                      <File className="h-4 w-4" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-foreground line-clamp-1" title={doc.filename}>
-                      {doc.filename}
-                    </h3>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge tone="info" className="capitalize">
-                  {doc.kind === "cv" ? "CV" : doc.kind === "cover" ? "Cover Letter" : "Document"}
-                </Badge>
-                {doc.date && (
-                  <Badge tone="muted" className="flex items-center gap-1 font-normal">
-                    <Calendar className="h-3 w-3" />
-                    {doc.date}
-                  </Badge>
-                )}
-                {doc.format && (
-                  <Badge tone="muted" className="uppercase font-normal">
-                    {doc.format}
-                  </Badge>
-                )}
-              </div>
+            <div className="min-w-0">
+              <h3 className="font-medium text-foreground break-words">{doc.title}</h3>
+              {doc.subtitle && <p className="mt-0.5 text-sm text-muted break-words">{doc.subtitle}</p>}
+              {doc.title !== doc.filename && <p className="mt-0.5 truncate font-mono text-xs text-faint" title={doc.filename}>{doc.filename}</p>}
+              <p className="mt-2 text-xs text-muted">
+                {KIND_LABEL[doc.kind]} · {formatDay(doc.date ?? new Date(doc.mtimeMs).toISOString().slice(0, 10))}
+              </p>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                className="w-full justify-between"
-                onClick={() => window.open(`/api/documents?id=${doc.id}`, "_blank")}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a
+                href={`/api/documents?id=${doc.id}`}
+                target="_blank"
+                rel="noopener"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
               >
                 Open PDF
-                <ExternalLink className="h-4 w-4 text-muted" />
-              </Button>
+                <ExternalLink className="h-3.5 w-3.5 text-muted" aria-hidden />
+              </a>
+              {doc.trackerN && (
+                <Link href={`/pipeline/${doc.trackerN}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Open role
+                </Link>
+              )}
             </div>
           </Card>
         ))}

@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickAwaitingDecision, groupAwaiting } from "../../src/lib/home/awaiting.mjs";
+import { pickAwaitingDecision, groupAwaiting, decisionBadges } from "../../src/lib/home/awaiting.mjs";
 
 // The real parser is lib/format.ts's scoreNum, which a .mjs test cannot import.
 // This stub must stay behaviourally identical for the cases below: a leading
@@ -160,4 +160,33 @@ test("without legitimacy, grouping is by score alone", () => {
     groupAwaiting([row("2026-08-01", "4.5/5")]).map(([label]) => label),
     ["Recommended"],
   );
+});
+
+// Each Today card carries its state as badges: when it was evaluated,
+// whether the tailored CV exists, and when the role was posted if known.
+const NOW = new Date(2026, 10, 11, 12, 0, 0);
+const dated = (date, notes) => ({ date, notes, score: "4.0/5", status: "Evaluated" });
+
+test("badges read evaluated, CV and posted state in that order", () => {
+  const badges = decisionBadges(dated("2026-11-11", "Consider; posted: 2026-11-11"), { pdfReady: false, now: NOW });
+  assert.deepEqual(badges.map((b) => b.label), ["Evaluated today", "CV not made yet", "Posted Nov 11"]);
+  assert.deepEqual(badges.map((b) => b.tone), ["good", "muted", "muted"]);
+});
+
+test("a made CV reads CV ready", () => {
+  const badges = decisionBadges(dated("2026-11-11", "posted: 2026-11-11"), { pdfReady: true, now: NOW });
+  assert.equal(badges[1].label, "CV ready");
+});
+
+test("notes with no posted date give two badges", () => {
+  assert.equal(decisionBadges(dated("2026-11-11", "Consider"), { pdfReady: false, now: NOW }).length, 2);
+});
+
+test("an older evaluation names the day", () => {
+  assert.equal(decisionBadges(dated("2026-11-10", ""), { pdfReady: false, now: NOW })[0].label, "Evaluated yesterday");
+  assert.equal(decisionBadges(dated("2026-11-05", ""), { pdfReady: false, now: NOW })[0].label, "Evaluated Nov 5");
+});
+
+test("without a clock (the server render) the evaluated badge leaves the day off", () => {
+  assert.deepEqual(decisionBadges(dated("2026-11-11", "posted: 2026-11-11"), { pdfReady: true, now: null }).map((b) => b.label), ["Evaluated", "CV ready"]);
 });

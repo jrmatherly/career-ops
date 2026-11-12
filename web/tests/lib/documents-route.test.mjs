@@ -57,6 +57,31 @@ test("API: List available generated PDF documents", async () => {
   }
 });
 
+test("API: a listed document carries its tracker row's company and role", async () => {
+  const { root, outputDir, manifestPath, cleanup } = setupTestEnv();
+  try {
+    fs.writeFileSync(path.join(outputDir, "cv-42.pdf"), "pdf");
+    fs.writeFileSync(path.join(outputDir, "cv-loose.pdf"), "pdf");
+    fs.writeFileSync(manifestPath, "042\toutput/cv-42.pdf\t\t\t2026-01-01\tcv\n");
+    const applications = [
+      { n: "42", company: "Fabrikam", role: "Engineering Manager", report: "[42](../reports/042-fabrikam-2026-01-01.md)" },
+    ];
+
+    const req = new Request("http://localhost:3000/api/documents");
+    const data = await (await handleDocumentsRequest(req, root, manifestPath, mockIsRegularContainedFile, applications)).json();
+
+    const titled = data.find((d) => d.filename === "cv-42.pdf");
+    assert.equal(titled.title, "Fabrikam");
+    assert.equal(titled.subtitle, "Engineering Manager");
+    assert.equal(titled.trackerN, "42");
+    const loose = data.find((d) => d.filename === "cv-loose.pdf");
+    assert.equal(loose.title, "cv-loose.pdf");
+    assert.equal(loose.trackerN, null);
+  } finally {
+    cleanup();
+  }
+});
+
 test("API: Invalid identifiers and path-traversal attempts", async () => {
   const { root, outputDir, manifestPath, cleanup } = setupTestEnv();
   try {
