@@ -1,8 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/page-frame";
 
 export default function JobsLoading() {
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10" aria-label="Loading workers">
+    <PageFrame aria-label="Loading workers">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-8 w-32" />
@@ -23,6 +24,6 @@ export default function JobsLoading() {
           </div>
         ))}
       </div>
-    </div>
+    </PageFrame>
   );
 }
