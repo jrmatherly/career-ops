@@ -1242,8 +1242,8 @@ try {
         ['KUBERNETES_SERVICE_HOST set', { KUBERNETES_SERVICE_HOST: '10.0.0.1' }],
       ]) {
         const state = runDoctor(dir, [], env);
-        if (!state._error && !state.warnings.some((w) => PLAYWRIGHT_RE.test(w))) {
-          pass(`hosted install (${name}) gets no Playwright MCP warning`);
+        if (!state._error && !state.warnings.some((w) => PLAYWRIGHT_RE.test(w)) && state.playwright_mcp?.claude === false) {
+          pass(`hosted install (${name}) gets no Playwright MCP warning and is not reported as configured`);
         } else {
           fail(`hosted install (${name}) still warns: ${JSON.stringify(state)}`);
         }
