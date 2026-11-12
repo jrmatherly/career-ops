@@ -204,7 +204,7 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
           <nav aria-label="Pinned" className="-mx-3">{pinned.map(navLink)}</nav>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
+              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : ""}</span>
               <span className="font-mono text-xs text-faint">THEME</span>
             </div>
             <ThemeToggle showLabel className="bg-surface-hover/40" />

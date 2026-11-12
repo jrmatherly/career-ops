@@ -119,7 +119,7 @@ export function ExplorerView({
 
   return (
     // One element whether or not a scan runs, so ResultsList stays mounted; the running scan is full-bleed.
-    <PageFrame className={scanRunning ? "max-w-none p-0 sm:p-0 max-sm:pb-0" : undefined}>
+    <PageFrame className={scanRunning ? "max-w-none p-0 sm:p-0 last:pb-0" : undefined}>
       <p role="status" aria-live="polite" aria-atomic="true" className="mb-4 text-sm text-muted">{!isAi && (employerOutcome?.message || (employer && running ? "Scanning selected employers…" : ""))}</p>
       {scanRunning && <DiscoveringState />}
       {!scanRunning && (

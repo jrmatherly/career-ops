@@ -36,8 +36,9 @@ export function BackToTop() {
       aria-hidden={!visible}
       tabIndex={visible ? 0 : -1}
       className={cn(
-        "fixed bottom-20 right-5 z-40 flex size-11 items-center justify-center rounded-full",
-        "border border-border bg-surface/90 text-muted shadow-lg backdrop-blur",
+        // Docked above the Ask tab, so the pair covers only the page gutter.
+        "fixed bottom-[4.5rem] right-0 z-40 flex h-11 w-9 items-center justify-center rounded-l-full",
+        "border border-r-0 border-border bg-surface/90 text-muted shadow-lg backdrop-blur",
         "transition-[opacity,transform,color,background-color] duration-200",
         "hover:bg-surface-hover hover:text-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",

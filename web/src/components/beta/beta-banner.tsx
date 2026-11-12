@@ -81,13 +81,12 @@ export function BetaBanner() {
 
   return (
     <>
-      <aside aria-label="Build" className="fixed bottom-3 left-3 z-[70] flex items-center gap-2 rounded-full border border-brand/30 bg-surface/90 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md md:w-[13.5rem] md:min-w-0 md:max-w-[13.5rem] md:flex-wrap">
-        <span className="flex items-center gap-1.5 font-medium text-brand-text">
-          <span className="size-1.5 animate-pulse rounded-full bg-brand" /> {meta.version}{meta.channel && meta.channel !== "stable" && ` · ${meta.channel}`}
+      <aside aria-label="Build" className="fixed bottom-3 left-3 z-[70] flex items-center gap-1.5 rounded-full md:left-[7.5rem] md:-translate-x-1/2 border border-brand/30 bg-surface/90 py-1 pl-3 pr-1 text-xs shadow-lg backdrop-blur-md">
+        <span title={meta.sha ? `Build ${meta.sha}` : undefined} className="flex items-center gap-1.5 font-medium text-brand-text">
+          <span className="size-1.5 rounded-full bg-brand motion-safe:animate-pulse" /> {meta.version}{meta.channel && meta.channel !== "stable" && ` · ${meta.channel}`}
         </span>
-        {meta.sha && <span className="hidden font-mono text-faint sm:inline">{meta.sha}</span>}
-        <button onClick={openReport} className="ml-1 inline-flex items-center justify-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 font-medium text-brand-text transition-colors hover:bg-brand/15 max-sm:min-h-[44px]">
-          <Bug className="size-3" /> Report a bug
+        <button onClick={openReport} aria-label="Report a bug" title="Report a bug" className="inline-flex size-6 items-center justify-center rounded-full bg-brand-soft text-brand-text transition-colors hover:bg-brand/15 max-sm:size-11">
+          <Bug className="size-3.5" />
         </button>
       </aside>
 
@@ -102,7 +101,7 @@ export function BetaBanner() {
         >
             <div className="mb-3 flex items-center gap-2">
               <Bug className="size-4 text-brand-text" />
-              <h2 id="bug-report-title" className="text-sm font-semibold text-foreground">Report a bug · {diag.version}</h2>
+              <h2 id="bug-report-title" className="text-sm font-semibold text-foreground">Report a bug · {diag.version}{diag.sha && ` (${diag.sha})`}</h2>
               <button onClick={() => setOpen(false)} aria-label="Close" className="ml-auto text-faint transition-colors hover:text-foreground">
                 <X className="size-4" />
               </button>

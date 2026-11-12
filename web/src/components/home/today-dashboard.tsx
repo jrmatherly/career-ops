@@ -177,7 +177,7 @@ export function TodayDashboard({
         {/* Readability scrim between the animated glow (z-0) and the copy (z-10). */}
         <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-surface/55 backdrop-blur-[2px] dark:bg-background/45" />
         <div className="relative z-10">
-          <h2 className={`${instrumentSerif.className} text-4xl leading-[1.05] text-landing md:text-5xl`}>
+          <h2 className={`${instrumentSerif.className} text-3xl leading-[1.05] text-landing`}>
             {heroState === "loading" ? (
               <>Your career queue is loading.</>
             ) : heroState === "unavailable" ? (

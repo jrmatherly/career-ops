@@ -15,13 +15,12 @@ export function ThemeToggle({ className, showLabel = false }: { className?: stri
       size={showLabel ? "default" : "icon"}
       type="button"
       onClick={toggleTheme}
-      aria-label="Dark mode"
-      aria-pressed={dark}
+      aria-label="Toggle theme"
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
       className={cn("text-muted", showLabel && "w-full justify-start px-2 text-xs", className)}
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      {showLabel && <span>Dark mode</span>}
+      {showLabel && <span>Toggle theme</span>}
     </Button>
   );
 }

@@ -83,7 +83,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                   return (
                     <li key={entry.key} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-1.5">
                       {href ? (
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 max-w-full truncate text-foreground hover:text-brand-text">
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 max-w-full truncate leading-6 text-foreground hover:text-brand-text">
                           {title}
                         </a>
                       ) : (
@@ -101,7 +101,7 @@ export function EvaluateQueuePanel({ jobs }: { jobs: ScheduledJob[] }) {
                         <Link
                           href={link}
                           title="Opens the Inbox on the UTC date this row was queued. The Inbox groups rows by the host-local scan day, so a row queued near midnight UTC, or ranked a day after its scan, sits under a different date."
-                          className="text-brand-text underline-offset-2 hover:underline"
+                          className="inline-flex min-h-6 items-center text-brand-text underline-offset-2 hover:underline"
                         >
                           In the Inbox
                         </Link>

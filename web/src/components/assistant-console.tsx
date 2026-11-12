@@ -828,10 +828,11 @@ export function AssistantConsole() {
           onClick={(e) => openAssistant(e.currentTarget)}
           onPointerEnter={loadMarkdown}
           onFocus={loadMarkdown}
-          className="fixed bottom-5 right-5 z-50 flex items-center justify-center gap-2 rounded-full border border-border bg-surface/90 py-1.5 pl-1.5 pr-4 shadow-lg backdrop-blur transition-colors hover:bg-surface-hover max-sm:min-h-[44px] md-tall:bottom-24 md-tall:left-3 md-tall:right-auto md-tall:max-w-[13.5rem]"
+          aria-label="Ask the assistant"
+          className="group fixed bottom-5 right-0 z-50 flex items-center justify-center rounded-l-full border border-r-0 border-border bg-surface/90 py-1.5 pl-1.5 pr-1 shadow-lg backdrop-blur transition-colors hover:bg-surface-hover max-sm:min-h-[44px] max-sm:pr-3"
         >
           <CoMark size={26} />
-          <span className="text-sm font-medium">Ask<span className="sr-only"> the assistant</span></span>
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-[max-width,opacity,padding] duration-200 group-hover:max-w-16 group-hover:pl-2 group-hover:pr-2.5 group-hover:opacity-100 group-focus-visible:max-w-16 group-focus-visible:pl-2 group-focus-visible:pr-2.5 group-focus-visible:opacity-100 motion-reduce:transition-none max-sm:max-w-16 max-sm:pl-2 max-sm:opacity-100">Ask<span className="sr-only"> the assistant</span></span>
         </button>
       )}
 

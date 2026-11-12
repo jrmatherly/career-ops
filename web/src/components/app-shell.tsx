@@ -1,5 +1,6 @@
 "use client";
 
+import { Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -17,6 +18,7 @@ import { FirstScoreView } from "@/components/explore/first-score-view";
 import { BetaBanner } from "@/components/beta/beta-banner";
 import { WorkerPills } from "@/components/jobs/worker-pills";
 import { UsageMeter } from "@/components/usage-meter";
+import { FootSection } from "@/components/foot-section";
 import { instrumentSerif } from "@/lib/fonts";
 import { useDeployment } from "@/components/deployment-context";
 import { navGroups, isActivePath, type NavItem } from "@/lib/nav-items";
@@ -35,7 +37,7 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
         href={href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
+          "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
           active ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-hover hover:text-foreground",
         )}
       >
@@ -65,12 +67,10 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
             </span>
           </Link>
           <CommandPalette followupsEnabled={followupsEnabled} />
-          {/* At md-tall the fixed Ask button sits over the sidebar's foot and the footer reserves room for it, so the
-              nav scrolls rather than pushing the footer under Ask; elsewhere the whole sidebar scrolls as before. */}
-          <nav aria-label="Main" className="flex flex-col gap-0.5 md-tall:min-h-0 md-tall:overflow-y-auto">
+          <nav aria-label="Main" className="flex flex-col gap-0.5">
             {main.map(({ label, items }) => (
               <div key={label} role="group" aria-labelledby={`nav-group-${label}`} className="flex flex-col gap-0.5">
-                <div id={`nav-group-${label}`} className="px-3 pb-1 pt-3 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
+                <div id={`nav-group-${label}`} className="px-3 pb-1 pt-4 text-xs uppercase tracking-[0.14em] text-faint">{label}</div>
                 {items.map(navLink)}
               </div>
             ))}
@@ -78,19 +78,19 @@ export function AppShell({ children, followupsEnabled }: { children: React.React
 
           <WorkerPills />
 
-          <div className="mt-auto space-y-3 pb-16 pt-3 md-tall:pb-30">
+          {/* pb-14 keeps the foot clear of the fixed version pill. */}
+          <div className="mt-auto space-y-1 pb-14 pt-3">
             <UsageMeter />
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-faint">Appearance</span>
-                <span className="font-mono text-xs text-faint">THEME</span>
-              </div>
+            {/* Open on the settings page, so the current link is never hidden. */}
+            <FootSection label="Settings" icon={<Settings className="size-3" />} defaultOpen={pinned.some((item) => isActivePath(item.href, pathname))}>
+              <nav aria-label="Pinned">{pinned.map((item) => navLink({ ...item, label: "All settings" }))}</nav>
               <ThemeToggle showLabel />
-              <nav aria-label="Pinned">{pinned.map(navLink)}</nav>
-              <div className="px-1">
-                <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : "local-first · v0"}</span>
+            </FootSection>
+            {host && (
+              <div className="px-1 pt-1">
+                <span className={`${instrumentSerif.className} text-sm text-faint`}>Hosted · {host}</span>
               </div>
-            </div>
+            )}
           </div>
         </aside>
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-x-hidden focus:outline-none">{children}</main>

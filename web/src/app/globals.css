@@ -8,10 +8,6 @@
     }
   }
 }
-/* Desktop windows tall enough that the sidebar's links, usage meter and theme
-   toggle all end above the Ask button parked at the sidebar's foot (about 850px
-   of sidebar content). Shorter windows keep Ask in the bottom-right corner. */
-@custom-variant md-tall (@media (min-width: 48rem) and (min-height: 56rem));
 
 /* ──────────────────────────────────────────────────────────────────────────
    Design tokens — inherited from career-ops-docs. Brand burnt-orange #dd7627
@@ -57,7 +53,7 @@
   --border: hsl(40 9% 86%);
   --fg: hsl(30 10% 11%); /* warm near-black, high legibility */
   --muted: hsl(35 9% 34%); /* darker than before for readable body text */
-  --faint: hsl(35 7% 42%); /* AA: ~4.6:1 on #fff (was 50% ≈ 3.9:1, failed small text) */
+  --faint: hsl(35 7% 38%); /* AA with margin on the cream surfaces: 42% measured 4.79:1 there, 0.3 above the floor */
   --landing: #59592a; /* olive editorial headline */
   --brand-text: hsl(26 80% 36%); /* darkened brand for small text: 5.5 white / 5.1 cream / 4.7 surface-hover */
   --dot: 40 8% 42% / 0.09;
@@ -89,6 +85,8 @@ body {
   text-rendering: optimizeLegibility;
 }
 html {
+  /* Keyboard focus and anchor jumps stop above the fixed Ask and back-to-top tabs. */
+  scroll-padding-bottom: 8rem;
   scrollbar-gutter: stable;
 }
 
