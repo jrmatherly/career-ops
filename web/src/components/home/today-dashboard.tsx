@@ -21,7 +21,8 @@ import { BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
 import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
-import { resolveHeroState, mayClaimAllClear, missingSourceLabel, displayCounts } from "@/lib/home/hero-state.mjs";
+import { useHydrated } from "@/lib/use-hydrated";
+import { resolveHeroState, mayClaimAllClear, missingSourceLabel, displayCounts, tileValue } from "@/lib/home/hero-state.mjs";
 import { homeFollowupRemainder } from "@/lib/home/followups-shown.mjs";
 
 // The retention "Today": a dual-loop action queue (the maintainer's
@@ -60,6 +61,7 @@ export function TodayDashboard({
   const [decisionUndo, setDecisionUndo] = useState<{ n: string; label: string; busy?: boolean; error?: string } | null>(null);
   const requestGeneration = useRef(0);
   const router = useRouter();
+  const hydrated = useHydrated();
   const dateLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }), []);
 
   const refetch = useCallback(() => {
@@ -180,7 +182,7 @@ export function TodayDashboard({
     <PageFrame>
       <PageHeader
         title="Today"
-        description={dateLabel}
+        description={hydrated ? dateLabel : undefined}
         actions={
           <div className="flex flex-wrap gap-2.5">
             <Link href="/explore" className="inline-flex min-h-6 items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-brand-foreground transition hover:bg-brand-200 max-sm:min-h-[44px]">
@@ -192,11 +194,10 @@ export function TodayDashboard({
           </div>
         }
       />
-      {/* A count from a source still loading or that failed is unknown, never 0. */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatTile value={freshLoading ? "…" : freshError ? "—" : shown.newThisWeek} label={shown.newThisWeek === 1 ? "new match this week" : "new matches this week"} href="/explore?view=fresh" />
+        <StatTile value={tileValue({ loading: freshLoading, error: freshError, count: shown.newThisWeek })} label={shown.newThisWeek === 1 ? "new match this week" : "new matches this week"} href="/explore?view=fresh" />
         {followupsEnabled && (
-          <StatTile value={followupsLoading ? "…" : followupsError ? "—" : shown.overdue} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
+          <StatTile value={tileValue({ loading: followupsLoading, error: followupsError, count: shown.overdue })} label={shown.overdue === 1 ? "follow-up due today" : "follow-ups due today"} href="/followups" />
         )}
         <StatTile value={aboveLine} label={aboveLine === 1 ? "role above the apply line" : "roles above the apply line"} href="/pipeline?tab=EVALUATED" />
       </div>
@@ -273,8 +274,8 @@ export function TodayDashboard({
                   {showBelow ? "Hide" : "Show"} {group.length} {group.length === 1 ? "role" : "roles"} below the apply line
                 </button>
               )}
-              {(label !== BELOW_APPLY_LINE || showBelow) && (
-                <>
+              {/* Hidden, not unmounted: a card keeps its in-flight decision guard across a collapse. */}
+              <div hidden={label === BELOW_APPLY_LINE && !showBelow}>
               <h3 className="mb-2 text-xs font-medium text-faint">{label}</h3>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {group.map((a) => (
@@ -290,8 +291,7 @@ export function TodayDashboard({
                   />
                 ))}
               </div>
-                </>
-              )}
+              </div>
             </div>
           ))}
         </Section>

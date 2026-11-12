@@ -26,12 +26,15 @@ export default async function Home() {
   const cvReady: Record<string, boolean> = {};
   const readReport = requestReportReader();
   const pdfNames = outputPdfNames();
-  for (const app of pickAwaitingDecision(applications, scoreNum)) {
+  const carded = new Set(pickAwaitingDecision(applications, scoreNum).map((app) => app.n));
+  // Every awaiting row's legitimacy, since the apply-line tile counts past the cards shown.
+  for (const app of pickAwaitingDecision(applications, scoreNum, Infinity)) {
     const content = readReport(app)?.content ?? "";
-    const reason = cardReason(content);
-    if (reason) reasons[app.n] = reason;
     const tier = parseReport(content).legitimacy;
     if (tier) legitimacy[app.n] = tier;
+    if (!carded.has(app.n)) continue;
+    const reason = cardReason(content);
+    if (reason) reasons[app.n] = reason;
     // The report page's PDF button reads the same two sources.
     const indexStatus = (await pdfPathStatusForReport(app.n)).status;
     cvReady[app.n] = tailoredCvOnDisk({ indexStatus, filenames: pdfNames, company: app.company || parseReport(content).title || "" });

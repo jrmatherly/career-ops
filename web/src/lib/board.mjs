@@ -73,8 +73,7 @@ const byScore = (a, b) => scoreOf(b) - scoreOf(a);
 
 /**
  * The Evaluated column's split at the same apply line Today and the report use:
- * rows at or above it, then the rest
- * (unscored rows included), each in input order.
+ * rows at or above it, then the rest (unscored rows included), each in input order.
  * @template {{ score?: string }} T
  * @param {readonly T[]} rows
  * @returns {{ above: T[], below: T[] }}

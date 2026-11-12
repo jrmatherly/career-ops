@@ -24,13 +24,17 @@ export function SettingsView() {
   const [busy, setBusy] = useState<string | null>(null);
   // Saving several groups in a row needs each save's new revision before React re-renders with it.
   const revision = useRef<SettingsResponse["revision"] | null>(null);
+  const saves = useRef(0);
 
   // keepEdits: a save made elsewhere on the page changes the revision, not what the user has typed here.
-  const load = useCallback(async (keepEdits = false) => {
+  const load = useCallback(async (keepEdits = false): Promise<void> => {
+    const savesBefore = saves.current;
     try {
       const res = await fetch("/api/settings", { cache: "no-store" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? `The server answered ${res.status}.`);
+      // Read before a save finished: its revision is already old, so read again.
+      if (savesBefore !== saves.current) return load(true);
       setData(body);
       revision.current = body.revision;
       setLoadError(null);
@@ -52,7 +56,7 @@ export function SettingsView() {
     return () => window.removeEventListener(SETTINGS_SAVED_EVENT, reload);
   }, [load]);
 
-  // Only "Saved." fades; a failure stays until the next save, edit-discard or reload.
+  // Only "Saved." fades; a failure stays until the next save, Discard or reload.
   useEffect(() => {
     if (notice?.kind !== "saved") return;
     const timer = setTimeout(() => setNotice(null), 4000);
@@ -70,6 +74,7 @@ export function SettingsView() {
       if (res.ok) {
         setData(body);
         revision.current = body.revision;
+        saves.current += 1;
         setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !Object.hasOwn(changes, id))));
         setErrors({});
         setNotice({ kind: "saved", text: done });

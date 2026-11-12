@@ -24,7 +24,7 @@ function readWatched(): { watched: WatchedCompany[]; missing: boolean; error: st
   }
 }
 
-// The last finished health check. Missing means none yet; a file that does not parse is shown, not ignored.
+// The last finished health check. Missing means none yet; one that does not parse is reported as an error.
 function readHealth(): { saved: ReturnType<typeof parsePortalHealth>; error: string | null } {
   try {
     let text: string | null = null;

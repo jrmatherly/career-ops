@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { filterPortals, healthOf, portalCounts, parsePortalHealth, withUnlisted } from "../../src/lib/portals-view-model.mjs";
+import { filterPortals, healthOf, portalCounts, parsePortalHealth, uncheckedCount, withToggles, withUnlisted } from "../../src/lib/portals-view-model.mjs";
 
 const companies = [
   { name: "Acme", enabled: true, host: "jobs.ashbyhq.com" },
@@ -56,4 +56,21 @@ test("a checked board the list does not hold still gets a row, so a broken one i
   assert.deepEqual(rows.map((c) => c.name), ["Acme ", "Example Board"]);
   assert.equal(healthOf(health, "Acme ").status, "live", "a tracked name with stray whitespace finds its result");
   assert.deepEqual(portalCounts(rows, health), { scanned: 2, paused: 0, attention: 1 });
+});
+
+test("two entries with one name keep their own switch and count", () => {
+  const watched = [{ name: "Acme", enabled: true, host: "a.example" }, { name: "Acme", enabled: false, host: "b.example" }];
+  const rows = withToggles(watched, [true, false]);
+  assert.deepEqual(rows.map((c) => [c.index, c.enabled]), [[0, true], [1, false]]);
+  assert.deepEqual(portalCounts(rows, {}), { scanned: 1, paused: 1, attention: 0 });
+  assert.equal(withToggles(watched, [false, false])[0].enabled, false);
+});
+
+test("a scanned company the last check does not hold is counted as unchecked", () => {
+  const rows = [{ name: "Acme", enabled: true, host: "" }, { name: "Globex", enabled: true, host: "" }, { name: "Initech", enabled: false, host: "" }];
+  assert.equal(uncheckedCount(rows, { Acme: { status: "live", detail: "" } }), 1);
+});
+
+test("a saved entry without a status or detail is an error, not a blank row", () => {
+  assert.throws(() => parsePortalHealth(JSON.stringify({ checkedAt: "2026-11-12T00:00:00Z", companies: [{ name: "Acme" }] })), /portal-health\.json/);
 });

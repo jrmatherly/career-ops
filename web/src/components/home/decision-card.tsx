@@ -10,6 +10,7 @@ import { scoreNum, scoreTone } from "@/lib/format";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
 import { statusWriteError } from "@/lib/home/status-result.mjs";
 import { decisionBadges } from "@/lib/home/awaiting.mjs";
+import { useHydrated } from "@/lib/use-hydrated";
 import type { Application } from "@/lib/career-ops";
 import type { CardReason } from "@/lib/machine-summary.mjs";
 
@@ -24,6 +25,7 @@ const DECISION_TONE: Record<string, string> = {
 // opens the report (PDF + Apply live there). Skip / Applied still write status,
 // and onDecided lets the parent offer an undo once the card is gone.
 export function DecisionCard({ app, reason, pdfReady, onDecided }: { app: Application; reason?: CardReason; pdfReady: boolean; onDecided?: (status: "Applied" | "Discarded") => void }) {
+  const hydrated = useHydrated();
   const router = useRouter();
   const [busy, setBusy] = useState<"" | "Applied" | "Discarded">("");
   const [done, setDone] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export function DecisionCard({ app, reason, pdfReady, onDecided }: { app: Applic
         )}
       </div>
       <ul aria-label="State" className="flex flex-wrap gap-1.5">
-        {decisionBadges(app, { pdfReady }).map((b) => (
+        {decisionBadges(app, { pdfReady, now: hydrated ? new Date() : null }).map((b) => (
           <li
             key={b.label}
             className={cn(

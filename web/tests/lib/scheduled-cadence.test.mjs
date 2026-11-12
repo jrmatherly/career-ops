@@ -22,3 +22,8 @@ test("any other interval names its count and unit", () => {
     "Every 6 hours · 4:00 AM Pacific",
   );
 });
+
+test("a job with a bad timezone or no start still gets a label", () => {
+  assert.equal(cadenceLabel({ unit: "days", every: 1, timezone: "Mars/Olympus", startAt: "2026-11-06T12:00:00.000Z" }), "Every 1 day");
+  assert.equal(cadenceLabel({ unit: "days", every: 2, timezone: "UTC" }), "Every 2 days");
+});

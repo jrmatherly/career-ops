@@ -97,11 +97,12 @@ const localDay = (at) => at.toLocaleDateString("en-CA");
  * its tailored CV exists, and when it was posted if the notes say (`posted: YYYY-MM-DD`).
  *
  * @param {{date?: string, notes?: string}} app
- * @param {{pdfReady: boolean, now?: Date}} options  pdfReady as the report page's PDF button reads it
+ * @param {{pdfReady: boolean, now?: Date | null}} options  pdfReady as the report page's PDF button reads it; a null `now` (the server render, whose clock is not the viewer's) leaves the day off
  * @returns {{label: string, tone: "good" | "muted"}[]}
  */
 export function decisionBadges(app, { pdfReady, now = new Date() }) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(app.date ?? "") ? app.date : "";
+  if (!now) return [{ label: "Evaluated", tone: "good" }, { label: pdfReady ? "CV ready" : "CV not made yet", tone: "muted" }];
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   const when = !date ? "" : date === localDay(now) ? " today" : date === localDay(yesterday) ? " yesterday" : ` ${formatDay(date, now)}`;

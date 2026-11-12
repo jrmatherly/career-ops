@@ -36,3 +36,8 @@ test("a report no tracker row links keeps its filename", () => {
   const doc = { filename: "cv-old.pdf", reportId: "99" };
   assert.deepEqual(documentTitle(doc, applications), { title: "cv-old.pdf", subtitle: "", trackerN: null });
 });
+
+test("the role link uses the tracker row number, not the report number", () => {
+  const rows = [{ n: "17", company: "Fabrikam", role: "Engineer", report: "[42](../reports/042-fabrikam-2026-11-02.md)" }];
+  assert.equal(documentTitle({ reportId: "42", name: "x.pdf" }, rows).trackerN, "17");
+});

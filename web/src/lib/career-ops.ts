@@ -278,8 +278,9 @@ export function outputPdfNames(): string[] {
       .readdirSync(dir)
       .filter((name) => name.toLowerCase().endsWith(".pdf"))
       .filter((name) => isRegularContainedFile(path.join(dir, name), dir));
-  } catch {
-    return [];
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw e;
   }
 }
 

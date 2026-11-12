@@ -17,8 +17,7 @@ import {
   showsQueue,
   knownWork,
   missingSourceLabel,
-  displayCounts,
-} from '../../src/lib/home/hero-state.mjs';
+  displayCounts, tileValue, } from '../../src/lib/home/hero-state.mjs';
 
 /** Everything answered, nothing pending, no work. */
 const CLEAR = {
@@ -125,4 +124,10 @@ test('a failed source cannot print its stale count', () => {
     displayCounts({ ...CLEAR, followupsError: true, freshError: true, overdue: 4, newThisWeek: 7 }),
     { overdue: 0, newThisWeek: 0 },
   );
+});
+
+test('a tile shows a loading or failed source as unknown, never its count', () => {
+  assert.equal(tileValue({ loading: true, error: false, count: 3 }), '…');
+  assert.equal(tileValue({ loading: false, error: true, count: 3 }), '—');
+  assert.equal(tileValue({ loading: false, error: false, count: 0 }), 0);
 });

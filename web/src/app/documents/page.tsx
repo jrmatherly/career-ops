@@ -119,6 +119,7 @@ export default function DocumentsPage() {
             <div className="min-w-0">
               <h3 className="font-medium text-foreground break-words">{doc.title}</h3>
               {doc.subtitle && <p className="mt-0.5 text-sm text-muted break-words">{doc.subtitle}</p>}
+              {doc.title !== doc.filename && <p className="mt-0.5 truncate font-mono text-xs text-faint" title={doc.filename}>{doc.filename}</p>}
               <p className="mt-2 text-xs text-muted">
                 {KIND_LABEL[doc.kind]} · {formatDay(doc.date ?? new Date(doc.mtimeMs).toISOString().slice(0, 10))}
               </p>

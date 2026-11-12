@@ -72,7 +72,6 @@ export function JobCard({
   return (
     <div className="co-rise group flex min-w-0 flex-col justify-between h-full gap-2.5 rounded-xl border border-border bg-surface/40 p-3.5 text-left transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-sm">
       <div className="space-y-2.5">
-        {/* Title, schedule badge and options menu */}
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
             <h2 className="truncate text-base font-semibold text-foreground">{job.name}</h2>

@@ -117,6 +117,13 @@ export function displayCounts(input) {
 }
 
 /**
+ * A Today tile's value: a source still loading or that failed is unknown, never its count.
+ * @param {{ loading: boolean, error: boolean, count: number }} source
+ * @returns {number | string}
+ */
+export const tileValue = ({ loading, error, count }) => (loading ? "…" : error ? "—" : count);
+
+/**
  * Does this state show counts?
  *
  * True for `queue` and `queue-partial` — the difference between them is the

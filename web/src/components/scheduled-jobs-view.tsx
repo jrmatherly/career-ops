@@ -43,7 +43,6 @@ export function ScheduledJobsView() {
   const loadData = async (quiet = false) => {
     const mine = ++loadSeq.current;
     if (!quiet) setLoading(true);
-    setError(null);
     try {
       const [jobsResponse, schedulerResponse] = await Promise.all([
         fetch("/api/scheduled-jobs", { cache: "no-store" }),
@@ -51,17 +50,17 @@ export function ScheduledJobsView() {
       ]);
       const resJobs = await jobsResponse.json().catch(() => ({}));
       const resScheduler = await schedulerResponse.json().catch(() => null);
-      if (!jobsResponse.ok) throw new Error(resJobs.error || "Could not load scheduled scans.");
+      // A 200 that is not the list (a gateway's HTML page) must not read as "no scans".
+      if (!jobsResponse.ok || !Array.isArray(resJobs.jobs)) throw new Error(resJobs.error || "Could not load scheduled scans.");
       // A slower, older load must not put a stale list back over a newer one that already landed.
       // A newer load that failed does not count, so it cannot discard this one.
       if (mine < appliedLoad.current) return;
       appliedLoad.current = mine;
-      if (!schedulerResponse.ok) setError(resScheduler?.error || "Could not refresh the scheduler status.");
-      setStore({
-        jobs: Array.isArray(resJobs.jobs) ? resJobs.jobs : [],
-        runs: Array.isArray(resJobs.runs) ? resJobs.runs : [],
-      });
-      if (schedulerResponse.ok && isSchedulerStatusPayload(resScheduler)) setScheduler(resScheduler as SchedulerStatus);
+      const schedulerRead = schedulerResponse.ok && isSchedulerStatusPayload(resScheduler);
+      // Cleared only here, so an older load that failed cannot leave its error over this one.
+      setError(schedulerRead ? null : resScheduler?.error || "Could not refresh the scheduler status.");
+      setStore({ jobs: resJobs.jobs, runs: Array.isArray(resJobs.runs) ? resJobs.runs : [] });
+      if (schedulerRead) setScheduler(resScheduler as SchedulerStatus);
     } catch (cause) {
       if (mine > appliedLoad.current) setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
     } finally {

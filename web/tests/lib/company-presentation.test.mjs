@@ -53,3 +53,15 @@ test("compactLocation drops country codes and repeated places", async () => {
   assert.equal(compactLocation("Austin · US"), "Austin, US", "a part inside another word is not a repeat");
   assert.equal(compactLocation("Seattle, WA · seattle"), "Seattle, WA");
 });
+
+test("compactLocation reads a place holding regex characters as text", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("Remote (US · US"), "Remote (US");
+  assert.equal(compactLocation("C++ City · c++ city"), "C++ City");
+});
+
+test("compactLocation keeps the country on a remote role", async () => {
+  const { compactLocation } = await import("../../src/lib/company-presentation.mjs");
+  assert.equal(compactLocation("US - Remote · GB - Remote"), "US - Remote, GB - Remote");
+  assert.equal(compactLocation("US - Seattle"), "Seattle");
+});

@@ -8,9 +8,10 @@ import { useJobs, type Job } from "@/components/jobs/job-store";
 import { Tabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/cn";
 import { formatWhen } from "@/lib/format-time.mjs";
+import { useHydrated } from "@/lib/use-hydrated";
 import type { WatchedCompany } from "@/lib/portals-config.mjs";
 import { showPortalsSetup } from "@/lib/portals-setup.mjs";
-import { filterPortals, healthOf, portalCounts, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
+import { filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
 
 type Company = { name: string; status: string; detail: string };
 type Health = Record<string, { status: string; detail: string }>;
@@ -44,7 +45,8 @@ export function PortalsView({
   const [checkedAt, setCheckedAt] = useState(savedAt);
   const [tab, setTab] = useState<PortalTab>("scanned");
   const [query, setQuery] = useState("");
-  const [enabled, setEnabled] = useState(() => new Map(watched.map((c) => [c.name, c.enabled])));
+  const [enabled, setEnabled] = useState(() => watched.map((c) => c.enabled));
+  const hydrated = useHydrated();
   const [pending, setPending] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [revision, setRevision] = useState(loaded);
@@ -61,9 +63,10 @@ export function PortalsView({
     return m;
   }, [jobs]);
 
-  const companies = useMemo(() => withUnlisted(watched.map((c) => ({ ...c, enabled: enabled.get(c.name) ?? c.enabled })), health), [watched, enabled, health]);
+  const companies = useMemo(() => withUnlisted(withToggles(watched, enabled), health), [watched, enabled, health]);
   const counts = portalCounts(companies, health);
   const shown = filterPortals(companies, { query, tab, health });
+  const unchecked = uncheckedCount(companies, health);
 
   function check() {
     setLoading(true);
@@ -80,10 +83,10 @@ export function PortalsView({
       .finally(() => setLoading(false));
   }
 
-  async function toggle(name: string) {
+  async function toggle(index: number, name: string) {
     if (pending) return;
-    const next = !enabled.get(name);
-    const set = (value: boolean) => setEnabled((all) => new Map(all).set(name, value));
+    const next = !enabled[index];
+    const set = (value: boolean) => setEnabled((all) => all.with(index, value));
     set(next);
     setPending(true);
     setToggleError(null);
@@ -132,6 +135,11 @@ export function PortalsView({
           <code className="break-all font-mono text-xs text-faint">{res.error}</code>
         </p>
       )}
+      {res?.available && res.configured && res.companies.length === 0 && (
+        <p role="alert" className="mt-4 rounded-xl border border-border bg-surface/30 p-4 text-sm text-muted">
+          The check ran but reported no companies, so any status below is from the last check that did.
+        </p>
+      )}
       {res?.saveError && (
         <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
           This check finished but could not be saved, so the page will not show it after a reload: {res.saveError}
@@ -172,7 +180,7 @@ export function PortalsView({
           )}
           {shown.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
-              {query.trim() ? "No company matches that search." : tab === "attention" ? (checkedAt ? "Every scanned board answered the last check." : "Run a health check to see which boards still answer.") : "No companies here."}
+              {query.trim() ? "No company matches that search." : tab === "attention" ? (checkedAt ? (unchecked ? `No broken boards in the last check. ${unchecked} scanned ${unchecked === 1 ? "company was" : "companies were"} not in it.` : "Every scanned board answered the last check.") : "Run a health check to see which boards still answer.") : "No companies here."}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
@@ -180,7 +188,7 @@ export function PortalsView({
                 const h = healthOf(health, c.name);
                 const t = h ? (TONE[h.status] ?? TONE.skipped) : null;
                 return (
-                  <li key={c.name} className="flex items-center gap-3 px-4 py-2.5">
+                  <li key={"index" in c ? `${c.index}-${c.name}` : c.name} className="flex items-center gap-3 px-4 py-2.5">
                     <div className={cn("flex min-w-0 items-center gap-3", !c.enabled && "opacity-60")}>
                       <span title={t?.label} className={cn("size-1.5 shrink-0 rounded-full", t ? t.dot : "bg-border")} />
                       <CompanyLogo name={c.name} size={20} />
@@ -191,14 +199,15 @@ export function PortalsView({
                         </p>
                         {h && (
                           <p className="truncate text-xs text-faint">
-                            {h.detail} · checked {formatWhen(checkedAt)}
+                            {h.detail}
+                            {hydrated && ` · checked ${formatWhen(checkedAt)}`}
                           </p>
                         )}
                       </div>
                     </div>
                     <div className="ml-auto flex shrink-0 items-center gap-2">
                       {h?.status === "broken" && <FixAffordance company={c.name} job={fixByCompany.get(c.name)} onFix={() => startJob({ title: `Fix · ${c.name}`, subtitle: "repair portal slug", kind: "fix-portal", input: c.name, page: "/portals" })} />}
-                      {!("unlisted" in c) && (
+                      {"index" in c && (
                       <button
                         type="button"
                         role="switch"
@@ -206,7 +215,7 @@ export function PortalsView({
                         aria-label={`Scan ${c.name}`}
                         // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
                         aria-disabled={pending}
-                        onClick={() => toggle(c.name)}
+                        onClick={() => toggle(c.index, c.name)}
                         className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors aria-disabled:opacity-60", c.enabled ? "bg-brand" : "bg-surface-hover")}
                       >
                         <span className={cn("absolute left-0 top-0.5 size-5 rounded-full bg-white shadow transition-transform", c.enabled ? "translate-x-[1.375rem]" : "translate-x-0.5")} />

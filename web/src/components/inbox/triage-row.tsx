@@ -15,9 +15,9 @@ import { agoLabel } from "@/lib/format-time.mjs";
 
 export type RowScore = { score: number | null; tone: "good" | "warn" | "bad" | "muted"; jobId: string; running: boolean; reportN?: number | null; needsReview?: boolean };
 
-// One raw posting in the triage list. Shows ONLY cheap, free signals; the ranker's
-// prior is a dashed "est." pill, never a fake match%. Once its shortlist eval finishes
-// it flips to EVALUADA (a real A–F badge). Save→shortlist / Skip→hidden are free + undoable.
+// One raw posting in the triage list. Before evaluation it shows only free signals and the
+// ranker's prior as a dashed "est." pill, never a match%. After its evaluation finishes it
+// shows the real N/5 badge. Save and Skip are free and undoable.
 export function TriageRow({
   index,
   cursor,

@@ -131,3 +131,19 @@ test("a health check that did not finish leaves the last saved result alone", as
   assert.equal(body.error, "verify-portals failed: boom");
   assert.equal(readFileSync(healthFile(), "utf8"), before);
 });
+
+test("a check that prints no company leaves the last saved result alone", async () => {
+  await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  const before = readFileSync(healthFile(), "utf8");
+  const body = await verifyWith('console.log("checked 0 companies");\n');
+  assert.deepEqual(body.companies, []);
+  assert.equal(readFileSync(healthFile(), "utf8"), before);
+});
+
+test("a check that cannot be saved still returns its result, with the reason", async () => {
+  writeFileSync(join(dataRoot, "data"), "not a directory");
+  const body = await verifyWith('console.log("  ✅ Acme — ashby/acme · 4 jobs");\n');
+  assert.equal(body.configured, true);
+  assert.equal(body.companies.length, 1);
+  assert.equal(typeof body.saveError, "string");
+});

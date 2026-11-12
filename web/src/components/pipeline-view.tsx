@@ -89,6 +89,23 @@ export function PipelineView({
   const omittedWhileRejected = useRef(new Set<string>());
   const pendingWhileRejected = useRef(new Set<string>());
   const activeTab = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const close = (event: KeyboardEvent | PointerEvent) => {
+      const menu = moreMenu.current;
+      if (!menu?.open) return;
+      if (event instanceof KeyboardEvent) {
+        if (event.key !== "Escape") return;
+        menu.querySelector("summary")?.focus();
+      } else if (menu.contains(event.target as Node)) return;
+      menu.open = false;
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, []);
   // A tab picked from More moves into the row, which unmounts the focused menu button.
   const refocusTab = useRef(false);
   const anchor = useRef<string | null>(null);

@@ -60,6 +60,15 @@ test(
       scanBox && scanBox.y + scanBox.height <= 900,
       `scan button must sit on the first 1280x900 screen, bottom edge at ${scanBox && scanBox.y + scanBox.height}`,
     );
+    const terms = Array.from({ length: 40 }, (_, i) => `term${i}`);
+    await page.goto(`${origin.origin}/explore?not=${terms.join(",")}`);
+    await page.getByText("40 exclusions").waitFor();
+    const longBox = await firstScreenScan.boundingBox();
+    assert.ok(longBox && longBox.y + longBox.height <= 900, "a long exclusion list must not push the scan button off the first screen");
+    await page.getByRole("button", { name: "Edit exclusions", exact: true }).click();
+    await page.getByLabel("Exclude", { exact: true }).waitFor();
+    await page.goto(`${origin.origin}/explore`);
+    await firstScreenScan.waitFor();
     await page
       .getByRole("button", { name: "Discovery source, location controls & scan depth", exact: true })
       .click();
