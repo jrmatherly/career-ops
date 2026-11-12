@@ -209,3 +209,51 @@ test('an edited entry updates the stored item, and a new period orphans it', () 
   assert.equal(third.lossless, false);
   assert.deepEqual(third.report.unparsed, []);
 });
+
+test('entries reordered in the file are stored in file order, ids kept', () => {
+  const a = '### Uni — City\n**BS**\n2010 – 2012';
+  const b = '### Other — Town\n**MS**\n2013 – 2014';
+  const first = absorb(`${HEADER}## Education\n\n${a}\n\n${b}\n`, null);
+  const ids = first.data.sections.education.items.map((i) => i.id);
+
+  const md = `${HEADER}## Education\n\n${b}\n\n${a}\n`;
+  const second = absorb(md, first.data);
+  assert.equal(second.lossless, true);
+  assert.equal(resumeToCvMarkdown(second.data), md);
+  assert.deepEqual(second.data.sections.education.items.map((i) => i.id), [ids[1], ids[0]]);
+  assert.deepEqual(second.report.orphans, []);
+  assert.deepEqual(second.report.unparsed, []);
+  assert.equal(second.report.added, 0);
+});
+
+test('a reorder keeps an entry the file dropped after the ones it has', () => {
+  const entry = (name, year) => `### ${name}\n**BS**\n${year}`;
+  const first = absorb(`${HEADER}## Education\n\n${entry('A', 2010)}\n\n${entry('B', 2011)}\n\n${entry('C', 2012)}\n`, null);
+  const second = absorb(`${HEADER}## Education\n\n${entry('C', 2012)}\n\n${entry('A', 2010)}\n`, first.data);
+  assert.deepEqual(second.data.sections.education.items.map((i) => i.school), ['C', 'A', 'B']);
+  assert.deepEqual(second.report.orphans.map((o) => o.name), ['B']);
+});
+
+test('a sentence directly under a heading is description, not the period', () => {
+  const { data } = roundTrips(`${HEADER}## Volunteer\n\n### Food Bank\nCoordinate volunteers.\n`);
+  const [item] = data.sections.volunteer.items;
+  assert.equal(item.period, '');
+  assert.equal(item.description, '<p>Coordinate volunteers.</p>');
+});
+
+test('a sentence directly under the bold line is description, not the period', () => {
+  const { data } = roundTrips(`${HEADER}## Education\n\n### Uni\n**BS**\nGraduated with honors.\n`);
+  const [item] = data.sections.education.items;
+  assert.equal(item.period, '');
+  assert.equal(item.description, '<p>Graduated with honors.</p>');
+});
+
+test('each period shape cv.md uses is stored as the period', () => {
+  for (const period of ['2023 – Present', 'Aug 2010 – May 2012', '2018-2020', '2010', 'Jan 2021 - Present']) {
+    const volunteer = roundTrips(`${HEADER}## Volunteer\n\n### Food Bank\n${period}\n\nHelp out.\n`).data.sections.volunteer.items[0];
+    assert.equal(volunteer.period, period);
+    assert.equal(volunteer.description, '<p>Help out.</p>');
+    const education = roundTrips(`${HEADER}## Education\n\n### Uni\n**BS**\n${period}\n`).data.sections.education.items[0];
+    assert.equal(education.period, period);
+  }
+});
