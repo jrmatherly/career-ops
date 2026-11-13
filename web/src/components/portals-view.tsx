@@ -121,7 +121,8 @@ export function PortalsView({
       setRevision(body.revision);
     } catch (e) {
       set(!next);
-      if (view.current?.contains(document.activeElement)) refocusCompany.current = index;
+      // Only while focus is still on a switch: the user may have moved on to the search field.
+      if (document.activeElement?.getAttribute("role") === "switch" && view.current?.contains(document.activeElement)) refocusCompany.current = index;
       setToggleError(`${name}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPending(false);

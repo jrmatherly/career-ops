@@ -233,9 +233,9 @@ export function CvMarkdownEditor({ editor, textareaRef }: { editor: CvEditorMode
           onChange={(e) => dispatch({ type: "edit", content: e.target.value })}
           spellCheck={false}
           placeholder="# Your Name&#10;&#10;## Summary&#10;..."
-          className="h-[calc(100vh-16rem)] w-full resize-none overflow-auto rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
+          className="h-[calc(100vh-16rem)] min-h-64 w-full resize-none overflow-auto rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
         />
-        <article aria-label="Markdown preview" className="report-prose h-[calc(100vh-16rem)] overflow-auto rounded-2xl border border-border bg-surface/30 p-5 [&_p]:whitespace-pre-line">
+        <article aria-label="Markdown preview" className="report-prose h-[calc(100vh-16rem)] min-h-64 overflow-auto rounded-2xl border border-border bg-surface/30 p-5 [&_p]:whitespace-pre-line">
           {state.content.trim() ? <CvMarkdown content={state.content} /> : <p className="text-muted">Preview appears here.</p>}
         </article>
       </div>

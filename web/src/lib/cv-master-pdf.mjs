@@ -31,7 +31,12 @@ const ROOT_ENV = ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER"
  */
 export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000, killGraceMs = 5_000 }) {
   if (!lossless) return { ok: false, status: 409, error: "cv.md could not be read cleanly" };
-  const rendered = await renderHtml();
+  let rendered;
+  try {
+    rendered = await renderHtml();
+  } catch (err) {
+    return { ok: false, status: 500, error: `CV preview failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
   if (!rendered.ok) return rendered;
 
   let dir;

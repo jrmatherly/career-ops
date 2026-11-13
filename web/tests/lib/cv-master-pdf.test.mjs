@@ -162,3 +162,8 @@ test("a clean render's advisories reach the server log", async (t) => {
   assert.equal(out.ok, true);
   assert.match(String(warns.mock.calls[0]?.arguments[0]), /2 pages, budget 1/);
 });
+
+test("a preview render that throws is a 500, not a rejection", async () => {
+  const out = await renderMasterPdf({ lossless: true, renderHtml: async () => { throw new Error("boom"); }, format: "letter", spawnFn: () => { throw new Error("must not spawn"); }, execPath: "node", coreRoot: "/" });
+  assert.deepEqual(out, { ok: false, status: 500, error: "CV preview failed: boom" });
+});
