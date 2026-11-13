@@ -59,5 +59,11 @@ write("portals.yml", `title_filter:
   positive:
     - "Fixture Engineer"
     - "Fixture Analyst"
+tracked_companies:
+  - name: Fixture Alpha
+    careers_url: https://jobs.example.com/fixture-alpha
+  - name: Fixture Beta
+    careers_url: https://beta.example.com/careers
+    provider: fixtureboard
 `);
 console.log(root);

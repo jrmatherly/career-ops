@@ -21,6 +21,7 @@ const RENDERS = {
   "/pipeline": [["the inbox Select all button", "button", /^Select all \d+$/]],
   "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
   "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
+  "/portals": [["the Board type filter", 'select[aria-label="Board type"]']],
   "/": [
     ["the follow-ups See all link", 'a[href="/followups"]', /^See all/],
     ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', /^See all/],
@@ -67,7 +68,7 @@ test("every page sits in one shell under one header, with readable text and reac
       .filter((el) => shown(el) && !el.closest("[aria-hidden=true]") && [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim()))
       .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
       .map((el) => `${label(el)} ${getComputedStyle(el).fontSize}`);
-    const smallTargets = [...main.querySelectorAll("input[type=checkbox], button, a")]
+    const smallTargets = [...main.querySelectorAll("input[type=checkbox], button, a, select")]
       .filter(shown)
       // WCAG 2.5.8 exempts a link in a sentence, whose height is its line's.
       .filter((el) => !(el.tagName === "A" && getComputedStyle(el).display === "inline"))
@@ -117,7 +118,7 @@ test("every page sits in one shell under one header, with readable text and reac
     await t.test(`${route}: no text under 12px`, () => {
       assert.deepEqual(m.smallText, []);
     });
-    await t.test(`${route}: every checkbox, button and link is at least 24px both ways`, () => {
+    await t.test(`${route}: every checkbox, button, link and select is at least 24px both ways`, () => {
       assert.deepEqual(m.smallTargets, []);
     });
   }

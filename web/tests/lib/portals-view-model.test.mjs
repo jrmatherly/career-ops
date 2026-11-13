@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { filterPortals, healthOf, portalCounts, parsePortalHealth, uncheckedCount, withToggles, withUnlisted } from "../../src/lib/portals-view-model.mjs";
+import { boardType, boardTypes, filterPortals, healthOf, portalCounts, parsePortalHealth, uncheckedCount, withToggles, withUnlisted } from "../../src/lib/portals-view-model.mjs";
 
 const companies = [
   { name: "Acme", enabled: true, host: "jobs.ashbyhq.com" },
@@ -73,4 +73,46 @@ test("a scanned company the last check does not hold is counted as unchecked", (
 
 test("a saved entry without a status or detail is an error, not a blank row", () => {
   assert.throws(() => parsePortalHealth(JSON.stringify({ checkedAt: "2026-11-12T00:00:00Z", companies: [{ name: "Acme" }] })), /portal-health\.json/);
+});
+
+test("a board is named by its provider, else by the host of its api or careers URL", () => {
+  assert.equal(boardType({ careers_url: "https://jobs.ashbyhq.com/acme" }), "Ashby");
+  assert.equal(boardType({ careers_url: "https://acme.example/careers", api: "https://boards-api.greenhouse.io/v1/boards/acme/jobs" }), "Greenhouse");
+  assert.equal(boardType({ provider: "smartrecruiters", careers_url: "https://acme.example" }), "Smartrecruiters");
+  assert.equal(boardType({ careers_url: "https://acme.wd5.myworkdayjobs.com/jobs" }), "Workday");
+  assert.equal(boardType({ careers_url: "https://apply.workable.com/acme" }), "Workable");
+  assert.equal(boardType({ careers_url: "https://jobs.lever.co/acme" }), "Lever");
+  for (const other of [{ careers_url: "https://notlever.co/x" }, { careers_url: "not a url" }, { provider: " " }, { provider: 7 }, {}]) assert.equal(boardType(other), "Other");
+});
+
+const boards = [
+  { name: "Acme", enabled: true, host: "", board: "Greenhouse" },
+  { name: "Globex", enabled: true, host: "", board: "Greenhouse" },
+  { name: "Initech", enabled: true, host: "", board: "Lever" },
+  { name: "Umbrella", enabled: true, host: "", board: "Other" },
+  { name: "Hooli", enabled: false, host: "", board: "Other" },
+];
+
+test("the board types present are listed once, sorted, with Other last", () => {
+  assert.deepEqual(boardTypes(boards), ["Greenhouse", "Lever", "Other"]);
+  assert.deepEqual(boardTypes([{ name: "Zed", enabled: true, host: "", board: "Workday" }, { name: "Odd", enabled: true, host: "", board: "Other" }, { name: "Ash", enabled: true, host: "", board: "Ashby" }]), ["Ashby", "Workday", "Other"]);
+  assert.deepEqual(boardTypes([]), []);
+});
+
+test("the board filter narrows a tab, combines with the search, and any shows every board", () => {
+  const filter = (extra) => names(filterPortals(boards, { query: "", tab: "scanned", health: {}, ...extra }));
+  assert.deepEqual(filter({ board: "Lever" }), ["Initech"]);
+  assert.deepEqual(filter({ board: "" }), ["Acme", "Globex", "Initech", "Umbrella"]);
+  assert.deepEqual(filter({}), filter({ board: "" }));
+  assert.deepEqual(filter({ board: "Greenhouse", query: "glob" }), ["Globex"]);
+  assert.deepEqual(filter({ board: "Other", tab: "paused" }), ["Hooli"]);
+});
+
+test("a board the check found that the list does not hold is Other, and shows under any and Other only", () => {
+  const all = withUnlisted(boards, { Stray: { status: "broken", detail: "gone" } });
+  assert.equal(all.at(-1).board, "Other");
+  const filter = (board) => names(filterPortals(all, { query: "", tab: "attention", health: { Stray: { status: "broken", detail: "gone" } }, board }));
+  assert.deepEqual(filter(""), ["Stray"]);
+  assert.deepEqual(filter("Other"), ["Stray"]);
+  assert.deepEqual(filter("Lever"), []);
 });
