@@ -56,6 +56,7 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { normalizeTextKey } from './tracker-parse.mjs';
 import { replaceUserFile, userFileWriteTarget } from './tracker-utils.mjs';
 import { acquireDirLock, releaseOrWarn } from './lib/dir-lock.mjs';
+import { acquireResumeLock } from './lib/resume/model.mjs';
 import { validateFlags } from './lib/cli-flags.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 
@@ -349,6 +350,9 @@ async function main() {
         owner: { tool: 'add-entry' },
       }));
     }
+    // resume.mjs save, adopt and import and the web's cv.md save compare cv.md and write it
+    // under the resume lock, so an addition must not land between their check and their write.
+    if (!dryRun && payload?.cv) locks.push(await acquireResumeLock(CAREER_OPS));
     const cvText = existsSync(CV_FILE) ? readFileSync(CV_FILE, 'utf-8') : null;
     const articleText = existsSync(ARTICLE_DIGEST_FILE) ? readFileSync(ARTICLE_DIGEST_FILE, 'utf-8') : null;
 

@@ -43,6 +43,7 @@ import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { validateLockedSections, sectionKey } from './generate-pdf.mjs';
 import { readLockedSections } from './theme-style.mjs';
 import { hasRequiredFields, templateSlotWarnings, validatePayload } from './lib/cv-payload-schema.mjs';
+import { bodyRuns } from './lib/resume/to-payload.mjs';
 import { resolveTrackerPath, resolveWorkspaceRoot } from './tracker-utils.mjs';
 import { PAGE_WIDTHS, resolvePageFormat } from './lib/page-format.mjs';
 import { PARTIAL_SECTIONS, declaredSections, parseMeta } from './lib/template-manifest.mjs';
@@ -475,13 +476,21 @@ function withResumePath(html, path) {
   return html.replace(/<[a-zA-Z][\w-]*/, tag => `${tag} data-resume-path="${escapeHtml(path)}"`);
 }
 
+// The entry's list items in cv.md order. A paragraph that follows a bullet is an item with its
+// native marker turned off, so it takes the list's font and spacing and needs no slot of its own
+// (a second block after the list would not: .job-context floats in the compact template).
+// A pack that draws its bullets with li::before must hide it on .job-note.
+function experienceItems(e) {
+  return bodyRuns(e).flatMap(run => (run.text
+    ? [`<li class="job-note" style="list-style: none">${escapeHtml(run.text)}</li>`]
+    : run.bullets.map(b => `<li>${escapeHtml(b)}</li>`)));
+}
+
 function buildExperience(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
     return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-      const bullets = Array.isArray(e.bullets)
-        ? e.bullets.filter(Boolean).map(b => `        <li>${escapeHtml(b)}</li>`).join('\n')
-        : '';
+      const bullets = experienceItems(e).map(li => `        ${li}`).join('\n');
       const location = e.location
         ? `\n    <div class="job-location">${escapeHtml(e.location)}</div>`
         : '';
@@ -503,9 +512,7 @@ ${bullets}
 
   const { entryTemplate, blocks } = partial;
   return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-    const bullets = Array.isArray(e.bullets)
-      ? e.bullets.filter(Boolean).map(b => `<li>${escapeHtml(b)}</li>`).join('\n    ')
-      : '';
+    const bullets = experienceItems(e).join('\n    ');
     const blockValues = new Map([
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''), present: Boolean(e.location) }],
       ['CONTEXT_BLOCK', { value: escapeHtml(e.context || ''), present: Boolean(e.context) }],
@@ -1001,9 +1008,11 @@ function renderMarkdown(payload, template) {
     const meta = mdJoin([e.location, e.dates || e.period], ' · ');
     if (meta) exp.push(`*${meta}*`, '');
     if (mdLine(e.context)) exp.push(mdLine(e.context), '');
-    const bullets = list(e.bullets).filter(Boolean);
-    for (const b of bullets) exp.push(`- ${mdLine(b)}`);
-    if (bullets.length) exp.push('');
+    for (const run of bodyRuns(e)) {
+      if (run.text) exp.push(mdLine(run.text));
+      else for (const b of run.bullets) exp.push(`- ${mdLine(b)}`);
+      exp.push('');
+    }
   }
   section('experience', exp);
 
