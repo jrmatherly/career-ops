@@ -21,7 +21,7 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
-import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, writeResume } from './lib/resume/model.mjs';
+import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, withResumeLock, writeResume } from './lib/resume/model.mjs';
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
@@ -244,18 +244,21 @@ async function saveCommand(root, args) {
     return 3;
   }
   const cvPath = join(root, 'cv.md');
-  const current = existsSync(cvPath) ? sha256(readFileSync(cvPath, 'utf8')) : '';
-  if (current !== expected) {
-    console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current }) : `cv.md changed since the draft was opened (sha ${current}); nothing written`);
-    return 4;
-  }
-  data.careerOps.pendingCvSha256 = sha256(generated);
-  await writeResume(root, data);
-  replaceUserFile(cvPath, generated);
-  markInSync(data, sha256(generated));
-  await writeResume(root, data);
-  console.log(json ? JSON.stringify({ written: true, cvSha256: data.careerOps.cvSha256 }) : 'cv.md and data/resume.json written');
-  return 0;
+  // The sha check sits inside the lock, after the wait, so a cv.md write made while this save waited is seen.
+  return withResumeLock(root, (path) => {
+    const current = existsSync(cvPath) ? sha256(readFileSync(cvPath, 'utf8')) : '';
+    if (current !== expected) {
+      console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current }) : `cv.md changed since the draft was opened (sha ${current}); nothing written`);
+      return 4;
+    }
+    data.careerOps.pendingCvSha256 = sha256(generated);
+    writeFileAtomic(path, serialize(data));
+    replaceUserFile(cvPath, generated);
+    markInSync(data, sha256(generated));
+    writeFileAtomic(path, serialize(data));
+    console.log(json ? JSON.stringify({ written: true, cvSha256: data.careerOps.cvSha256 }) : 'cv.md and data/resume.json written');
+    return 0;
+  });
 }
 
 function checkCommand(root, args) {
