@@ -975,7 +975,7 @@ export function PipelineView({
                         target="_blank"
                         rel="noreferrer"
                         title="Open the tailored CV PDF"
-                        className="inline-flex items-center gap-1.5 text-brand-text hover:underline"
+                        className="inline-flex min-h-6 items-center gap-1.5 text-brand-text hover:underline"
                       >
                         <FileText aria-hidden="true" className="size-3.5" /> PDF
                       </a>

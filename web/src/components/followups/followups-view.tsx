@@ -411,7 +411,7 @@ function FollowupRow({
         </td>
         <td className="px-2.5 py-3 font-medium">
           {e.reportPath ? (
-            <Link href={`/pipeline/${e.num}`} className="flex items-center gap-2.5 transition-colors group-hover:text-brand-text">
+            <Link href={`/pipeline/${e.num}`} className="flex min-h-6 items-center gap-2.5 transition-colors group-hover:text-brand-text">
               <CompanyLogo name={e.company} size={20} />
               {e.company}
             </Link>
