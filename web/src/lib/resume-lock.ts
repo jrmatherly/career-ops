@@ -15,9 +15,12 @@ import { acquireDirLock, releaseOrWarn } from "./core/dir-lock.mjs";
 export async function withResumeLock<T>(root: string, fn: () => T): Promise<T> {
   const lockDir = path.join(root, "data", "resume.json.lock");
   fs.mkdirSync(path.dirname(lockDir), { recursive: true });
+  // A request that waits a minute reads as a hang, so the web gives up sooner than the CLI.
+  const timeoutMs = Number(process.env.CAREER_OPS_WEB_RESUME_LOCK_TIMEOUT_MS) || 5_000;
   const lock = await acquireDirLock(lockDir, {
-    // A request that waits a minute reads as a hang, so the web gives up sooner than the CLI.
-    timeoutMs: Number(process.env.CAREER_OPS_WEB_RESUME_LOCK_TIMEOUT_MS) || 5_000,
+    timeoutMs,
+    // Without this the wait restarts each time the lock changes hands, up to ten times timeoutMs.
+    maxWaitMs: timeoutMs,
     retryMs: 50,
     staleMs: 600_000,
     owner: { tool: "web-cv" },
