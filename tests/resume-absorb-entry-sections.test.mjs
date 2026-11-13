@@ -278,14 +278,16 @@ test('a stored name holding a spaced dash reads back as that entry, in Education
   assert.equal(first.lossless, true, JSON.stringify(first.report));
   first.data.sections.experience.items[0].company = 'Acme — Labs';
   first.data.sections.education.items[0].school = 'Example University — Downtown';
+  first.data.sections.education.items[0].location = 'Springfield, IL';
   const md = resumeToCvMarkdown(first.data);
-  assert.match(md, /### Example University — Downtown/);
+  assert.match(md, /### Example University — Downtown — Springfield, IL/);
   const again = absorb(md, first.data);
   assert.deepEqual(again.report.orphans, []);
   assert.equal(again.report.added, 0);
   assert.equal(again.lossless, true);
   assert.equal(again.data.sections.education.items.length, 1);
   assert.equal(again.data.sections.education.items[0].school, 'Example University — Downtown');
+  assert.equal(again.data.sections.education.items[0].location, 'Springfield, IL');
   assert.equal(again.data.sections.experience.items.length, 1);
   assert.equal(again.data.sections.experience.items[0].company, 'Acme — Labs');
 });
