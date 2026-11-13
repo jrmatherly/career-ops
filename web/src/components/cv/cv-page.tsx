@@ -202,8 +202,10 @@ export function CvPage({ format, templates, templatesError }: { format: string |
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 0);
-      const warning = res.headers.get(PAGE_OVERFLOW_HEADER);
-      setOverflow(warning ? decodeURIComponent(warning) : null);
+      let warning = res.headers.get(PAGE_OVERFLOW_HEADER);
+      // The file is already saved here, so a header that will not decode must not read as a failed download.
+      try { warning = warning && decodeURIComponent(warning); } catch {}
+      setOverflow(warning || null);
     } catch (err) {
       setDownloadError((err as Error).message);
     } finally {
