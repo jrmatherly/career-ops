@@ -43,3 +43,25 @@ test('a hand-added paragraph after the bullets is stored after the list', () => 
   assert.equal(report.changed, 1);
   assert.equal(out.sections.experience.items.find((i) => i.id === entry.id).description, DESCRIPTION);
 });
+
+test('a cv.md absorbed with no stored resume keeps each description in file order', () => {
+  const P_UL_P_UL = '<p>Ran the tools team.</p><ul><li><p>Shipped the asset pipeline</p></li></ul><p>Then moved to the engine team.</p><ul><li><p>Cut build times in half</p></li></ul>';
+  const UL_P = '<ul><li><p>Shipped the asset pipeline</p></li></ul><p>Left to found Larkspur Labs.</p>';
+  const cases = [
+    ['paragraph, bullets, paragraph, bullets', (data) => data.sections.experience.items.find((i) => !i.roles?.length), P_UL_P_UL],
+    ['bullets, then a paragraph', (data) => data.sections.experience.items.find((i) => !i.roles?.length), UL_P],
+    ['a role of an item with roles', (data) => data.sections.experience.items.find((i) => i.roles?.length).roles[1], P_UL_P_UL],
+  ];
+  for (const [shape, pick, description] of cases) {
+    const data = fixture();
+    const entry = pick(data);
+    entry.description = description;
+    const md = resumeToCvMarkdown(data);
+    const { data: out, report, lossless } = absorb(md, null);
+    assert.equal(lossless, true, shape);
+    assert.deepEqual(report.unparsed, [], shape);
+    const stored = out.sections.experience.items.find((i) => i.position === entry.position);
+    assert.equal(stored.description, description, `${shape}: stored in file order`);
+    assert.equal(resumeToCvMarkdown(out), md, `${shape}: regenerates the same cv.md`);
+  }
+});
