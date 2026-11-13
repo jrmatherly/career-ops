@@ -125,4 +125,4 @@ All **decided** by Jason from annotated screenshots of `mockups.html`. The mocku
 | C1, expected effect | Only 6 of 166 providers emit a salary (Ashby among them; Greenhouse, Lever and Workday do not), so the minimum salary will drop few sweep rows even once wired. Reported by an explorer, not re-counted. |
 | C4 | No web component renders `doctor` warnings, so the fix is in `doctor.mjs` only. Reported by an explorer. |
 
-The plan is `docs/superpowers/plans/2026-11-11-deployment-config-review.md`.
+The plan is `docs/superpowers/plans/completed/2026-11-11-deployment-config-review.md`.

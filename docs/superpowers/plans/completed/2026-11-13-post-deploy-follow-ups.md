@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js (App Router) and Tailwind in `web/`, Node `.mjs` scripts, `node:test`, Playwright with Chrome for the browser suites.
 
-**Spec:** `docs/superpowers/research/2026-11-11-deployment-config-review/post-deploy-findings.md` (item ids A, B, C, D, E used below) and `mockups.html` beside it. The parent plan is `docs/superpowers/plans/2026-11-11-deployment-config-review.md`.
+**Spec:** `docs/superpowers/research/2026-11-11-deployment-config-review/post-deploy-findings.md` (item ids A, B, C, D, E used below) and `mockups.html` beside it. The parent plan is `docs/superpowers/plans/completed/2026-11-11-deployment-config-review.md`.
 
 ## Global Constraints
 

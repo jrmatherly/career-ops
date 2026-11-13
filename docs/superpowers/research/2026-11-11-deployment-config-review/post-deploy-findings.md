@@ -2,7 +2,7 @@
 
 Recorded 2026-11-13 after career-ops 2.2.0 and web 1.2.0 were deployed to `https://career.matherly.net` (home-cluster d021b6e). These are the items the release left open. Each says how it was found and where the code is. The [Outcomes](#outcomes) section records what the follow-up branch did with each one.
 
-The plan is `docs/superpowers/plans/2026-11-11-deployment-config-review.md`. Its rules are a 12px floor for UI text and 24px in both dimensions for interactive targets (plan line 25).
+The plan is `docs/superpowers/plans/completed/2026-11-11-deployment-config-review.md`. Its rules are a 12px floor for UI text and 24px in both dimensions for interactive targets (plan line 25).
 
 ## How the checks were run
 
@@ -29,7 +29,7 @@ A1 is the clear miss: an icon-only target at half the minimum in both directions
 
 The browser suite that asserts the rule is `web/tests/lib/layout-shell.browser.test.mjs`. It passed on the release while the live site shows A1 to A5, because its fixture, `web/tests/fixtures/pipeline-status.mjs`, has three tracker rows and nothing else, so none of these controls renders. Run against a fixture that renders them (`web/tests/fixtures/layout-shell.mjs`), the unchanged suite failed on exactly A1 to A5 and on nothing else: the chip buttons at 12 by 12, "Select all" at 16 tall, and the PDF link, the Follow-ups company link and both "See all" links on Today at 20 tall. A4 shows only when the company name fits on one line; a name that wraps makes the link 40 tall. The suite already exempts a link inside a sentence, which covers A6.
 
-The fixes are planned in `docs/superpowers/plans/2026-11-13-post-deploy-follow-ups.md`, one branch and one PR. Its "Decisions already made" table records the owner's answers on A2 to A5, B2 and C2.
+The fixes are planned in `docs/superpowers/plans/completed/2026-11-13-post-deploy-follow-ups.md`, one branch and one PR. Its "Decisions already made" table records the owner's answers on A2 to A5, B2 and C2.
 
 ## B. Differences from the mockups
 

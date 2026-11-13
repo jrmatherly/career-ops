@@ -403,7 +403,7 @@ The fork cuts its own releases on the 2.x line (web component 1.x) with release-
 
 ### Deployment configuration review (2026-11-11)
 
-Plan: `docs/superpowers/plans/2026-11-11-deployment-config-review.md`. One row per upstream file a phase changes.
+Plan: `docs/superpowers/plans/completed/2026-11-11-deployment-config-review.md`. One row per upstream file a phase changes.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
