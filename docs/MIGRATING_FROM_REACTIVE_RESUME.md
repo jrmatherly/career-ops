@@ -15,7 +15,7 @@ The CSV export of applications works too, but it carries no timeline notes and n
 
 ## 2. Import the resume
 
-`cv.md` is the canonical CV in career-ops. The import writes it and a derived `data/resume.json` that the dashboard's Resume editor reads.
+`cv.md` is the canonical CV in career-ops. The import writes it and a derived `data/resume.json` that the structured editor on the dashboard's CV page reads.
 
 ```bash
 node resume.mjs import my-resume.json --format rr
@@ -63,9 +63,10 @@ Skip this if career-ops stays on your machine. To run the dashboard on a server 
 
 Open the dashboard (`npm run ui`, or your deployed URL) and walk the pages the imports feed:
 
-- **Resume** (`/resume`) shows the imported CV with its Check score.
+- **CV** (`/cv`) shows the imported CV. Its Edit tab holds the structured editor with its Check score.
 - **Board** (`/board`) shows the imported applications in their columns, and **Pipeline** holds the saved ones.
-- **Generate a PDF** from a report or the Resume page. The file appears under `output/` in the data root (`/data/output` in a pod).
+- **Download the CV as a PDF** from **CV** → **Export** → **Download PDF**. The browser saves the imported master CV as a PDF.
+- **Generate a tailored PDF** from a report. The file appears under `output/` in the data root (`/data/output` in a pod).
 - **Publish a share** from `/shares` and open its link from a phone off your network. The page renders and the view counter moves.
 - **Plugin install:** run `/career-ops:career-ops` in Claude Code. The command menu lists the modes.
 
@@ -73,4 +74,4 @@ If a step fails, `node doctor.mjs` names the missing piece.
 
 ## Afterwards
 
-`cv.md` is the source of truth from here. Retire any script that used to regenerate it from Reactive Resume, and edit the CV in `cv.md` or the Resume page; `node resume.mjs absorb` keeps `data/resume.json` in step. Exports back out (`node resume.mjs export docx|rr-json|json-resume`) are in [SCRIPTS.md](SCRIPTS.md).
+`cv.md` is the source of truth from here. Retire any script that used to regenerate it from Reactive Resume, and edit the CV in `cv.md` or on the dashboard's CV page; `node resume.mjs absorb` keeps `data/resume.json` in step. Exports back out (`node resume.mjs export docx|rr-json|json-resume`) are in [SCRIPTS.md](SCRIPTS.md).

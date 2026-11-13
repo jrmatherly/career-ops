@@ -249,3 +249,45 @@ test("a failed load cannot be saved, so an empty page cannot replace the file", 
   assert.equal(shouldSave(state), false);
   assert.equal(state.content, "");
 });
+
+test("a write from the other editor replaces clean text, so the next save expects the new file", () => {
+  const next = editorReducer(ready("# A"), { type: "external", content: "# B" });
+  assert.equal(next.content, "# B");
+  assert.equal(next.saved, "# B");
+  assert.equal(next.conflict, false);
+  assert.equal(next.snapshotPrior, true);
+  assert.equal(shouldSave(editorReducer(next, { type: "edit", content: "# B!" })), true);
+});
+
+test("a write from the other editor keeps unsaved text and marks it as a conflict", () => {
+  const next = editorReducer(ready("# A typed", { saved: "# A" }), { type: "external", content: "# B" });
+  assert.equal(next.content, "# A typed");
+  assert.equal(next.saved, "# A");
+  assert.equal(next.conflict, true);
+  assert.match(next.error, /changed in the structured editor/);
+  assert.equal(shouldSave(next), false);
+});
+
+test("a write from the other editor that could not be re-read stops saves here", () => {
+  const next = editorReducer(ready("# A"), { type: "external", content: null });
+  assert.equal(next.content, "# A");
+  assert.equal(next.conflict, true);
+  assert.match(next.error, /could not be re-read/);
+});
+
+test("a write from the other editor that matches the file is a no-op, and one during a save is left to that save's 409", () => {
+  const clean = ready("# A");
+  assert.equal(editorReducer(clean, { type: "external", content: "# A" }), clean);
+  const saving = ready("# A2", { saved: "# A", inflight: "# A2" });
+  assert.equal(editorReducer(saving, { type: "external", content: "# B" }), saving);
+});
+
+test("a file that returns to this tab's saved text ends the conflict and keeps the draft", () => {
+  const conflicted = editorReducer(ready("# A typed", { saved: "# A" }), { type: "external", content: "# B" });
+  assert.equal(conflicted.conflict, true);
+  const next = editorReducer(conflicted, { type: "external", content: "# A" });
+  assert.equal(next.conflict, false);
+  assert.equal(next.error, null);
+  assert.equal(next.content, "# A typed");
+  assert.equal(next.saved, "# A");
+});

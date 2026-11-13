@@ -19,9 +19,9 @@ test("CV preview keeps one header field per line without blank lines between blo
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto(`${origin.origin}/cv`);
+  await page.goto(`${origin.origin}/cv?tab=edit`);
   await page.locator("textarea").first().fill(markdown);
-  const preview = page.locator("article.report-prose");
+  const preview = page.locator("article.report-prose:visible");
   await preview.getByText("on request").waitFor();
 
   const box = async (locator) => (await locator.boundingBox()) ?? assert.fail("element is laid out");

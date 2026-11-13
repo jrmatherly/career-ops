@@ -18,7 +18,8 @@ test("the navigation groups come in their fixed order, Settings pinned last", { 
   const groups = nav.navGroups(true);
   assert.deepEqual(groups.map((g) => g.label), ["Daily", "Discover", "Profile", "Insight", "Pinned"]);
   assert.deepEqual(groups[0].items.map((i) => i.href), ["/", "/pipeline", "/board", "/followups"]);
-  assert.deepEqual(groups.at(-1).items.map((i) => i.href), ["/config"]);
+  assert.deepEqual(groups.find((g) => g.label === "Profile").items.map((i) => i.label), ["CV", "Documents", "Shares"]);
+  assert.deepEqual(groups.at(-1).items.map((i) => [i.href, i.label]), [["/config", "Settings"]]);
 });
 
 test("follow-ups switched off drops /followups from its group", { skip }, () => {

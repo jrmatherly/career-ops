@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Loader2, Radar, Wrench } from "lucide-react";
 import { CompanyLogo } from "@/components/company-logo";
@@ -83,10 +83,30 @@ export function PortalsView({
       .finally(() => setLoading(false));
   }
 
+  // A switch takes its row out of the tab it is on, so focus moves to the row that takes its place.
+  const view = useRef<HTMLDivElement>(null);
+  const refocusAt = useRef<number | null>(null);
+  // A failed toggle puts its row back, so focus goes back to that company's switch.
+  const refocusCompany = useRef<number | null>(null);
+  useEffect(() => {
+    const company = refocusCompany.current;
+    refocusCompany.current = null;
+    if (company !== null) {
+      view.current?.querySelector<HTMLElement>(`[role="switch"][data-index="${company}"]`)?.focus();
+      return;
+    }
+    const at = refocusAt.current;
+    if (at === null) return;
+    refocusAt.current = null;
+    const switches = view.current?.querySelectorAll<HTMLElement>('[role="switch"]') ?? [];
+    (switches[at] ?? switches[at - 1] ?? view.current?.querySelector<HTMLElement>('[aria-pressed="true"]'))?.focus();
+  }, [enabled]);
+
   async function toggle(index: number, name: string) {
     if (pending) return;
     const next = !enabled[index];
     const set = (value: boolean) => setEnabled((all) => all.with(index, value));
+    if (view.current?.contains(document.activeElement)) refocusAt.current = shown.filter((c) => "index" in c).findIndex((c) => "index" in c && c.index === index);
     set(next);
     setPending(true);
     setToggleError(null);
@@ -101,6 +121,8 @@ export function PortalsView({
       setRevision(body.revision);
     } catch (e) {
       set(!next);
+      // Only while focus is still on a switch: the user may have moved on to the search field.
+      if (document.activeElement?.getAttribute("role") === "switch" && view.current?.contains(document.activeElement)) refocusCompany.current = index;
       setToggleError(`${name}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPending(false);
@@ -108,7 +130,7 @@ export function PortalsView({
   }
 
   return (
-    <div>
+    <div ref={view}>
       <div className="flex items-center gap-3">
         <button
           onClick={check}
@@ -213,6 +235,7 @@ export function PortalsView({
                         role="switch"
                         aria-checked={c.enabled}
                         aria-label={`Scan ${c.name}`}
+                        data-index={c.index}
                         // Not `disabled`: a disabled button drops keyboard focus, and the list is long.
                         aria-disabled={pending}
                         onClick={() => toggle(c.index, c.name)}

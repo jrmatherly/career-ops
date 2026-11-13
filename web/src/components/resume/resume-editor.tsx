@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CvPreview } from "@/components/cv-studio/cv-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckPanel, type CheckReport, type Severity } from "@/components/resume/check-panel";
 import { DesignPanel } from "@/components/resume/design-panel";
-import { PageFrame } from "@/components/page-frame";
-import { PageHeader } from "@/components/page-header";
 import { GatePanel, type Report } from "@/components/resume/gate-panel";
 import { Field, SectionForm, type FieldKind, type ResumeDraft } from "@/components/resume/section-form";
 import { SELECT, TemplatePicker, type TemplateOption } from "@/components/resume/template-picker";
@@ -50,8 +48,12 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
 // A route that throws answers with an HTML error page, not JSON.
 const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
-export function ResumeEditor({ templates, templatesError }: { templates: TemplateOption[]; templatesError?: string }) {
+export function ResumeEditor({ templates, templatesError, onDirtyChange }: { templates: TemplateOption[]; templatesError?: string; onDirtyChange?: (dirty: boolean) => void }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
+  const dataRef = useRef(state.data);
+  useLayoutEffect(() => {
+    dataRef.current = state.data;
+  }, [state.data]);
   const [html, setHtml] = useState("");
   // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
   const [omitted, setOmitted] = useState<{ unmapped: string[]; warnings: string[] }>({ unmapped: [], warnings: [] });
@@ -69,14 +71,21 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
 
   useEffect(() => {
     let live = true;
+    // The form stays editable while a reload is pending; an edit made in that window outranks the reload.
+    const before = dataRef.current;
+    const editedSince = () => {
+      if (dataRef.current === before) return false;
+      setStale(true);
+      return true;
+    };
     fetch("/api/resume")
       .then(async (res) => {
         const body = await readBody(res);
-        if (!live) return;
+        if (!live || editedSince()) return;
         if (!res.ok) return dispatch({ type: "failed", message: body.error ?? `HTTP ${res.status}` });
         dispatch({ type: "loaded", data: body.data, cvMdSha: body.cvMdSha, report: body.report, lossless: body.lossless });
       })
-      .catch((err: Error) => live && dispatch({ type: "failed", message: err.message }));
+      .catch((err: Error) => live && !editedSince() && dispatch({ type: "failed", message: err.message }));
     return () => {
       live = false;
     };
@@ -136,6 +145,24 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   };
 
   const dirty = state.data !== state.saved;
+  const dirtyRef = useRef(dirty);
+  useLayoutEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+  // cv.md written by the markdown editor or an upload after this form loaded, while it held unsaved edits.
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      if ((e as CustomEvent<{ source?: string }>).detail?.source === "structured") return;
+      if (dirtyRef.current) return setStale(true);
+      setGeneration((g) => g + 1);
+    };
+    window.addEventListener("co-cv-saved", onSaved);
+    return () => window.removeEventListener("co-cv-saved", onSaved);
+  }, []);
+  useEffect(() => setStale(false), [generation]);
+
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -146,6 +173,8 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   const resolved = (message?: string) => {
     setNotice(message ?? null);
     setGeneration((g) => g + 1);
+    // An adoption rewrites cv.md and a pairing changes how it reads back, so the rest of the page re-reads both.
+    window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
   };
 
   const edit = (next: ResumeDraft, delay = 300) => {
@@ -165,7 +194,10 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
     try {
       const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha }) });
       const body = await readBody(res);
-      if (res.ok) dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
+      if (res.ok) {
+        dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
+        window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
+      }
       // A 5xx from save (500, or 503 on timeout) may come after cv.md was written, so it locks like a conflict until reload.
       else if (res.status === 409 || res.status >= 500) dispatch({ type: "conflict", message: body.error ?? `HTTP ${res.status}` });
       else dispatch({ type: "invalid", message: body.error ?? `HTTP ${res.status}` });
@@ -175,15 +207,19 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   };
 
   return (
-    <PageFrame>
-      <PageHeader
-        title="Resume"
-        description={<>Edit your CV as structured sections. Save writes <code className="text-foreground">cv.md</code>.</>}
-      />
+    <div>
+      <p className="text-sm text-muted">
+        Edit your CV as structured sections. Save writes <code className="text-foreground">cv.md</code>.
+      </p>
 
       {notice && (
         <p role="status" className="mt-4 text-sm text-foreground">
           {notice}
+        </p>
+      )}
+      {stale && (
+        <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-300">
+          cv.md changed in the markdown editor after this form loaded. Your edits here are kept, but saving them will be refused until you reload, which drops them.
         </p>
       )}
       {status.kind === "loading" && <p className="mt-6 text-sm text-muted">Loading…</p>}
@@ -290,6 +326,6 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
           </div>
         </div>
       )}
-    </PageFrame>
+    </div>
   );
 }

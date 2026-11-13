@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CvLoading() {
   return (
-    <PageFrame aria-label="Loading CV editor">
+    <PageFrame aria-label="Loading CV">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-8 w-36" />
