@@ -18,6 +18,8 @@ for (const [file, strings] of Object.entries(COPY)) {
   test(`${file} carries the mockup's copy`, () => {
     const text = src(file);
     for (const s of strings) assert.ok(text.includes(s), `missing: ${JSON.stringify(s)}`);
+    // Scheduled scans names its create button in the header and in the empty state.
+    if (file.endsWith("scheduled-jobs-view.tsx")) assert.equal(text.split("New scan\n").length - 1, 2);
     for (const s of RETIRED) assert.ok(!text.includes(s), `still says: ${s}`);
   });
 }

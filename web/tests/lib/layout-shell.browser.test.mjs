@@ -16,15 +16,16 @@ import { settled } from "../helpers/streaming.mjs";
 const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab=ALL", "/followups", "/portals", "/analytics", "/cv", "/cv?tab=edit", "/documents", "/config", "/board", "/shares"];
 
 // Controls only data renders. A fixture that stops rendering one fails here, not silently on size.
+// Each row is a label, a selector inside main, and the text the control starts with.
 const RENDERS = {
   "/explore": [["a chip remove button", 'button[aria-label^="Remove "]']],
-  "/pipeline": [["the inbox Select all button", "button", /^Select all \d+$/]],
+  "/pipeline": [["the inbox Select all button", "button", "Select all "]],
   "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
   "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
   "/portals": [["the Board type filter", 'select[aria-label="Board type"]']],
   "/": [
-    ["the follow-ups See all link", 'a[href="/followups"]', /^See all/],
-    ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', /^See all/],
+    ["the follow-ups See all link", 'a[href="/followups"]', "See all "],
+    ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', "See all "],
   ],
 };
 
@@ -51,7 +52,7 @@ test("every page sits in one shell under one header, with readable text and reac
     await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   }
 
-  const measure = () => page.evaluate(() => {
+  const measure = (renders = []) => page.evaluate((renders) => {
     const main = document.querySelector("main");
     const mainBox = main.getBoundingClientRect();
     const label = (el) => `<${el.tagName.toLowerCase()}> "${(el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40)}"`;
@@ -68,10 +69,11 @@ test("every page sits in one shell under one header, with readable text and reac
       .filter((el) => shown(el) && !el.closest("[aria-hidden=true]") && [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim()))
       .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
       .map((el) => `${label(el)} ${getComputedStyle(el).fontSize}`);
-    const smallTargets = [...main.querySelectorAll("input[type=checkbox], button, a, select")]
+    const targets = [...main.querySelectorAll("input[type=checkbox], button, a, select")]
       .filter(shown)
       // WCAG 2.5.8 exempts a link in a sentence, whose height is its line's.
-      .filter((el) => !(el.tagName === "A" && getComputedStyle(el).display === "inline"))
+      .filter((el) => !(el.tagName === "A" && getComputedStyle(el).display === "inline"));
+    const smallTargets = targets
       .map((el) => ({ el, box: el.getBoundingClientRect() }))
       .filter(({ box }) => box.width < 24 || box.height < 24)
       .map(({ el, box }) => `${label(el)} ${Math.round(box.width)}x${Math.round(box.height)}`);
@@ -88,16 +90,26 @@ test("every page sits in one shell under one header, with readable text and reac
       lastPad: parseFloat(getComputedStyle(main.lastElementChild).paddingBottom),
       smallText: [...new Set(smallText)],
       smallTargets: [...new Set(smallTargets)],
+      // Counted among the measured targets, so a hidden or inline match is not a pass.
+      rendered: renders.map(([, selector, starts = ""]) => targets.filter((el) => el.matches(selector) && el.textContent.trim().startsWith(starts)).length),
+      chipHeights: [...main.querySelectorAll(".co-fb__chip")].map((el) => el.getBoundingClientRect().height),
     };
-  });
+  }, renders);
 
   for (const route of ROUTES) {
     await open(route);
-    const m = await measure();
-    for (const [label, selector, text] of RENDERS[route] ?? []) {
-      const found = await page.locator(`main ${selector}`).filter(text ? { hasText: text } : {}).count();
+    const renders = RENDERS[route] ?? [];
+    // A control that data renders arrives after hydration.
+    for (const [, selector] of renders) await page.locator(`main ${selector}`).first().waitFor({ timeout: 10_000 }).catch(() => {});
+    const m = await measure(renders);
+    for (const [i, [label]] of renders.entries()) {
       await t.test(`${route}: renders ${label}`, () => {
-        assert.ok(found > 0, `${label} did not render, so its size was not checked`);
+        assert.ok(m.rendered[i] > 0, `${label} did not render, so its size was not checked`);
+      });
+    }
+    if (route === "/explore") {
+      await t.test("/explore: a chip's remove button does not make the chip taller than 24px", () => {
+        assert.ok(m.chipHeights.length > 0 && m.chipHeights.every((h) => h <= 24), `chip heights ${m.chipHeights}`);
       });
     }
     await t.test(`${route}: one page header`, () => {

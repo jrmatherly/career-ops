@@ -47,7 +47,7 @@ The parent plan says each page task follows the matching screen in `mockups.html
 
 ## C. Other things seen
 
-- **C1. Logo misses log console errors.** `/api/logo?company=…` answers 404 for a company with no logo (4 on the live inbox), by design (`web/src/app/api/logo/route.ts:19`). The row falls back to the monogram, and the browser logs one error per miss.
+- **C1. Logo misses log console errors.** `/api/logo?company=…` answered 404 in 2.2.0 for a company with no logo (4 on the live inbox), by design (`web/src/app/api/logo/route.ts`). The row falls back to the monogram, and the browser logs one error per miss.
 - **C2. The logo monogram is 8px, 10px on Today.** It sits behind the logo image and is `aria-hidden`, so it is not counted as text under 12px. It is what a sighted user sees when the logo is missing.
 - **C3. The Pipeline table scrolls sideways inside its box at 798px** (725px of table in 508px). The page itself does not overflow.
 - **C4. A manual scan holds the runner lock for its whole run.** During the 15-minute forced sweep, the 20:15Z scan tick logged `scheduled-jobs lock timeout: /data/data/scheduled-jobs.json.runner` and did nothing. Expected, but a tick is lost for every long manual run.
@@ -85,14 +85,14 @@ Recorded 2026-11-13 on the branch `fix/post-deploy-follow-ups`. "Fixed" means fi
 | A2 to A5 | Fixed. Each control has a 24px minimum height. A5 was two links, the follow-ups and the fresh matches "See all", and both are fixed. |
 | A6 | Exempt. A link inside a sentence. |
 | The suite | Fixed. `layout-shell` runs on a fixture that renders these controls, fails when one stops rendering, and measures selects too. |
-| B1, B3, B4 | Fixed. The subtitles, tab names and buttons match the mockups. The Analytics description states the tracked count, the average score and the active applications. |
+| B1, B3, B4 | Fixed. The subtitles, tab names and buttons match the mockups. On Explore that is the scan-mode subtitle; the AI-search and employer subtitles have no mockup and are unchanged. The Analytics description states the tracked count, the average score and the active applications. |
 | B2, "Board type" | Fixed. Portals has a Board type filter. |
 | B2, "Add company" | Left by decision. It needs a write path into `portals.yml` and gets its own plan. |
 | C1 | Fixed. A logo miss answers 204. The monogram still shows, and the browser logs nothing. |
 | C2 | Left by decision. |
 | C3 | Left as built. The page itself does not overflow. |
 | C4 | Left. A tick that cannot take the runner lock still runs the rank and drain passes, and the job stays due for the next tick, so nothing is lost but up to 15 minutes. |
-| C5 | Fixed. A full sweep's run records `droppedTier`, `droppedSalary` and `droppedContent`. |
+| C5 | Fixed. A full sweep's run records `droppedTier`, `droppedSalary` and `droppedContent`, and `stoppedEarly` when the runner's timeout cut the sweep short, since those counts cover only the boards it reached. |
 | C6 | Left. The writer that made cells starting with "; " was fixed in PR 72, and the eight rows were repaired by hand. D3 checks it on the next evaluation. |
 | D1 to D7 | Open. Each needs an event or the owner's go; the plan's "After the merge" table names the trigger. D2 is read from `droppedSalary` on the next sweep's run once C5 is deployed. |
 | E | Unchanged. |

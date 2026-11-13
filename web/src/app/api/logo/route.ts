@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 // Each key is fetched until Google answers for it, then served from
 // .career-ops-web/logo-cache forever (a hit, or an empty sentinel for a known
 // miss). A lookup that failed (timeout, offline, 429, 5xx) is not an answer and
-// is not cached. On any miss → 204: the client's <img onError> still falls back
-// to the offline monogram, and the browser logs no failed request. Because the cache is
+// is not cached. Any miss answers 204, not 404: the client's <img onError> falls
+// back to the offline monogram, and the browser logs no failed request. Because the cache is
 // keyed by company, once a company's logo resolves it's instant for that card AND
 // every other card (this search or any future one), forever. "Forever" is why
 // company keys are versioned — see lib/core/logo-cache-key.

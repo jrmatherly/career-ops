@@ -26,7 +26,7 @@ const write = (file, text) => fs.writeFileSync(path.join(root, file), text);
 
 write(".layout-shell-fixture", "fictional-only\n");
 // Rows 11 to 13 and cv.md match pipeline-status.mjs; the suite's CV subtests read them.
-// Nine Applied rows a month old make nine follow-ups due, one more than Today lists.
+// Nine Applied rows are due, one more than the eight /api/followups sends Today, so its "See all" link shows.
 // Row 14 is one word: a name that wraps makes its Follow-ups link two lines tall, which hides a short one.
 write("data/applications.md", `# Fictional browser fixture
 

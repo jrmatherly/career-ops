@@ -3,7 +3,7 @@
 // the @/ loader against a temp data root, with fetch stubbed: nothing reaches the network.
 import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,4 +83,15 @@ test("a cached logo answers 200 as a PNG", async () => {
 test("bad input still answers 400", async () => {
   assert.equal((await get("domain=..bad")).status, 400);
   assert.equal((await get("")).status, 400);
+});
+
+test("a lookup that fails answers 204 and is not cached, so the next request asks again", async () => {
+  globalThis.fetch = async (url) => {
+    asked.push(String(url));
+    return new Response("", { status: 503 });
+  };
+  assert.equal((await get("domain=fixture.example")).status, 204);
+  assert.equal(existsSync(join(cache, "fixture.example.png")), false);
+  assert.equal((await get("domain=fixture.example")).status, 204);
+  assert.equal(asked.length, 2);
 });
