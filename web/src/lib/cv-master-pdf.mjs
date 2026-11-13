@@ -19,17 +19,19 @@ const ROOT_ENV = ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER"
  * generate-pdf.mjs refuses paths outside its data root and always records the
  * render in that root's data/pdf-index.tsv, so the render runs with its data
  * root set to a fresh temp directory, which is removed before this returns.
+ * The profile is only read, so the render is pointed at the real one: without
+ * it the page limit, strict mode, section order and style settings are skipped.
  *
  * @param {{
  *   lossless: boolean,
  *   renderHtml: () => Promise<{ok: true, html: string} | {ok: false, status: number, error: string}>,
- *   format: "letter"|"a4",
+ *   format: "letter"|"a4", profilePath?: string,
  *   spawnFn: Function, execPath: string, coreRoot: string,
  *   spawnPdf?: typeof spawnGeneratePdf, timeoutMs?: number, killGraceMs?: number,
  * }} args
  * @returns {Promise<{ok: true, pdf: Buffer} | {ok: false, status: number, error: string}>} Never rejects.
  */
-export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000, killGraceMs = 5_000 }) {
+export async function renderMasterPdf({ lossless, renderHtml, format, profilePath, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000, killGraceMs = 5_000 }) {
   if (!lossless) return { ok: false, status: 409, error: "cv.md could not be read cleanly" };
   let rendered;
   try {
@@ -55,7 +57,7 @@ export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, e
     const isolatedSpawn = (cmd, args, opts) => {
       const env = { ...opts.env };
       for (const k of ROOT_ENV) delete env[k];
-      const child = spawnFn(cmd, args, { ...opts, windowsHide: true, env: { ...env, CAREER_OPS_ROOT: dir } });
+      const child = spawnFn(cmd, args, { ...opts, windowsHide: true, env: { ...env, CAREER_OPS_ROOT: dir, ...(profilePath ? { CAREER_OPS_PROFILE: profilePath } : {}) } });
       timer = setTimeout(() => {
         timedOut = true;
         child.kill();
@@ -66,7 +68,12 @@ export async function renderMasterPdf({ lossless, renderHtml, format, spawnFn, e
     };
     const r = await spawnPdf({ spawnFn: isolatedSpawn, execPath, coreRoot, html, finalPdf, format });
     if (timedOut) return { ok: false, status: 504, error: "PDF rendering timed out" };
-    if (!r.ok) return { ok: false, status: 500, error: `PDF rendering failed: ${r.stderr.slice(-500)}` };
+    if (!r.ok) {
+      // The renderer's own refusal, without the temp paths and warnings around it.
+      const refusal = /PDF generation failed: ([\s\S]*?)(?: Rejected draft:|$)/.exec(r.stderr)?.[1].trim();
+      if (refusal) return { ok: false, status: /strict page budget/.test(refusal) ? 422 : 500, error: refusal };
+      return { ok: false, status: 500, error: `PDF rendering failed: ${r.stderr.slice(-500) || "the renderer stopped without a message"}` };
+    }
     let pdf;
     try {
       pdf = await readFile(finalPdf);

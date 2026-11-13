@@ -84,9 +84,14 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
     await frame().waitFor({ state: "attached" });
     assert.match(await (await exportMenu()).textContent(), /use the saved cv\.md, not the unsaved text/);
     await page.keyboard.press("Escape");
+
+    // A markdown save lands while the form holds that edit: the form says so and keeps it.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "markdown" } })));
+    await page.getByText("cv.md changed in the markdown editor after this form loaded.").waitFor({ timeout: 5_000 });
+    assert.equal(await page.getByLabel("Headline").inputValue(), "Kept while closed");
   });
 
-  // Every case below fulfills /api/resume, so the cv.md written above does not matter.
+  // Most cases below fulfill /api/resume with this lossless answer; the /api/cv re-read cases use the real cv.md.
   const absorbed = await (await page.request.get(`${origin}/api/resume`)).json();
   assert.equal(absorbed.lossless, true, JSON.stringify(absorbed.report));
   const lossless = (route) => route.fulfill({ json: { ...absorbed, report: { unparsed: [] }, lossless: true } });
@@ -123,7 +128,7 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       await page.getByText("Not shown in the preview, the print or the PDF (still saved in cv.md): Volunteer").waitFor({ timeout: 5_000 });
       await page.getByText("A render warning.").waitFor({ timeout: 5_000 });
       const menu = await exportMenu();
-      await menu.getByText("The PDF and the print leave out Volunteer: this template has no place for it.").waitFor({ timeout: 5_000 });
+      await menu.getByText("The PDF and the print leave out Volunteer: this template has no place for it. A render warning.").waitFor({ timeout: 5_000 });
       await page.keyboard.press("Escape");
     } finally {
       await page.unroute("**/api/resume/preview");
@@ -302,6 +307,27 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       assert.equal(await page.locator("main").getByRole("alert").count(), 0);
     } finally {
       release();
+      await page.unroute("**/api/cv");
+    }
+  });
+
+  await t.test("a re-read that fails after the editor's own save is not a conflict", async () => {
+    await open("/cv?tab=edit");
+    await page.waitForFunction(() => document.querySelector('textarea[aria-label="CV Markdown"]')?.value.length > 0);
+    let failed = 0;
+    await page.route("**/api/cv", (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      failed++;
+      return route.abort();
+    });
+    try {
+      await markdown().fill(`${await markdown().inputValue()}\nSaved with no re-read.\n`);
+      await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
+      while (!failed) await page.waitForTimeout(50);
+      await page.waitForTimeout(300);
+      assert.equal(await page.locator("main").getByRole("alert").count(), 0, await page.locator("main").getByRole("alert").allTextContents().then((a) => a.join(" | ")));
+      assert.equal(await page.locator("main p[role=status]", { hasText: /^Saved$/ }).count(), 1);
+    } finally {
       await page.unroute("**/api/cv");
     }
   });

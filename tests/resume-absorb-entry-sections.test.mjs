@@ -258,3 +258,52 @@ test('each period shape cv.md uses is stored as the period', () => {
     assert.equal(education.period, period);
   }
 });
+
+test('a stored name holding a spaced dash reads back as that entry, in Education and in Experience', () => {
+  const first = absorb(`${HEADER}## Work Experience
+
+### Acme Labs
+
+**Engineer**
+2020 – 2022
+
+- Built it.
+
+## Education
+
+### Example University
+**BS Computer Science**
+2010 – 2014
+`, null);
+  assert.equal(first.lossless, true, JSON.stringify(first.report));
+  first.data.sections.experience.items[0].company = 'Acme — Labs';
+  first.data.sections.education.items[0].school = 'Example University — Downtown';
+  const md = resumeToCvMarkdown(first.data);
+  assert.match(md, /### Example University — Downtown/);
+  const again = absorb(md, first.data);
+  assert.deepEqual(again.report.orphans, []);
+  assert.equal(again.report.added, 0);
+  assert.equal(again.lossless, true);
+  assert.equal(again.data.sections.education.items.length, 1);
+  assert.equal(again.data.sections.education.items[0].school, 'Example University — Downtown');
+  assert.equal(again.data.sections.experience.items.length, 1);
+  assert.equal(again.data.sections.experience.items[0].company, 'Acme — Labs');
+});
+
+test('editing the degree on the bold line keeps the area it still ends with', () => {
+  const md = `${HEADER}## Education
+
+### Example University
+**BS Computer Science**
+2010 – 2014
+`;
+  const first = absorb(md, null);
+  Object.assign(first.data.sections.education.items[0], { degree: 'BS', area: 'Computer Science' });
+  const edited = absorb(md.replace('**BS Computer Science**', '**BA Computer Science**'), first.data);
+  const [item] = edited.data.sections.education.items;
+  assert.equal(item.degree, 'BA');
+  assert.equal(item.area, 'Computer Science');
+  const replaced = absorb(md.replace('**BS Computer Science**', '**MA History**'), first.data);
+  assert.equal(replaced.data.sections.education.items[0].degree, 'MA History');
+  assert.equal(replaced.data.sections.education.items[0].area, '');
+});

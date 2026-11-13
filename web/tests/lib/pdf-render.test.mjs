@@ -603,3 +603,10 @@ test("renderAndMarkPdf: the rejected HTML cannot be kept -> the error carries no
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("spawnGeneratePdf: no report number -> no --report argument", async () => {
+  const calls = [];
+  const spawnFn = (execPath, args) => { calls.push(args); return fakeChild({ exitCode: 0 }); };
+  await spawnGeneratePdf({ spawnFn, execPath: "node", coreRoot: "/root", html: "/root/x.html", finalPdf: "/root/x.pdf", format: "a4" });
+  assert.deepEqual(calls[0].slice(1), ["/root/x.html", "/root/x.pdf", "--format=a4", "--allow-reorder"]);
+});

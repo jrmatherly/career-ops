@@ -55,6 +55,9 @@ test("the render's data root is the temp directory, so generate-pdf writes nothi
   };
   await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", spawnPdf, spawnFn, execPath: "node", coreRoot: "/code" });
   assert.equal(env.CAREER_OPS_ROOT, dir);
+  await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", profilePath: "/data/config/profile.yml", spawnPdf, spawnFn, execPath: "node", coreRoot: "/code" });
+  assert.equal(env.CAREER_OPS_PROFILE, "/data/config/profile.yml", "the render reads the data root's own profile, not the one in the environment");
+  await renderMasterPdf({ lossless: true, renderHtml: html, format: "letter", spawnPdf, spawnFn, execPath: "node", coreRoot: "/code" });
   assert.equal(env.PATH, "/bin");
   for (const k of ["CAREER_OPS_TRACKER", "CAREER_OPS_DATA_DIR", "CAREER_OPS_PDF_INDEX", "CAREER_OPS_PDF_SHARED", "CAREER_OPS_PDF_SOCKET", "CAREER_OPS_PROFILE"]) {
     assert.equal(env[k], undefined, `${k} not passed to the render`);
@@ -166,4 +169,15 @@ test("a clean render's advisories reach the server log", async (t) => {
 test("a preview render that throws is a 500, not a rejection", async () => {
   const out = await renderMasterPdf({ lossless: true, renderHtml: async () => { throw new Error("boom"); }, format: "letter", spawnFn: () => { throw new Error("must not spawn"); }, execPath: "node", coreRoot: "/" });
   assert.deepEqual(out, { ok: false, status: 500, error: "CV preview failed: boom" });
+});
+
+test("a CV over a strict page limit answers 422 with the renderer's reason and no temp paths", async () => {
+  const stderr = "⚠️  Fact check did not run: no cv.md at /tmp/x/cv.md\n❌ PDF generation failed: CV is 3 pages; the allowed maximum is 1 page. Trim it. (strict page budget: --strict-pages or cv.strict_pages) Rejected draft: /tmp/x/cv.overflow.pdf (nothing was written to the output path).\n";
+  const out = await renderMasterPdf({ lossless: true, renderHtml: html, format: "a4", spawnPdf: async () => ({ ok: false, stderr }), spawnFn: () => {}, execPath: "node", coreRoot: "/code" });
+  assert.deepEqual(out, { ok: false, status: 422, error: "CV is 3 pages; the allowed maximum is 1 page. Trim it. (strict page budget: --strict-pages or cv.strict_pages)" });
+});
+
+test("a renderer that dies with no output still says something", async () => {
+  const out = await renderMasterPdf({ lossless: true, renderHtml: html, format: "a4", spawnPdf: async () => ({ ok: false, stderr: "" }), spawnFn: () => {}, execPath: "node", coreRoot: "/code" });
+  assert.deepEqual(out, { ok: false, status: 500, error: "PDF rendering failed: the renderer stopped without a message" });
 });

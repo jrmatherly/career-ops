@@ -71,3 +71,13 @@ test('a section layout that is not a string is dropped, not thrown on', () => {
   assert.equal(parsed.ok, true);
   assert.equal('layout' in parsed.data.sections.education, false);
 });
+
+test('a custom section keeps its entries layout, and Skills keeps its own', () => {
+  const json = sample();
+  json.customSections[0].layout = 'entries-spaced';
+  const skillsLayout = json.sections.skills.layout;
+  const parsed = parseResume(json);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.customSections[0].layout, 'entries-spaced');
+  assert.deepEqual(parsed.data.sections.skills.layout, skillsLayout);
+});

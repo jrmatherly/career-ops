@@ -166,6 +166,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   const exportNote = exportBlocked ? null : [
     unsaved || structuredDirty ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null,
     omittedNames.length ? `The PDF and the print leave out ${new Intl.ListFormat("en", { type: "conjunction" }).format(omittedNames)}: this template has no place for ${omittedNames.length === 1 ? "it" : "them"}.` : null,
+    ...omitted.warnings,
   ].filter(Boolean).join(" ") || null;
 
   // A hidden frame has no layout to print, so Print from Edit shows the preview first.

@@ -37,6 +37,7 @@ async function render(): Promise<Response | Failure> {
   const out = await renderMasterPdf({
     lossless,
     format: page.format,
+    profilePath: page.profilePath,
     renderHtml: async () => {
       const res = await previewResume(new Request("http://localhost/api/resume/preview", { method: "POST", body: JSON.stringify({ data }) }));
       const body = (await res.json().catch(() => ({}))) as { html?: string; error?: string };
