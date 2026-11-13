@@ -100,7 +100,9 @@ export function editorReducer(state, action) {
     }
     case "external": {
       // cv.md was written elsewhere on this page; null means it could not be re-read.
-      if (state.phase !== "ready" || state.inflight !== null || action.content === state.saved) return state;
+      if (state.phase !== "ready" || state.inflight !== null) return state;
+      // The file is back at the text this tab started from, so a conflict with it is over.
+      if (action.content === state.saved) return state.conflict ? { ...state, conflict: false, error: null } : state;
       if (state.content === state.saved && !state.conflict && typeof action.content === "string") {
         return { ...state, content: action.content, saved: action.content, exists: true, error: null, snapshotPrior: true };
       }

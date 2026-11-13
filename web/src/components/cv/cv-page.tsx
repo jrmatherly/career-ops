@@ -269,7 +269,8 @@ export function CvPage({ format, templates, templatesError }: { format: string |
           action="Fix in editor →"
           onFix={() => {
             setTab("edit");
-            setFocusLine({ line: attention.firstLine! });
+            // The line number belongs to the saved cv.md, not to text edited since.
+            if (!unsaved) setFocusLine({ line: attention.firstLine! });
           }}
         />
       )}

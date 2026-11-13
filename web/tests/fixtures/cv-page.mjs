@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const codeRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-cv-page-"));
 fs.mkdirSync(path.join(root, "data"));
+fs.writeFileSync(path.join(root, ".cv-page-fixture"), "fictional-only\n");
 fs.copyFileSync(path.join(codeRoot, "examples", "cv-example.md"), path.join(root, "cv.md"));
 fs.writeFileSync(path.join(root, "portals.yml"), `tracked_companies:
   - name: Alpha Labs

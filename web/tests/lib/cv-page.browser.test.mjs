@@ -18,6 +18,7 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
   const origin = new URL(url).origin;
   const fromTmp = path.relative(realpathSync(os.tmpdir()), realpathSync(root));
   assert.ok(fromTmp && !fromTmp.startsWith("..") && !path.isAbsolute(fromTmp), `${root} is not a disposable root`);
+  assert.equal(readFileSync(path.join(root, ".cv-page-fixture"), "utf8").trim(), "fictional-only");
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   t.after(() => browser.close());
@@ -284,7 +285,7 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
     });
     try {
       await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } })));
-      await markdown().fill((await markdown().inputValue()).replace("Typed after.", "Typed after. Saved past the re-read."));
+      await markdown().fill(`${await markdown().inputValue()}\nSaved past the re-read.\n`);
       await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
       release();
       while (!answered) await page.waitForTimeout(50);
@@ -312,7 +313,7 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       await frame().waitFor();
       held = new Promise((resolve) => (release = resolve));
       await page.getByRole("button", { name: "Edit", exact: true }).click();
-      await markdown().fill((await markdown().inputValue()).replace("Another line.", "Another line. Read back."));
+      await markdown().fill(`${await markdown().inputValue()}\nRead back.\n`);
       await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
       const menu = await exportMenu();
       const print = menu.getByRole("menuitem", { name: "Print" });

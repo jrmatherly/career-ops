@@ -281,3 +281,13 @@ test("a write from the other editor that matches the file is a no-op, and one du
   const saving = ready("# A2", { saved: "# A", inflight: "# A2" });
   assert.equal(editorReducer(saving, { type: "external", content: "# B" }), saving);
 });
+
+test("a file that returns to this tab's saved text ends the conflict and keeps the draft", () => {
+  const conflicted = editorReducer(ready("# A typed", { saved: "# A" }), { type: "external", content: "# B" });
+  assert.equal(conflicted.conflict, true);
+  const next = editorReducer(conflicted, { type: "external", content: "# A" });
+  assert.equal(next.conflict, false);
+  assert.equal(next.error, null);
+  assert.equal(next.content, "# A typed");
+  assert.equal(next.saved, "# A");
+});
