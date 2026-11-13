@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/jrmatherly/career-ops/compare/web-v1.2.0...web-v1.3.0) (2026-11-13)
+
+
+### Features
+
+* **web:** Portals can be filtered by board type ([0ebc1e2](https://github.com/jrmatherly/career-ops/commit/0ebc1e280c405e56de6d52d5a061878b23561dd6))
+
+
+### Bug Fixes
+
+* **web:** a board type is one filter option however the entry cases its provider ([1bdf82d](https://github.com/jrmatherly/career-ops/commit/1bdf82d66be00a2039c91a7849e00f8a26c3ebab))
+* **web:** a company with no logo answers 204, so the console stays clean ([cf8beb9](https://github.com/jrmatherly/career-ops/commit/cf8beb993305613dcf13f899762ca0cae62f18a8))
+* **web:** a run says when its sweep was stopped early ([fba4b3d](https://github.com/jrmatherly/career-ops/commit/fba4b3d906c2f0c5f6c95c448e3b9f8ccacf0362))
+* **web:** a scheduled run records what its sweep dropped by tier, salary and content ([19f25a8](https://github.com/jrmatherly/career-ops/commit/19f25a8a387c9d88eb624dc6a39b20dcc246e291))
+* **web:** a sweep the runner's timeout stops is recorded as failed, not as a success with 0 roles ([70de5fe](https://github.com/jrmatherly/career-ops/commit/70de5febec8d668b4b30b93abad578d5eb1db7d5))
+* **web:** every chip button and text control is at least 24px tall ([792680c](https://github.com/jrmatherly/career-ops/commit/792680c5ff8812928b1da53de388a74166633650))
+* **web:** page subtitles, tab names and scan buttons match the mockups ([77af428](https://github.com/jrmatherly/career-ops/commit/77af42835d538de66f595221c3514fdc63a8d7b3))
+* **web:** post-deploy follow-ups for 2.2.0: 24px targets, mockup copy, board filter ([36adf3c](https://github.com/jrmatherly/career-ops/commit/36adf3ca7a499d8a33a8f97684cc760b27c53ecf))
+* **web:** the Analytics description takes its figures from the Progress panel's metrics ([0306dd4](https://github.com/jrmatherly/career-ops/commit/0306dd4b1fcd9c7b57904973ab6e01715f16cdaa))
+
 ## [1.2.0](https://github.com/jrmatherly/career-ops/compare/web-v1.1.2...web-v1.2.0) (2026-11-13)
 
 
