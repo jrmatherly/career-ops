@@ -69,15 +69,17 @@ test('the HTML keeps the order through the shipped partials, the ATS partials an
   }
 });
 
-test('a section partial without AFTER_BULLETS still renders every bullet and paragraph', () => {
+test("a template pack's own experience partial keeps the order with no change to the pack", () => {
   const dir = mkdtempSync(join(tmpdir(), 'resume-paragraph-pack-'));
   try {
     const template = join(dir, 'cv-template.html');
     copyFileSync(repo('templates/cv-template.html'), template);
     mkdirSync(join(dir, 'sections'));
-    writeFileSync(join(dir, 'sections', 'experience.html'), readFileSync(repo('templates/sections/experience.html'), 'utf8').replace('{{AFTER_BULLETS}}', ''));
+    copyFileSync(repo('templates/sections/experience.html'), join(dir, 'sections', 'experience.html'));
     const html = render(payloadFor(MIXED).payload, dir, 'pack', template);
-    for (const piece of IN_ORDER) assert.ok(html.includes(piece), `${piece} is rendered`);
+    assertOrder(html, 'pack');
+    assert.equal(html.match(/<li class="job-note" style="list-style: none">/g)?.length, 2, 'each following paragraph is one item with no marker');
+    assert.equal(html.includes('class="job-context">Closing note.'), false, 'a following paragraph is not a context line');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

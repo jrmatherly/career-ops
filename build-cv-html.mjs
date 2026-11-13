@@ -476,23 +476,20 @@ function withResumePath(html, path) {
   return html.replace(/<[a-zA-Z][\w-]*/, tag => `${tag} data-resume-path="${escapeHtml(path)}"`);
 }
 
-// The entry's first run of bullets, which goes in the list every template has, and the
-// markup after that list: each paragraph that follows a bullet and each later list, in order.
-function experienceBody(e) {
-  const runs = bodyRuns(e);
-  const head = runs[0]?.bullets ?? [];
-  const after = runs.slice(runs[0]?.bullets ? 1 : 0).map(run => (run.text
-    ? `<div class="job-context">${escapeHtml(run.text)}</div>`
-    : `<ul>\n${run.bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('\n')}\n</ul>`)).join('\n');
-  return { head, after };
+// The entry's list items in cv.md order. A paragraph that follows a bullet is an item with no
+// marker, so it takes the list's type and spacing in every template and pack, and needs no slot
+// of its own (a second block after the list would not: .job-context floats in the compact template).
+function experienceItems(e) {
+  return bodyRuns(e).flatMap(run => (run.text
+    ? [`<li class="job-note" style="list-style: none">${escapeHtml(run.text)}</li>`]
+    : run.bullets.map(b => `<li>${escapeHtml(b)}</li>`)));
 }
 
 function buildExperience(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
     return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-      const { head, after } = experienceBody(e);
-      const bullets = head.map(b => `        <li>${escapeHtml(b)}</li>`).join('\n');
+      const bullets = experienceItems(e).map(li => `        ${li}`).join('\n');
       const location = e.location
         ? `\n    <div class="job-location">${escapeHtml(e.location)}</div>`
         : '';
@@ -507,33 +504,25 @@ function buildExperience(entries, partial) {
     <div class="job-role">${escapeHtml(e.role)}</div>${context}${location}
     <ul>
 ${bullets}
-    </ul>${after ? `\n${after}` : ''}
+    </ul>
   </div>`, e.path);
     }).join('\n  ');
   }
 
   const { entryTemplate, blocks } = partial;
   return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-    // A pack written before AFTER_BULLETS has nowhere to put what follows the first list, so it
-    // keeps the older layout: every bullet in the one list, those paragraphs in the context line.
-    const ordered = entryTemplate.includes('{{AFTER_BULLETS}}');
-    const runs = bodyRuns(e);
-    const { head, after } = ordered ? experienceBody(e) : { head: runs.flatMap(r => r.bullets ?? []), after: '' };
-    const trailing = ordered ? [] : runs.map(r => r.text).filter(Boolean);
-    const context = trailing.length ? [e.context, ...trailing].filter(Boolean).join(' ') : (e.context || '');
-    const bullets = head.map(b => `<li>${escapeHtml(b)}</li>`).join('\n    ');
+    const bullets = experienceItems(e).join('\n    ');
     const blockValues = new Map([
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''), present: Boolean(e.location) }],
-      ['CONTEXT_BLOCK', { value: escapeHtml(context), present: Boolean(context) }],
+      ['CONTEXT_BLOCK', { value: escapeHtml(e.context || ''), present: Boolean(e.context) }],
     ]);
     return withResumePath(fillEntry(entryTemplate, blocks, {
       COMPANY: escapeHtml(e.company || ''),
       PERIOD: escapeHtml(e.dates || e.period || ''),
       ROLE: escapeHtml(e.role || ''),
       LOCATION: escapeHtml(e.location || ''),
-      CONTEXT: escapeHtml(context),
+      CONTEXT: escapeHtml(e.context || ''),
       BULLETS: bullets,
-      AFTER_BULLETS: after ? `\n  ${after}` : '',
     }, blockValues), e.path);
   }).join('\n  ');
 }
