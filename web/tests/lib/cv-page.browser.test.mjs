@@ -97,7 +97,7 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
   const lossless = (route) => route.fulfill({ json: { ...absorbed, report: { unparsed: [] }, lossless: true } });
 
   const states = [
-    ["a 404", (route) => route.fulfill({ status: 404, json: { error: "cv.md not found" } }), async () => page.getByText("No cv.md yet. Write it in Edit, or upload a PDF or TeX file.").waitFor()],
+    ["a 404", (route) => route.fulfill({ status: 404, json: { error: "cv.md not found" } }), async () => page.getByText("No cv.md yet. Write it in Edit, or upload your resume.").waitFor()],
     ["a 500", (route) => route.fulfill({ status: 500, json: { error: "x" } }), async () => assert.equal(await page.locator("main").getByRole("alert").filter({ hasText: "The preview could not be built: x" }).count(), 1)],
     ["a 200 that is not JSON", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<html>oops</html>" }), async () => assert.equal(await page.locator("main").getByRole("alert").filter({ hasText: "The preview could not be built: HTTP 200" }).count(), 1)],
   ];
