@@ -5,6 +5,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -14,6 +15,8 @@ import "../helpers/web-ts-alias-loader.mjs";
 const codeRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const dataRoot = mkdtempSync(join(tmpdir(), "resume-route-data-"));
 const cvPath = join(dataRoot, "cv.md");
+const sidecarPath = join(dataRoot, "data", "resume.json");
+const sidecarSha = () => createHash("sha256").update(readFileSync(sidecarPath)).digest("hex");
 const ENV_KEYS = ["CAREER_OPS_CODE_ROOT", "CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_PROFILE", "CAREER_OPS_TRACKER"];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 
@@ -65,11 +68,12 @@ const descriptionOf = (data) => data.sections.experience.items[1].description;
 
 let opened;
 
-test("GET absorbs cv.md and returns the lossless draft with its sha and report", async () => {
+test("GET absorbs cv.md and returns the lossless draft with its shas and report", async () => {
   const { status, body } = await get();
   assert.equal(status, 200, JSON.stringify(body));
   assert.equal(body.lossless, true);
   assert.match(body.cvMdSha, /^[0-9a-f]{64}$/);
+  assert.equal(body.resumeSha, sidecarSha(), "the revision is the sidecar's bytes after the absorb wrote them");
   assert.equal(body.data.basics.name, "Alex Chen");
   assert.equal(body.report.lossless, true);
   assert.ok(Array.isArray(body.report.newEntries));
@@ -99,28 +103,30 @@ test("preview rejects an invalid draft with 400", async () => {
 
 test("PUT rejects a bad body with 400", async () => {
   assert.equal((await put("not json")).status, 400);
-  assert.equal((await put({ data: opened.data, expectedCvSha: "abc" })).status, 400);
-  assert.equal((await put({ data: "x", expectedCvSha: opened.cvMdSha })).status, 400);
+  assert.equal((await put({ data: opened.data, expectedCvSha: "abc", expectedResumeSha: opened.resumeSha })).status, 400);
+  assert.equal((await put({ data: "x", expectedCvSha: opened.cvMdSha, expectedResumeSha: opened.resumeSha })).status, 400);
+  assert.equal((await put({ data: opened.data, expectedCvSha: opened.cvMdSha })).status, 400);
 });
 
 test("PUT with a blank new experience item fails the round-trip gate with 422", async () => {
   const data = structuredClone(opened.data);
   data.sections.experience.items.push({ id: "blank-1", hidden: false, company: "", position: "", location: "", period: "", website: { url: "", label: "", inlineLink: false }, description: "", roles: [] });
   const before = readFileSync(cvPath, "utf8");
-  const { status } = await put({ data, expectedCvSha: opened.cvMdSha });
+  const { status } = await put({ data, expectedCvSha: opened.cvMdSha, expectedResumeSha: opened.resumeSha });
   assert.equal(status, 422);
   assert.equal(readFileSync(cvPath, "utf8"), before);
 });
 
 test("PUT with the right sha writes the edit into cv.md; the old sha then conflicts", async () => {
-  const saved = await put({ data: withEditedBullet(opened.data), expectedCvSha: opened.cvMdSha });
+  const saved = await put({ data: withEditedBullet(opened.data), expectedCvSha: opened.cvMdSha, expectedResumeSha: opened.resumeSha });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.match(saved.body.cvMdSha, /^[0-9a-f]{64}$/);
   assert.notEqual(saved.body.cvMdSha, opened.cvMdSha);
+  assert.equal(saved.body.resumeSha, sidecarSha());
   const after = readFileSync(cvPath, "utf8");
   assert.match(after, new RegExp(`- ${EDITED}`));
 
-  const stale = await put({ data: opened.data, expectedCvSha: opened.cvMdSha });
+  const stale = await put({ data: opened.data, expectedCvSha: opened.cvMdSha, expectedResumeSha: opened.resumeSha });
   assert.equal(stale.status, 409);
   assert.match(stale.body.error, /cv\.md changed/);
   assert.equal(readFileSync(cvPath, "utf8"), after, "a stale save leaves cv.md alone");
@@ -128,6 +134,7 @@ test("PUT with the right sha writes the edit into cv.md; the old sha then confli
   const reopened = await get();
   assert.equal(reopened.body.lossless, true, "a saved cv.md absorbs back losslessly");
   assert.equal(reopened.body.cvMdSha, saved.body.cvMdSha);
+  assert.equal(reopened.body.resumeSha, saved.body.resumeSha, "re-opening a saved draft rewrites nothing");
   assert.match(descriptionOf(reopened.body.data), new RegExp(EDITED));
 });
 
@@ -135,17 +142,40 @@ test("a custom section with a non-built-in title saves and re-opens losslessly",
   const { body: current } = await get();
   const data = structuredClone(current.data);
   data.customSections.push({ title: "Additional projects", icon: "", columns: 1, hidden: false, showHeading: true, keepTogether: false, startOnNewPage: false, type: "projects", id: "custom-1", items: [{ id: "cp-1", hidden: false, name: "Side tool", period: "2024", website: { url: "", label: "", inlineLink: false }, description: "" }] });
-  const saved = await put({ data, expectedCvSha: current.cvMdSha });
+  const saved = await put({ data, expectedCvSha: current.cvMdSha, expectedResumeSha: current.resumeSha });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.match(readFileSync(cvPath, "utf8"), /## Additional projects\n\n- \*\*Side tool\*\* \(2024\)/);
   const reopened = await get();
   assert.equal(reopened.body.lossless, true);
+  assert.equal(reopened.body.resumeSha, saved.body.resumeSha, "re-opening after adding a section rewrites nothing, so the saving tab is not stale");
   assert.equal(reopened.body.data.customSections.find((s) => s.id === "custom-1")?.items[0]?.name, "Side tool");
 
   // The editor refuses this before it reaches the CLI (customTitleProblem); the CLI's own gate is the backstop.
   const clash = structuredClone(reopened.body.data);
   clash.customSections.find((s) => s.id === "custom-1").title = "Projects";
-  assert.equal((await put({ data: clash, expectedCvSha: reopened.body.cvMdSha })).status, 422);
+  assert.equal((await put({ data: clash, expectedCvSha: reopened.body.cvMdSha, expectedResumeSha: reopened.body.resumeSha })).status, 422);
+});
+
+test("a hide-only save leaves cv.md as it was and makes another draft from the same opening conflict", async () => {
+  const { body: current } = await get();
+  const hides = structuredClone(current.data);
+  hides.sections.experience.items[0].hidden = true;
+  const renames = structuredClone(current.data);
+  renames.basics.headline = "Edited in a second tab";
+  const cv = readFileSync(cvPath, "utf8");
+
+  const first = await put({ data: hides, expectedCvSha: current.cvMdSha, expectedResumeSha: current.resumeSha });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(readFileSync(cvPath, "utf8"), cv, "hiding an item does not change cv.md");
+
+  const second = await put({ data: renames, expectedCvSha: current.cvMdSha, expectedResumeSha: current.resumeSha });
+  assert.equal(second.status, 409, JSON.stringify(second.body));
+  assert.match(second.body.error, /resume\.json was saved/);
+  assert.equal(second.body.resumeSha, first.body.resumeSha);
+  assert.equal(JSON.parse(readFileSync(sidecarPath, "utf8")).sections.experience.items[0].hidden, true, "the first save's hidden flag survives");
+
+  const retried = await put({ data: { ...renames, sections: hides.sections }, expectedCvSha: first.body.cvMdSha, expectedResumeSha: first.body.resumeSha });
+  assert.equal(retried.status, 200, JSON.stringify(retried.body));
 });
 
 test("GET after a dates line changed on disk is read-only with one orphan", async () => {

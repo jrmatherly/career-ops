@@ -6,14 +6,15 @@
  *   node resume.mjs adopt [--confirm]
  *   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
  *   node resume.mjs export cv-md|payload|docx|rr-json|json-resume [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
- *   node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+ *   node resume.mjs save --in file --expected-cv-sha <sha> [--expected-resume-sha <sha>] [--json]
  *   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
  *   node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]
  *
  * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
  * 3 the lossless gate failed (nothing written), 4 save with a stale
- * --expected-cv-sha (nothing written). check is advisory: it exits 0 whatever
- * it finds, and 3 only while the absorb gate fails, like export.
+ * --expected-cv-sha or --expected-resume-sha (nothing written). check is
+ * advisory: it exits 0 whatever it finds, and 3 only while the absorb gate
+ * fails, like export.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -21,7 +22,7 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
-import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, writeResume } from './lib/resume/model.mjs';
+import { markInSync, readResume, readResumeFile, resumePath, serialize, sha256, withResumeLock, writeResume } from './lib/resume/model.mjs';
 import { absorb, pairOrphan } from './lib/resume/absorb.mjs';
 import { resumeToCvMarkdown } from './lib/resume/to-cv-md.mjs';
 import { resumeToPayload } from './lib/resume/to-payload.mjs';
@@ -34,10 +35,10 @@ const USAGE = `Usage:
   node resume.mjs adopt [--confirm]
   node resume.mjs pair <orphanId> <newId> [<orphanId> <newId> ...]
   node resume.mjs export cv-md|payload|docx|rr-json|json-resume [--in file] [--out file] [--json] [--hide s,...] [--hide-item id,...]
-  node resume.mjs save --in file --expected-cv-sha <sha> [--json]
+  node resume.mjs save --in file --expected-cv-sha <sha> [--expected-resume-sha <sha>] [--json]
   node resume.mjs import <file> [--format rr|json-resume|linkedin|docx] [--confirm] [--replace-cv]
   node resume.mjs check [--in file] [--json] [--ignore RULE_ID[,RULE_ID...]]`;
-const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--format', '--ignore'];
+const VALUE_FLAGS = ['--in', '--out', '--hide', '--hide-item', '--expected-cv-sha', '--expected-resume-sha', '--format', '--ignore'];
 const FLAGS = [...VALUE_FLAGS, '--json', '--confirm', '--replace-cv', '--help', '-h'];
 
 class UsageError extends Error {}
@@ -237,25 +238,35 @@ async function saveCommand(root, args) {
   const json = hasFlag(args, '--json');
   const expected = flagValue(args, '--expected-cv-sha');
   if (!expected) throw new UsageError('--expected-cv-sha <sha> is required');
-  const data = readDraft(flagValue(args, '--in'));
-  const generated = resumeToCvMarkdown(data);
-  if (!absorb(generated, data).lossless) {
+  const expectedResume = flagValue(args, '--expected-resume-sha');
+  const draft = readDraft(flagValue(args, '--in'));
+  const generated = resumeToCvMarkdown(draft);
+  const result = absorb(generated, draft);
+  if (!result.lossless) {
     console.log(json ? JSON.stringify({ lossless: false, written: false }) : 'The draft renders a cv.md that does not absorb back; nothing written');
     return 3;
   }
+  // Stored as the next absorb of this cv.md would store it, so that absorb writes nothing and the returned resumeSha256 stays current.
+  const { data } = result;
   const cvPath = join(root, 'cv.md');
-  const current = existsSync(cvPath) ? sha256(readFileSync(cvPath, 'utf8')) : '';
-  if (current !== expected) {
-    console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current }) : `cv.md changed since the draft was opened (sha ${current}); nothing written`);
-    return 4;
-  }
-  data.careerOps.pendingCvSha256 = sha256(generated);
-  await writeResume(root, data);
-  replaceUserFile(cvPath, generated);
-  markInSync(data, sha256(generated));
-  await writeResume(root, data);
-  console.log(json ? JSON.stringify({ written: true, cvSha256: data.careerOps.cvSha256 }) : 'cv.md and data/resume.json written');
-  return 0;
+  // The sha checks sit inside the lock, after the wait, so a write made while this save waited is seen.
+  return withResumeLock(root, (path) => {
+    const current = existsSync(cvPath) ? sha256(readFileSync(cvPath, 'utf8')) : '';
+    const currentResume = existsSync(path) ? sha256(readFileSync(path, 'utf8')) : '';
+    const moved = current !== expected ? 'cv.md' : expectedResume !== undefined && currentResume !== expectedResume ? 'data/resume.json' : null;
+    if (moved) {
+      console.log(json ? JSON.stringify({ stale: true, written: false, cvSha256: current, resumeSha256: currentResume }) : `${moved} changed since the draft was opened; nothing written`);
+      return 4;
+    }
+    data.careerOps.pendingCvSha256 = sha256(generated);
+    writeFileAtomic(path, serialize(data));
+    replaceUserFile(cvPath, generated);
+    markInSync(data, sha256(generated));
+    const text = serialize(data);
+    writeFileAtomic(path, text);
+    console.log(json ? JSON.stringify({ written: true, cvSha256: data.careerOps.cvSha256, resumeSha256: sha256(text) }) : 'cv.md and data/resume.json written');
+    return 0;
+  });
 }
 
 function checkCommand(root, args) {

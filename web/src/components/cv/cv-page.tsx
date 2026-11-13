@@ -15,6 +15,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { SECTION_TYPES } from "@/lib/resume-form.mjs";
 import { attentionSummary, attentionText, lineRange, lossyNotice } from "@/lib/cv-attention.mjs";
+import { readPageOverflow } from "@/lib/cv/page-overflow.mjs";
 import { cn } from "@/lib/cn";
 
 type Tab = "preview" | "edit";
@@ -183,9 +184,11 @@ export function CvPage({ format, templates, templatesError }: { format: string |
 
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [overflow, setOverflow] = useState<string | null>(null);
   const download = async () => {
     setDownloading(true);
     setDownloadError(null);
+    setOverflow(null);
     try {
       const res = await fetch("/api/cv/pdf");
       if (!res.ok) {
@@ -199,6 +202,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 0);
+      setOverflow(readPageOverflow(res.headers));
     } catch (err) {
       setDownloadError((err as Error).message);
     } finally {
@@ -242,6 +246,12 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">
           The PDF could not be downloaded: {downloadError}
         </p>
+      )}
+
+      {overflow && (
+        <div role="alert">
+          <AttentionBanner text={{ title: "The PDF downloaded, but it is longer than your page limit.", detail: overflow }} action="Trim in editor →" onFix={() => setTab("edit")} />
+        </div>
       )}
 
       {importing && state.phase === "ready" && !state.conflict && (

@@ -195,13 +195,14 @@ export function addCustomSection(data, type, id, title) {
 
 /**
  * The editor's state machine. `saved` is the draft as last loaded or written, so `data !== saved` means
- * unsaved edits. A conflict stays until reload (the draft's base sha is stale), a save in flight stays
- * until it answers, and a save that returns while newer edits are pending goes back to editing.
+ * unsaved edits. A conflict stays until reload (the draft's base revision of cv.md or data/resume.json
+ * is stale), a save in flight stays until it answers, and a save that returns while newer edits are
+ * pending goes back to editing.
  */
 export function editorReducer(state, a) {
   switch (a.type) {
     case "loaded":
-      return { data: a.data, saved: a.data, cvMdSha: a.cvMdSha, report: a.report, status: a.lossless && a.data ? { kind: "editing" } : { kind: "readonly" } };
+      return { data: a.data, saved: a.data, cvMdSha: a.cvMdSha, resumeSha: a.resumeSha, report: a.report, status: a.lossless && a.data ? { kind: "editing" } : { kind: "readonly" } };
     case "failed":
       return { ...state, status: { kind: "error", message: a.message } };
     case "edit":
@@ -209,7 +210,7 @@ export function editorReducer(state, a) {
     case "saving":
       return { ...state, status: { kind: "saving" } };
     case "saved":
-      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, status: state.data === a.data ? { kind: "saved" } : { kind: "editing" } };
+      return { ...state, saved: a.data, cvMdSha: a.cvMdSha, resumeSha: a.resumeSha, status: state.data === a.data ? { kind: "saved" } : { kind: "editing" } };
     case "conflict":
       return { ...state, status: { kind: "conflict", message: a.message } };
     case "invalid":

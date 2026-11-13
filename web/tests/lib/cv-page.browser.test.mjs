@@ -10,6 +10,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
+import { PAGE_OVERFLOW_HEADER } from "../../src/lib/cv/page-overflow.mjs";
 
 const url = process.env.CV_PAGE_TEST_URL;
 const root = process.env.CV_PAGE_TEST_ROOT;
@@ -190,6 +191,37 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       const menu = await exportMenu();
       await menu.getByRole("menuitem", { name: "Download PDF" }).click();
       await page.locator("main").getByRole("alert").filter({ hasText: "The PDF could not be downloaded: cv.md could not be read cleanly" }).waitFor({ timeout: 5_000 });
+    } finally {
+      await page.unroute("**/api/cv/pdf");
+      await page.unroute("**/api/resume");
+    }
+  });
+
+  await t.test("a download past the page limit says so on the page, and the next one clears it", async () => {
+    const sentence = "CV is 3 pages; the allowed maximum is 2 pages. Trim the Experience section, then regenerate.";
+    let overflowing = true;
+    await page.route("**/api/resume", lossless);
+    await page.route("**/api/cv/pdf", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/pdf",
+      headers: overflowing ? { [PAGE_OVERFLOW_HEADER]: encodeURIComponent(sentence) } : {},
+      body: "%PDF-1.4\n%%EOF\n",
+    }));
+    try {
+      await open("/cv");
+      await frame().waitFor();
+      const alert = page.locator("main").getByRole("alert").filter({ hasText: "The PDF downloaded, but it is longer than your page limit." });
+      let menu = await exportMenu();
+      await Promise.all([page.waitForEvent("download"), menu.getByRole("menuitem", { name: "Download PDF" }).click()]);
+      await alert.filter({ hasText: sentence }).waitFor({ timeout: 5_000 });
+
+      await alert.getByRole("button", { name: /Trim in editor →/ }).click();
+      await tabBecomes("Edit");
+
+      overflowing = false;
+      menu = await exportMenu();
+      await Promise.all([page.waitForEvent("download"), menu.getByRole("menuitem", { name: "Download PDF" }).click()]);
+      await alert.waitFor({ state: "detached", timeout: 5_000 });
     } finally {
       await page.unroute("**/api/cv/pdf");
       await page.unroute("**/api/resume");

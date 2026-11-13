@@ -25,14 +25,14 @@ type Status =
   | { kind: "invalid"; message: string };
 
 // `saved` is the draft as last loaded or written; `data !== saved` means unsaved edits.
-type State = { status: Status; data: ResumeDraft | null; saved: ResumeDraft | null; cvMdSha: string | null; report: Report | null };
+type State = { status: Status; data: ResumeDraft | null; saved: ResumeDraft | null; cvMdSha: string | null; resumeSha: string | null; report: Report | null };
 
 type Action =
-  | { type: "loaded"; data: ResumeDraft | null; cvMdSha: string | null; report: Report; lossless: boolean }
+  | { type: "loaded"; data: ResumeDraft | null; cvMdSha: string | null; resumeSha: string | null; report: Report; lossless: boolean }
   | { type: "failed"; message: string }
   | { type: "edit"; data: ResumeDraft }
   | { type: "saving" }
-  | { type: "saved"; data: ResumeDraft; cvMdSha: string }
+  | { type: "saved"; data: ResumeDraft; cvMdSha: string; resumeSha: string }
   | { type: "conflict"; message: string }
   | { type: "invalid"; message: string };
 
@@ -49,7 +49,7 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
 const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
 export function ResumeEditor({ templates, templatesError, onDirtyChange }: { templates: TemplateOption[]; templatesError?: string; onDirtyChange?: (dirty: boolean) => void }) {
-  const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
+  const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, resumeSha: null, report: null });
   const dataRef = useRef(state.data);
   useLayoutEffect(() => {
     dataRef.current = state.data;
@@ -83,7 +83,7 @@ export function ResumeEditor({ templates, templatesError, onDirtyChange }: { tem
         const body = await readBody(res);
         if (!live || editedSince()) return;
         if (!res.ok) return dispatch({ type: "failed", message: body.error ?? `HTTP ${res.status}` });
-        dispatch({ type: "loaded", data: body.data, cvMdSha: body.cvMdSha, report: body.report, lossless: body.lossless });
+        dispatch({ type: "loaded", data: body.data, cvMdSha: body.cvMdSha, resumeSha: body.resumeSha, report: body.report, lossless: body.lossless });
       })
       .catch((err: Error) => live && !editedSince() && dispatch({ type: "failed", message: err.message }));
     return () => {
@@ -187,15 +187,15 @@ export function ResumeEditor({ templates, templatesError, onDirtyChange }: { tem
 
   const save = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    if (!data || !state.cvMdSha || status.kind === "saving" || status.kind === "conflict") return;
+    if (!data || !state.cvMdSha || !state.resumeSha || status.kind === "saving" || status.kind === "conflict") return;
     const titleProblem = firstTitleProblem(data);
     if (titleProblem) return dispatch({ type: "invalid", message: `Not saved. ${titleProblem}` });
     dispatch({ type: "saving" });
     try {
-      const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha }) });
+      const res = await fetch("/api/resume", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ data, expectedCvSha: state.cvMdSha, expectedResumeSha: state.resumeSha }) });
       const body = await readBody(res);
       if (res.ok) {
-        dispatch({ type: "saved", data, cvMdSha: body.cvMdSha });
+        dispatch({ type: "saved", data, cvMdSha: body.cvMdSha, resumeSha: body.resumeSha });
         window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
       }
       // A 5xx from save (500, or 503 on timeout) may come after cv.md was written, so it locks like a conflict until reload.

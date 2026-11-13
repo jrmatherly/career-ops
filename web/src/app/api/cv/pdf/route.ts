@@ -3,6 +3,7 @@ import { GET as readResume } from "@/app/api/resume/route";
 import { POST as previewResume } from "@/app/api/resume/preview/route";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { masterPdfFilename, renderMasterPdf } from "@/lib/cv-master-pdf.mjs";
+import { PAGE_OVERFLOW_HEADER } from "@/lib/cv/page-overflow.mjs";
 import { masterPageFormat } from "@/lib/master-page-format";
 
 export const runtime = "nodejs";
@@ -51,6 +52,11 @@ async function render(): Promise<Response | Failure> {
   const name = typeof data?.basics?.name === "string" ? data.basics.name : "";
   return new Response(new Uint8Array(out.pdf), {
     status: 200,
-    headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${masterPdfFilename(name)}"`, "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${masterPdfFilename(name)}"`,
+      "Cache-Control": "no-store",
+      ...(out.warning ? { [PAGE_OVERFLOW_HEADER]: encodeURIComponent(out.warning) } : {}),
+    },
   });
 }

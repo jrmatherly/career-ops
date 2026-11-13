@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnGeneratePdf } from "./pdf-render.mjs";
+import { pageOverflowWarning } from "./cv/page-overflow.mjs";
 
 /** @param {string} fullName */
 export function masterPdfFilename(fullName) {
@@ -29,7 +30,7 @@ const ROOT_ENV = ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER"
  *   spawnFn: Function, execPath: string, coreRoot: string,
  *   spawnPdf?: typeof spawnGeneratePdf, timeoutMs?: number, killGraceMs?: number,
  * }} args
- * @returns {Promise<{ok: true, pdf: Buffer} | {ok: false, status: number, error: string}>} Never rejects.
+ * @returns {Promise<{ok: true, pdf: Buffer, warning: string | null} | {ok: false, status: number, error: string}>} Never rejects.
  */
 export async function renderMasterPdf({ lossless, renderHtml, format, profilePath, spawnFn, execPath, coreRoot, spawnPdf = spawnGeneratePdf, timeoutMs = 120_000, killGraceMs = 5_000 }) {
   if (!lossless) return { ok: false, status: 409, error: "cv.md could not be read cleanly" };
@@ -81,9 +82,8 @@ export async function renderMasterPdf({ lossless, renderHtml, format, profilePat
       if (err.code !== "ENOENT") throw err;
       return { ok: false, status: 500, error: `PDF rendering exited cleanly but wrote no PDF: ${r.stderr.slice(-500) || "no output"}` };
     }
-    // The page-overflow warning arrives here on a successful render.
     if (r.stderr) console.warn(`cv pdf: ${r.stderr}`);
-    return { ok: true, pdf };
+    return { ok: true, pdf, warning: pageOverflowWarning(r.stderr) };
   } catch (err) {
     return { ok: false, status: 500, error: `PDF rendering failed: ${err.message}` };
   } finally {
