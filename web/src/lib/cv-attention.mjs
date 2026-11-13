@@ -13,9 +13,13 @@ export function attentionSummary(report, cvMarkdown) {
     if (m) headings.push({ name: m[1], line: i + 1 });
   });
   const sections = [];
+  // Keyed on the heading's line: two sections can share a name.
+  const seen = new Set();
   for (const line of lines) {
-    const name = headings.findLast((h) => h.line < line)?.name ?? "Header";
-    if (!sections.some((s) => s.name === name)) sections.push({ name, line });
+    const heading = headings.findLast((h) => h.line < line);
+    if (seen.has(heading?.line)) continue;
+    seen.add(heading?.line);
+    sections.push({ name: heading?.name ?? "Header", line });
   }
   return { count: sections.length, sections, firstLine: lines[0] ?? null };
 }

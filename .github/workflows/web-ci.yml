@@ -66,8 +66,10 @@ jobs:
       # build above once per suite on disposable data and runs it there, where a
       # skip is a failure. They launch Google Chrome (`channel: "chrome"`), which
       # the ubuntu-latest image ships; checked first, so a runner image without
-      # it fails here by name rather than in one launch error per suite.
+      # it fails here by name rather than in one launch error per suite. `npm ci`
+      # downloads no Playwright Chromium, so the PDF route the cv-page suite
+      # downloads from renders with that same Chrome.
       - name: "🌐 Browser suites against the built app"
         run: |
           google-chrome --version
-          npm run test:browser
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$(command -v google-chrome)" npm run test:browser

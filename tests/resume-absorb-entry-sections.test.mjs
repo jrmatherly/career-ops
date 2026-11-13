@@ -22,10 +22,11 @@ Provide IT support for a local nonprofit.
 
 /** Every non-blank line of `md` survives a rewrite or is reported as unreadable. */
 function assertNoLineDropped(md, { data, report, lossless }) {
-  const rewritten = new Set(resumeToCvMarkdown(data).split('\n'));
-  const unparsed = new Set(report.unparsed.map((u) => u.text));
-  for (const line of md.split('\n')) {
-    if (line.trim()) assert.ok(rewritten.has(line) || unparsed.has(line), `dropped: ${line}`);
+  // Counted, not a Set: a line that appears twice must survive twice.
+  const count = (lines) => lines.reduce((m, l) => m.set(l, (m.get(l) ?? 0) + 1), new Map());
+  const kept = count([...resumeToCvMarkdown(data).split('\n'), ...report.unparsed.map((u) => u.text)]);
+  for (const [line, n] of count(md.split('\n').filter((l) => l.trim()))) {
+    assert.ok((kept.get(line) ?? 0) >= n, `dropped: ${line}`);
   }
   if (report.unparsed.length) assert.equal(lossless, false);
 }

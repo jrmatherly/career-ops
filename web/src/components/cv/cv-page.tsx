@@ -13,6 +13,7 @@ import type { TemplateOption } from "@/components/resume/template-picker";
 import { SkillGaps } from "@/components/skill-gaps";
 import { Tabs } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
+import { SECTION_TYPES } from "@/lib/resume-form.mjs";
 import { attentionSummary, attentionText, lineRange, lossyNotice } from "@/lib/cv-attention.mjs";
 import { cn } from "@/lib/cn";
 
@@ -46,6 +47,8 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   const absorb: Absorb = state.phase === "load-error" ? { kind: "error", message: state.error ?? "cv.md could not be loaded" } : absorbed;
   const [html, setHtml] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  // What the render leaves out: sections with no template slot, and build-cv-html warnings.
+  const [omitted, setOmitted] = useState<{ unmapped: string[]; warnings: string[] }>({ unmapped: [], warnings: [] });
   const [structured, setStructured] = useState(false);
   // Mounted from its first opening on, so closing it hides unsaved edits instead of dropping them.
   const [structuredMounted, setStructuredMounted] = useState(false);
@@ -60,6 +63,13 @@ export function CvPage({ format, templates, templatesError }: { format: string |
 
   // Re-read cv.md through the absorb after every confirmed save, so the preview and banner follow the file on disk.
   const saved = state.phase === "ready" ? state.saved : null;
+  // A pairing in the structured editor changes the report and leaves cv.md's text as it was.
+  const [structuredWrites, setStructuredWrites] = useState(0);
+  useEffect(() => {
+    const onSaved = (e: Event) => (e as CustomEvent<{ source?: string }>).detail?.source === "structured" && setStructuredWrites((n) => n + 1);
+    window.addEventListener("co-cv-saved", onSaved);
+    return () => window.removeEventListener("co-cv-saved", onSaved);
+  }, []);
   useEffect(() => {
     if (saved === null) return;
     let live = true;
@@ -78,7 +88,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     return () => {
       live = false;
     };
-  }, [saved]);
+  }, [saved, structuredWrites]);
 
   const lossless = absorb.kind === "ready" && absorb.lossless;
   const data = absorb.kind === "ready" ? absorb.data : null;
@@ -86,6 +96,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     // A render or an error belongs to the absorbed data it came from.
     setHtml(null);
     setPreviewError(null);
+    setOmitted({ unmapped: [], warnings: [] });
     if (!lossless || !data) return;
     let live = true;
     fetch("/api/resume/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ data }) })
@@ -97,6 +108,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
           return setPreviewError(body.error ?? `HTTP ${res.status}`);
         }
         setPreviewError(null);
+        setOmitted({ unmapped: body.unmapped ?? [], warnings: body.warnings ?? [] });
         setHtml(body.html);
       })
       .catch((err: Error) => {
@@ -145,9 +157,15 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     : null;
   const conflictBlocked = state.conflict ? "Download and Print are off while this tab's text conflicts with cv.md on disk." : null;
   const pdfBlocked = exportBlocked ?? conflictBlocked;
-  const printBlocked = exportBlocked ?? conflictBlocked;
+  // The frame holds the previous cv.md until the save just made is read back; Download reads the file itself.
+  const staleRender = absorb.kind === "ready" && absorb.markdown !== saved ? "Print is off until the saved cv.md is read back." : null;
+  const printBlocked = exportBlocked ?? conflictBlocked ?? staleRender;
   const unsaved = state.phase === "ready" && (state.content !== state.saved || state.conflict);
-  const exportNote = unsaved && !exportBlocked ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null;
+  const omittedNames = omitted.unmapped.map((s) => (SECTION_TYPES as Record<string, { label?: string }>)[s]?.label ?? s);
+  const exportNote = exportBlocked ? null : [
+    unsaved ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null,
+    omittedNames.length ? `The PDF and the print leave out ${new Intl.ListFormat("en", { type: "conjunction" }).format(omittedNames)}: this template has no place for ${omittedNames.length === 1 ? "it" : "them"}.` : null,
+  ].filter(Boolean).join(" ") || null;
 
   // A hidden frame has no layout to print, so Print from Edit shows the preview first.
   const [printPending, setPrintPending] = useState(false);
@@ -279,7 +297,19 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         ) : absorb.kind === "error" ? (
           <p role="alert" className="text-sm text-red-700 dark:text-red-300">The preview could not be built: {absorb.message}</p>
         ) : showRendered ? (
+          <>
+            {omitted.unmapped.length > 0 && (
+              <p className="mb-2 text-sm text-muted">
+                Not shown in the preview, the print or the PDF (still saved in cv.md): {omittedNames.join(", ")}
+              </p>
+            )}
+            {omitted.warnings.map((w, i) => (
+              <p key={i} className="mb-2 text-sm text-muted">
+                {w}
+              </p>
+            ))}
           <CvPreview html={html} caption={(pages) => [`Page 1 of ${pages}`, format, "rendered from cv.md"].filter(Boolean).join(" · ")} />
+          </>
         ) : (
           <>
             {previewError && (
@@ -305,6 +335,8 @@ export function CvPage({ format, templates, templatesError }: { format: string |
             type="button"
             aria-expanded={structured}
             aria-controls="cv-structured"
+            // A structured save during the first read of cv.md would be overwritten in this tab by that older read.
+            disabled={state.phase === "loading"}
             onClick={() => openStructured(!structured)}
             className="inline-flex min-h-6 items-center text-sm font-medium text-brand-text underline-offset-2 hover:underline max-sm:min-h-[44px]"
           >

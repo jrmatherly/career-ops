@@ -18,6 +18,15 @@ test("unreadable lines group under the nearest ## heading above them", () => {
   });
 });
 
+test("two sections with the same heading are counted apart", () => {
+  const md = cv({ 1: "# Name", 20: "## Projects", 60: "## Projects" });
+  assert.deepEqual(attentionSummary(unparsed(25, 26, 65), md), {
+    count: 2,
+    sections: [{ name: "Projects", line: 25 }, { name: "Projects", line: 65 }],
+    firstLine: 25,
+  });
+});
+
 test("nothing unreadable needs no attention", () => {
   assert.deepEqual(attentionSummary({ unparsed: [] }, cv({ 60: "## Education" })), { count: 0, sections: [], firstLine: null });
   assert.deepEqual(attentionSummary(null, ""), { count: 0, sections: [], firstLine: null });

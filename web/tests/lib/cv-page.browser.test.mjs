@@ -4,7 +4,7 @@
 // The suite writes cv.md in that disposable root (saves and a real PDF render);
 // every Portals write is intercepted.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -16,7 +16,8 @@ const root = process.env.CV_PAGE_TEST_ROOT;
 
 test("the CV page shows every failure where the user can act on it", { skip: liveServerSkip("CV_PAGE_TEST_URL", "CV_PAGE_TEST_ROOT"), timeout: 300_000 }, async (t) => {
   const origin = new URL(url).origin;
-  assert.ok(path.resolve(root).startsWith(os.tmpdir()), `${root} is not a disposable root`);
+  const fromTmp = path.relative(realpathSync(os.tmpdir()), realpathSync(root));
+  assert.ok(fromTmp && !fromTmp.startsWith("..") && !path.isAbsolute(fromTmp), `${root} is not a disposable root`);
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   t.after(() => browser.close());
@@ -106,6 +107,24 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       }
     });
   }
+
+  await t.test("a section the template has no slot for is named above the preview, with the render's warnings", async () => {
+    await page.route("**/api/resume/preview", async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), unmapped: ["volunteer"], warnings: ["A render warning."] } });
+    });
+    try {
+      await open("/cv");
+      await frame().waitFor();
+      await page.getByText("Not shown in the preview, the print or the PDF (still saved in cv.md): Volunteer").waitFor({ timeout: 5_000 });
+      await page.getByText("A render warning.").waitFor({ timeout: 5_000 });
+      const menu = await exportMenu();
+      await menu.getByText("The PDF and the print leave out Volunteer: this template has no place for it.").waitFor({ timeout: 5_000 });
+      await page.keyboard.press("Escape");
+    } finally {
+      await page.unroute("**/api/resume/preview");
+    }
+  });
 
   await t.test("a lossy read with nothing unreadable says so, and its banner opens the structured editor", async () => {
     await page.route("**/api/resume", (route) => route.fulfill({ json: { data: null, cvMdSha: null, report: { unparsed: [], orphans: [] }, lossless: false } }));
@@ -247,6 +266,71 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
       assert.equal(await markdown().inputValue(), "# Newer read\n");
     } finally {
       await page.unroute("**/api/cv");
+    }
+  });
+
+  await t.test("a re-read begun before a markdown save does not put the older text back", async () => {
+    await open("/cv?tab=edit");
+    await page.waitForFunction(() => document.querySelector('textarea[aria-label="CV Markdown"]')?.value.length > 0);
+    let release;
+    const held = new Promise((resolve) => (release = resolve));
+    let answered = false;
+    await page.route("**/api/cv", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const response = await route.fetch();
+      await held;
+      await route.fulfill({ response });
+      answered = true;
+    });
+    try {
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } })));
+      await markdown().fill((await markdown().inputValue()).replace("Typed after.", "Typed after. Saved past the re-read."));
+      await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
+      release();
+      while (!answered) await page.waitForTimeout(50);
+      await page.waitForTimeout(300);
+      assert.match(await markdown().inputValue(), /Saved past the re-read\./);
+      assert.equal(await page.locator("main").getByRole("alert").count(), 0);
+    } finally {
+      release();
+      await page.unroute("**/api/cv");
+    }
+  });
+
+  await t.test("Export waits for a save to be read back, and a structured write with the same text is read again", async () => {
+    let release = () => {};
+    let held = null;
+    let lossy = false;
+    await page.route("**/api/resume", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      await held;
+      if (lossy) return route.fulfill({ json: { data: null, cvMdSha: null, report: { unparsed: [], orphans: [] }, lossless: false } });
+      await lossless(route);
+    });
+    try {
+      await open("/cv");
+      await frame().waitFor();
+      held = new Promise((resolve) => (release = resolve));
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
+      await markdown().fill((await markdown().inputValue()).replace("Another line.", "Another line. Read back."));
+      await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
+      const menu = await exportMenu();
+      const print = menu.getByRole("menuitem", { name: "Print" });
+      assert.equal(await print.getAttribute("aria-disabled"), "true");
+      assert.match(await print.evaluate((el) => document.getElementById(el.getAttribute("aria-describedby")).textContent), /until the saved cv\.md is read back/);
+      assert.equal(await menu.getByRole("menuitem", { name: "Download PDF" }).getAttribute("aria-disabled"), null);
+      await page.keyboard.press("Escape");
+      release();
+      await (await exportMenu()).locator('[role=menuitem]:not([aria-disabled])', { hasText: "Print" }).waitFor({ timeout: 10_000 });
+      await page.keyboard.press("Escape");
+
+      // What a pairing does: cv.md keeps its text and reads back differently.
+      lossy = true;
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } })));
+      await page.getByRole("button", { name: /would be rewritten differently/ }).waitFor({ timeout: 5_000 });
+    } finally {
+      release();
+      await page.unroute("**/api/resume");
     }
   });
 

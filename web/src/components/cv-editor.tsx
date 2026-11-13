@@ -135,9 +135,11 @@ export function useCvEditor() {
   useEffect(() => {
     let latest = 0;
     const onSaved = (e: Event) => {
-      if ((e as CustomEvent<{ source?: string }>).detail?.source !== "structured") return;
+      const source = (e as CustomEvent<{ source?: string }>).detail?.source;
       // Only the newest re-read may land; an older one answering last would put older text back.
+      // A markdown save is newer than any re-read begun before it.
       const n = ++latest;
+      if (source !== "structured") return;
       fetch("/api/cv")
         .then(async (res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);

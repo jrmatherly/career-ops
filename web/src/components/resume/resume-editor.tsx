@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CvPreview } from "@/components/cv-studio/cv-preview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,7 +51,9 @@ const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }
 export function ResumeEditor({ templates, templatesError }: { templates: TemplateOption[]; templatesError?: string }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
   const dataRef = useRef(state.data);
-  dataRef.current = state.data;
+  useLayoutEffect(() => {
+    dataRef.current = state.data;
+  }, [state.data]);
   const [html, setHtml] = useState("");
   // What the rendered preview leaves out: sections with no template slot, and build-cv-html warnings.
   const [omitted, setOmitted] = useState<{ unmapped: string[]; warnings: string[] }>({ unmapped: [], warnings: [] });
@@ -144,7 +146,9 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
 
   const dirty = state.data !== state.saved;
   const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  useLayoutEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
   // cv.md written by the markdown editor or an upload after this form loaded, while it held unsaved edits.
   const [stale, setStale] = useState(false);
   useEffect(() => {
@@ -168,6 +172,8 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   const resolved = (message?: string) => {
     setNotice(message ?? null);
     setGeneration((g) => g + 1);
+    // An adoption rewrites cv.md and a pairing changes how it reads back, so the rest of the page re-reads both.
+    window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } }));
   };
 
   const edit = (next: ResumeDraft, delay = 300) => {

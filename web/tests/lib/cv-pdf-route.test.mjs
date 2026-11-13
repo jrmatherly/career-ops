@@ -6,7 +6,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,9 +15,9 @@ import "../helpers/web-ts-alias-loader.mjs";
 const codeRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const dataRoot = mkdtempSync(join(tmpdir(), "cv-pdf-route-data-"));
 const cvPath = join(dataRoot, "cv.md");
-const ENV_KEYS = ["CAREER_OPS_CODE_ROOT", "CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_PROFILE", "CAREER_OPS_TRACKER"];
+// TMPDIR and its Windows names: the temp-directory check gives this file its own, since other test files render in the shared one.
+const ENV_KEYS = ["CAREER_OPS_CODE_ROOT", "CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_PROFILE", "CAREER_OPS_TRACKER", "TMPDIR", "TEMP", "TMP"];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
-const tempDirs = () => readdirSync(tmpdir()).filter((f) => f.startsWith("cv-master-pdf-"));
 
 let route;
 
@@ -51,10 +51,13 @@ test("a lossy cv.md answers 409 JSON and leaves no temp directory", async (t) =>
   copyFileSync(join(codeRoot, "examples", "cv-example.md"), cvPath);
   // A list row under Skills without its bold lead is a line the absorb cannot place.
   writeFileSync(cvPath, `${readFileSync(cvPath, "utf8").trimEnd()}\n- stray bullet without a bold lead\n`);
-  const before = tempDirs();
+  const ownTmp = join(dataRoot, "tmp");
+  mkdirSync(ownTmp);
+  for (const k of ["TMPDIR", "TEMP", "TMP"]) process.env[k] = ownTmp;
+  assert.equal(tmpdir(), ownTmp);
   const res = await route.GET();
   assert.equal(res.status, 409);
   assert.match(res.headers.get("content-type"), /application\/json/);
   assert.equal((await res.json()).error, "cv.md could not be read cleanly");
-  assert.deepEqual(tempDirs().filter((d) => !before.includes(d)), []);
+  assert.deepEqual(readdirSync(ownTmp), []);
 });

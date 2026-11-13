@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { contentHeightPx, frameHeightAfterProbe, frameHeightPx, PREVIEW_PAGE_PX, previewPageCount } from "@/lib/cv-studio/page-estimate.mjs";
 import { previewHtml } from "@/lib/cv-studio/preview-html.mjs";
 import { markerTargets } from "@/lib/resume-markers.mjs";
@@ -59,7 +59,9 @@ export function CvPreview({ html, markers, pinned, caption }: { html: string; ma
     if (nextFrame > 0) setFramePx(nextFrame);
   };
   const measureRef = useRef(measure);
-  measureRef.current = measure;
+  useLayoutEffect(() => {
+    measureRef.current = measure;
+  });
 
   const mark = () => {
     const doc = frame.current?.contentDocument;
