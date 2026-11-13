@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { strFromU8, unzipSync } from 'fflate';
 import { rmSync } from './helpers.mjs';
 import { parseResume } from '../lib/resume/schema.mjs';
-import { resumeToPayload } from '../lib/resume/to-payload.mjs';
+import { bodyRuns, resumeToPayload } from '../lib/resume/to-payload.mjs';
 import { payloadToDocx } from '../lib/resume/export/docx.mjs';
 import { validatePayload } from '../lib/cv-payload-schema.mjs';
 
@@ -88,4 +88,11 @@ test("a template pack's own experience partial keeps the order with no change to
 test('the DOCX keeps the order', async () => {
   const xml = strFromU8(unzipSync(new Uint8Array(await payloadToDocx(payloadFor(MIXED).payload)))['word/document.xml']);
   assertOrder(xml, 'docx');
+});
+
+test('paragraphs listed out of order, or with a position that is not a count, still land where before says', () => {
+  const runs = bodyRuns({ bullets: ['A', '', 'B'], paragraphs: [{ text: 'Later', before: 3 }, { text: 'Earlier', before: 1 }, { text: 'First', before: 'x' }, null, { before: 1 }] });
+  assert.deepEqual(runs, [{ text: 'First' }, { bullets: ['A'] }, { text: 'Earlier' }, { bullets: ['B'] }, { text: 'Later' }]);
+  assert.deepEqual(bodyRuns({ bullets: ['A'] }), [{ bullets: ['A'] }]);
+  assert.deepEqual(bodyRuns({}), []);
 });
