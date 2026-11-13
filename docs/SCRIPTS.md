@@ -33,7 +33,7 @@ All scripts live in the project root as `.mjs` modules. Most are exposed via
 | `node resume.mjs check` | `resume.mjs` | Report the 23 Reactive Resume Check rules (ATS findings on contact details, dates, layout, headings and writing) for `data/resume.json` with a score; advisory, exit 0 whatever it finds (1 on a usage error, 3 while the `cv.md` absorb gate fails) |
 | `node resume.mjs export docx --out cv.docx` | `resume.mjs` | Export the CV as a one-column Word file in the render payload's section order; `export rr-json` writes a Reactive Resume JSON and `export json-resume` a JSON Resume document |
 | `npm run upskill` | `upskill.mjs` | Aggregate skill-gap map from tracked reports (or `--url-text <url\|file>` for a single-JD targeted gap analysis) |
-| `npm run add` | `add-entry.mjs` | Dedup + insert a `/career-ops add` entry into cv.md / article-digest.md |
+| `npm run add` | `add-entry.mjs` | Dedup + insert a `/career-ops add` entry into cv.md / article-digest.md; a cv.md addition holds the resume lock (`data/resume.json.lock`) that `resume.mjs` and the web CV save take |
 | `npm run update:check` | `update-system.mjs check` | Check for a newer published release |
 | `npm run update` | `update-system.mjs apply --confirm` | Apply upstream update |
 | `npm run rollback` | `update-system.mjs rollback` | Rollback last update |
