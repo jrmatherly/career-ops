@@ -225,7 +225,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
             onClick={() => setImporting(!importing)}
             className={cn(buttonVariants({ variant: "outline" }), "min-h-6")}
           >
-            <Upload aria-hidden="true" className="size-4" /> {importing ? "Close upload" : "Upload PDF or TeX"}
+            <Upload aria-hidden="true" className="size-4" /> {importing ? "Close upload" : "Upload Resume"}
           </button>
           <ExportMenu pdfBlocked={pdfBlocked} printBlocked={printBlocked} note={exportNote} downloading={downloading} onDownload={download} onPrint={print} />
         </div>}
@@ -246,9 +246,9 @@ export function CvPage({ format, templates, templatesError }: { format: string |
 
       {importing && state.phase === "ready" && !state.conflict && (
         <section id="cv-import" aria-labelledby="cv-import-heading" className="mb-6">
-          <h2 id="cv-import-heading" className="font-display text-lg tracking-tight text-foreground">Upload a CV</h2>
+          <h2 id="cv-import-heading" className="font-display text-lg tracking-tight text-foreground">Upload a resume</h2>
           <p className="mb-3 mt-1 text-sm text-muted">
-            Upload your CV, review the conversion, then update cv.md.
+            Upload your resume, review the conversion, then update cv.md.
             {state.content !== state.saved && " Your unsaved edits stay in the editor until you update."}
           </p>
           <CvIngest
@@ -296,7 +296,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         {absorb.kind === "loading" ? (
           <p className="text-sm text-muted">Loading…</p>
         ) : absorb.kind === "missing" ? (
-          <p className="text-sm text-muted">No cv.md yet. Write it in Edit, or upload a PDF or TeX file.</p>
+          <p className="text-sm text-muted">No cv.md yet. Write it in Edit, or upload your resume.</p>
         ) : absorb.kind === "error" ? (
           <p role="alert" className="text-sm text-red-700 dark:text-red-300">The preview could not be built: {absorb.message}</p>
         ) : showRendered ? (
