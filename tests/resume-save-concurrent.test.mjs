@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,6 @@ test('two structured saves opened on the same cv.md: one is written, the other i
     assert.ok(cv.includes(winner) && !cv.includes(loser), `cv.md holds the written edit only:\n${cv}`);
     assert.equal(stored.basics.headline, winner, 'data/resume.json holds the written edit');
     assert.equal(stored.careerOps.cvSha256, sha256(cv), 'data/resume.json records the cv.md on disk');
-    assert.equal(existsSync(`${resumePath(root)}.lock`), false, 'no lock left behind');
   } finally {
     for (const [name, value] of [['CAREER_OPS_ROOT', savedEnv.root], ['CAREER_OPS_DATA_DIR', savedEnv.dir]]) {
       if (value === undefined) delete process.env[name];

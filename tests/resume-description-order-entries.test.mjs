@@ -38,3 +38,12 @@ test('a hand-added paragraph after a Volunteer entry\'s bullets is stored after 
   );
   assert.equal(resumeToCvMarkdown(data), md);
 });
+
+test('moving a Volunteer entry\'s trailing paragraph above its bullets, with no other edit, is stored', () => {
+  const { data: stored } = absorb(entry('Provide IT support.\n\n- Set up the donor database\n\nLater ran the weekend shift.'), null);
+  const md = entry('Provide IT support.\n\nLater ran the weekend shift.\n\n- Set up the donor database');
+  const { data, report, lossless } = absorb(md, stored);
+  assert.equal(lossless, true);
+  assert.equal(report.changed, 1);
+  assert.equal(volunteer(data).description, '<p>Provide IT support.</p><p>Later ran the weekend shift.</p><ul><li><p>Set up the donor database</p></li></ul>');
+});

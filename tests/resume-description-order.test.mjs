@@ -50,7 +50,6 @@ test('a cv.md absorbed with no stored resume keeps each description in file orde
   const cases = [
     ['paragraph, bullets, paragraph, bullets', (data) => data.sections.experience.items.find((i) => !i.roles?.length), P_UL_P_UL],
     ['bullets, then a paragraph', (data) => data.sections.experience.items.find((i) => !i.roles?.length), UL_P],
-    ['a role of an item with roles', (data) => data.sections.experience.items.find((i) => i.roles?.length).roles[1], P_UL_P_UL],
   ];
   for (const [shape, pick, description] of cases) {
     const data = fixture();
@@ -64,4 +63,33 @@ test('a cv.md absorbed with no stored resume keeps each description in file orde
     assert.equal(stored.description, description, `${shape}: stored in file order`);
     assert.equal(resumeToCvMarkdown(out), md, `${shape}: regenerates the same cv.md`);
   }
+});
+
+test('a paragraph hand-added after a role\'s bullets is stored after them on that role', () => {
+  const data = fixture();
+  const item = data.sections.experience.items.find((i) => i.roles?.length);
+  const role = item.roles[1];
+  role.description = '<p>Ran the tools team.</p><ul><li><p>Shipped the asset pipeline</p></li></ul>';
+  const md = resumeToCvMarkdown(data).replace('- Shipped the asset pipeline\n', '- Shipped the asset pipeline\n\nLeft to found Larkspur Labs.\n');
+  const { data: out, report, lossless } = absorb(md, data);
+  assert.equal(lossless, true);
+  assert.equal(report.changed, 1);
+  const stored = out.sections.experience.items.find((i) => i.id === item.id).roles.find((r) => r.id === role.id);
+  assert.equal(stored.description, `${role.description}<p>Left to found Larkspur Labs.</p>`);
+  assert.equal(resumeToCvMarkdown(out), md);
+});
+
+test('moving the paragraph after the bullets to before them, with no other edit, is stored', () => {
+  const { data, entry } = withTrailingParagraph();
+  const md = resumeToCvMarkdown(data).replace(
+    '- Shipped the asset pipeline\n- Cut build times in half\n\nLeft to found Larkspur Labs.\n',
+    'Left to found Larkspur Labs.\n\n- Shipped the asset pipeline\n- Cut build times in half\n',
+  );
+  const { data: out, report, lossless } = absorb(md, data);
+  assert.equal(lossless, true);
+  assert.equal(report.changed, 1);
+  assert.equal(
+    out.sections.experience.items.find((i) => i.id === entry.id).description,
+    '<p>Ran the tools team.</p><p>Left to found Larkspur Labs.</p><ul><li><p>Shipped the asset pipeline</p></li><li><p>Cut build times in half</p></li></ul>',
+  );
 });
