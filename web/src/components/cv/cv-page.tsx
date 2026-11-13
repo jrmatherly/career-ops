@@ -52,6 +52,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   const [structured, setStructured] = useState(false);
   // Mounted from its first opening on, so closing it hides unsaved edits instead of dropping them.
   const [structuredMounted, setStructuredMounted] = useState(false);
+  const [structuredDirty, setStructuredDirty] = useState(false);
   const structuredHeading = useRef<HTMLHeadingElement>(null);
   const [revealStructured, setRevealStructured] = useState(false);
   const openStructured = (open: boolean) => {
@@ -163,7 +164,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
   const unsaved = state.phase === "ready" && (state.content !== state.saved || state.conflict);
   const omittedNames = omitted.unmapped.map((s) => (SECTION_TYPES as Record<string, { label?: string }>)[s]?.label ?? s);
   const exportNote = exportBlocked ? null : [
-    unsaved ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null,
+    unsaved || structuredDirty ? "Download and Print use the saved cv.md, not the unsaved text in the editor." : null,
     omittedNames.length ? `The PDF and the print leave out ${new Intl.ListFormat("en", { type: "conjunction" }).format(omittedNames)}: this template has no place for ${omittedNames.length === 1 ? "it" : "them"}.` : null,
   ].filter(Boolean).join(" ") || null;
 
@@ -347,7 +348,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         {structuredMounted && (
           <section id="cv-structured" hidden={!structured} aria-labelledby="cv-structured-heading" className="mt-4">
             <h2 id="cv-structured-heading" ref={structuredHeading} tabIndex={-1} className="font-display text-lg tracking-tight text-foreground focus-visible:outline-none">Structured editor</h2>
-            <ResumeEditor templates={templates} templatesError={templatesError} />
+            <ResumeEditor templates={templates} templatesError={templatesError} onDirtyChange={setStructuredDirty} />
           </section>
         )}
         {/* Below the editor: the gaps are context for what to write next, and they belong after the document. */}

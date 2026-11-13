@@ -81,6 +81,9 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
     assert.equal(await page.getByLabel("Headline").isVisible(), false);
     await toggle.click();
     assert.equal(await page.getByLabel("Headline").inputValue(), "Kept while closed");
+    await frame().waitFor({ state: "attached" });
+    assert.match(await (await exportMenu()).textContent(), /use the saved cv\.md, not the unsaved text/);
+    await page.keyboard.press("Escape");
   });
 
   // Every case below fulfills /api/resume, so the cv.md written above does not matter.
@@ -276,15 +279,20 @@ test("the CV page shows every failure where the user can act on it", { skip: liv
     let release;
     const held = new Promise((resolve) => (release = resolve));
     let answered = false;
+    let captured;
+    const read = new Promise((resolve) => (captured = resolve));
     await page.route("**/api/cv", async (route) => {
       if (route.request().method() !== "GET") return route.continue();
       const response = await route.fetch();
+      captured();
       await held;
       await route.fulfill({ response });
       answered = true;
     });
     try {
       await page.evaluate(() => window.dispatchEvent(new CustomEvent("co-cv-saved", { detail: { source: "structured" } })));
+      // The held answer must be the file as it was before the save below.
+      await read;
       await markdown().fill(`${await markdown().inputValue()}\nSaved past the re-read.\n`);
       await page.locator("main p[role=status]", { hasText: /^Saved$/ }).waitFor({ timeout: 10_000 });
       release();

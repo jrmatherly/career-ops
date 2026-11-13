@@ -138,13 +138,15 @@ export function useCvEditor() {
       // Every save re-reads, this editor's own included, and only the newest re-read may land: an older
       // one answering last would put older text back, and a write that overlapped this one shows up here.
       const n = ++latest;
+      // A failed re-read after this editor's own save is not a conflict: the file holds what it wrote.
+      const own = (e as CustomEvent<{ source?: string }>).detail?.source === "markdown";
       fetch("/api/cv")
         .then(async (res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const body = (await res.json()) as { content?: unknown };
           if (n === latest) dispatch({ type: "external", content: typeof body.content === "string" ? body.content : null });
         })
-        .catch(() => n === latest && dispatch({ type: "external", content: null }));
+        .catch(() => n === latest && !own && dispatch({ type: "external", content: null }));
     };
     window.addEventListener("co-cv-saved", onSaved);
     return () => window.removeEventListener("co-cv-saved", onSaved);

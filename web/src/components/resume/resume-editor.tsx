@@ -48,7 +48,7 @@ const BASICS: { key: string; label: string; kind: FieldKind }[] = [
 // A route that throws answers with an HTML error page, not JSON.
 const readBody = (res: Response): Promise<{ error?: string; [key: string]: any }> => res.json().catch(() => ({ error: `HTTP ${res.status}` }));
 
-export function ResumeEditor({ templates, templatesError }: { templates: TemplateOption[]; templatesError?: string }) {
+export function ResumeEditor({ templates, templatesError, onDirtyChange }: { templates: TemplateOption[]; templatesError?: string; onDirtyChange?: (dirty: boolean) => void }) {
   const [state, dispatch] = useReducer(reducer, { status: { kind: "loading" }, data: null, saved: null, cvMdSha: null, report: null });
   const dataRef = useRef(state.data);
   useLayoutEffect(() => {
@@ -149,6 +149,7 @@ export function ResumeEditor({ templates, templatesError }: { templates: Templat
   useLayoutEffect(() => {
     dirtyRef.current = dirty;
   }, [dirty]);
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
   // cv.md written by the markdown editor or an upload after this form loaded, while it held unsaved edits.
   const [stale, setStale] = useState(false);
   useEffect(() => {
