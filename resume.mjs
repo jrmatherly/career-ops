@@ -12,7 +12,8 @@
  *
  * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
  * 3 the lossless gate failed (nothing written), 4 save with a stale
- * --expected-cv-sha or --expected-resume-sha (nothing written). check is
+ * --expected-cv-sha or --expected-resume-sha, or adopt or import after cv.md or
+ * data/resume.json changed while it waited for the lock (nothing written). check is
  * advisory: it exits 0 whatever it finds, and 3 only while the absorb gate
  * fails, like export.
  */
@@ -49,6 +50,18 @@ function readCv(root) {
   const path = join(root, 'cv.md');
   if (!existsSync(path)) throw new UsageError(`${path} not found`);
   return readFileSync(path, 'utf8');
+}
+
+const textOrNull = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
+
+/**
+ * Whether cv.md and data/resume.json still hold the text a command read before it took the
+ * lock. Called inside withResumeLock, so a save that finished while the command waited is seen.
+ */
+function unchangedSince(root, cv, json) {
+  if (textOrNull(join(root, 'cv.md')) === cv && textOrNull(resumePath(root)) === json) return true;
+  console.log('cv.md or data/resume.json changed while this ran; nothing written. Run it again to see the new diff.');
+  return false;
 }
 
 function readDraft(path) {
@@ -132,6 +145,7 @@ async function absorbCommand(root, json) {
 async function adoptCommand(root, confirm) {
   const cvPath = join(root, 'cv.md');
   const cv = readCv(root);
+  const json = textOrNull(resumePath(root));
   const result = absorb(cv, readResume(root));
   const generated = resumeToCvMarkdown(result.data);
   printFindings(result.report);
@@ -141,13 +155,16 @@ async function adoptCommand(root, confirm) {
     console.log('\nNothing written. Run node resume.mjs adopt --confirm to replace cv.md (a copy is kept as cv.md.bak, or a timestamped .bak when that exists).');
     return 0;
   }
-  const bak = existsSync(`${cvPath}.bak`) ? `${cvPath}.${Date.now()}.bak` : `${cvPath}.bak`;
-  writeFileAtomic(bak, cv);
-  replaceUserFile(cvPath, generated);
-  markInSync(result.data, sha256(generated));
-  await writeResume(root, result.data);
-  console.log(`\ncv.md replaced (previous copy in ${bak}); data/resume.json written`);
-  return 0;
+  return withResumeLock(root, (path) => {
+    if (!unchangedSince(root, cv, json)) return 4;
+    const bak = existsSync(`${cvPath}.bak`) ? `${cvPath}.${Date.now()}.bak` : `${cvPath}.bak`;
+    writeFileAtomic(bak, cv);
+    replaceUserFile(cvPath, generated);
+    markInSync(result.data, sha256(generated));
+    writeFileAtomic(path, serialize(result.data));
+    console.log(`\ncv.md replaced (previous copy in ${bak}); data/resume.json written`);
+    return 0;
+  });
 }
 
 async function pairCommand(root, ids) {
@@ -320,9 +337,9 @@ async function importCommand(root, file, args) {
   }
   const cvPath = join(root, 'cv.md');
   const jsonPath = resumePath(root);
-  const cv = existsSync(cvPath) ? readFileSync(cvPath, 'utf8') : null;
+  const cv = textOrNull(cvPath);
   // The sidecar holds orphans, hidden flags and links that cv.md cannot carry, so it is gated and backed up like cv.md.
-  const json = existsSync(jsonPath) ? readFileSync(jsonPath, 'utf8') : null;
+  const json = textOrNull(jsonPath);
   if (cv !== null) {
     console.log('cv.md exists; import would replace it:');
     console.log(lineDiff(cv, generated, `generated from ${basename(file)}`));
@@ -342,12 +359,15 @@ async function importCommand(root, file, args) {
     writeFileAtomic(bak, text);
     return bak;
   };
-  const baks = [cv !== null && backup(cvPath, cv), json !== null && backup(jsonPath, json)].filter(Boolean);
-  replaceUserFile(cvPath, generated);
-  markInSync(data, sha256(generated));
-  await writeResume(root, data);
-  console.log(`cv.md and data/resume.json written${baks.length ? ` (previous copies in ${baks.join(', ')})` : ''}`);
-  return 0;
+  return withResumeLock(root, () => {
+    if (!unchangedSince(root, cv, json)) return 4;
+    const baks = [cv !== null && backup(cvPath, cv), json !== null && backup(jsonPath, json)].filter(Boolean);
+    replaceUserFile(cvPath, generated);
+    markInSync(data, sha256(generated));
+    writeFileAtomic(jsonPath, serialize(data));
+    console.log(`cv.md and data/resume.json written${baks.length ? ` (previous copies in ${baks.join(', ')})` : ''}`);
+    return 0;
+  });
 }
 
 export async function main(args) {

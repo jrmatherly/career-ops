@@ -5,6 +5,7 @@ import { careerOpsRoot } from "@/lib/career-ops";
 import { atomicWrite, atomicWriteWithBackup } from "@/lib/core/safe-write";
 import { decideCvWrite } from "@/lib/cv-write.mjs";
 import { readJsonObject } from "@/lib/json-body";
+import { withResumeLock } from "@/lib/resume-lock";
 
 function cvPath() {
   return path.join(careerOpsRoot(), "cv.md");
@@ -31,6 +32,17 @@ function readCv(): { exists: boolean; content: string } {
 export async function POST(req: Request) {
   const body = await readJsonObject<{ content?: string; backup?: boolean; expected?: { content?: string; exists?: boolean } }>(req);
   if (!body) return NextResponse.json({ error: "bad json" }, { status: 400 });
+  try {
+    // The read, the comparison with the text the editor started from and the write are one step
+    // under the lock, so a structured save cannot land between them and be overwritten.
+    return await withResumeLock(careerOpsRoot(), () => writeCv(body));
+  } catch (err) {
+    console.error("cv save: could not take the resume lock", err);
+    return NextResponse.json({ error: "cv.md is being saved somewhere else. Your text is still in this tab; try again." }, { status: 503 });
+  }
+}
+
+function writeCv(body: { content?: string; backup?: boolean; expected?: { content?: string; exists?: boolean } }) {
   let disk: { exists: boolean; content: string };
   try {
     disk = readCv();
