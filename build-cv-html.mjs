@@ -519,7 +519,8 @@ ${bullets}
     const ordered = entryTemplate.includes('{{AFTER_BULLETS}}');
     const runs = bodyRuns(e);
     const { head, after } = ordered ? experienceBody(e) : { head: runs.flatMap(r => r.bullets ?? []), after: '' };
-    const context = ordered ? (e.context || '') : [e.context, ...runs.map(r => r.text)].filter(Boolean).join(' ');
+    const trailing = ordered ? [] : runs.map(r => r.text).filter(Boolean);
+    const context = trailing.length ? [e.context, ...trailing].filter(Boolean).join(' ') : (e.context || '');
     const bullets = head.map(b => `<li>${escapeHtml(b)}</li>`).join('\n    ');
     const blockValues = new Map([
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''), present: Boolean(e.location) }],

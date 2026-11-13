@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { strFromU8, unzipSync } from 'fflate';
+import { rmSync } from './helpers.mjs';
 import { parseResume } from '../lib/resume/schema.mjs';
 import { resumeToPayload } from '../lib/resume/to-payload.mjs';
 import { payloadToDocx } from '../lib/resume/export/docx.mjs';
