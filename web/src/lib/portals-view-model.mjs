@@ -32,7 +32,8 @@ function boardOfUrl(url) {
  */
 export function boardType({ provider, api, careers_url }) {
   const named = typeof provider === "string" ? provider.trim() : "";
-  if (named) return named[0].toUpperCase() + named.slice(1);
+  // One spelling however the entry cases it, so a board is one filter option.
+  if (named) return named[0].toUpperCase() + named.slice(1).toLowerCase();
   return boardOfUrl(api) ?? boardOfUrl(careers_url) ?? OTHER_BOARD;
 }
 

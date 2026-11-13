@@ -79,6 +79,8 @@ test("a board is named by its provider, else by the host of its api or careers U
   assert.equal(boardType({ careers_url: "https://jobs.ashbyhq.com/acme" }), "Ashby");
   assert.equal(boardType({ careers_url: "https://acme.example/careers", api: "https://boards-api.greenhouse.io/v1/boards/acme/jobs" }), "Greenhouse");
   assert.equal(boardType({ provider: "smartrecruiters", careers_url: "https://acme.example" }), "Smartrecruiters");
+  // One spelling per board, however the entry cases it, and the same one a host gives.
+  for (const provider of ["greenhouse", "GreenHouse", " GREENHOUSE "]) assert.equal(boardType({ provider }), "Greenhouse");
   assert.equal(boardType({ careers_url: "https://acme.wd5.myworkdayjobs.com/jobs" }), "Workday");
   assert.equal(boardType({ careers_url: "https://apply.workable.com/acme" }), "Workable");
   assert.equal(boardType({ careers_url: "https://jobs.lever.co/acme" }), "Lever");
