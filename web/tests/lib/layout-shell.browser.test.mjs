@@ -1,5 +1,5 @@
 // Opt-in real Chrome regression: start the local web server against the
-// fictional pipeline-status fixture, then
+// fictional layout-shell fixture, then
 // LAYOUT_SHELL_TEST_URL=http://127.0.0.1:3000 node --test this-file.mjs.
 // Every mutating API is intercepted; no CLI or real data write is invoked.
 import assert from "node:assert/strict";
@@ -12,8 +12,20 @@ import { fileURLToPath } from "node:url";
 import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
-// /pipeline opens on the inbox, which this fixture leaves empty; ?tab=ALL is the tracker table.
+// /pipeline opens on the inbox; ?tab=ALL is the tracker table.
 const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab=ALL", "/followups", "/portals", "/analytics", "/cv", "/cv?tab=edit", "/documents", "/config", "/board", "/shares"];
+
+// Controls only data renders. A fixture that stops rendering one fails here, not silently on size.
+const RENDERS = {
+  "/explore": [["a chip remove button", 'button[aria-label^="Remove "]']],
+  "/pipeline": [["the inbox Select all button", "button", /^Select all \d+$/]],
+  "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
+  "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
+  "/": [
+    ["the follow-ups See all link", 'a[href="/followups"]', /^See all/],
+    ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', /^See all/],
+  ],
+};
 
 const url = process.env.LAYOUT_SHELL_TEST_URL;
 test("every page sits in one shell under one header, with readable text and reachable targets", { skip: liveServerSkip("LAYOUT_SHELL_TEST_URL"), timeout: 300_000 }, async (t) => {
@@ -81,6 +93,12 @@ test("every page sits in one shell under one header, with readable text and reac
   for (const route of ROUTES) {
     await open(route);
     const m = await measure();
+    for (const [label, selector, text] of RENDERS[route] ?? []) {
+      const found = await page.locator(`main ${selector}`).filter(text ? { hasText: text } : {}).count();
+      await t.test(`${route}: renders ${label}`, () => {
+        assert.ok(found > 0, `${label} did not render, so its size was not checked`);
+      });
+    }
     await t.test(`${route}: one page header`, () => {
       assert.equal(m.h1Count, 1, `${m.h1Count} h1 elements inside main`);
       assert.equal(m.fontSize, "30px", `h1 "${m.h1Text}"`);

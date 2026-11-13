@@ -75,7 +75,7 @@ const SUITES = {
   "followups-loading": { url: "FOLLOWUPS_LOADING_TEST_URL", root: "FOLLOWUPS_LOADING_TEST_ROOT", fixture: "pipeline-status" },
   "inbox-keys": { url: "INBOX_KEYS_TEST_URL", root: "INBOX_KEYS_TEST_ROOT", fixture: "inbox-undo" },
   "inbox-undo": { url: "INBOX_UNDO_TEST_URL", root: "INBOX_UNDO_TEST_ROOT", fixture: "inbox-undo" },
-  "layout-shell": { url: "LAYOUT_SHELL_TEST_URL", fixture: "pipeline-status" },
+  "layout-shell": { url: "LAYOUT_SHELL_TEST_URL", fixture: "layout-shell" },
   "loading-transition": { url: "LOADING_TRANSITION_TEST_URL", root: "LOADING_TRANSITION_TEST_ROOT", fixture: "pipeline-status" },
   "mobile-nav-drawer": { url: "MOBILE_NAV_TEST_URL", fixture: "blank" },
   "pipeline-inline-status": { url: "PIPELINE_STATUS_TEST_URL", root: "PIPELINE_STATUS_TEST_ROOT", fixture: "pipeline-status" },
