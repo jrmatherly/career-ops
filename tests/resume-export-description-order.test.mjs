@@ -13,9 +13,17 @@ test('the JSON Resume export names an entry whose paragraph after the bullets it
   entry.description = '<p>Ran the tools team.</p><ul><li><p>Shipped the asset pipeline</p></li></ul><p>Left to found Larkspur Labs.</p>';
   const project = data.sections.projects.items[0];
   project.description = '<ul><li><p>Open source</p></li></ul><p>Archived since.</p>';
+  const volunteer = data.sections.volunteer.items[0];
+  volunteer.description = project.description;
+  const award = data.sections.awards.items[0];
+  award.description = project.description;
+  const school = data.sections.education.items[0];
+  school.description = project.description;
   const { unmapped } = resumeToJsonResume(data);
-  assert.ok(unmapped.includes(`${entry.company} ${NOTE}`), unmapped.join(' | '));
-  assert.ok(unmapped.includes(`${project.name} ${NOTE}`), unmapped.join(' | '));
+  for (const label of [entry.company, project.name, volunteer.organization, award.title]) {
+    assert.ok(unmapped.includes(`${label} ${NOTE}`), `${label}: ${unmapped.join(' | ')}`);
+  }
+  assert.equal(unmapped.filter((u) => u.endsWith(NOTE)).length, 4, 'education exports bullets only, so it is not named');
 });
 
 test('an entry with its paragraphs before the bullets is not named', () => {
