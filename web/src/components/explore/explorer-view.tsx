@@ -128,7 +128,7 @@ export function ExplorerView({
         title="Explore"
         description={!isResults && (isAi
           ? "Describe the role in plain language — an AI hunts the open web for it, on your own AI. Candidates are unverified until you evaluate."
-          : employer ? "Scan selected employer sites using your role and location terms, zero tokens. Open an original JD to check its details." : "Scan the public ATS network — Greenhouse, Lever, Ashby, Workday. Fresh postings matched to you, zero tokens. You only spend when you choose to evaluate one.")}
+          : employer ? "Scan selected employer sites using your role and location terms, zero tokens. Open an original JD to check its details." : "Scan public job boards for fresh postings. Free until you evaluate one.")}
         actions={<div className="w-full sm:w-auto"><ExploreModeToggle mode={mode} onChange={setMode} cliConfigured={!!cli.id} /></div>}
       />
 

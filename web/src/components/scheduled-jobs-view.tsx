@@ -161,7 +161,7 @@ export function ScheduledJobsView() {
     <PageFrame className="space-y-8">
       <PageHeader
         title="Scheduled scans"
-        description="Persistent, automated crawler jobs supporting Zero-Token and Full ATS Dataset sweeps."
+        description="Scans that run on a schedule and evaluate what they find."
         actions={<div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -169,7 +169,7 @@ export function ScheduledJobsView() {
             className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground shadow-lg transition-all hover:bg-brand-200"
           >
             <CalendarPlus className="size-4" />
-            New Scheduled Scan
+            New scan
           </button>
           <button
             type="button"
@@ -177,7 +177,7 @@ export function ScheduledJobsView() {
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover"
           >
             <History className="size-4 text-brand-text" />
-            Run Logs ({store.runs.length})
+            Run log
           </button>
           <button
             type="button"
@@ -293,7 +293,7 @@ export function ScheduledJobsView() {
             onClick={() => setCreateModalOpen(true)}
             className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow"
           >
-            <CalendarPlus className="size-3.5" /> New Scheduled Scan
+            <CalendarPlus className="size-3.5" /> New scan
           </button>
         </div>
       ) : (

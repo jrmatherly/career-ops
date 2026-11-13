@@ -98,7 +98,7 @@ test("visible labels are part of accessible names, and shell content sits in lan
   });
 
   await t.test("/scheduled-scans: Use portals.yml filters hides only the six lists", async () => {
-    await page.getByRole("button", { name: "New Scheduled Scan" }).first().click();
+    await page.getByRole("button", { name: "New scan" }).first().click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("textbox", { name: "Roles to find" }).waitFor();
     await dialog.getByRole("checkbox", { name: /Use portals\.yml filters/ }).check();

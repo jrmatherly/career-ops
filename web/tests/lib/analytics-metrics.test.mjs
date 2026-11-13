@@ -190,7 +190,7 @@ test("strategic insights are deterministic with complete and missing data", () =
   assert.deepEqual(generateInsights(computeStatsMetrics([])), []);
 });
 
-test("empty progress and Search stats metrics are stable", () => {
+test("empty progress and Scan stats metrics are stable", () => {
   const progress = computeProgressMetrics([]);
   const stats = computeStatsMetrics([]);
   assert.equal(progress.tracked, 0);

@@ -16,6 +16,8 @@
 // dropping the caveat turns a hedged figure into a confident one. Those rules
 // are the part worth testing, so they live here rather than inside JSX.
 
+import { canonStatus } from "../status-alias.mjs";
+
 /**
  * @typedef {{key: string, label: string, value: number}} FunnelStage
  * @typedef {{key: string, label: string, value: number|null}} FunnelRate
@@ -34,6 +36,22 @@
  * @typedef {ThresholdSection|BreakdownSection|VendorSection} StatsSection
  * @typedef {{state: "unavailable"|"below-threshold"|"ready", progress: {current: number, threshold: number|null, message: string}|null, sections: StatsSection[]}} StatsModel
  */
+
+const ACTIVE = new Set(["APPLIED", "RESPONDED", "ASSESSMENT", "INTERVIEW", "OFFER"]);
+
+/**
+ * The Analytics page's description line. The average is over rows with a
+ * numeric score, and is left out when no row has one.
+ *
+ * @param {{score: string, status: string}[]} applications
+ * @returns {string}
+ */
+export function analyticsSummary(applications) {
+  const scores = applications.map((a) => Number.parseFloat(String(a.score ?? ""))).filter(Number.isFinite);
+  const active = applications.filter((a) => ACTIVE.has(canonStatus(a.status))).length;
+  const average = scores.length ? [`average score ${(scores.reduce((sum, n) => sum + n, 0) / scores.length).toFixed(1)}`] : [];
+  return [`${applications.length} tracked`, ...average, `${active} active application${active === 1 ? "" : "s"}`].join(" · ");
+}
 
 /** A rate that cannot be computed is absent, never 0. */
 const NO_RATE = null;

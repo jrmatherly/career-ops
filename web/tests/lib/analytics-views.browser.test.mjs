@@ -10,7 +10,7 @@ import { liveServerSkip } from "../helpers/live-server.mjs";
 const url = process.env.ANALYTICS_TEST_URL;
 const root = process.env.ANALYTICS_TEST_ROOT;
 
-test("Analytics rebase retains Progress, Search stats and core Insights", {
+test("Analytics rebase retains Progress, Scan stats and core Insights", {
   skip: liveServerSkip("ANALYTICS_TEST_URL", "ANALYTICS_TEST_ROOT"),
   timeout: 120_000,
 }, async (t) => {
@@ -36,7 +36,7 @@ test("Analytics rebase retains Progress, Search stats and core Insights", {
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { name: "Pipeline progress", exact: true }).waitFor();
       await page.getByRole("heading", { name: "Conversion", exact: true }).waitFor();
-      assert.equal(await nav.getByRole("link", { name: "Search progress", exact: true }).getAttribute("aria-current"), "page");
+      assert.equal(await nav.getByRole("link", { name: "Progress", exact: true }).getAttribute("aria-current"), "page");
       assert.deepEqual(await nav.getByRole("link").evaluateAll(links => links.map(link => link.getAttribute("href"))),
         ["/analytics", "/analytics?view=insights", "/analytics?view=search-stats"]);
     });
@@ -62,11 +62,11 @@ test("Analytics rebase retains Progress, Search stats and core Insights", {
       assert.ok(Math.abs(parseFloat(row.width) - (Number(row.count) / tracked) * 100) < 0.01, JSON.stringify(row));
     }
   });
-  await t.test("Search stats still renders and links to core Insights", async () => {
+  await t.test("Scan stats still renders and links to core Insights", async () => {
     const response = await page.goto(`${origin.origin}/analytics?view=search-stats&tab=progress`);
     assert.equal(response.status(), 200);
     await page.getByRole("heading", { name: "Strategic insights", exact: true }).waitFor();
-    assert.equal(await nav.getByRole("link", { name: "Search stats", exact: true }).getAttribute("aria-current"), "page");
+    assert.equal(await nav.getByRole("link", { name: "Scan stats", exact: true }).getAttribute("aria-current"), "page");
     assert.equal(await nav.getByRole("link", { name: "Insights", exact: true }).getAttribute("href"), "/analytics?view=insights");
     assert.equal(await page.getByRole("heading", { name: "Pipeline progress", exact: true }).count(), 0);
   });
@@ -87,10 +87,10 @@ test("Analytics rebase retains Progress, Search stats and core Insights", {
     page.off("request", track);
   });
   await t.test("view links navigate between all three panels using one query contract", async () => {
-    await nav.getByRole("link", { name: "Search stats", exact: true }).click();
+    await nav.getByRole("link", { name: "Scan stats", exact: true }).click();
     await page.getByRole("heading", { name: "Strategic insights", exact: true }).waitFor();
     assert.equal(new URL(page.url()).search, "?view=search-stats");
-    await nav.getByRole("link", { name: "Search progress", exact: true }).click();
+    await nav.getByRole("link", { name: "Progress", exact: true }).click();
     await page.getByRole("heading", { name: "Pipeline progress", exact: true }).waitFor();
     assert.equal(new URL(page.url()).search, "");
     await nav.getByRole("link", { name: "Insights", exact: true }).click();

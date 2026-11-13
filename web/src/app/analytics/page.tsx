@@ -5,6 +5,7 @@ import { cumulativeProgressWithHistory } from "@/lib/funnel-tiles.mjs";
 import { analyticsApplications } from "@/lib/analytics-data";
 import { computeProgressMetrics, computeStatsMetrics, generateInsights, resolveAnalyticsView } from "@/lib/analytics-metrics.mjs";
 import { AnalyticsShell, ProgressPanel, StatsPanel } from "@/components/analytics-view";
+import { analyticsSummary } from "@/lib/analytics/view-model.mjs";
 import { FunnelRates } from "@/components/analytics/funnel-rates";
 import { SearchInsights } from "@/components/analytics/search-insights";
 
@@ -17,10 +18,10 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
   // the inbox, and no analytics view reads the inbox.
   const applications = readApplications();
   // One URL contract for all three views. Each view owns its reads, as on main:
-  // an incomplete Progress core install must not take Insights/Search stats down.
+  // an incomplete Progress core install must not take Insights/Scan stats down.
   const view = resolveAnalyticsView(params.view);
   return (
-    <AnalyticsShell total={applications.length} view={view}>
+    <AnalyticsShell summary={analyticsSummary(applications)} view={view}>
       {view === "insights" ? <SearchInsights /> : view === "search-stats" ? <SearchStatsView applications={applications} /> : <ProgressView applications={applications} />}
     </AnalyticsShell>
   );

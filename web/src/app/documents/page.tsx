@@ -57,7 +57,7 @@ export default function DocumentsPage() {
   }, [refetch]);
 
 
-  const header = <PageHeader title="Documents" description="Browse your generated CVs and cover letters." />;
+  const header = <PageHeader title="Documents" description="Tailored CVs and cover letters." />;
 
   if (loading) {
     return (

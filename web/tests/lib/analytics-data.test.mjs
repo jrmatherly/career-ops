@@ -47,7 +47,7 @@ test("report prose cannot become location or cross-currency compensation", () =>
   assert.equal(enriched.paySource, "");
 });
 
-test("Search stats evidence comes from notes, not plausible report location/pay/work mode", () => {
+test("Scan stats evidence comes from notes, not plausible report location/pay/work mode", () => {
   const report = "**Location:** Austin, TX\n**Remote:** On-site\n**Comp:** USD 180K\n**Archetype:** AI Engineer";
   const enriched = enrichAnalyticsApplication(application(""), report);
   assert.equal(enriched.archetype, "AI Engineer");
