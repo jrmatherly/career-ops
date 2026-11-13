@@ -12,8 +12,8 @@
  *
  * Exit codes: 0 ok, 1 any other error, 2 import refused (nothing written),
  * 3 the lossless gate failed (nothing written), 4 save with a stale
- * --expected-cv-sha or --expected-resume-sha, or adopt or import after cv.md or
- * data/resume.json changed while it waited for the lock (nothing written). check is
+ * --expected-cv-sha or --expected-resume-sha, or adopt or import when cv.md or
+ * data/resume.json changed after the command read them (nothing written). check is
  * advisory: it exits 0 whatever it finds, and 3 only while the absorb gate
  * fails, like export.
  */

@@ -93,6 +93,53 @@ test('the DOCX keeps the order', async () => {
 test('paragraphs listed out of order, or with a position that is not a count, still land where before says', () => {
   const runs = bodyRuns({ bullets: ['A', '', 'B'], paragraphs: [{ text: 'Later', before: 3 }, { text: 'Earlier', before: 1 }, { text: 'First', before: 'x' }, null, { before: 1 }] });
   assert.deepEqual(runs, [{ text: 'First' }, { bullets: ['A'] }, { text: 'Earlier' }, { bullets: ['B'] }, { text: 'Later' }]);
+  assert.deepEqual(bodyRuns({ bullets: ['A', 'B'], paragraphs: [{ text: 'End', before: 99 }, { text: 'Start', before: -2 }] }), [{ text: 'Start' }, { bullets: ['A', 'B'] }, { text: 'End' }]);
   assert.deepEqual(bodyRuns({ bullets: ['A'] }), [{ bullets: ['A'] }]);
   assert.deepEqual(bodyRuns({}), []);
+});
+
+test('a malformed paragraphs value is a payload error, not a silently shorter CV', () => {
+  const base = { company: 'Orderly Co', role: 'Engineer', bullets: ['A'] };
+  const errorsFor = (paragraphs) => validatePayload({ experience: [{ ...base, paragraphs }] }, 'html').errors;
+  for (const bad of [['a note'], [{ text: 'a note', before: '1' }], [{ text: '', before: 1 }], [{ before: 1 }], 'a note', [null]]) {
+    assert.match(errorsFor(bad).join('\n'), /experience\[0\]: paragraphs must be an array/, JSON.stringify(bad));
+  }
+  assert.deepEqual(errorsFor([{ text: 'a note', before: 1 }]), []);
+  assert.deepEqual(errorsFor([]), []);
+});
+
+test('a following paragraph is escaped, a role of a multi-role entry carries one, and the markdown output keeps the order', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'resume-paragraph-md-'));
+  try {
+    const data = parseResume(JSON.parse(readFileSync(repo('tests/fixtures/resume/sample.json'), 'utf8'))).data;
+    const item = data.sections.experience.items.find((i) => i.roles?.length);
+    item.roles[0].description = '<ul><li>Role bullet</li></ul><p>R&amp;D with &lt;partners&gt;.</p>';
+    const { payload } = resumeToPayload(data);
+    const entry = payload.experience.find((e) => e.company === item.company && e.role === item.roles[0].position);
+    assert.deepEqual(entry.paragraphs, [{ text: 'R&D with <partners>.', before: 1 }]);
+    const html = render(payload, dir, 'escaped', repo('templates/cv-template.html'));
+    assert.ok(html.includes('<li class="job-note" style="list-style: none">R&amp;D with &lt;partners&gt;.</li>'));
+
+    const input = join(dir, 'mixed.json');
+    const output = join(dir, 'mixed.md');
+    writeFileSync(input, JSON.stringify(payloadFor(MIXED).payload));
+    execFileSync(process.execPath, [repo('build-cv-html.mjs'), input, '--markdown', output], { stdio: 'pipe' });
+    assertOrder(readFileSync(output, 'utf8'), 'markdown');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a payload without paragraphs renders as it did before the field existed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'resume-paragraph-same-'));
+  try {
+    const { payload } = payloadFor(MIXED);
+    const without = JSON.parse(JSON.stringify(payload, (k, v) => (k === 'paragraphs' ? undefined : v)));
+    for (const [label, template] of [['partials', repo('templates/cv-template.html')], ['compact', repo('templates/cv-template.compact.html')]]) {
+      const withNotes = render(payload, dir, `with-${label}`, template).replace(/\n\s*<li class="job-note"[^>]*>[^<]*<\/li>/g, '');
+      assert.equal(withNotes, render(without, dir, `without-${label}`, template), label);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

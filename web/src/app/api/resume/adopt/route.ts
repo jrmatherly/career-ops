@@ -39,7 +39,7 @@ async function adopt(req: Request): Promise<Response> {
   const r = await runCoreCli("resume", ["adopt", "--confirm"]);
   // Exit 0 means cv.md was replaced; the message only names the backup.
   if (r.code === 0) return Response.json({ ok: true, message: r.stdout.split("\n").find((l) => l.startsWith("cv.md replaced")) ?? "cv.md replaced" });
-  // Exit 4: a save landed while adopt waited on the resume lock, and nothing was written.
+  // Exit 4: cv.md or data/resume.json changed after adopt read them, and nothing was written.
   if (r.code === 4) return Response.json({ error: "cv.md or data/resume.json changed while adopt ran; review the new diff before adopting" }, { status: 409 });
   return usageResponse(r) ?? failure(r, "adopt", ". cv.md may have changed: reload before trying again.");
 }

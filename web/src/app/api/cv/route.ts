@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // under the lock, so a structured save cannot land between them and be overwritten.
     return await withResumeLock(careerOpsRoot(), () => writeCv(body));
   } catch (err) {
-    console.error("cv save: could not take the resume lock", err);
+    console.error("cv save failed before the write", err);
     if ((err as { code?: string }).code !== "LOCK_TIMEOUT") return NextResponse.json({ error: "write failed" }, { status: 500 });
     return NextResponse.json({ error: "cv.md is being saved somewhere else. Your text is still in this tab; try again." }, { status: 503 });
   }

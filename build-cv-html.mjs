@@ -476,9 +476,10 @@ function withResumePath(html, path) {
   return html.replace(/<[a-zA-Z][\w-]*/, tag => `${tag} data-resume-path="${escapeHtml(path)}"`);
 }
 
-// The entry's list items in cv.md order. A paragraph that follows a bullet is an item with no
-// marker, so it takes the list's type and spacing in every template and pack, and needs no slot
-// of its own (a second block after the list would not: .job-context floats in the compact template).
+// The entry's list items in cv.md order. A paragraph that follows a bullet is an item with its
+// native marker turned off, so it takes the list's font and spacing and needs no slot of its own
+// (a second block after the list would not: .job-context floats in the compact template).
+// A pack that draws its bullets with li::before must hide it on .job-note.
 function experienceItems(e) {
   return bodyRuns(e).flatMap(run => (run.text
     ? [`<li class="job-note" style="list-style: none">${escapeHtml(run.text)}</li>`]
