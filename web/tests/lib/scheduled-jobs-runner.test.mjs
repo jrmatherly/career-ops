@@ -994,6 +994,13 @@ test("executeJob reports a scanner timeout as a timeout and does not retry it", 
     assert.equal(timedOut.state, "failed");
     assert.equal(timedOut.attempt, 1);
     assert.equal(timedOut.message, `Scanner timed out after ${SCAN_TIMEOUT_MS / 60_000} minutes.`);
+    // The full sweep catches SIGTERM and exits 0, and what it prints then arrives too late to be read.
+    const exitedClean = executeJob(temp, job, {
+      spawnFn: () => ({ status: 0, signal: null, stdout: "", stderr: FULL_SCAN_PROGRESS, error: Object.assign(new Error("spawnSync /usr/bin/node ETIMEDOUT"), { code: "ETIMEDOUT" }) }),
+    });
+    assert.equal(exitedClean.state, "failed");
+    assert.equal(exitedClean.message, timedOut.message);
+    assert.equal("counts" in exitedClean, false);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -1546,9 +1553,6 @@ test("a full sweep's drop counts are read from its JSON, zeros included", () => 
   assert.deepEqual(extractScanCounts("full", "not json"), {});
   assert.deepEqual(extractScanCounts("full", "null"), {});
   assert.deepEqual(extractScanCounts("portals", stdout), {});
-  // A sweep the runner's timeout stopped still exits 0, with counts for the boards it reached.
-  assert.deepEqual(extractScanCounts("full", JSON.stringify({ stoppedEarly: true, postingsKept: 2, postingsDroppedTier: 4, postingsDroppedSalary: 0 })), { droppedTier: 4, droppedSalary: 0, stoppedEarly: true });
-  assert.equal("stoppedEarly" in extractScanCounts("full", JSON.stringify({ stoppedEarly: false, postingsDroppedTier: 4 })), false);
 });
 
 test("a recorded run keeps its drop counts through the store, and a failed run has none", async () => {

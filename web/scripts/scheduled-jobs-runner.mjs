@@ -158,14 +158,12 @@ function readScanResult(engine, stdout) {
   if (!result || typeof result !== "object") return { rolesFound: 0, counts: {} };
   // A zero is kept, since the scan stated it. Only a missing or non-numeric count is left out.
   const counts = Object.fromEntries(SCAN_COUNTS.filter(([, printed]) => Number.isFinite(result[printed])).map(([key, printed]) => [key, result[printed]]));
-  // A sweep the timeout stops still exits 0, with counts for the boards it reached.
-  if (result.stoppedEarly === true) counts.stoppedEarly = true;
   return { rolesFound: Number.isFinite(Number(result.postingsKept)) ? Number(result.postingsKept) : 0, counts };
 }
 
 export const extractRolesFound = (engine, stdout) => readScanResult(engine, stdout).rolesFound;
 
-/** @returns {{ droppedTier?: number, droppedSalary?: number, droppedContent?: number, stoppedEarly?: true }} */
+/** @returns {{ droppedTier?: number, droppedSalary?: number, droppedContent?: number }} */
 export const extractScanCounts = (engine, stdout) => readScanResult(engine, stdout).counts;
 
 function portalsPath(root, env = process.env) {
@@ -295,7 +293,8 @@ export function executeJob(root, job, options = {}) {
         },
       );
 
-      if (result.status === 0) {
+      // A sweep that catches the timeout's SIGTERM still exits 0, without the result it prints on the way out.
+      if (result.status === 0 && result.error?.code !== "ETIMEDOUT") {
         const { rolesFound, counts } = readScanResult(job.engine || "full", result.stdout || "");
         return {
           state: "success",
