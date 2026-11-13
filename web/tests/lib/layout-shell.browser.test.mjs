@@ -1,5 +1,5 @@
 // Opt-in real Chrome regression: start the local web server against the
-// fictional pipeline-status fixture, then
+// fictional layout-shell fixture, then
 // LAYOUT_SHELL_TEST_URL=http://127.0.0.1:3000 node --test this-file.mjs.
 // Every mutating API is intercepted; no CLI or real data write is invoked.
 import assert from "node:assert/strict";
@@ -12,8 +12,25 @@ import { fileURLToPath } from "node:url";
 import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
-// /pipeline opens on the inbox, which this fixture leaves empty; ?tab=ALL is the tracker table.
+// /pipeline opens on the inbox; ?tab=ALL is the tracker table.
 const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab=ALL", "/followups", "/portals", "/analytics", "/cv", "/cv?tab=edit", "/documents", "/config", "/board", "/shares"];
+
+// Controls only data renders. A fixture that stops rendering one fails here, not silently on size.
+// Each row is a label, a selector inside main, and the text the control starts with.
+const RENDERS = {
+  "/explore": [["a chip remove button", 'button[aria-label^="Remove "]']],
+  "/pipeline": [
+    ["the inbox Select all button", "button", "Select all "],
+    ["the inbox restore button", "button", "1 hidden"],
+  ],
+  "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
+  "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
+  "/portals": [["the Board type filter", 'select[aria-label="Board type"]']],
+  "/": [
+    ["the follow-ups See all link", 'a[href="/followups"]', "See all "],
+    ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', "See all "],
+  ],
+};
 
 const url = process.env.LAYOUT_SHELL_TEST_URL;
 test("every page sits in one shell under one header, with readable text and reachable targets", { skip: liveServerSkip("LAYOUT_SHELL_TEST_URL"), timeout: 300_000 }, async (t) => {
@@ -29,6 +46,8 @@ test("every page sits in one shell under one header, with readable text and reac
     unexpected.push(route.request().url());
     return route.abort();
   });
+  // The inbox keeps its hidden rows in the browser; one hidden row renders the restore button.
+  await page.addInitScript(() => localStorage.setItem("career-ops:hidden", JSON.stringify(["https://example.com/inbox-alpha"])));
   await page.route("**/api/version", (route) => route.fulfill({ json: { version: "0.0.0-fixture", channel: "alpha", sha: "f1x7ure" } }));
 
   async function open(route) {
@@ -38,7 +57,7 @@ test("every page sits in one shell under one header, with readable text and reac
     await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   }
 
-  const measure = () => page.evaluate(() => {
+  const measure = (renders = []) => page.evaluate((renders) => {
     const main = document.querySelector("main");
     const mainBox = main.getBoundingClientRect();
     const label = (el) => `<${el.tagName.toLowerCase()}> "${(el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 40)}"`;
@@ -55,10 +74,11 @@ test("every page sits in one shell under one header, with readable text and reac
       .filter((el) => shown(el) && !el.closest("[aria-hidden=true]") && [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim()))
       .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
       .map((el) => `${label(el)} ${getComputedStyle(el).fontSize}`);
-    const smallTargets = [...main.querySelectorAll("input[type=checkbox], button, a")]
+    const targets = [...main.querySelectorAll("input[type=checkbox], button, a, select")]
       .filter(shown)
       // WCAG 2.5.8 exempts a link in a sentence, whose height is its line's.
-      .filter((el) => !(el.tagName === "A" && getComputedStyle(el).display === "inline"))
+      .filter((el) => !(el.tagName === "A" && getComputedStyle(el).display === "inline"));
+    const smallTargets = targets
       .map((el) => ({ el, box: el.getBoundingClientRect() }))
       .filter(({ box }) => box.width < 24 || box.height < 24)
       .map(({ el, box }) => `${label(el)} ${Math.round(box.width)}x${Math.round(box.height)}`);
@@ -75,12 +95,28 @@ test("every page sits in one shell under one header, with readable text and reac
       lastPad: parseFloat(getComputedStyle(main.lastElementChild).paddingBottom),
       smallText: [...new Set(smallText)],
       smallTargets: [...new Set(smallTargets)],
+      // Counted among the measured targets, so a hidden or inline match is not a pass.
+      rendered: renders.map(([, selector, starts = ""]) => targets.filter((el) => el.matches(selector) && el.textContent.trim().startsWith(starts)).length),
+      chipHeights: [...main.querySelectorAll(".co-fb__chip")].map((el) => el.getBoundingClientRect().height),
     };
-  });
+  }, renders);
 
   for (const route of ROUTES) {
     await open(route);
-    const m = await measure();
+    const renders = RENDERS[route] ?? [];
+    // A control that data renders arrives after hydration.
+    for (const [, selector, starts = ""] of renders) await page.locator(`main ${selector}`).filter({ hasText: starts }).first().waitFor({ timeout: 10_000 }).catch(() => {});
+    const m = await measure(renders);
+    for (const [i, [label]] of renders.entries()) {
+      await t.test(`${route}: renders ${label}`, () => {
+        assert.ok(m.rendered[i] > 0, `${label} did not render, so its size was not checked`);
+      });
+    }
+    if (route === "/explore") {
+      await t.test("/explore: a chip's remove button does not make the chip taller than 24px", () => {
+        assert.ok(m.chipHeights.length > 0 && m.chipHeights.every((h) => h <= 24), `chip heights ${m.chipHeights}`);
+      });
+    }
     await t.test(`${route}: one page header`, () => {
       assert.equal(m.h1Count, 1, `${m.h1Count} h1 elements inside main`);
       assert.equal(m.fontSize, "30px", `h1 "${m.h1Text}"`);
@@ -99,10 +135,20 @@ test("every page sits in one shell under one header, with readable text and reac
     await t.test(`${route}: no text under 12px`, () => {
       assert.deepEqual(m.smallText, []);
     });
-    await t.test(`${route}: every checkbox, button and link is at least 24px both ways`, () => {
+    await t.test(`${route}: every checkbox, button, link and select is at least 24px both ways`, () => {
       assert.deepEqual(m.smallTargets, []);
     });
   }
+
+  await t.test("/portals: the Board type filter narrows the list to that board", async () => {
+    await open("/portals");
+    const rows = page.locator('main [role="switch"]');
+    assert.equal(await rows.count(), 2);
+    await page.getByLabel("Board type").selectOption("Fixtureboard");
+    assert.deepEqual(await rows.evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))), ["Scan Fixture Beta"]);
+    await page.getByLabel("Board type").selectOption("");
+    assert.equal(await rows.count(), 2);
+  });
 
   // Visible headings in main, in document order, never skip a level; the rendered CV is checked in its own document.
   const headingLevels = (scope) => scope.evaluate((root) =>

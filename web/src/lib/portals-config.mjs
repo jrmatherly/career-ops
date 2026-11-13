@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import * as yaml from "js-yaml";
+import { boardType } from "./portals-view-model.mjs";
 
 /**
  * A configuration error that lets the route distinguish a broken user-layer
@@ -300,7 +301,7 @@ export function setCompanyEnabledText(source, name, enabled) {
 }
 
 /**
- * @typedef {{ name: string, enabled: boolean, host: string }} WatchedCompany
+ * @typedef {{ name: string, enabled: boolean, host: string, board: string }} WatchedCompany
  */
 
 /**
@@ -322,6 +323,6 @@ export function watchedCompanies(doc) {
   return list
     .filter((c) => isMapping(c) && typeof c.name === "string" && c.name.trim())
     // The exact name: the Portals switch sends it back, and "Acme " is not "Acme".
-    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api) }))
+    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api), board: boardType(c) }))
     .sort((a, b) => Number(b.enabled) - Number(a.enabled));
 }

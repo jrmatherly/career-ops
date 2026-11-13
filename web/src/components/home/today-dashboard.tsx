@@ -232,7 +232,7 @@ export function TodayDashboard({
             ))}
           </div>
           {followupRest.hidden > 0 && (
-            <Link href="/followups" className="mt-3 inline-flex items-center text-sm text-muted transition hover:text-brand-text max-sm:min-h-[44px]">
+            <Link href="/followups" className="mt-3 inline-flex min-h-6 items-center text-sm text-muted transition hover:text-brand-text max-sm:min-h-[44px]">
               See all {followupRest.total} {followupRest.total === 1 ? "follow-up" : "follow-ups"}
             </Link>
           )}
@@ -306,7 +306,7 @@ export function TodayDashboard({
             ))}
           </div>
           {fresh.length > 6 && (
-            <Link href="/explore?view=fresh" className="mt-3 inline-flex items-center text-sm text-muted transition hover:text-brand-text max-sm:min-h-[44px]">
+            <Link href="/explore?view=fresh" className="mt-3 inline-flex min-h-6 items-center text-sm text-muted transition hover:text-brand-text max-sm:min-h-[44px]">
               See all {freshCount} →
             </Link>
           )}

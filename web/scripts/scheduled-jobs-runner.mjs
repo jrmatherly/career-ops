@@ -136,18 +136,35 @@ export function buildScanCommand(job) {
   };
 }
 
-export function extractRolesFound(engine, stdout) {
-  if (engine === "full") {
-    try {
-      const result = JSON.parse(stdout);
-      return Number.isFinite(Number(result.postingsKept)) ? Number(result.postingsKept) : 0;
-    } catch {
-      return 0;
-    }
+// [key on the run, key in the scan-ats-full.mjs --json output]
+const SCAN_COUNTS = [
+  ["droppedTier", "postingsDroppedTier"],
+  ["droppedSalary", "postingsDroppedSalary"],
+  ["droppedContent", "postingsDroppedContent"],
+];
+
+/** What a finished scan printed: the roles it kept, and for a full sweep each drop count it stated. */
+function readScanResult(engine, stdout) {
+  if (engine !== "full") {
+    const match = stdout.match(/New offers added:\s*(\d+)/i);
+    return { rolesFound: match ? Number(match[1]) : 0, counts: {} };
   }
-  const match = stdout.match(/New offers added:\s*(\d+)/i);
-  return match ? Number(match[1]) : 0;
+  let result;
+  try {
+    result = JSON.parse(stdout);
+  } catch {
+    result = null;
+  }
+  if (!result || typeof result !== "object") return { rolesFound: 0, counts: {} };
+  // A zero is kept, since the scan stated it. Only a missing or non-numeric count is left out.
+  const counts = Object.fromEntries(SCAN_COUNTS.filter(([, printed]) => Number.isFinite(result[printed])).map(([key, printed]) => [key, result[printed]]));
+  return { rolesFound: Number.isFinite(Number(result.postingsKept)) ? Number(result.postingsKept) : 0, counts };
 }
+
+export const extractRolesFound = (engine, stdout) => readScanResult(engine, stdout).rolesFound;
+
+/** @returns {{ droppedTier?: number, droppedSalary?: number, droppedContent?: number }} */
+export const extractScanCounts = (engine, stdout) => readScanResult(engine, stdout).counts;
 
 function portalsPath(root, env = process.env) {
   const override = env.CAREER_OPS_PORTALS?.trim();
@@ -276,12 +293,14 @@ export function executeJob(root, job, options = {}) {
         },
       );
 
-      if (result.status === 0) {
-        const rolesFound = extractRolesFound(job.engine || "full", result.stdout || "");
+      // A sweep that catches the timeout's SIGTERM still exits 0, without the result it prints on the way out.
+      if (result.status === 0 && result.error?.code !== "ETIMEDOUT") {
+        const { rolesFound, counts } = readScanResult(job.engine || "full", result.stdout || "");
         return {
           state: "success",
           attempt,
           rolesFound,
+          counts,
           durationMs: Date.now() - startedAt,
           message: `Scan finished with ${rolesFound} matching role${rolesFound === 1 ? "" : "s"}.`,
         };
@@ -331,8 +350,9 @@ export async function recordCompletion(storePath, claim, result, inMemoryStore =
     }
 
     const run = store.runs.find((item) => item.id === claim.runId && item.jobId === job.id);
-    if (run) Object.assign(run, { at, durationMs: result.durationMs, state: result.state, attempt: result.attempt, message: result.message, rolesFound: result.rolesFound, engine: job.engine || "full" });
-    else store.runs.unshift({ id: claim.runId || randomUUID(), jobId: job.id, at, durationMs: result.durationMs, state: result.state, attempt: result.attempt, message: result.message, rolesFound: result.rolesFound, engine: job.engine || "full" });
+    const outcome = { at, durationMs: result.durationMs, state: result.state, attempt: result.attempt, message: result.message, rolesFound: result.rolesFound, engine: job.engine || "full", ...result.counts };
+    if (run) Object.assign(run, outcome);
+    else store.runs.unshift({ id: claim.runId || randomUUID(), jobId: job.id, ...outcome });
     store.queue = store.queue.filter((item) => !(item.id === claim.queueId && item.claimToken === claim.claimToken));
     if (store.runs.length > MAX_RUNS) store.runs = store.runs.slice(0, MAX_RUNS);
   };

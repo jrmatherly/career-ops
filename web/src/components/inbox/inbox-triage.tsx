@@ -434,12 +434,12 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
           {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
         </p>
         {visible.some((e) => !selected.has(e.job.url)) && (
-          <button type="button" onClick={() => setSelected((s) => selectionWithAll(s, visible.map((e) => e.job.url)))} className="ml-auto text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
+          <button type="button" onClick={() => setSelected((s) => selectionWithAll(s, visible.map((e) => e.job.url)))} className="ml-auto inline-flex min-h-6 items-center text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
             Select all {visible.length}
           </button>
         )}
         {hiddenCount > 0 && (
-          <button type="button" onClick={() => void restoreHidden()} disabled={restoring} aria-busy={restoring} className="text-xs text-faint transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-[44px]">
+          <button type="button" onClick={() => void restoreHidden()} disabled={restoring} aria-busy={restoring} className="inline-flex min-h-6 items-center text-xs text-faint transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-[44px]">
             {hiddenCount} hidden · {restoring ? "restoring…" : "restore"}
           </button>
         )}

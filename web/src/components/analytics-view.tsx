@@ -30,8 +30,8 @@ type StatsMetrics = {
 
 const BAR_TONES = ["bg-brand", "bg-sky-400", "bg-emerald-400", "bg-yellow-300", "bg-orange-300", "bg-pink-400"];
 
-export function AnalyticsShell({ total, view, children }: {
-  total: number;
+export function AnalyticsShell({ summary, view, children }: {
+  summary: string;
   view: "progress" | "search-stats" | "insights";
   children: React.ReactNode;
 }) {
@@ -39,22 +39,18 @@ export function AnalyticsShell({ total, view, children }: {
     <PageFrame>
       <PageHeader
         title="Analytics"
-        description="A read on the roles you are pursuing, the funnel they move through, and the patterns worth acting on."
-        actions={<div className="flex items-center gap-2 text-xs text-faint">
-          <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-          <span className="tabular-nums">{total}</span> tracked evaluation{total === 1 ? "" : "s"}
-        </div>}
+        description={summary}
       />
 
       <nav aria-label="Analytics views" className="-mb-px flex gap-1 overflow-x-auto border-b border-border">
         <AnalyticsTab href="/analytics" active={view === "progress"} icon={<BarChart3 className="size-3.5" />}>
-          Search progress
+          Progress
         </AnalyticsTab>
         <AnalyticsTab href="/analytics?view=insights" active={view === "insights"} icon={<Sparkles className="size-3.5" />}>
           Insights
         </AnalyticsTab>
         <AnalyticsTab href="/analytics?view=search-stats" active={view === "search-stats"} icon={<Target className="size-3.5" />}>
-          Search stats
+          Scan stats
         </AnalyticsTab>
       </nav>
 

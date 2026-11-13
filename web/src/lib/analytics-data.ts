@@ -86,7 +86,7 @@ function reportArchetype(content: string, fallbackArchetype: string): string {
   return scalar(machine, "archetype_primary") || scalar(machine, "archetype") || archetypeTable || meta.fields.find((field) => field.label === "Archetype")?.value || fallbackArchetype;
 }
 
-/** Read-only Search stats display metadata, not a second lifecycle engine.
+/** Read-only Scan stats display metadata, not a second lifecycle engine.
  * Unlike the Go TUI's general-purpose note enrichment, these USD-only charts
  * require explicit work-mode evidence and must not guess on-site from a city.
  * Keep those reviewed evidence/unit boundaries here until the core exposes

@@ -31,7 +31,7 @@ function seed(root) {
   ].join("\n"));
 }
 
-test("Search stats reads the tracker and lists reports/ once for the whole page", { skip: skipTs }, () => {
+test("Scan stats reads the tracker and lists reports/ once for the whole page", { skip: skipTs }, () => {
   const root = mkdtempSync(join(tmpdir(), "co-analytics-lookup-once-"));
   const prevRoot = process.env.CAREER_OPS_ROOT;
   const { readFileSync, readdirSync } = fs;

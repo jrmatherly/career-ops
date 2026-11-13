@@ -48,7 +48,7 @@ export default function PortalsPage() {
     <PageFrame width="reading">
       <PageHeader
         title="Portals"
-        description="The companies career-ops watches for new roles. Run a health check to catch company boards that have quietly broken — a broken link means that company silently disappears from every future scan."
+        description="The company boards the daily scan reads."
       />
       <p className="text-xs text-faint">
         {deploymentMode().hosted ? (

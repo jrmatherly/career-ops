@@ -114,10 +114,18 @@ test("watchedCompanies lists scanned companies first, then paused ones, with the
     ],
   };
   assert.deepEqual(watchedCompanies(doc), [
-    { name: "Acme AI", enabled: true, host: "careers.acme.example" },
-    { name: "Initech", enabled: true, host: "boards-api.example.test" },
-    { name: "Globex", enabled: false, host: "jobs.example.test" },
+    { name: "Acme AI", enabled: true, host: "careers.acme.example", board: "Other" },
+    { name: "Initech", enabled: true, host: "boards-api.example.test", board: "Other" },
+    { name: "Globex", enabled: false, host: "jobs.example.test", board: "Other" },
   ]);
+  const boards = watchedCompanies({
+    tracked_companies: [
+      { name: "By host", careers_url: "https://jobs.lever.co/byhost" },
+      { name: "By api", careers_url: "https://byapi.example/careers", api: "https://boards-api.greenhouse.io/v1/boards/byapi/jobs" },
+      { name: "By provider", careers_url: "https://byprovider.example", provider: "smartrecruiters" },
+    ],
+  });
+  assert.deepEqual(boards.map((c) => c.board), ["Lever", "Greenhouse", "Smartrecruiters"]);
   assert.deepEqual(watchedCompanies({ title_filter: {} }), []);
 });
 

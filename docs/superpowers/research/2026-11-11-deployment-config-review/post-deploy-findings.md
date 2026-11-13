@@ -1,6 +1,6 @@
 # Post-deploy findings, career-ops 2.2.0
 
-Recorded 2026-11-13 after career-ops 2.2.0 and web 1.2.0 were deployed to `https://career.matherly.net` (home-cluster d021b6e). These are the items the release left open, for a follow-up session. None is fixed. Each says how it was found and where the code is.
+Recorded 2026-11-13 after career-ops 2.2.0 and web 1.2.0 were deployed to `https://career.matherly.net` (home-cluster d021b6e). These are the items the release left open. Each says how it was found and where the code is. The [Outcomes](#outcomes) section records what the follow-up branch did with each one.
 
 The plan is `docs/superpowers/plans/2026-11-11-deployment-config-review.md`. Its rules are a 12px floor for UI text and 24px in both dimensions for interactive targets (plan line 25).
 
@@ -27,7 +27,7 @@ Found on the live site. The local fixture could not show them, because it had no
 
 A1 is the clear miss: an icon-only target at half the minimum in both directions. A2 to A6 are text links or text buttons, wide enough and 16 to 20px tall. Whether an inline text link has to meet the 24px rule is a decision for the owner; WCAG 2.5.8 exempts a link inside a sentence, and the plan's rule does not.
 
-The browser suite that asserts the rule is `web/tests/lib/layout-shell.browser.test.mjs`. It passed on the release while the live site shows A1 to A5, because its fixture, `web/tests/fixtures/pipeline-status.mjs`, has three tracker rows and nothing else, so none of these controls renders (read on 2026-11-13). The suite already exempts a link inside a sentence, which covers A6.
+The browser suite that asserts the rule is `web/tests/lib/layout-shell.browser.test.mjs`. It passed on the release while the live site shows A1 to A5, because its fixture, `web/tests/fixtures/pipeline-status.mjs`, has three tracker rows and nothing else, so none of these controls renders. Run against a fixture that renders them (`web/tests/fixtures/layout-shell.mjs`), the unchanged suite failed on exactly A1 to A5 and on nothing else: the chip buttons at 12 by 12, "Select all" at 16 tall, and the PDF link, the Follow-ups company link and both "See all" links on Today at 20 tall. A4 shows only when the company name fits on one line; a name that wraps makes the link 40 tall. The suite already exempts a link inside a sentence, which covers A6.
 
 The fixes are planned in `docs/superpowers/plans/2026-11-13-post-deploy-follow-ups.md`, one branch and one PR. Its "Decisions already made" table records the owner's answers on A2 to A5, B2 and C2.
 
@@ -43,11 +43,11 @@ Found on the local run by comparing each page's headings, subtitle, tabs and but
 | B4 | Scheduled scans | buttons "Run log" and "New scan" | "Run Logs (N)" and "New Scheduled Scan" |
 | B5 | Settings | "Hosted at career.matherly.net. Your data is in /data on this server." | matches, read on the live site |
 
-Whether the plan's phase tasks included these copy changes was not checked against the task list. The plan's "Not in this plan" section lists moving Shares into Documents, which the mockup also shows, as out of scope.
+The parent plan says each page task follows the matching screen in `mockups.html`, so the copy differences are misses. Its Portals task never listed "Add company" or "Board type". The plan's "Not in this plan" section lists moving Shares into Documents, which the mockup also shows, as out of scope.
 
 ## C. Other things seen
 
-- **C1. Logo misses log console errors.** `/api/logo?company=…` answers 404 for a company with no logo (4 on the live inbox), by design (`web/src/app/api/logo/route.ts:19`). The row falls back to the monogram, and the browser logs one error per miss.
+- **C1. Logo misses log console errors.** `/api/logo?company=…` answered 404 in 2.2.0 for a company with no logo (4 on the live inbox), by design (`web/src/app/api/logo/route.ts`). The row falls back to the monogram, and the browser logs one error per miss.
 - **C2. The logo monogram is 8px, 10px on Today.** It sits behind the logo image and is `aria-hidden`, so it is not counted as text under 12px. It is what a sighted user sees when the logo is missing.
 - **C3. The Pipeline table scrolls sideways inside its box at 798px** (725px of table in 508px). The page itself does not overflow.
 - **C4. A manual scan holds the runner lock for its whole run.** During the 15-minute forced sweep, the 20:15Z scan tick logged `scheduled-jobs lock timeout: /data/data/scheduled-jobs.json.runner` and did nothing. Expected, but a tick is lost for every long manual run.
@@ -74,3 +74,25 @@ All older than this release.
 - `runCoreCli` kills `resume.mjs` at 30 seconds while the CLI waits 60 for the lock, so a stuck lock shows in the web as "timed out".
 - In the web adopt flow, a write between the route's check and the CLI's first read is adopted unseen.
 - "Resume" replacing "CV" in the web UI, about 110 visible strings in 45 files, is tabled by the owner.
+
+## Outcomes
+
+Recorded 2026-11-13 on the branch `fix/post-deploy-follow-ups`. "Fixed" means fixed on that branch, with a test. Nothing here is deployed until the next release.
+
+| Item | Outcome |
+|------|---------|
+| A1 | Fixed. The chip's remove button is 24 by 24 on desktop. The chip is 23.4 tall before and after. |
+| A2 to A5 | Fixed. Each control has a 24px minimum height. A5 was two links, the follow-ups and the fresh matches "See all", and both are fixed. |
+| A6 | Exempt. A link inside a sentence. |
+| The suite | Fixed. `layout-shell` runs on a fixture that renders these controls, fails when one stops rendering, and measures selects too. |
+| B1, B3, B4 | Fixed. The subtitles, tab names and buttons match the mockups. On Explore that is the scan-mode subtitle; the AI-search and employer subtitles have no mockup and are unchanged. The Analytics description states the tracked count, the average score and the active applications. |
+| B2, "Board type" | Fixed. Portals has a Board type filter. |
+| B2, "Add company" | Left by decision. It needs a write path into `portals.yml` and gets its own plan. |
+| C1 | Fixed. A logo miss answers 204. The monogram still shows, and the browser logs nothing. |
+| C2 | Left by decision. |
+| C3 | Left as built. The page itself does not overflow. |
+| C4 | Left. A tick that cannot take the runner lock still runs the rank and drain passes, and the job stays due. A manual run can hold the lock across several ticks. When the lock frees, the job runs once and its next run moves to the next future occurrence, so occurrences missed in between are not replayed. |
+| C5 | Fixed. A full sweep's run records `droppedTier`, `droppedSalary` and `droppedContent`. A sweep the runner's 25-minute timeout stops used to be stored as a success with 0 roles, because the sweep catches the signal and exits 0; it is now stored as failed with the timeout message. |
+| C6 | Left. The writer that made cells starting with "; " was fixed in PR 72, and the eight rows were repaired by hand. D3 checks it on the next evaluation. |
+| D1 to D7 | Open. Each needs an event or the owner's go; the plan's "After the merge" table names the trigger. D2 is read from `droppedSalary` on the next sweep's run once C5 is deployed. |
+| E | Unchanged. |

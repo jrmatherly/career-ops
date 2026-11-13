@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { careerOpsRoot } from "@/lib/career-ops";
@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 // Each key is fetched until Google answers for it, then served from
 // .career-ops-web/logo-cache forever (a hit, or an empty sentinel for a known
 // miss). A lookup that failed (timeout, offline, 429, 5xx) is not an answer and
-// is not cached. On any miss → 404 so the client's <img onError> falls back to
-// the offline monogram. Because the cache is
+// is not cached. Any miss answers 204, not 404: the client's <img onError> falls
+// back to the offline monogram, and the browser logs no failed request. Because the cache is
 // keyed by company, once a company's logo resolves it's instant for that card AND
 // every other card (this search or any future one), forever. "Forever" is why
 // company keys are versioned — see lib/core/logo-cache-key.
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     if (!companyKey) return new Response("bad company", { status: 400 });
     key = companyKey;
     candidates = companyDomains(company, companyDomain);
-    if (candidates.length === 0) return new Response("no logo", { status: 404 });
+    if (candidates.length === 0) return new Response(null, { status: 204 });
   } else {
     return new Response("need domain or company", { status: 400 });
   }
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     if (buf.byteLength > 0) {
       return new Response(new Uint8Array(buf), { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800" } });
     }
-    return new Response("no logo", { status: 404 });
+    return new Response(null, { status: 204 });
   } catch {
     /* not cached yet → resolve below */
   }
@@ -74,6 +74,6 @@ export async function GET(req: NextRequest) {
   const result = await resolveLogo(candidates);
   await cacheLogoResult(file, result);
 
-  if (result.kind !== "hit") return new Response("no logo", { status: 404 });
+  if (result.kind !== "hit") return new Response(null, { status: 204 });
   return new Response(result.bytes, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=604800" } });
 }

@@ -25,6 +25,7 @@ html.dark .co-fb__chip.inc{color:hsl(26 86% 70%);background:hsl(26 80% 55% / .14
 .co-fb__field{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;min-height:2.6rem;padding:.45rem .55rem;border-radius:.7rem}
 .co-fb__field input{flex:1;min-width:7rem;background:transparent;border:none;outline:none;font-size:13.5px;color:inherit}
 .co-fb__field input::placeholder{color:var(--co-faint,hsl(0 0% 60%))}
+@media (min-width:640px){.co-fb__chip button{min-width:24px;min-height:24px;align-items:center;justify-content:center;margin:-6px}}
 @media (max-width:639px){.co-fb__chip button{min-width:44px;min-height:44px;justify-content:center}.co-fb__chip{min-height:44px}.co-fb__field{min-height:44px}.co-fb__field input{min-height:32px}}
 `;
 

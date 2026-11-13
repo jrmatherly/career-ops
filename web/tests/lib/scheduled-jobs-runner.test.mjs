@@ -23,6 +23,7 @@ import {
   enqueueDueJobs,
   executeJob,
   extractRolesFound,
+  extractScanCounts,
   main as runnerTick,
   MAX_ATTEMPTS,
   MAX_RUNS,
@@ -136,10 +137,11 @@ test("scheduled overlay falls back to portal title keywords and preserves hard l
         assert.equal(options.env.CAREER_OPS_ROOT, temp);
         assert.ok(fs.existsSync(path.join(options.cwd, "scan.mjs")));
         overlay = yaml.load(fs.readFileSync(options.env.CAREER_OPS_PORTALS, "utf8"));
-        return { status: 0, stdout: JSON.stringify({ postingsKept: 0 }), stderr: "" };
+        return { status: 0, stdout: JSON.stringify({ postingsKept: 0, postingsDroppedSalary: 5 }), stderr: "" };
       },
     });
     assert.equal(result.state, "success");
+    assert.deepEqual(result.counts, { droppedSalary: 5 });
     assert.deepEqual(overlay.title_filter.positive, ["engineer"]);
     assert.deepEqual(overlay.title_filter_full.positive, ["architect"], "an empty job list leaves the file's full-title list alone");
     assert.deepEqual(overlay.location_filter.block_hard, ["Brazil"]);
@@ -992,6 +994,13 @@ test("executeJob reports a scanner timeout as a timeout and does not retry it", 
     assert.equal(timedOut.state, "failed");
     assert.equal(timedOut.attempt, 1);
     assert.equal(timedOut.message, `Scanner timed out after ${SCAN_TIMEOUT_MS / 60_000} minutes.`);
+    // The full sweep catches SIGTERM and exits 0, and what it prints then arrives too late to be read.
+    const exitedClean = executeJob(temp, job, {
+      spawnFn: () => ({ status: 0, signal: null, stdout: "", stderr: FULL_SCAN_PROGRESS, error: Object.assign(new Error("spawnSync /usr/bin/node ETIMEDOUT"), { code: "ETIMEDOUT" }) }),
+    });
+    assert.equal(exitedClean.state, "failed");
+    assert.equal(exitedClean.message, timedOut.message);
+    assert.equal("counts" in exitedClean, false);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
@@ -1534,4 +1543,38 @@ test("a failing drain or a drain lock held elsewhere goes to stderr and the tick
     assert.equal(ran, false);
     assert.match(held.stderr, /another runner is draining/);
   });
+});
+
+test("a full sweep's drop counts are read from its JSON, zeros included", () => {
+  const stdout = JSON.stringify({ postingsKept: 7, postingsDroppedTier: 12, postingsDroppedSalary: 0, postingsDroppedContent: 3 });
+  assert.deepEqual(extractScanCounts("full", stdout), { droppedTier: 12, droppedSalary: 0, droppedContent: 3 });
+  assert.equal(extractRolesFound("full", stdout), 7);
+  assert.deepEqual(extractScanCounts("full", JSON.stringify({ postingsKept: 7, postingsDroppedTier: "many", postingsDroppedSalary: null })), {});
+  assert.deepEqual(extractScanCounts("full", "not json"), {});
+  assert.deepEqual(extractScanCounts("full", "null"), {});
+  assert.deepEqual(extractScanCounts("portals", stdout), {});
+});
+
+test("a recorded run keeps its drop counts through the store, and a failed run has none", async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-scheduled-counts-"));
+  const storePath = path.join(temp, "scheduled-jobs.json");
+  const jobId = "22222222-2222-4222-8222-222222222222";
+  const now = Date.parse("2026-08-08T12:00:00.000Z");
+  const keys = ["droppedTier", "droppedSalary", "droppedContent"];
+  try {
+    await withScheduledStore(storePath, (store) => {
+      store.jobs.push({ id: jobId, name: "Counts", status: "active", engine: "full", filters: {}, timezone: "UTC", startAt: new Date(now).toISOString(), every: 1, unit: "hours", createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() });
+    });
+    const claim = await withScheduledStore(storePath, (store) => claimManualJob(store, jobId, now));
+    await recordCompletion(storePath, claim, { state: "success", attempt: 1, rolesFound: 7, durationMs: 1, message: "ok", counts: { droppedTier: 12, droppedSalary: 0, droppedContent: 3 } });
+    const kept = readScheduledStore(storePath).runs[0];
+    assert.deepEqual(keys.map((k) => kept[k]), [12, 0, 3]);
+    const failed = await withScheduledStore(storePath, (store) => claimManualJob(store, jobId, now + 60_000));
+    await recordCompletion(storePath, failed, { state: "failed", attempt: 2, rolesFound: 0, durationMs: 1, message: "boom" });
+    const run = readScheduledStore(storePath).runs[0];
+    assert.equal(run.state, "failed");
+    assert.deepEqual(keys.filter((k) => k in run), []);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

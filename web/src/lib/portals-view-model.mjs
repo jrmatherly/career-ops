@@ -1,8 +1,47 @@
 // Imported by the client view too, so no node: imports here.
 
-/** @typedef {{ name: string, enabled: boolean, host: string }} WatchedCompany */
+/** @typedef {{ name: string, enabled: boolean, host: string, board: string }} WatchedCompany */
 /** @typedef {{ status: string, detail: string }} PortalHealth */
 /** @typedef {'scanned' | 'paused' | 'attention'} PortalTab */
+
+const BOARD_HOSTS = [
+  ["greenhouse.io", "Greenhouse"],
+  ["lever.co", "Lever"],
+  ["ashbyhq.com", "Ashby"],
+  ["myworkdayjobs.com", "Workday"],
+  ["workable.com", "Workable"],
+];
+const OTHER_BOARD = "Other";
+
+/** @param {unknown} url */
+function boardOfUrl(url) {
+  let host;
+  try {
+    host = new URL(String(url)).hostname.toLowerCase();
+  } catch {
+    return undefined;
+  }
+  // The domain itself or a subdomain of it, so notlever.co is not Lever.
+  return BOARD_HOSTS.find(([base]) => host === base || host.endsWith(`.${base}`))?.[1];
+}
+
+/**
+ * The job board a tracked company is read from: its `provider`, else the board
+ * its `api` or `careers_url` is hosted on, else Other.
+ * @param {{ provider?: unknown, api?: unknown, careers_url?: unknown }} company
+ */
+export function boardType({ provider, api, careers_url }) {
+  const named = typeof provider === "string" ? provider.trim() : "";
+  // One spelling however the entry cases it, so a board is one filter option.
+  if (named) return named[0].toUpperCase() + named.slice(1).toLowerCase();
+  return boardOfUrl(api) ?? boardOfUrl(careers_url) ?? OTHER_BOARD;
+}
+
+/** The distinct boards present, sorted, Other last. @param {WatchedCompany[]} companies */
+export function boardTypes(companies) {
+  const present = [...new Set(companies.map((c) => c.board))];
+  return [...present.filter((b) => b !== OTHER_BOARD).sort(), ...present.filter((b) => b === OTHER_BOARD)];
+}
 
 /** The check prints trimmed names, so a tracked "Acme " still finds its result. @param {Record<string, PortalHealth>} health @param {string} name */
 export const healthOf = (health, name) => health[name.trim()];
@@ -23,7 +62,7 @@ export const withToggles = (watched, enabled) => watched.map((c, index) => ({ ..
  */
 export function withUnlisted(companies, health) {
   const listed = new Set(companies.map((c) => c.name.trim()));
-  return [...companies, ...Object.keys(health).filter((name) => !listed.has(name)).map((name) => ({ name, host: "", enabled: true, unlisted: /** @type {const} */ (true) }))];
+  return [...companies, ...Object.keys(health).filter((name) => !listed.has(name)).map((name) => ({ name, host: "", board: OTHER_BOARD, enabled: true, unlisted: /** @type {const} */ (true) }))];
 }
 
 /** @param {WatchedCompany} c @param {PortalTab} tab @param {Record<string, PortalHealth>} health */
@@ -36,12 +75,12 @@ function inTab(c, tab, health) {
 /**
  * @template {WatchedCompany} T
  * @param {T[]} companies
- * @param {{ query: string, tab: PortalTab, health: Record<string, PortalHealth> }} filter
+ * @param {{ query: string, tab: PortalTab, health: Record<string, PortalHealth>, board?: string }} filter `board` is '' for any.
  */
-export function filterPortals(companies, { query, tab, health }) {
+export function filterPortals(companies, { query, tab, health, board = "" }) {
   const q = query.trim().toLowerCase();
   return companies.filter(
-    (c) => inTab(c, tab, health) && (!q || c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q)),
+    (c) => inTab(c, tab, health) && (!board || c.board === board) && (!q || c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q)),
   );
 }
 

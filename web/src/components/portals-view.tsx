@@ -11,7 +11,7 @@ import { formatWhen } from "@/lib/format-time.mjs";
 import { useHydrated } from "@/lib/use-hydrated";
 import type { WatchedCompany } from "@/lib/portals-config.mjs";
 import { showPortalsSetup } from "@/lib/portals-setup.mjs";
-import { filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
+import { boardTypes, filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
 
 type Company = { name: string; status: string; detail: string };
 type Health = Record<string, { status: string; detail: string }>;
@@ -45,6 +45,7 @@ export function PortalsView({
   const [checkedAt, setCheckedAt] = useState(savedAt);
   const [tab, setTab] = useState<PortalTab>("scanned");
   const [query, setQuery] = useState("");
+  const [board, setBoard] = useState("");
   const [enabled, setEnabled] = useState(() => watched.map((c) => c.enabled));
   const hydrated = useHydrated();
   const [pending, setPending] = useState(false);
@@ -65,7 +66,7 @@ export function PortalsView({
 
   const companies = useMemo(() => withUnlisted(withToggles(watched, enabled), health), [watched, enabled, health]);
   const counts = portalCounts(companies, health);
-  const shown = filterPortals(companies, { query, tab, health });
+  const shown = filterPortals(companies, { query, tab, health, board });
   const unchecked = uncheckedCount(companies, health);
 
   function check() {
@@ -187,14 +188,25 @@ export function PortalsView({
               { id: "attention", label: "Needs attention", count: counts.attention },
             ]}
           />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search companies…"
-            aria-label="Search companies"
-            className="mt-4 w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground placeholder:text-faint sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-          />
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search companies…"
+              aria-label="Search companies"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground placeholder:text-faint sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            />
+            <select
+              value={board}
+              onChange={(e) => setBoard(e.target.value)}
+              aria-label="Board type"
+              className="min-h-6 rounded-lg border border-border bg-surface px-3 py-2 text-base text-foreground sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]"
+            >
+              <option value="">Board type: any</option>
+              {boardTypes(companies).map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
           {toggleError && (
             <p role="alert" className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
               {toggleError}
@@ -202,7 +214,7 @@ export function PortalsView({
           )}
           {shown.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
-              {query.trim() ? "No company matches that search." : tab === "attention" ? (checkedAt ? (unchecked ? `No broken boards in the last check. ${unchecked} scanned ${unchecked === 1 ? "company was" : "companies were"} not in it.` : "Every scanned board answered the last check.") : "Run a health check to see which boards still answer.") : "No companies here."}
+              {query.trim() || board ? "No company matches that search." : tab === "attention" ? (checkedAt ? (unchecked ? `No broken boards in the last check. ${unchecked} scanned ${unchecked === 1 ? "company was" : "companies were"} not in it.` : "Every scanned board answered the last check.") : "Run a health check to see which boards still answer.") : "No companies here."}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface/40">
