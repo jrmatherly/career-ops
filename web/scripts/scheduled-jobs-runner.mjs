@@ -136,7 +136,7 @@ export function buildScanCommand(job) {
   };
 }
 
-// Run key, and the key scan-ats-full.mjs --json prints it under.
+// [key on the run, key in the scan-ats-full.mjs --json output]
 const SCAN_COUNTS = [
   ["droppedTier", "postingsDroppedTier"],
   ["droppedSalary", "postingsDroppedSalary"],
@@ -156,14 +156,16 @@ function readScanResult(engine, stdout) {
     result = null;
   }
   if (!result || typeof result !== "object") return { rolesFound: 0, counts: {} };
-  // A zero is kept: it says the filter ran and dropped nothing.
+  // A zero is kept, since the scan stated it. Only a missing or non-numeric count is left out.
   const counts = Object.fromEntries(SCAN_COUNTS.filter(([, printed]) => Number.isFinite(result[printed])).map(([key, printed]) => [key, result[printed]]));
+  // A sweep the timeout stops still exits 0, with counts for the boards it reached.
+  if (result.stoppedEarly === true) counts.stoppedEarly = true;
   return { rolesFound: Number.isFinite(Number(result.postingsKept)) ? Number(result.postingsKept) : 0, counts };
 }
 
 export const extractRolesFound = (engine, stdout) => readScanResult(engine, stdout).rolesFound;
 
-/** @returns {{ droppedTier?: number, droppedSalary?: number, droppedContent?: number }} */
+/** @returns {{ droppedTier?: number, droppedSalary?: number, droppedContent?: number, stoppedEarly?: true }} */
 export const extractScanCounts = (engine, stdout) => readScanResult(engine, stdout).counts;
 
 function portalsPath(root, env = process.env) {

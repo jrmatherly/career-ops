@@ -137,10 +137,11 @@ test("scheduled overlay falls back to portal title keywords and preserves hard l
         assert.equal(options.env.CAREER_OPS_ROOT, temp);
         assert.ok(fs.existsSync(path.join(options.cwd, "scan.mjs")));
         overlay = yaml.load(fs.readFileSync(options.env.CAREER_OPS_PORTALS, "utf8"));
-        return { status: 0, stdout: JSON.stringify({ postingsKept: 0 }), stderr: "" };
+        return { status: 0, stdout: JSON.stringify({ postingsKept: 0, postingsDroppedSalary: 5 }), stderr: "" };
       },
     });
     assert.equal(result.state, "success");
+    assert.deepEqual(result.counts, { droppedSalary: 5 });
     assert.deepEqual(overlay.title_filter.positive, ["engineer"]);
     assert.deepEqual(overlay.title_filter_full.positive, ["architect"], "an empty job list leaves the file's full-title list alone");
     assert.deepEqual(overlay.location_filter.block_hard, ["Brazil"]);
@@ -1545,6 +1546,9 @@ test("a full sweep's drop counts are read from its JSON, zeros included", () => 
   assert.deepEqual(extractScanCounts("full", "not json"), {});
   assert.deepEqual(extractScanCounts("full", "null"), {});
   assert.deepEqual(extractScanCounts("portals", stdout), {});
+  // A sweep the runner's timeout stopped still exits 0, with counts for the boards it reached.
+  assert.deepEqual(extractScanCounts("full", JSON.stringify({ stoppedEarly: true, postingsKept: 2, postingsDroppedTier: 4, postingsDroppedSalary: 0 })), { droppedTier: 4, droppedSalary: 0, stoppedEarly: true });
+  assert.equal("stoppedEarly" in extractScanCounts("full", JSON.stringify({ stoppedEarly: false, postingsDroppedTier: 4 })), false);
 });
 
 test("a recorded run keeps its drop counts through the store, and a failed run has none", async () => {
