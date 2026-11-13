@@ -248,7 +248,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         <section id="cv-import" aria-labelledby="cv-import-heading" className="mb-6">
           <h2 id="cv-import-heading" className="font-display text-lg tracking-tight text-foreground">Upload a resume</h2>
           <p className="mb-3 mt-1 text-sm text-muted">
-            Upload your CV, review the conversion, then update cv.md.
+            Upload your resume, review the conversion, then update cv.md.
             {state.content !== state.saved && " Your unsaved edits stay in the editor until you update."}
           </p>
           <CvIngest
