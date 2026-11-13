@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -46,8 +47,10 @@ export async function GET() {
       return failure(r, "absorb");
     }
     let data: Record<string, unknown> | null = null;
+    let text = "";
     try {
-      data = JSON.parse(await readFile(path.join(careerOpsRoot(), "data", "resume.json"), "utf8"));
+      text = await readFile(path.join(careerOpsRoot(), "data", "resume.json"), "utf8");
+      data = JSON.parse(text);
     } catch (err) {
       // Only an absent sidecar is expected (read-only view of a cv.md never absorbed); anything else is a fault.
       if (r.code === 0 || (err as NodeJS.ErrnoException).code !== "ENOENT") return failure(r, "absorb");
@@ -55,7 +58,9 @@ export async function GET() {
     const lossless = r.code === 0;
     const cvMdSha = lossless ? (data?.careerOps as { cvSha256?: unknown } | undefined)?.cvSha256 : null;
     if (lossless && !validSha(cvMdSha)) return failure(r, "absorb");
-    return Response.json({ data, cvMdSha, report, lossless });
+    // The sha of the bytes served, read after absorb's write, is the revision a save of this data must still find.
+    const resumeSha = lossless ? createHash("sha256").update(text).digest("hex") : null;
+    return Response.json({ data, cvMdSha, resumeSha, report, lossless });
   }
   const usage = usageMessage(r);
   if (usage && /[/\\]cv\.md not found$/.test(usage)) return Response.json({ error: "cv.md not found" }, { status: 404 });
@@ -64,21 +69,24 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const body = await readJsonObject<{ data?: unknown; expectedCvSha?: unknown }>(req);
-  if (!body || !isPlainObject(body.data) || !validSha(body.expectedCvSha)) {
-    return Response.json({ error: "body must be { data: object, expectedCvSha: sha256 hex }" }, { status: 400 });
+  const body = await readJsonObject<{ data?: unknown; expectedCvSha?: unknown; expectedResumeSha?: unknown }>(req);
+  if (!body || !isPlainObject(body.data) || !validSha(body.expectedCvSha) || !validSha(body.expectedResumeSha)) {
+    return Response.json({ error: "body must be { data: object, expectedCvSha: sha256 hex, expectedResumeSha: sha256 hex }" }, { status: 400 });
   }
-  const sha = body.expectedCvSha;
-  const r = await withDraftFile(body.data, (file) => runCoreCli("resume", ["save", "--in", file, "--expected-cv-sha", sha, "--json"]));
+  const { expectedCvSha, expectedResumeSha } = body;
+  const r = await withDraftFile(body.data, (file) => runCoreCli("resume", ["save", "--in", file, "--expected-cv-sha", expectedCvSha, "--expected-resume-sha", expectedResumeSha, "--json"]));
   const out = (() => {
     try {
-      return JSON.parse(r.stdout) as { cvSha256?: string };
+      return JSON.parse(r.stdout) as { cvSha256?: string; resumeSha256?: string };
     } catch {
       return {};
     }
   })();
-  if (r.code === 0) return validSha(out.cvSha256) ? Response.json({ cvMdSha: out.cvSha256 }) : failure(r, "save", STALE_AFTER_SAVE);
-  if (r.code === 4) return Response.json({ error: "cv.md changed since this draft was opened; reload to continue", cvMdSha: out.cvSha256 }, { status: 409 });
+  if (r.code === 0) return validSha(out.cvSha256) && validSha(out.resumeSha256) ? Response.json({ cvMdSha: out.cvSha256, resumeSha: out.resumeSha256 }) : failure(r, "save", STALE_AFTER_SAVE);
+  if (r.code === 4) {
+    const error = out.cvSha256 !== expectedCvSha ? "cv.md changed since this draft was opened; reload to continue" : "data/resume.json was saved from another tab or command since this draft was opened; reload to continue";
+    return Response.json({ error, cvMdSha: out.cvSha256, resumeSha: out.resumeSha256 }, { status: 409 });
+  }
   if (r.code === 3) return Response.json({ error: "cv.md cannot hold this draft as written: check for an entry whose first field (company, school, name, title) is empty, and for leading or trailing spaces" }, { status: 422 });
   const usage = usageMessage(r);
   if (usage) return Response.json({ error: usage }, { status: 400 });
