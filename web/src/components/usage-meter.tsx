@@ -93,7 +93,7 @@ export function UsageMeter() {
 
   return (
     <div className="border-t border-border pt-2">
-      <FootSection label="Usage" icon={<Gauge className="size-3" />} summary={failed ? "stale" : rows.map((r) => `${r.label} ${r.pct}%`).join(" · ")} alert={rows.some((r) => r.pct >= NEAR_LIMIT) ? "near the plan's limit" : undefined}>
+      <FootSection label="Usage" icon={<Gauge className="size-3" />} summary={failed ? "stale" : rows.map((r) => `${r.label} ${r.pct}%`).join(" ")} alert={rows.some((r) => r.pct >= NEAR_LIMIT) ? "near the plan's limit" : undefined}>
       <div className="space-y-2 px-1">
         {rows.map((r) => {
           const pct = r.pct;

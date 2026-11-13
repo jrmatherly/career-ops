@@ -23,11 +23,11 @@ export function FootSection({ label, icon, summary, alert, defaultOpen = false, 
   }, [defaultOpen]);
   return (
     <details ref={ref} className="group" open={initial}>
-      <summary className="flex min-h-7 max-sm:min-h-[44px] cursor-pointer list-none items-center gap-1.5 rounded-md px-1 text-xs font-semibold uppercase tracking-[0.14em] text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 [&::-webkit-details-marker]:hidden">
-        {icon}
+      <summary className="flex min-h-7 max-sm:min-h-[44px] cursor-pointer list-none items-center gap-1 rounded-md px-1 text-xs font-semibold uppercase tracking-[0.14em] text-faint transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 [&::-webkit-details-marker]:hidden">
+        {/* The warning takes the section icon's place, and the gaps are 4px, so a usage line with both windows at 100% fits the sidebar. */}
+        {alert ? <TriangleAlert aria-hidden className="size-3 shrink-0 text-red-700 dark:text-red-400" /> : icon}
         <span>{label}</span>
         <span className={cn("ml-auto inline-flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap font-normal normal-case tracking-normal tabular-nums", alert && "font-medium text-red-700 dark:text-red-400")}>
-          {alert && <TriangleAlert aria-hidden className="size-3 shrink-0" />}
           {summary}
           {alert && <span className="sr-only">, {alert}</span>}
         </span>
