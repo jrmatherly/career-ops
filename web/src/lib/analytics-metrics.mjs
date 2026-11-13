@@ -362,3 +362,16 @@ export function formatMoney(value) {
 }
 
 export { scoreValue };
+
+/**
+ * The Analytics page's description line, from the same figures the Progress
+ * panel shows. The average is left out when no row has a score.
+ *
+ * @param {{score?: string, status?: string}[]} applications
+ * @returns {string}
+ */
+export function analyticsSummary(applications) {
+  const { tracked, avgScore, activeApps } = computeProgressMetrics(applications);
+  const average = avgScore > 0 ? [`average score ${avgScore.toFixed(1)}`] : [];
+  return [`${tracked} tracked`, ...average, `${activeApps} active application${activeApps === 1 ? "" : "s"}`].join(" · ");
+}

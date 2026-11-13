@@ -3,9 +3,8 @@ import { PipelineSankey } from "@/components/analytics/pipeline-sankey";
 import { canonStatus } from "@/lib/format";
 import { cumulativeProgressWithHistory } from "@/lib/funnel-tiles.mjs";
 import { analyticsApplications } from "@/lib/analytics-data";
-import { computeProgressMetrics, computeStatsMetrics, generateInsights, resolveAnalyticsView } from "@/lib/analytics-metrics.mjs";
+import { analyticsSummary, computeProgressMetrics, computeStatsMetrics, generateInsights, resolveAnalyticsView } from "@/lib/analytics-metrics.mjs";
 import { AnalyticsShell, ProgressPanel, StatsPanel } from "@/components/analytics-view";
-import { analyticsSummary } from "@/lib/analytics/view-model.mjs";
 import { FunnelRates } from "@/components/analytics/funnel-rates";
 import { SearchInsights } from "@/components/analytics/search-insights";
 

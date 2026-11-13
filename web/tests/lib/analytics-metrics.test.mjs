@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { cumulativeProgressWithHistory } from "../../src/lib/funnel-tiles.mjs";
 import {
+  analyticsSummary,
   canonicalizeArchetype,
   canonicalizeLocation,
   computeProgressMetrics,
@@ -231,4 +232,16 @@ test("location junk filter drops form labels but keeps places that share a prefi
   assert.equal(canonicalizeLocation("Applicant location"), "");
   assert.equal(canonicalizeLocation("Idaho Falls, ID"), "Idaho Falls, ID");
   assert.equal(canonicalizeLocation("Jobner, India"), "Jobner, India");
+});
+
+test("the Analytics description counts tracked rows, averages the scored ones and counts the active ones", () => {
+  const row = (score, status) => ({ score, status });
+  assert.equal(analyticsSummary([row("4.0/5", "Applied"), row("3.0/5", "Evaluated"), row("N/A", "Interview")]), "3 tracked · average score 3.5 · 2 active applications");
+  assert.equal(analyticsSummary([row("—", "Applied")]), "1 tracked · 1 active application");
+  assert.equal(analyticsSummary([]), "0 tracked · 0 active applications");
+  // One reading of a score cell for the description and the Progress panel: the first number in it, zero left out.
+  const mixed = [row("**4.5/5**", "applied"), row("3/5", "Evaluated"), row("0/5", "SKIP")];
+  assert.equal(analyticsSummary(mixed), "3 tracked · average score 3.8 · 1 active application");
+  assert.equal(computeProgressMetrics(mixed).avgScore, 3.75);
+  assert.equal(analyticsSummary([row("4.25/5", "Responded"), row("4/5", "Assessment"), row("3.5/5", "Offer"), row("5/5", "Rejected")]), "4 tracked · average score 4.2 · 3 active applications");
 });
