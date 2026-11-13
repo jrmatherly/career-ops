@@ -15,7 +15,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { buttonVariants } from "@/components/ui/button";
 import { SECTION_TYPES } from "@/lib/resume-form.mjs";
 import { attentionSummary, attentionText, lineRange, lossyNotice } from "@/lib/cv-attention.mjs";
-import { PAGE_OVERFLOW_HEADER } from "@/lib/cv/page-overflow.mjs";
+import { readPageOverflow } from "@/lib/cv/page-overflow.mjs";
 import { cn } from "@/lib/cn";
 
 type Tab = "preview" | "edit";
@@ -202,10 +202,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 0);
-      let warning = res.headers.get(PAGE_OVERFLOW_HEADER);
-      // The file is already saved here, so a header that will not decode must not read as a failed download.
-      try { warning = warning && decodeURIComponent(warning); } catch {}
-      setOverflow(warning || null);
+      setOverflow(readPageOverflow(res.headers));
     } catch (err) {
       setDownloadError((err as Error).message);
     } finally {

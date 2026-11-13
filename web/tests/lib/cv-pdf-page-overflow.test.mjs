@@ -3,14 +3,14 @@
 // Chromium, so this drives renderMasterPdf with a fake renderer whose stderr is
 // the exact line generate-pdf.mjs prints, captured from its own enforcePageBudget.
 //
-// Run:  node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/cv-pdf-page-overflow.test.mjs
+// Run:  node --test tests/lib/cv-pdf-page-overflow.test.mjs
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { enforcePageBudget } from "../../../generate-pdf.mjs";
 import { renderMasterPdf } from "../../src/lib/cv-master-pdf.mjs";
-import { pageOverflowWarning } from "../../src/lib/cv/page-overflow.mjs";
+import { PAGE_OVERFLOW_HEADER, pageOverflowWarning, readPageOverflow } from "../../src/lib/cv/page-overflow.mjs";
 
 function rendererWarning(pageCount, maxPages) {
   const lines = [];
@@ -60,4 +60,12 @@ test("a render within its page limit carries no warning", async (t) => {
 
 test("a one-page limit is read too", () => {
   assert.match(pageOverflowWarning(rendererWarning(2, 1)), /^CV is 2 pages; the allowed maximum is 1 page\. /);
+});
+
+test("the page reads the warning back from the response header, and a header that will not decode still warns", () => {
+  const headers = (value) => new Headers(value === null ? {} : { [PAGE_OVERFLOW_HEADER]: value });
+  const sentence = pageOverflowWarning(rendererWarning(3, 2));
+  assert.equal(readPageOverflow(headers(encodeURIComponent(sentence))), sentence);
+  assert.equal(readPageOverflow(headers(null)), null);
+  assert.equal(readPageOverflow(headers("CV%20is%E0%A4%A")), "Trim the CV, then download it again.");
 });
