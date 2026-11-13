@@ -173,7 +173,8 @@ test("the mirrored heading patterns agree with lib/cv-markdown.mjs and absorb.mj
 test("the editor reducer keeps save state honest", () => {
   const d1 = { v: 1 };
   const d2 = { v: 2 };
-  const loaded = editorReducer({}, { type: "loaded", data: d1, cvMdSha: "s1", report: {}, lossless: true });
+  const loaded = editorReducer({}, { type: "loaded", data: d1, cvMdSha: "s1", resumeSha: "r1", report: {}, lossless: true });
+  assert.equal(loaded.resumeSha, "r1");
   assert.equal(loaded.status.kind, "editing");
   assert.equal(loaded.data, loaded.saved, "nothing unsaved after load");
   assert.equal(editorReducer({}, { type: "loaded", data: d1, cvMdSha: null, report: {}, lossless: false }).status.kind, "readonly");
@@ -182,11 +183,12 @@ test("the editor reducer keeps save state honest", () => {
   const saving = editorReducer(loaded, { type: "saving" });
   const editedMidSave = editorReducer(saving, { type: "edit", data: d2 });
   assert.equal(editedMidSave.status.kind, "saving", "an edit does not re-enable Save while a save is in flight");
-  const answered = editorReducer(editedMidSave, { type: "saved", data: d1, cvMdSha: "s2" });
+  const answered = editorReducer(editedMidSave, { type: "saved", data: d1, cvMdSha: "s2", resumeSha: "r2" });
   assert.equal(answered.status.kind, "editing", "newer edits are not reported as saved");
   assert.equal(answered.saved, d1);
   assert.notEqual(answered.data, answered.saved, "the newer edit still counts as unsaved");
   assert.equal(answered.cvMdSha, "s2");
+  assert.equal(answered.resumeSha, "r2", "the next save is checked against the revision this one wrote");
   assert.equal(editorReducer(saving, { type: "saved", data: d1, cvMdSha: "s2" }).status.kind, "saved");
 
   const conflict = editorReducer(loaded, { type: "conflict", message: "x" });
