@@ -27,7 +27,9 @@ Found on the live site. The local fixture could not show them, because it had no
 
 A1 is the clear miss: an icon-only target at half the minimum in both directions. A2 to A6 are text links or text buttons, wide enough and 16 to 20px tall. Whether an inline text link has to meet the 24px rule is a decision for the owner; WCAG 2.5.8 exempts a link inside a sentence, and the plan's rule does not.
 
-The browser suite that asserts the rule is `web/tests/lib/layout-shell.browser.test.mjs`. It passed on the release while the live site shows A1 to A5, so its fixture most likely renders none of them (inferred, the fixture was not read). A fix for A1 should come with a fixture that renders role chips, or the suite may keep passing without checking them.
+The browser suite that asserts the rule is `web/tests/lib/layout-shell.browser.test.mjs`. It passed on the release while the live site shows A1 to A5, because its fixture, `web/tests/fixtures/pipeline-status.mjs`, has three tracker rows and nothing else, so none of these controls renders (read on 2026-11-13). The suite already exempts a link inside a sentence, which covers A6.
+
+The fixes are planned in `docs/superpowers/plans/2026-11-13-post-deploy-follow-ups.md`, one branch and one PR. Its "Decisions already made" table records the owner's answers on A2 to A5, B2 and C2.
 
 ## B. Differences from the mockups
 
