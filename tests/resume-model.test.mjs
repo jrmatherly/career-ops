@@ -63,3 +63,11 @@ test('writeResume round-trips through readResume and leaves no lock', async () =
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a section layout that is not a string is dropped, not thrown on', () => {
+  const json = sample();
+  json.sections.education.layout = { toString: null };
+  const parsed = parseResume(json);
+  assert.equal(parsed.ok, true);
+  assert.equal('layout' in parsed.data.sections.education, false);
+});

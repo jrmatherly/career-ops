@@ -27,7 +27,7 @@ type Absorb =
   | { kind: "loading" }
   | { kind: "missing" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; markdown: string; data: unknown; report: Report; lossless: boolean };
+  | { kind: "ready"; markdown: string; writes: number; data: unknown; report: Report; lossless: boolean };
 type Report = { unparsed?: { line: number; text: string }[]; orphans?: { company?: string; position?: string; name?: string; section?: string }[] };
 
 export function CvPage({ format, templates, templatesError }: { format: string | null; templates: TemplateOption[]; templatesError?: string }) {
@@ -83,7 +83,7 @@ export function CvPage({ format, templates, templatesError }: { format: string |
         if (!body || typeof body !== "object" || !body.report || typeof body.report !== "object") {
           return setAbsorb({ kind: "error", message: body?.error ?? "The CV reader answered without a report." });
         }
-        setAbsorb({ kind: "ready", markdown: saved, data: body.data, report: body.report, lossless: body.lossless === true });
+        setAbsorb({ kind: "ready", markdown: saved, writes: structuredWrites, data: body.data, report: body.report, lossless: body.lossless === true });
       })
       .catch((err: Error) => live && setAbsorb({ kind: "error", message: err.message }));
     return () => {
@@ -158,8 +158,8 @@ export function CvPage({ format, templates, templatesError }: { format: string |
     : null;
   const conflictBlocked = state.conflict ? "Download and Print are off while this tab's text conflicts with cv.md on disk." : null;
   const pdfBlocked = exportBlocked ?? conflictBlocked;
-  // The frame holds the previous cv.md until the save just made is read back; Download reads the file itself.
-  const staleRender = absorb.kind === "ready" && absorb.markdown !== saved ? "Print is off until the saved cv.md is read back." : null;
+  // The frame holds the previous cv.md until the save just made, in either editor, is read back; Download reads the file itself.
+  const staleRender = absorb.kind === "ready" && (absorb.markdown !== saved || absorb.writes !== structuredWrites) ? "Print is off until the saved cv.md is read back." : null;
   const printBlocked = exportBlocked ?? conflictBlocked ?? staleRender;
   const unsaved = state.phase === "ready" && (state.content !== state.saved || state.conflict);
   const omittedNames = omitted.unmapped.map((s) => (SECTION_TYPES as Record<string, { label?: string }>)[s]?.label ?? s);
