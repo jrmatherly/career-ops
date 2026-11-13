@@ -48,6 +48,12 @@ test('a paragraph that follows bullets is carried with the number of bullets ahe
   assert.deepEqual(validatePayload(payload, 'html'), { errors: [], warnings: [] });
 });
 
+test('a following paragraph with markup and no text is left out, so the payload still validates', () => {
+  const { payload, entry } = payloadFor('<ul><li>Only bullet</li></ul><p><strong></strong></p>');
+  assert.equal('paragraphs' in entry, false);
+  assert.deepEqual(validatePayload(payload, 'html').errors, []);
+});
+
 test('a description with its paragraphs first carries no paragraphs field', () => {
   const { entry } = payloadFor('<p>Lead-in.</p><ul><li>Only bullet</li></ul>');
   assert.equal('paragraphs' in entry, false);
