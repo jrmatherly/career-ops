@@ -19,7 +19,10 @@ const ROUTES = ["/", "/explore", "/scheduled-scans", "/pipeline", "/pipeline?tab
 // Each row is a label, a selector inside main, and the text the control starts with.
 const RENDERS = {
   "/explore": [["a chip remove button", 'button[aria-label^="Remove "]']],
-  "/pipeline": [["the inbox Select all button", "button", "Select all "]],
+  "/pipeline": [
+    ["the inbox Select all button", "button", "Select all "],
+    ["the inbox restore button", "button", "1 hidden"],
+  ],
   "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
   "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
   "/portals": [["the Board type filter", 'select[aria-label="Board type"]']],
@@ -43,6 +46,8 @@ test("every page sits in one shell under one header, with readable text and reac
     unexpected.push(route.request().url());
     return route.abort();
   });
+  // The inbox keeps its hidden rows in the browser; one hidden row renders the restore button.
+  await page.addInitScript(() => localStorage.setItem("career-ops:hidden", JSON.stringify(["https://example.com/inbox-alpha"])));
   await page.route("**/api/version", (route) => route.fulfill({ json: { version: "0.0.0-fixture", channel: "alpha", sha: "f1x7ure" } }));
 
   async function open(route) {
@@ -100,7 +105,7 @@ test("every page sits in one shell under one header, with readable text and reac
     await open(route);
     const renders = RENDERS[route] ?? [];
     // A control that data renders arrives after hydration.
-    for (const [, selector] of renders) await page.locator(`main ${selector}`).first().waitFor({ timeout: 10_000 }).catch(() => {});
+    for (const [, selector, starts = ""] of renders) await page.locator(`main ${selector}`).filter({ hasText: starts }).first().waitFor({ timeout: 10_000 }).catch(() => {});
     const m = await measure(renders);
     for (const [i, [label]] of renders.entries()) {
       await t.test(`${route}: renders ${label}`, () => {
@@ -134,6 +139,16 @@ test("every page sits in one shell under one header, with readable text and reac
       assert.deepEqual(m.smallTargets, []);
     });
   }
+
+  await t.test("/portals: the Board type filter narrows the list to that board", async () => {
+    await open("/portals");
+    const rows = page.locator('main [role="switch"]');
+    assert.equal(await rows.count(), 2);
+    await page.getByLabel("Board type").selectOption("Fixtureboard");
+    assert.deepEqual(await rows.evaluateAll((els) => els.map((el) => el.getAttribute("aria-label"))), ["Scan Fixture Beta"]);
+    await page.getByLabel("Board type").selectOption("");
+    assert.equal(await rows.count(), 2);
+  });
 
   // Visible headings in main, in document order, never skip a level; the rendered CV is checked in its own document.
   const headingLevels = (scope) => scope.evaluate((root) =>

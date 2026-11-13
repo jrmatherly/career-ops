@@ -91,8 +91,8 @@ Recorded 2026-11-13 on the branch `fix/post-deploy-follow-ups`. "Fixed" means fi
 | C1 | Fixed. A logo miss answers 204. The monogram still shows, and the browser logs nothing. |
 | C2 | Left by decision. |
 | C3 | Left as built. The page itself does not overflow. |
-| C4 | Left. A tick that cannot take the runner lock still runs the rank and drain passes, and the job stays due for the next tick, so nothing is lost but up to 15 minutes. |
-| C5 | Fixed. A full sweep's run records `droppedTier`, `droppedSalary` and `droppedContent`, and `stoppedEarly` when the runner's timeout cut the sweep short, since those counts cover only the boards it reached. |
+| C4 | Left. A tick that cannot take the runner lock still runs the rank and drain passes, and the job stays due. A manual run can hold the lock across several ticks. When the lock frees, the job runs once and its next run moves to the next future occurrence, so occurrences missed in between are not replayed. |
+| C5 | Fixed. A full sweep's run records `droppedTier`, `droppedSalary` and `droppedContent`. A sweep the runner's 25-minute timeout stops used to be stored as a success with 0 roles, because the sweep catches the signal and exits 0; it is now stored as failed with the timeout message. |
 | C6 | Left. The writer that made cells starting with "; " was fixed in PR 72, and the eight rows were repaired by hand. D3 checks it on the next evaluation. |
 | D1 to D7 | Open. Each needs an event or the owner's go; the plan's "After the merge" table names the trigger. D2 is read from `droppedSalary` on the next sweep's run once C5 is deployed. |
 | E | Unchanged. |
