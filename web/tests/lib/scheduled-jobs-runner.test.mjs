@@ -23,6 +23,7 @@ import {
   enqueueDueJobs,
   executeJob,
   extractRolesFound,
+  extractScanCounts,
   main as runnerTick,
   MAX_ATTEMPTS,
   MAX_RUNS,
@@ -1534,4 +1535,38 @@ test("a failing drain or a drain lock held elsewhere goes to stderr and the tick
     assert.equal(ran, false);
     assert.match(held.stderr, /another runner is draining/);
   });
+});
+
+test("a full sweep's drop counts are read from its JSON, zeros included", () => {
+  const stdout = JSON.stringify({ postingsKept: 7, postingsDroppedTier: 12, postingsDroppedSalary: 0, postingsDroppedContent: 3 });
+  assert.deepEqual(extractScanCounts("full", stdout), { droppedTier: 12, droppedSalary: 0, droppedContent: 3 });
+  assert.equal(extractRolesFound("full", stdout), 7);
+  assert.deepEqual(extractScanCounts("full", JSON.stringify({ postingsKept: 7, postingsDroppedTier: "many", postingsDroppedSalary: null })), {});
+  assert.deepEqual(extractScanCounts("full", "not json"), {});
+  assert.deepEqual(extractScanCounts("full", "null"), {});
+  assert.deepEqual(extractScanCounts("portals", stdout), {});
+});
+
+test("a recorded run keeps its drop counts through the store, and a failed run has none", async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-scheduled-counts-"));
+  const storePath = path.join(temp, "scheduled-jobs.json");
+  const jobId = "22222222-2222-4222-8222-222222222222";
+  const now = Date.parse("2026-08-08T12:00:00.000Z");
+  const keys = ["droppedTier", "droppedSalary", "droppedContent"];
+  try {
+    await withScheduledStore(storePath, (store) => {
+      store.jobs.push({ id: jobId, name: "Counts", status: "active", engine: "full", filters: {}, timezone: "UTC", startAt: new Date(now).toISOString(), every: 1, unit: "hours", createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString() });
+    });
+    const claim = await withScheduledStore(storePath, (store) => claimManualJob(store, jobId, now));
+    await recordCompletion(storePath, claim, { state: "success", attempt: 1, rolesFound: 7, durationMs: 1, message: "ok", counts: { droppedTier: 12, droppedSalary: 0, droppedContent: 3 } });
+    const kept = readScheduledStore(storePath).runs[0];
+    assert.deepEqual(keys.map((k) => kept[k]), [12, 0, 3]);
+    const failed = await withScheduledStore(storePath, (store) => claimManualJob(store, jobId, now + 60_000));
+    await recordCompletion(storePath, failed, { state: "failed", attempt: 2, rolesFound: 0, durationMs: 1, message: "boom" });
+    const run = readScheduledStore(storePath).runs[0];
+    assert.equal(run.state, "failed");
+    assert.deepEqual(keys.filter((k) => k in run), []);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });
