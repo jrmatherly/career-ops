@@ -43,6 +43,7 @@ import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { validateLockedSections, sectionKey } from './generate-pdf.mjs';
 import { readLockedSections } from './theme-style.mjs';
 import { hasRequiredFields, templateSlotWarnings, validatePayload } from './lib/cv-payload-schema.mjs';
+import { bodyRuns } from './lib/resume/to-payload.mjs';
 import { resolveTrackerPath, resolveWorkspaceRoot } from './tracker-utils.mjs';
 import { PAGE_WIDTHS, resolvePageFormat } from './lib/page-format.mjs';
 import { PARTIAL_SECTIONS, declaredSections, parseMeta } from './lib/template-manifest.mjs';
@@ -475,13 +476,23 @@ function withResumePath(html, path) {
   return html.replace(/<[a-zA-Z][\w-]*/, tag => `${tag} data-resume-path="${escapeHtml(path)}"`);
 }
 
+// The entry's first run of bullets, which goes in the list every template has, and the
+// markup after that list: each paragraph that follows a bullet and each later list, in order.
+function experienceBody(e) {
+  const runs = bodyRuns(e);
+  const head = runs[0]?.bullets ?? [];
+  const after = runs.slice(runs[0]?.bullets ? 1 : 0).map(run => (run.text
+    ? `<div class="job-context">${escapeHtml(run.text)}</div>`
+    : `<ul>\n${run.bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('\n')}\n</ul>`)).join('\n');
+  return { head, after };
+}
+
 function buildExperience(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
     return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-      const bullets = Array.isArray(e.bullets)
-        ? e.bullets.filter(Boolean).map(b => `        <li>${escapeHtml(b)}</li>`).join('\n')
-        : '';
+      const { head, after } = experienceBody(e);
+      const bullets = head.map(b => `        <li>${escapeHtml(b)}</li>`).join('\n');
       const location = e.location
         ? `\n    <div class="job-location">${escapeHtml(e.location)}</div>`
         : '';
@@ -496,27 +507,32 @@ function buildExperience(entries, partial) {
     <div class="job-role">${escapeHtml(e.role)}</div>${context}${location}
     <ul>
 ${bullets}
-    </ul>
+    </ul>${after ? `\n${after}` : ''}
   </div>`, e.path);
     }).join('\n  ');
   }
 
   const { entryTemplate, blocks } = partial;
   return entries.filter(e => hasRequiredFields(e, 'experience', 'html')).map(e => {
-    const bullets = Array.isArray(e.bullets)
-      ? e.bullets.filter(Boolean).map(b => `<li>${escapeHtml(b)}</li>`).join('\n    ')
-      : '';
+    // A pack written before AFTER_BULLETS has nowhere to put what follows the first list, so it
+    // keeps the older layout: every bullet in the one list, those paragraphs in the context line.
+    const ordered = entryTemplate.includes('{{AFTER_BULLETS}}');
+    const runs = bodyRuns(e);
+    const { head, after } = ordered ? experienceBody(e) : { head: runs.flatMap(r => r.bullets ?? []), after: '' };
+    const context = ordered ? (e.context || '') : [e.context, ...runs.map(r => r.text)].filter(Boolean).join(' ');
+    const bullets = head.map(b => `<li>${escapeHtml(b)}</li>`).join('\n    ');
     const blockValues = new Map([
       ['LOCATION_BLOCK', { value: escapeHtml(e.location || ''), present: Boolean(e.location) }],
-      ['CONTEXT_BLOCK', { value: escapeHtml(e.context || ''), present: Boolean(e.context) }],
+      ['CONTEXT_BLOCK', { value: escapeHtml(context), present: Boolean(context) }],
     ]);
     return withResumePath(fillEntry(entryTemplate, blocks, {
       COMPANY: escapeHtml(e.company || ''),
       PERIOD: escapeHtml(e.dates || e.period || ''),
       ROLE: escapeHtml(e.role || ''),
       LOCATION: escapeHtml(e.location || ''),
-      CONTEXT: escapeHtml(e.context || ''),
+      CONTEXT: escapeHtml(context),
       BULLETS: bullets,
+      AFTER_BULLETS: after ? `\n  ${after}` : '',
     }, blockValues), e.path);
   }).join('\n  ');
 }
@@ -1001,9 +1017,11 @@ function renderMarkdown(payload, template) {
     const meta = mdJoin([e.location, e.dates || e.period], ' · ');
     if (meta) exp.push(`*${meta}*`, '');
     if (mdLine(e.context)) exp.push(mdLine(e.context), '');
-    const bullets = list(e.bullets).filter(Boolean);
-    for (const b of bullets) exp.push(`- ${mdLine(b)}`);
-    if (bullets.length) exp.push('');
+    for (const run of bodyRuns(e)) {
+      if (run.text) exp.push(mdLine(run.text));
+      else for (const b of run.bullets) exp.push(`- ${mdLine(b)}`);
+      exp.push('');
+    }
   }
   section('experience', exp);
 
