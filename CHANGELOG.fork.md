@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.2.0...career-ops-v2.2.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **web:** post-deploy follow-ups for 2.2.0: 24px targets, mockup copy, board filter ([36adf3c](https://github.com/jrmatherly/career-ops/commit/36adf3ca7a499d8a33a8f97684cc760b27c53ecf))
+
 ## [2.2.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.1.0...career-ops-v2.2.0) (2026-11-13)
 
 
