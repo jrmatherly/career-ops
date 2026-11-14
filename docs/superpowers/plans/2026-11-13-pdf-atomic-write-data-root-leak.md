@@ -25,9 +25,9 @@ Each is one line to overturn.
 
 ## Global Constraints
 
-- One branch, `fix/pdf-atomic-test-data-root`, in a sibling worktree cut from `main`. One PR. No merge without Jason's word in-session.
-- This plan and its findings file are committed on `main`. Pull `main` before cutting the worktree, or Task 2 has no findings file to edit.
-- A fresh worktree has no `node_modules`. Clone it before running tests: `cp -c -R ../career-ops/node_modules node_modules`.
+- This work lands on the existing branch `feat/recruiter-advice-and-test-leak`, in the worktree `/Users/jason/dev/career-ops-recruiter-advice-and-test-leak`, beside the recruiter advice follow-ups. Jason decided this on 2026-11-13. One PR covers both. Do not cut a new branch or worktree. No merge without Jason's word in-session.
+- This plan and its findings file are committed on `main`, and the branch is rebased onto that commit. If the worktree has no findings file, rebase the branch onto `main` first.
+- The worktree already has `node_modules` and `web/node_modules`. If either is missing, clone it before running tests: `cp -c -R ../career-ops/node_modules node_modules`.
 - No product file changes. `generate-pdf.mjs` is not edited.
 - A new test is its own file under `tests/*.test.mjs`. No `process.exit()` or `finish()` in a suite.
 - No personal data. Fixtures are inline strings with no names.
@@ -222,7 +222,7 @@ Under a new heading `### PDF atomic-write test data-root leak (2026-11-13)` befo
 
 - [ ] **Step 5: Fill in Outcomes in the findings file**
 
-Replace the "To be filled in" line with: the branch name, "fixed in this branch" for the leak with the guard test's name, "not built" for the index-writer guard with the reason from the decisions table, and "not investigated" for the suites that fail outside the runner.
+Replace the "To be filled in" line with: the branch name `feat/recruiter-advice-and-test-leak`, "fixed in this branch" for the leak with the guard test's name, "not built" for the index-writer guard with the reason from the decisions table, and "not investigated" for the suites that fail outside the runner.
 
 - [ ] **Step 6: Commit**
 
