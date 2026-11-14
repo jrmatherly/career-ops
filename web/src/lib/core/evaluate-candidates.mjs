@@ -75,3 +75,24 @@ export function candidatesFor({ pendingRows: rows, scanHistoryRows, since }) {
     return firstSeen && firstSeen >= since;
   });
 }
+
+/**
+ * The URLs of the rows a job's location hold keeps back: those whose last
+ * `added` scan-history row has a location the gate rejects. A row with no
+ * history row has no confirmed place, so the gate sees it as blank.
+ *
+ * @param {{ rows: Array<{ url: string }>, scanHistoryRows: Array<{ url: string, status?: string, location?: string, title?: string }>, gate: (location: string, title: string) => { eligible: boolean } }} input
+ * @returns {Set<string>}
+ */
+export function heldForLocation({ rows, scanHistoryRows, gate }) {
+  const added = new Map();
+  for (const row of scanHistoryRows) {
+    if ((row.status || "added") !== "added") continue;
+    const key = normalizeUrl(row.url);
+    if (key) added.set(key, row);
+  }
+  return new Set(rows.filter((row) => {
+    const seen = added.get(normalizeUrl(row.url));
+    return !gate(seen?.location || "", seen?.title || "").eligible;
+  }).map((row) => row.url));
+}
