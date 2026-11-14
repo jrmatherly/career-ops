@@ -29,7 +29,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-import { splitStoryBlocks, isValidStory, parseStories, getField, STORY_FIELDS } from '../lib/story-bank.mjs';
+import { isResultPending, splitStoryBlocks, isValidStory, parseStories, getField, STORY_FIELDS } from '../lib/story-bank.mjs';
 import { parseStories as matchStarParseStories } from '../match-star.mjs';
 import { parseStoryBlocks, classifyStoryBank, malformedEntries } from '../story-provenance-check.mjs';
 import { analyze } from '../negotiation-roi.mjs';
@@ -374,4 +374,20 @@ test('oferta.md no longer appends only "if the file exists"', () => {
 
 test('batch workers are told never to write story-bank.md', () => {
   assert.match(read('batch/batch-prompt.md'), /Never write to `interview-prep\/story-bank\.md`/);
+});
+
+test('a story may carry a Scope line, and a story without one parses as before', () => {
+  const [withScope, without] = parseStories([
+    '### [Ops] Evening shift', '**Scope:** 8 associates, 120,000 units a month', '**A (Action):** Led the shift.', '**R (Result):** Zero missed handoffs.',
+    '### [Ops] Intake form', '**A (Action):** Built one form.', '**R (Result):** pending: Q1 numbers',
+  ].join('\n'));
+  assert.equal(withScope.scope, '8 associates, 120,000 units a month');
+  assert.equal(withScope.resultPending, false);
+  assert.equal(without.scope, '');
+  assert.equal(without.resultPending, true);
+});
+
+test('a result is pending only when the field says so', () => {
+  for (const r of ['pending', 'Pending', 'PENDING: Q1 numbers', 'pending (ask finance)', 'Pending.', 'pending - awaiting Q1', 'pending, due in March']) assert.equal(isResultPending(r), true, r);
+  for (const r of ['The pending migration shipped', '', 'Shipped', 'pending approval was granted']) assert.equal(isResultPending(r), false, r);
 });

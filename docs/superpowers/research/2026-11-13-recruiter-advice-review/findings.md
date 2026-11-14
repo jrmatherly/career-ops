@@ -68,4 +68,25 @@ Found in the plan's review on 2026-11-13. The instruction A1 names in `modes/pdf
 
 ## Outcomes
 
-To be filled in by the plan `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`.
+Recorded 2026-11-13 from the branch `feat/recruiter-advice-and-test-leak` (first named `feat/recruiter-advice-follow-ups`), plan `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`. Jason confirmed the four decisions in session on 2026-11-13: D1, D3 and D4 are not built, every copy of the keyword rule changes, the two bullet rules count toward the Check score, and the cover draft in `modes/oferta.md` is aligned with `modes/cover.md`.
+
+| # | Outcome | Pinned by |
+|---|---------|-----------|
+| A1 | Fixed in this branch, in `modes/pdf.md` and every copy of the rule, including `modes/pdf.md:64` and `modes/text.md:60`, which the plan had missed. | `tests/recruiter-advice-wording.test.mjs`: "the CV mode asks for a relevant summary", "no copy of the CV rules still says to inject keywords" |
+| A2 | Fixed in this branch. Interview prep gives points and evidence by default. | `tests/recruiter-advice-wording.test.mjs`: "interview prep gives points and evidence" |
+| A3 | Fixed in this branch. STAR for a behavioural question, result-first for the rest. | same test |
+| A4 | Fixed in this branch, in `modes/cover.md`, `modes/pdf.md` and the cover draft in `modes/oferta.md`. | `tests/recruiter-advice-wording.test.mjs`: "no mode asks for a metric in every bullet" |
+| B1 | Fixed in this branch. `WEAK_BULLET_START` and `LONG_BULLET` in `lib/resume/check.mjs`, info severity, one finding per description with a count. | `tests/resume-check.test.mjs`, the bullet tests |
+| B2 | Fixed in this branch as an instruction to ask the user. No lint, since telling a clear number from an ambiguous one is a heuristic. | `tests/recruiter-advice-wording.test.mjs`: "the bullet heuristics cover plain words, number hygiene, scope and acronyms" |
+| B3 | Fixed in this branch. `modes/interview.md` asks for scope apart from outcomes, and the story bank has an optional `**Scope:**` field. | `tests/recruiter-advice-wording.test.mjs`: "the English cover and evaluation modes do not ask for a metric in every bullet" pins the `modes/interview.md` and `modes/add.md` lines, and `tests/story-bank-contract.test.mjs` the field |
+| B3, follow-up | Added on 2026-11-13 after the contract review: `story-provenance-check.mjs` classifies every figure on a `**Scope:**` line against `cv.md`, so an unbacked scope number is reported instead of passing as clean. | `tests/story-provenance-scope.test.mjs` |
+| B4 | Fixed in this branch. | `tests/recruiter-advice-wording.test.mjs`, same test as B2 |
+| C1 | Fixed in this branch. "The behavioural checks" in `modes/interview/practice.md`. | `tests/recruiter-advice-wording.test.mjs`: "practice feedback checks the common behavioural mistakes by name" |
+| C2 | Fixed in this branch. `node story-coverage.mjs`, run by `modes/interview/plan.md` step 5. | `tests/story-coverage.test.mjs` |
+| C3, C4, C5, C6 | Fixed in this branch, in the recruiter-screen pack of `modes/interview-prep.md`. | `tests/recruiter-advice-wording.test.mjs`: "interview prep gives points and evidence" |
+| D1 | Not built. About 100 tracker rows and few sent applications would make a per-template rate noise. | none |
+| D2 | Fixed in this branch, small. A story's Result can be "pending", and `story-coverage.mjs` lists those stories. No new file or mode. | `tests/story-bank-contract.test.mjs`, `tests/story-coverage.test.mjs` |
+| D3 | Not built. Upstream declined it in writing (`templates/ats-rules.yml`). | none |
+| D4 | Left as built. It is upstream's design, and `pdf --ats` already folds it for parsers. | none |
+
+Not verified by this branch: that a CV or prep document an agent writes from the new wording reads differently. The tests pin the wording, not the agent's output. The first CV generated after the merge is that check.

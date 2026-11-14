@@ -502,7 +502,7 @@ Two things follow from that, and they are the cheapest wins available:
 
 ### Step 4: Tailor the CV HTML (~3,000 Tokens)
 
-Now, use the headless tailor to inject JD keywords, reorder experience, and build the customized HTML for the role.
+Now, use the headless tailor to put the real experience in the JD's own terms, reorder experience, and build the customized HTML for the role.
 
 ```bash
 OPENAI_API_KEY="sk-or-your_openrouter_key" \

@@ -203,11 +203,11 @@ Wait for all four answers before proceeding to Step 7.
 Select 4-5 achievement bullets from `cv.md` only (`article-digest.md` may be read for context but is not a source of achievement bullets):
 1. Read all bullet points across all roles in cv.md
 2. Score each against the JD's top 3-4 required competencies
-3. Pick the 4-5 highest-scoring, with at least one metric per bullet
+3. Pick the 4-5 highest-scoring. Prefer a bullet whose result is stated, with its metric when cv.md has one
 4. Use the exact wording and metrics from cv.md — never paraphrase or invent
 5. Apply keyword mirroring from Step 4 to the vocabulary around each bullet (not the metrics)
 
-Format: `**Bold lead phrase,** one sentence of impact with metric.` This describes the *rendered* bullet only — the `lead` value in the JSON payload (Step 9) must be a bare phrase with no trailing punctuation; `generate-cover-letter.mjs` appends the comma automatically when building the bullet.
+Format: `**Bold lead phrase,** one sentence of impact, with its metric when cv.md has one.` This describes the *rendered* bullet only — the `lead` value in the JSON payload (Step 9) must be a bare phrase with no trailing punctuation; `generate-cover-letter.mjs` appends the comma automatically when building the bullet.
 
 ---
 
@@ -236,10 +236,10 @@ Years of experience, current/most recent role, domain. Read from cv.md summary.
 Tone matches user's choice from Step 6D.
 
 [Achievements — 4-5 bullets]
-• **Lead phrase,** impact sentence with metric.
-• **Lead phrase,** impact sentence with metric.
-• **Lead phrase,** impact sentence with metric.
-• **Lead phrase,** impact sentence with metric.
+• **Lead phrase,** impact sentence, with its metric when cv.md has one.
+• **Lead phrase,** impact sentence, with its metric when cv.md has one.
+• **Lead phrase,** impact sentence.
+• **Lead phrase,** impact sentence.
 
 [Problems I will solve — 2-3 sentences]
 Derived from: confirmed research (Step 3) + Angle B + Angle C.
@@ -273,7 +273,7 @@ contracts, plus the bans that are stricter than the shared list.
 5. **No filler openers** — never "I am pleased to", "I am writing to express", "I am excited to"
 6. **Concrete over abstract** — every claim needs a number, system name, or specific outcome. "Improved performance" is banned. "Cut latency from 2s to 380ms" is fine.
 7. **350-420 words** total body (header + credentials not counted)
-8. **Bullet format** — `**Bold lead phrase,** impact sentence with metric.` No em dash between lead and sentence.
+8. **Bullet format** — `**Bold lead phrase,** impact sentence, with its metric when cv.md has one.` No em dash between lead and sentence.
 9. **Self-check** — before finalising, re-read each sentence: could it appear in any cover letter for any company? If yes, rewrite it.
 10. **Tone consistency** — apply the chosen tone (Step 6D) uniformly. Don't shift register mid-letter.
 

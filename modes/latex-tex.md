@@ -43,7 +43,7 @@ latex:
 5. Tailor **only** the `slots[].text` values for JD fit (same ethics as `modes/latex.md` / `pdf`):
    - Extract 15–20 JD keywords
    - Reorder bullets by relevance (reorder patch list order if needed; patch ids stay stable)
-   - Inject keywords into existing achievements — **NEVER invent skills**
+   - Use the JD's own terms in existing achievements where they truthfully apply — **NEVER invent skills**
    - If `cv.md` exists, cross-check claims against it; omit anything not backed by in-scope sources
 6. Write the patches file to `/tmp/cv-patches[-{report}]-{company}.json` (include `-{report}` whenever a report number exists, as in `modes/latex.md` step 11):
 

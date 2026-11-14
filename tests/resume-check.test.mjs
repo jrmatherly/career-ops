@@ -76,12 +76,17 @@ test('scores the share of rules with no open finding, and groups them by categor
   assert.deepEqual(report.categories.contact, { total: 7, passed: 6 });
 });
 
-test('leaves the English heading rule out of the score for other languages', () => {
+test('leaves the English heading and weak-bullet rules out of the score for other languages', () => {
   const english = lint(makeResume());
   const german = lint(makeResume((data) => (data.metadata.page.locale = 'de-DE')));
-  assert.equal(german.totalRules, english.totalRules - 1);
+  assert.equal(german.totalRules, english.totalRules - 2);
   assert.equal(german.categories.headings.total, english.categories.headings.total - 1);
-  assert.equal(lint(makeResume(), { locale: 'de-DE' }).totalRules, english.totalRules - 1, 'opts.locale wins over metadata');
+  assert.equal(lint(makeResume(), { locale: 'de-DE' }).totalRules, english.totalRules - 2, 'opts.locale wins over metadata');
+  const weak = makeResume((data) => {
+    data.metadata.page.locale = 'de-DE';
+    data.sections.experience.items[0].description = '<ul><li>Responsible for billing.</li></ul>';
+  });
+  assert.deepEqual(codesOf(weak), []);
 });
 
 test('keys findings by entry id, so reordering entries keeps the key', () => {
@@ -570,7 +575,7 @@ test('check --in --json exits 0 with the report', () => withRoot((root) => {
   const r = run(root, 'check', '--in', SAMPLE, '--json');
   assert.equal(r.status, 0, r.stderr);
   const report = JSON.parse(r.stdout);
-  assert.equal(report.totalRules, 23);
+  assert.equal(report.totalRules, 25);
   assert.ok(Array.isArray(report.findings) && report.findings.every((f) => CHECK_RULE_IDS.includes(f.id)));
 }));
 
@@ -579,7 +584,7 @@ test('check prints a score below 100 and the missing email, and --ignore drops i
   const r = run(root, 'check', '--in', draft);
   assert.equal(r.status, 0, r.stderr);
   const lines = r.stdout.trim().split('\n');
-  const [, score] = lines[0].match(/^Check score (\d+)\/100 \(\d+ of 23 rules pass\)$/);
+  const [, score] = lines[0].match(/^Check score (\d+)\/100 \(\d+ of 25 rules pass\)$/);
   assert.ok(Number(score) < 100);
   assert.ok(lines.some((line) => line.startsWith('MISSING_EMAIL contact basics.email  ')), r.stdout);
 
@@ -608,7 +613,7 @@ test('check without --in absorbs cv.md in memory, writing nothing', () => withRo
   const r = run(root, 'check', '--json');
   assert.equal(r.status, 0, r.stderr);
   const report = JSON.parse(r.stdout);
-  assert.equal(report.totalRules, 23);
+  assert.equal(report.totalRules, 25);
   assert.ok(report.findings.some((f) => f.id === 'MISSING_PHONE'), r.stdout);
   assert.equal(existsSync(join(root, 'data', 'resume.json')), false);
 }));
@@ -667,6 +672,73 @@ test('export keeps human text on the absorb gate failure that check --json turns
   assert.match(r.stdout, /^cv\.md does not absorb losslessly/);
 }));
 
+test('a bullet that opens with a duty phrase is flagged, and the same words mid-sentence are not', () => {
+  const data = parsed(sample());
+  data.sections.experience.items[0].description =
+    '<ul><li>Responsible for billing disputes.</li><li>Led the team responsible for billing.</li></ul>';
+  const found = lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START');
+  assert.equal(found.length, 1);
+  assert.equal(found[0].params.text, 'Responsible for billing disputes.');
+  assert.equal(found[0].params.count, 1);
+  assert.equal(found[0].severity, 'info');
+});
+
+test('two weak bullets in one description are one finding with a count, and a role is checked under its own key', () => {
+  const data = parsed(sample());
+  data.sections.experience.items[0].description = '<ul><li>Helped with releases.</li><li>Worked on billing.</li></ul>';
+  data.sections.experience.items[1].roles[0].description = '<ul><li>Assisted the support team.</li></ul>';
+  const found = lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START');
+  assert.deepEqual(found.map((f) => f.params.count), [2, 1]);
+  assert.match(found[0].message, /and so does 1 more in this entry/);
+  assert.match(found[1].pointer, /\/roles\/0\/description$/);
+  assert.equal(new Set(found.map((f) => f.key)).size, 2);
+});
+
+test('a paragraph is not linted as a bullet, alone or above a list', () => {
+  const data = parsed(sample());
+  data.sections.experience.items[0].description = '<p>Responsible for the billing platform.</p>';
+  assert.deepEqual(lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START'), []);
+  data.sections.experience.items[0].description += '<ul><li>Shipped the intake form.</li></ul>';
+  assert.deepEqual(lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START'), []);
+});
+
+test('a bullet over 240 characters is flagged, and a link target does not count', () => {
+  const data = parsed(sample());
+  const long = `Consolidated ${'vendor approvals and '.repeat(12)}one intake form.`;
+  const linked = `<a href="https://example.com/${'x'.repeat(300)}">Shipped the intake form</a>`;
+  data.sections.experience.items[0].description = `<ul><li>${long}</li><li>${linked}</li></ul>`;
+  const found = lint(data).findings.filter((f) => f.id === 'LONG_BULLET');
+  assert.equal(found.length, 1);
+  assert.equal(found[0].params.count, 1);
+  assert.equal(found[0].params.length, long.length);
+  assert.ok(found[0].params.text.length <= 61);
+  data.sections.experience.items[0].description = `<ul><li>${'a'.repeat(240)}</li><li>Assisted-living intake rebuilt.</li><li>PARTICIPATED IN the audit.</li></ul>`;
+  const edge = lint(data).findings.filter((f) => f.id.endsWith('BULLET') || f.id === 'WEAK_BULLET_START');
+  assert.deepEqual(edge.map((f) => [f.id, f.params.text]), [['WEAK_BULLET_START', 'PARTICIPATED IN the audit.']]);
+});
+
+test('nested, unclosed and glyph-led list items are each read as their own bullet', () => {
+  const weak = (description) => {
+    const data = parsed(sample());
+    data.sections.experience.items[0].description = description;
+    return lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START').map((f) => [f.params.text, f.params.count]);
+  };
+  assert.deepEqual(weak('<ul><li>Led platform work<ul><li>Responsible for billing.</li><li>Helped QA.</li></ul></li></ul>'), [['Responsible for billing.', 2]]);
+  assert.deepEqual(weak('<ul><li>Responsible for billing.<li>Shipped the form.</ul>'), [['Responsible for billing.', 1]]);
+  assert.deepEqual(weak('<ul><li>• Worked on releases.</li></ul><p>Responsible for nothing listed.</p>'), [['Worked on releases.', 1]]);
+  assert.deepEqual(weak('<ul><li>Built tooling.</li></ul><p>Responsible for regional operations.</p><ol><li>Reduced delays.</li></ol>'), []);
+  assert.deepEqual(weak('<ul><li>Built a workflow that<ul><li>Reduced failures.</li></ul>helped teams ship faster.</li></ul>'), []);
+  assert.deepEqual(weak('<li>Helped with a bare item.'), [['Helped with a bare item.', 1]]);
+  assert.deepEqual(weak('<ul><!-- <li>Helped with the old thing.</li> --><li>— Assisted the audit.</li></ul>'), [['Assisted the audit.', 1]]);
+});
+
 test('every rule id is produced by some fixture above', () => {
   assert.deepEqual(CHECK_RULE_IDS.filter((id) => !seen.has(id)), []);
+});
+
+test('a long bullet is flagged in a resume that is not in English', () => {
+  const data = parsed(sample());
+  data.metadata.page.locale = 'de-DE';
+  data.sections.experience.items[0].description = `<ul><li>${'a'.repeat(241)}</li></ul>`;
+  assert.equal(lint(data).findings.filter((f) => f.id === 'LONG_BULLET').length, 1);
 });

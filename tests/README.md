@@ -179,8 +179,15 @@ The suite is run inside real workspaces, so it never reads or writes the
 developer's data. When `helpers.mjs` loads it creates a scratch directory, pins
 `CAREER_OPS_ROOT` to it (clearing `CAREER_OPS_DATA_DIR`, as it clears
 `CAREER_OPS_TRACKER`), and removes it at exit. Every script a test spawns
-inherits that, so the default for a new test is already safe.
+inherits that. A suite is covered when it is run by
+`test-all.mjs`, or when it imports `helpers.mjs` itself.
 
+- **A test that imports a script in-process**, rather than spawning it, imports
+  `helpers.mjs` first, even when it uses nothing from it. A script reads the
+  data root when it is imported, so a suite without that import resolves to the
+  developer's checkout whenever it is run on its own.
+  `rendering-suites-pin-data-root.test.mjs` enforces this for the suites that
+  render a PDF.
 - **A test that needs data** writes it under a `mkdtemp` directory and passes
   that directory to the child: `env: { ...process.env, CAREER_OPS_ROOT: dir,
   CAREER_OPS_DATA_DIR: '' }`. Never write a fixture over a file under `ROOT`
@@ -199,3 +206,21 @@ anything differs. That includes the user files resolved from the checkout
 rather than the data root (`plugins.local/`, `plugins.lock`, `opencode.json`,
 `.claude/settings.json`, `.claude/hooks/`), which the scratch root does not
 move: a test that touches them works in a fixture checkout of its own.
+
+To check that no suite leaves a file behind when it runs outside the runner,
+run every suite that way in a throwaway clone and list what changed:
+
+```bash
+audit=$(mktemp -d) && git clone -q --local . "$audit" && cd "$audit" \
+  && cp -c -R "$OLDPWD/node_modules" node_modules \
+  && { env -u CAREER_OPS_ROOT -u CAREER_OPS_DATA_DIR -u CAREER_OPS_TEST_DATA_ROOT -u CAREER_OPS_TRACKER \
+       node --test --test-concurrency=10 "tests/**/*.test.mjs" > /dev/null 2>&1; \
+       git status --short --ignored | grep -v node_modules; }
+```
+
+On Linux, `cp -c` is `cp --reflink=auto`.
+
+An empty list is a pass. The exit status is not: a few suites fail outside the
+runner for reasons of their own. The clone holds committed files only, so
+commit first. Every step is chained, so a failed clone never runs the suites
+in the checkout you are standing in. It takes about two and a half minutes.

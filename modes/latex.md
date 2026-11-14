@@ -13,10 +13,10 @@ Export a tailored, ATS-optimized CV as a `.tex` file and compile it to PDF via `
 4. Extract 15-20 keywords from the JD
 5. Use `language.output` for the CV language. The JD language and `language.modes_dir` supply market vocabulary and evaluation context, but never override the configured output language.
 6. Detect role archetype → adapt framing
-7. Rewrite Professional Summary injecting JD keywords (same rules as `pdf` mode — NEVER invent skills)
+7. Rewrite Professional Summary around the role, in the JD's own terms (same rules as `pdf` mode — NEVER invent skills)
 8. Select top 3-4 most relevant projects for the offer, and populate `awards[]` from `cv.md`'s Awards / Honors section when it has entries that support the role (omit the key otherwise — the section is dropped, header included; never invent an award)
 9. Reorder experience bullets by JD relevance
-10. Inject keywords naturally into existing achievements
+10. Use the JD's own term where it truthfully names what the candidate did (NEVER invent)
 11. Build a JSON payload (see schema below) and write to `/tmp/cv-{candidate}-{company}.json` — if a report number is already assigned for this run (auto-pipeline, batch, or any parallel fan-out per AGENTS.md "Parallel fan-outs"), include it: `/tmp/cv-{candidate}-{report}-{company}.json`. Two parallel agents handling the same company on the same day otherwise write the *same* temp path and can silently read each other's JSON.
 12. Run: `node build-cv-latex.mjs /tmp/cv-{candidate}[-{report}]-{company}.json output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.tex`
 13. Run: `node generate-latex.mjs output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.tex output/cv-{candidate}-{report}-{company}-{YYYY-MM-DD}.pdf`
@@ -62,8 +62,8 @@ Write a JSON file with this structure. `build-cv-latex.mjs` handles template mer
       "location": "Remote",
       "dates": "June 2022 - Present",
       "bullets": [
-        "Achievement bullet with JD keywords injected",
-        "Another bullet with quantified impact"
+        "Achievement bullet in the JD's own terms",
+        "Another bullet: what was done, how, and the result"
       ]
     }
   ],
@@ -111,7 +111,7 @@ Write a JSON file with this structure. `build-cv-latex.mjs` handles template mer
 | `experience[].role` | string | Job title |
 | `experience[].location` | string | Work location |
 | `experience[].dates` | string | Date range |
-| `experience[].bullets` | string[] | Reordered and keyword-injected achievement bullets. Wrap a span in `**…**` to emphasise it — the builder renders it as `\textbf{…}` after escaping (see **Markdown bold in bullets** below) |
+| `experience[].bullets` | string[] | Reordered achievement bullets in the JD's own terms. Wrap a span in `**…**` to emphasise it — the builder renders it as `\textbf{…}` after escaping (see **Markdown bold in bullets** below) |
 | `projects[].name` | string | From cv.md Projects |
 | `projects[].context` | string | Tech stack — appears next to project name |
 | `projects[].dates` | string | Date range (or empty) |
@@ -176,7 +176,7 @@ Emphasis is not a substitute for evidence — bold reorders attention, it does n
 - Standard section headers: Education, Work Experience, Personal Projects, Awards & Honors, Technical Skills
 - Optional sections (Work Experience, Personal Projects, Education, Awards & Honors, Technical Skills) are dropped entirely — header included — when their array is empty or absent
 - UTF-8, machine-readable via `\pdfgentounicode=1`
-- Keywords distributed: first bullet of each role, skills section
+- JD terms appear where the matching work is described: the summary, the bullets that did that work, and Skills. Never repeat a term to raise a count.
 - No images, no graphics, no color in body text
 
 ## Keyword Injection Strategy

@@ -17,6 +17,10 @@ import { linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+// Loaded for its side effect: it pins CAREER_OPS_ROOT to a scratch directory.
+// generate-pdf.mjs reads the data root when it is imported, and a successful
+// render records a row in that root's data/pdf-index.tsv.
+import './helpers.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const { renderHtmlToPdf } = await import(pathToFileURL(join(ROOT, 'generate-pdf.mjs')).href);

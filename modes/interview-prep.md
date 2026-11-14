@@ -193,24 +193,28 @@ When that round's Platform resolves to "HireVue" (detected, but `isAIInterviewer
 
 ## Step 4 — Likely Questions (per audience)
 
-Group all discovered and inferred questions by the audience that asks them, not by question type. Within each audience, draft candidate-specific answers using `cv.md`, `article-digest.md`, `config/profile.yml`, and `modes/_profile.md`. **Never fabricate questions** — sourced questions must cite, inferred questions must be tagged `[inferred from JD]`.
+Group all discovered and inferred questions by the audience that asks them, not by question type. Within each audience, prepare candidate-specific answers using `cv.md`, `article-digest.md`, `config/profile.yml`, and `modes/_profile.md`. **Never fabricate questions** — sourced questions must cite, inferred questions must be tagged `[inferred from JD]`.
+
+By default, give the candidate points and evidence, not a script. For each question write the point to land, the one or two proof points that carry it, and the role's need it speaks to. Write full sentences only for a figure, a name or a phrase that has to be exact. Tell the candidate to practise saying the points several ways, since a memorised answer breaks on the first follow-up.
 
 If any of those profile files are missing, incomplete, or out-of-date, note the gap inline (e.g. "comp target unknown — defer to recruiter band") and proceed with what's available rather than blocking the prep. The mode's value is partial-but-honest output, not perfect-or-nothing.
 
-For every answer, use result-first framing:
+One shape per kind of answer. A behavioral question takes a story in STAR order, with its Reflection when the story has one, as the story bank holds it. Open with the Result in one sentence, then tell the story in order. Use a figure from the story bank only as `node story-provenance-check.mjs --summary` clears it, and never lead with a Result that is still pending: tell that story from its Action and list its Result as a gap. Every other answer (a motivation, a design choice, an opinion) uses result-first framing:
 
 1. **Headline** — the result, decision, or point.
 2. **Effect** — why it mattered to the business, users, system, or team.
 3. **Rationale** — what tradeoff or constraint shaped the choice.
 4. **Operations** — what the candidate actually did, with enough implementation detail to be credible.
 
-This is especially important for senior, technical, and leadership answers. Simple recruiter answers can be shorter, but should still start with the point.
+Result-first framing matters most in senior and technical answers. Simple recruiter answers can be shorter, but should still start with the point.
 
 ### Audience: `recruiter-screen`
 
 The recruiter is screening for fit, not testing skill. Wrong-foot answers (vague comp, fuzzy motivation, missing logistics) end the process before any technical signal is collected. Cover at minimum:
 
-- **"Walk me through your CV / why are you looking?"** — 60–90s narrative anchored to `modes/_profile.md` narrative + the role's archetype.
+- **"Tell me about yourself" / "Walk me through your CV"** — 60–90s, built from four points: Where the candidate is now. The progression or specialty most relevant to this role. One or two experiences that support it. Why this role is a sensible next step. Start where the relevant story starts, not at the first job. For a walk-through, go in order but give the relevant roles the time. For a career change, lead with what transfers and name the gap plainly.
+- **"Why are you looking?" / "Why did you leave?"** — the decision and what the candidate wants more of, from `config/profile.yml` → `narrative.exit_story` and `modes/_profile.md`, with no complaint about a past employer. If neither says why the candidate left, list it as a gap and never write a reason. If the candidate was laid off, say so in one sentence and move on. Then compare the reason with this role: if the evaluation or the JD shows the same condition here (limited growth, on-call load, travel), flag it to the candidate before the call.
+- **"What are you looking for?"** — the candidate's real preferences from `config/profile.yml` and `modes/_profile.md`, and where this role meets them. Where it does not, say so to the candidate. Never write an answer that claims a preference they did not state.
 - **Comp expectation** — concrete range pulled from Step 1 Levels.fyi/Glassdoor data, anchored to `config/profile.yml` `compensation.target_range` (`compensation.minimum` is the floor, never volunteered). Note the leverage hand: if comp data is thin or the candidate has no competing offer, recommend deferring with a clean script ("I'm calibrating to market for {level}, can you share the band for this role?").
 - **Why this company** — 2–3 sentences referencing public signals from Step 1 (recent launch, named values, team work). Avoid generic praise.
 - **Location / remote / visa** — answer derived from `config/profile.yml` location policy and the role's posted policy. Flag deal-breakers from `modes/_profile.md` so the recruiter can route correctly.
@@ -226,7 +230,7 @@ The HM is screening for motivation + scope fit. They've already trusted the recr
 - **"What would your first 90 days look like here?"** — derived from JD scope + the team's recent work (engineering blog, public roadmap).
 - **Risk map closure** — make sure the strongest likely doubts from the evaluation are answered with concrete proof, not enthusiasm.
 - **Leadership / collaboration questions** — map to `interview-prep/story-bank.md`.
-- **Sharp questions to ask back** — 2–3 tied to a specific recent thing the team shipped or wrote about, not generic "what's the team like".
+- **Sharp questions to ask back** — 2–3 tied to a specific recent thing the team shipped or wrote about, not generic "what's the team like". Add one question that tests each deal-breaker in `modes/_profile.md` the JD leaves open, worded as a neutral question about how the team works.
 
 ### Audience: `peer-tech`
 

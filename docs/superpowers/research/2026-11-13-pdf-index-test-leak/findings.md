@@ -78,4 +78,11 @@ An earlier quick-suite run the same evening also reported one failure. Its log w
 
 ## Outcomes
 
-To be filled in by the plan `docs/superpowers/plans/2026-11-13-pdf-atomic-write-data-root-leak.md`.
+Plan: `docs/superpowers/plans/2026-11-13-pdf-atomic-write-data-root-leak.md`. Branch: `feat/recruiter-advice-and-test-leak`.
+
+| Finding | Outcome |
+|---------|---------|
+| `tests/generate-pdf-atomic-write.test.mjs` writes `data/pdf-index.tsv` into the checkout | Fixed in this branch. The suite imports `tests/helpers.mjs`, and `tests/rendering-suites-pin-data-root.test.mjs` fails when a rendering suite pins no data root. |
+| `tests/README.md` overstates the default | Fixed in this branch, with the in-process import rule and the clone audit command. |
+| The index writer records a row for a PDF outside its workspace | Not built. `generate-pdf.mjs` is an upstream product file, the problem is test-only, and suites that set `CAREER_OPS_PDF_INDEX` and render into their own temp directory would break. |
+| Suites that fail outside the runner | Not investigated. |

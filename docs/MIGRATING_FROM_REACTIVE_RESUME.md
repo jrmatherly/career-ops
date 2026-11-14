@@ -39,7 +39,7 @@ node resume.mjs absorb --json
 node resume.mjs check
 ```
 
-`absorb` reports `lossless: true` when `cv.md` and `data/resume.json` agree. `check` lists the 23 Reactive Resume Check rules against your CV with a score; it is advisory.
+`absorb` reports `lossless: true` when `cv.md` and `data/resume.json` agree. `check` scores your CV against the 23 Reactive Resume Check rules and two career-ops bullet rules and prints the score and its findings; it is advisory. The weak-opening bullet rule applies to English resumes only.
 
 ## 3. Import the applications
 

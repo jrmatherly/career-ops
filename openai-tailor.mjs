@@ -237,7 +237,7 @@ ${profileContent}
 IMPORTANT OPERATING RULES FOR THIS SESSION
 ═══════════════════════════════════════════════════════
 1. NEVER invent skills, metrics, or experience the candidate does not have.
-2. Inject keywords naturally by reformulating the real experience using JD vocabulary.
+2. Reformulate the real experience in JD vocabulary where it truthfully applies. A keyword is not a qualification.
 3. Apply the 6-second clarity gate: strongest matching evidence first.
 4. Replace all {{PLACEHOLDERS}} in the HTML Template exactly as instructed.
 5. Your final output MUST be the complete, raw, tailored HTML document.

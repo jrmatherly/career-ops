@@ -128,18 +128,30 @@
  * Deliberately not exhaustive — matches jd-skill-gap.mjs's design stance
  * that under-extraction is recoverable (the user can still read the story)
  * while over-extraction would misreport narrative prose as a "claim". Five
- * patterns, each documented at its declaration below:
+ * patterns, each documented at its declaration below, plus each number on a
+ * story's `**Scope:**` line that is followed by the noun it counts
+ * (scopeClaims()), since that is a line of figures and not prose:
  *
  *   percent      \d+(\.\d+)?%                      "cut costs 40%"
  *   plus-noun     \d+\+\s+word                       "500+ employees"
  *   hour-range    N hours/hrs (→|->|to) M hours/hrs   "8 hours to 2 hours"
  *   scale-hyphen  \d+-(person|member)                 "15-person team"
  *   scale-noun    \d+ (students|employees|...)        "50 students"
+ *   scope-figure  a number and the noun it counts,    "8 associates", "$2M budget"
+ *                 on a Scope line only
+ *
+ * In every pattern a number may be a grouped thousand ("1,500 employees"),
+ * and a match must start on a whole number. readFigure() reads a Scope
+ * figure's value (magnitude applied), currency and unit the same way it reads
+ * cv.md; the five patterns read their own value and unit, and only a currency
+ * written before the number. A claim is `existing` only against a cv.md number of the same value,
+ * unit and currency: a currency written on one side only is a mismatch, and
+ * a sign agrees with the codes it can stand for ("$" with USD, CAD or AUD).
  *
  * Known gaps (not covered, intentionally, to keep the pattern set legible
  * and low-noise — same tradeoff jd-skill-gap.mjs's SKILL_TOKEN_RE makes):
  *   - spelled-out numbers ("fifty students")
- *   - currency figures ("$40K budget") — verify-cv-facts.mjs already owns
+ *   - currency figures ("$40K budget") outside a Scope line — verify-cv-facts.mjs already owns
  *     currency/metric-noun extraction for generated documents; this script
  *     stays scoped to story-bank.md's narrative shapes instead of
  *     duplicating that gate
@@ -147,6 +159,17 @@
  *     this for generated CVs; story-bank.md is authored in the profile's
  *     language, so this is a smaller gap here, but still a gap)
  *   - a bare number with no adjacent noun/unit ("trained 40 in Q1")
+ *   - on a Scope line: a percentage spelled out ("40 percent"), a figure
+ *     written after its noun ("budget $2M" is skipped at the end of an item,
+ *     and otherwise takes the next word as its noun), a
+ *     year after a month or a word such as "since" ("since 2021"), and a
+ *     number glued to a letter, slash or dot ("FY2023", "24/7", "v2.1"). A
+ *     year with no such cue ("2021 rollout") is read as a count and shows
+ *     up as unverified
+ *   - a cv.md sentence about something else that happens to count the same
+ *     number of the same noun ("8 associates" at a food bank) still verifies
+ *     the claim; the fixed-noun patterns have always had this limit, and a
+ *     Scope line extends it to any noun
  *
  * Usage:
  *   node story-provenance-check.mjs
@@ -179,8 +202,8 @@ const CLAIM_PATTERNS = [
   // "cut costs 40%" / "improved completion 12.5%"
   {
     kind: 'percent',
-    re: /\d+(?:\.\d+)?%/g,
-    values: (m) => [parseFloat(m[0])],
+    re: /(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%/g,
+    values: (m) => [toNumber(m[0])],
     units: () => ['%'],
   },
   // "500+ employees", "50+ courses" — number, literal +, a following word.
@@ -190,39 +213,40 @@ const CLAIM_PATTERNS = [
   // unit cv.md has to count in.
   {
     kind: 'plus-noun',
-    re: /\b(\d+)\+\s+([a-zA-Z]+)/g,
-    values: (m) => [parseFloat(m[1])],
+    re: /\b(\d{1,3}(?:,\d{3})+|\d+)\+\s+([a-zA-Z]+)/g,
+    values: (m) => [toNumber(m[1])],
     units: (m) => [normalizeUnit(m[2])],
   },
   // "8 hours to 2 hours", "8 hrs -> 2 hrs" — the classic before/after
   // automation-story shape. Both endpoints must match cv.md for `existing`.
   {
     kind: 'hour-range',
-    re: /\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:→|->|to)\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b/gi,
-    values: (m) => [parseFloat(m[1]), parseFloat(m[2])],
+    re: /\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\s*(?:→|->|to)\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b/gi,
+    values: (m) => [toNumber(m[1]), toNumber(m[2])],
     units: () => ['hour', 'hour'],
   },
   // "15-person team", "6-member panel"
   {
     kind: 'scale-hyphen',
-    re: /\b(\d+)-(person|member)\b/gi,
-    values: (m) => [parseFloat(m[1])],
+    re: /\b(\d{1,3}(?:,\d{3})+|\d+)-(person|member)\b/gi,
+    values: (m) => [toNumber(m[1])],
     units: (m) => [normalizeUnit(m[2])],
   },
   // "50 students", "200 employees", "12 instructors"
   {
     kind: 'scale-noun',
-    re: /\b(\d+)\s+(students?|employees?|people|staff|learners?|instructors?|departments?|cohorts?)\b/gi,
-    values: (m) => [parseFloat(m[1])],
+    re: /\b(\d{1,3}(?:,\d{3})+|\d+)\s+(students?|employees?|people|staff|learners?|instructors?|departments?|cohorts?)\b/gi,
+    values: (m) => [toNumber(m[1])],
     units: (m) => [normalizeUnit(m[2])],
   },
 ];
 
 const HOUR_UNITS = new Set(['h', 'hr', 'hrs', 'hour', 'hours']);
 // Units that say how much but not of what (see hasScopedNumberMatch()), and
-// the words that spell them, which are never context.
+// the words that are never context: the ones that spell those units,
+// magnitudes ("million") and currency codes.
 const UNITS_WITHOUT_METRIC = new Set(['%', 'hour']);
-const UNIT_WORDS = new Set([...HOUR_UNITS, 'percent', 'cent']);
+const UNIT_WORDS = new Set([...HOUR_UNITS, 'percent', 'cent', 'thousand', 'million', 'billion', 'usd', 'eur', 'gbp', 'jpy', 'cad', 'aud', 'chf']);
 const METRIC_CONTEXT_WORDS = 2;
 const PERSON_UNITS = new Set(['person', 'persons', 'people', 'member', 'members']);
 
@@ -241,26 +265,71 @@ function normalizeUnit(word) {
   return w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
 }
 
-/**
- * The unit a number in cv.md is followed by: `%` (or "percent"), or the next
- * word, through a hyphen or a `+` ("15-person", "500+ customers"). null when
- * nothing unit-like follows — "2019 – 2024" verifies nothing.
- * @param {string} text
- * @param {number} end - index just past the number
- * @returns {string|null}
- */
-function unitAfter(text, end) {
-  const after = foldForContext(text.slice(end, end + 40));
-  if (/^\s?(?:%|per\s?cent\b)/.test(after)) return '%';
-  const word = after.match(/^(?:-|\+?\s*)(\p{L}+)/u);
-  return word ? normalizeUnit(word[1]) : null;
-}
-
 // Generic number scanner used to find every number in cv.md. Permissive on
 // purpose: it finds the candidates, and buildCvNumberContexts() records the
 // unit and sentence each one sits in, so a claim counts as `existing` only
 // against an occurrence of the same number counting the same thing.
-const NUMBER_SCAN_RE = /\d+(?:\.\d+)?/g;
+// A grouped thousand ("120,000", "1,200.50") is one number, not 120 and 0.
+const NUMBER_SCAN_RE = /(?<!\d)\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d|,\d)|\d+(?:\.\d+)?/g;
+const toNumber = (digits) => parseFloat(digits.replace(/,/g, ''));
+
+/** The currency written just before the number at `start`: a sign ("$2M") or an ISO code ("USD 2M"), or null. */
+function leadingCurrency(text, start) {
+  // A code before a sign wins: "USD $2M" is USD, not any dollar.
+  const sign = /[$€£¥]/.test(text[start - 1] ?? '') ? text[start - 1] : '';
+  const at = start - sign.length;
+  const code = text.slice(Math.max(0, at - 5), at).match(/(?<!\p{L})(usd|eur|gbp|jpy|cad|aud|chf)[ \t]?$/iu);
+  if (code) return { currency: code[1].toUpperCase(), length: code[0].length + sign.length };
+  return { currency: sign || null, length: sign.length };
+}
+
+const MAGNITUDES = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9, thousand: 1e3, million: 1e6, billion: 1e9 };
+// Words that follow a number without saying what it counts ("8 to 12", "3 of the").
+const NOT_A_UNIT = new Set(['to', 'of', 'and', 'or', 'per', 'in', 'a', 'an', 'the', 'at', 'on', 'for', 'by', 'with', 'from', 'as']);
+
+/**
+ * What the number at [start, end) says: its value with any magnitude applied
+ * ("$2M" and "2 million" are both 2,000,000), the currency it is written in
+ * (a sign or ISO code before or after it), and the unit it counts:
+ * `%`, or the next word through a hyphen or a `+` ("15-person", "500+
+ * customers"). The lower bound of a range takes the upper bound's unit ("8 to
+ * 12 associates", "8-12 associates", "8 – 12 associates"), when the range runs
+ * upward and is not two years. A code after a sign wins ("$2M USD" is USD).
+ * `unit` is null when nothing unit-like follows: "2019 – 2024 rollout"
+ * verifies nothing for 2019, and neither does "8 to".
+ * Scope-line claims and cv.md are both read through this, so they compare like
+ * with like. The five patterns read their own value and unit.
+ * @param {string} text
+ * @param {number} start
+ * @param {number} end - index just past the number
+ * @param {number} [limit] - read no further than this index
+ * @returns {{value: number, currency: string|null, unit: string|null, textEnd: number}}
+ */
+function readFigure(text, start, end, limit = end + 60) {
+  let at = end;
+  const eat = (re) => {
+    const m = text.slice(at, limit).match(re);
+    if (m) at += m[0].length;
+    return m;
+  };
+  let value = toNumber(text.slice(start, end));
+  let { currency } = leadingCurrency(text, start);
+  if (eat(/^\s?(?:%|per\s?cent\b)/i)) return { value, currency, unit: '%', textEnd: at };
+  // A range runs upward and is not two years: in "5 - 3 engineers" the dash
+  // is a separator, and "2019 – 2024" is a date.
+  const upper = text.slice(at, limit).match(/^(?:[ \t]*[-–][ \t]*|[ \t]+to[ \t]+)(\d[\d,]*(?:\.\d+)?)(?![\d,])/i);
+  const isYear = (s) => /^(?:19|20)\d\d$/.test(s);
+  if (upper && toNumber(upper[1]) > value && !(isYear(upper[1]) && isYear(text.slice(start, end)))) at += upper[0].length;
+  const magnitude = eat(/^(?:(k|mm|m|bn|b)(?![\p{L}\p{N}])|[ \t]?(thousand|million|billion)(?!\p{L}))/iu);
+  // toPrecision: 2.01 * 1e6 is 2009999.9999999998, which would miss "2,010,000".
+  if (magnitude) value = Number((value * MAGNITUDES[(magnitude[1] ?? magnitude[2]).toLowerCase()]).toPrecision(15));
+  const trailing = eat(/^[ \t]?(?:([$€£¥])|(usd|eur|gbp|jpy|cad|aud|chf)(?!\p{L}))/iu);
+  // An ISO code says more than a sign: "$2M USD" is USD, not any dollar.
+  if (trailing) currency = trailing[2]?.toUpperCase() ?? currency ?? trailing[1];
+  const word = eat(/^(?:-|\+?[ \t]*)(\p{L}+)/u);
+  const unit = word && !NOT_A_UNIT.has(word[1].toLowerCase()) ? normalizeUnit(foldForContext(word[1])) : null;
+  return { value, currency, unit, textEnd: at };
+}
 
 // Filtered out of context-word overlap so common connective words don't
 // manufacture a false supportedByResume match.
@@ -374,19 +443,62 @@ function malformedEntries(entries) {
 /**
  * Extract numeric claims from a story block's body text.
  * @param {string} body
- * @returns {Array<{kind: string, text: string, index: number, values: number[], units: string[]}>}
+ * @returns {Array<{kind: string, text: string, index: number, values: number[], units: string[], currency: string|null, words?: string[]}>}
  */
 function extractClaims(body) {
   const claims = [];
+  // A pattern may only match from the start of a whole number: the "500" inside "1,500 employees" is not a claim.
+  const numberStarts = new Set([...body.matchAll(NUMBER_SCAN_RE)].map((m) => m.index));
   for (const { kind, re, values, units } of CLAIM_PATTERNS) {
     re.lastIndex = 0;
     let m;
     while ((m = re.exec(body)) !== null) {
-      claims.push({ kind, text: m[0], index: m.index, values: values(m), units: units(m) });
+      if (!numberStarts.has(m.index)) continue;
+      claims.push({ kind, text: m[0], index: m.index, values: values(m), units: units(m), currency: leadingCurrency(body, m.index).currency });
     }
   }
+  claims.push(...scopeClaims(body, claims));
   claims.sort((a, b) => a.index - b.index);
   return claims;
+}
+
+// A year reads as a date after a month or a word such as "since". Without one, "2000 customers" is a count.
+const DATED_YEAR_RE = /(?<!\p{L})(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\p{L}*\.?[ \t]+$|(?<!\p{L})(?:in|since|from|until|till|through|by|during|fy)[ \t]+$/iu;
+const SCOPE_LINE_RE = /^[ \t]*(?:[-*+>][ \t]+)?\*\*Scope:\*\*[ \t]*(.+)$/gim;
+
+/**
+ * Each number on a `**Scope:**` line that is followed by its noun and that no pattern above already read. The patterns stay narrow because story
+ * prose is full of numbers that are not claims; a Scope line holds only scale figures, so each number that counts
+ * something is a claim. Each comma- or semicolon-separated item is read on its own, context words included: on
+ * "$2M budget, 5 regions" the regions say nothing about the budget.
+ *
+ * Not read, to keep noise out: a number glued to a letter, slash or dot ("FY2023", "24/7", "v2.1"), and a year
+ * that follows a month or a word such as "since".
+ * @param {string} body
+ * @param {Array<{index: number, text: string}>} taken - claims the patterns found
+ */
+function scopeClaims(body, taken) {
+  const out = [];
+  for (const line of body.matchAll(SCOPE_LINE_RE)) {
+    let itemStart = line.index + line[0].length - line[1].length;
+    for (const item of line[1].split(/;|,(?=\s)/)) {
+      const itemEnd = itemStart + item.length;
+      const words = wordsOf(item);
+      for (const m of item.matchAll(NUMBER_SCAN_RE)) {
+        const start = itemStart + m.index;
+        const end = start + m[0].length;
+        if (taken.some((c) => start >= c.index && start < c.index + c.text.length)) continue;
+        if (/[\p{L}/.]/u.test(body[start - 1] ?? '')) continue;
+        const figure = readFigure(body, start, end, itemEnd);
+        if (figure.unit === null || figure.unit === '%') continue;
+        if (/^(?:19|20)\d\d$/.test(m[0]) && DATED_YEAR_RE.test(body.slice(Math.max(0, start - 12), start))) continue;
+        const from = start - leadingCurrency(body, start).length;
+        out.push({ kind: 'scope-figure', text: body.slice(from, figure.textEnd), index: from, values: [figure.value], units: [figure.unit], currency: figure.currency, words });
+      }
+      itemStart = itemEnd + 1;
+    }
+  }
+  return out;
 }
 
 /**
@@ -398,7 +510,7 @@ function extractNumbers(text) {
   const out = new Set();
   let m;
   const re = new RegExp(NUMBER_SCAN_RE);
-  while ((m = re.exec(text)) !== null) out.add(parseFloat(m[0]));
+  while ((m = re.exec(text)) !== null) out.add(toNumber(m[0]));
   return out;
 }
 
@@ -413,17 +525,20 @@ function extractNumbers(text) {
  * percentage is not a headcount, so the unit has to match as well as the
  * context.
  * @param {string} cvText
- * @returns {Map<number, Array<{unit: string|null, sentence: number, words: string[]}>>}
+ * @returns {Map<number, Array<{currency: string|null, unit: string|null, sentence: number, words: string[]}>>}
  */
 function buildCvNumberContexts(cvText) {
   const map = new Map();
   const re = new RegExp(NUMBER_SCAN_RE);
   let m;
   while ((m = re.exec(cvText)) !== null) {
-    const value = parseFloat(m[0]);
     const end = m.index + m[0].length;
+    // As on a Scope line, the 7 of "24/7" and the year of "FY2023" count nothing. Unlike a Scope line, a glued currency code ("USD2M") is read here.
+    if (/[\p{L}/.]/u.test(cvText[m.index - 1] ?? '') && !leadingCurrency(cvText, m.index).currency) continue;
+    const { value, currency, unit } = readFigure(cvText, m.index, end);
     const occurrence = {
-      unit: unitAfter(cvText, end),
+      currency,
+      unit,
       sentence: sentenceBounds(cvText, m.index, end).start,
       words: contextWords(cvText, m.index, m[0].length),
     };
@@ -527,7 +642,12 @@ function foldForContext(text) {
 
 function contextWords(body, matchIndex, matchLength) {
   const { start, end } = sentenceBounds(body, matchIndex, matchIndex + matchLength);
-  const snippet = foldForContext(body.slice(start, end).replace(/\*\*[^*\n]*:\*\*/g, ' '))
+  return wordsOf(body.slice(start, end));
+}
+
+/** The content words of a snippet, folded: what contextWords() returns for a sentence. */
+function wordsOf(text) {
+  const snippet = foldForContext(text.replace(/\*\*[^*\n]*:\*\*/g, ' '))
     .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ');
   const words = snippet.split(/\s+/).filter(Boolean);
   // `\p{N}` not `\d`: a token of Devanagari or full-width digits is just as
@@ -568,6 +688,10 @@ function hasContextOverlap(words, cvText) {
   return words.some((w) => bounded(w).test(haystack));
 }
 
+// The ISO codes a sign can stand for. "$2M" agrees with "$2M USD" and with "2M CAD", never with "€2M".
+const SIGN_CODES = { $: ['USD', 'CAD', 'AUD'], '€': ['EUR'], '£': ['GBP'], '¥': ['JPY'] };
+const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || SIGN_CODES[b]?.includes(a));
+
 /**
  * Whether cv.md has the claim's numbers in ONE sentence, each counting the
  * claim's unit, with enough shared context words to be the same metric — the
@@ -583,17 +707,26 @@ function hasContextOverlap(words, cvText) {
  * deploy time 40%" and "The team reduced incident rate 40%" share "team" and
  * nothing about the metric, so these need METRIC_CONTEXT_WORDS shared words,
  * and the unit's own words ("hours", "percent") never count toward them.
- * @param {{values: number[], units: string[]}} claim
+ *
+ * A Scope item is a number and what it counts and nothing else, so the whole
+ * item is the context: every content word of it has to be in the cv.md
+ * sentence. "8 support engineers" is not "8 support tickets", and a noun too
+ * short to be a content word ("8 PMs", "$2M ARR") matches on its unit alone.
+ * @param {{kind?: string, values: number[], units: string[], currency?: string|null}} claim
  * @param {string[]} claimWords
  * @param {ReturnType<typeof buildCvNumberContexts>} cvNumberContexts
  * @returns {boolean}
  */
 function hasScopedNumberMatch(claim, claimWords, cvNumberContexts) {
   const occurrences = (i) => (cvNumberContexts.get(claim.values[i]) || [])
-    .filter((o) => o.unit === claim.units[i]);
+    .filter((o) => o.unit === claim.units[i] && sameCurrency(o.currency, claim.currency ?? null));
   const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS : 1;
   const shared = (words) => words.filter((w) => claimWords.includes(w) && !UNIT_WORDS.has(w)).length;
-  return occurrences(0).some((first) => shared(first.words) >= needed
+  const sameContext = claim.kind === 'scope-figure'
+    // A token with a digit is the figure itself ("250k"), already compared by value.
+    ? (words) => claimWords.every((w) => UNIT_WORDS.has(w) || /\p{N}/u.test(w) || words.includes(w))
+    : (words) => shared(words) >= needed;
+  return occurrences(0).some((first) => sameContext(first.words)
     && claim.values.every((_, i) => occurrences(i).some((o) => o.sentence === first.sentence)));
 }
 
@@ -660,7 +793,7 @@ function classifyEntries(stories, cvText) {
         continue;
       }
 
-      const claimWords = contextWords(story.body, claim.index, claim.text.length);
+      const claimWords = claim.words ?? contextWords(story.body, claim.index, claim.text.length);
 
       // Scoped number match: the number must appear in cv.md counting the
       // same unit, and that cv.md sentence must share a term with the
