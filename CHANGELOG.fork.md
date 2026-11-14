@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.2.1...career-ops-v2.3.0) (2026-11-14)
+
+
+### Features
+
+* **modes:** recruiter advice follow-ups, and the PDF atomic-write suite pins its data root ([#87](https://github.com/jrmatherly/career-ops/issues/87)) ([c3acc77](https://github.com/jrmatherly/career-ops/commit/c3acc77a87eef4975b0df30fc8f6e8c72d38a95c))
+
 ## [2.2.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.2.0...career-ops-v2.2.1) (2026-11-13)
 
 
