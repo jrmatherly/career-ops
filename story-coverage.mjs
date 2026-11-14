@@ -40,7 +40,7 @@ export const COMMON_PROMPTS = Object.freeze([
   { id: 'changed-priorities', prompt: 'priorities changed' },
   { id: 'disagreement', prompt: 'disagreement conflict coworker stakeholder' },
   { id: 'mistake', prompt: 'mistake error' },
-  { id: 'hard-feedback', prompt: 'difficult feedback criticism' },
+  { id: 'hard-feedback', prompt: 'feedback criticism' },
   { id: 'influence', prompt: 'influence authority persuasion' },
   { id: 'initiative', prompt: 'initiative proactive' },
   { id: 'deadline', prompt: 'deadline pressure' },

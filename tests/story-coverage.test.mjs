@@ -124,3 +124,10 @@ test('the CLI refuses a bank with no story, names text cut off by a table, and l
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a story about a difficult problem does not cover the hard-feedback prompt', () => {
+  const stories = bank(['### [Ops] The outage', '**A (Action):** Traced it.', '**Best for questions about:** difficult-problem']);
+  const rows = coverage(stories);
+  assert.equal(rows.find((r) => r.id === 'difficult-problem').status, 'covered');
+  assert.equal(rows.find((r) => r.id === 'hard-feedback').status, 'none');
+});

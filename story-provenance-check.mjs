@@ -723,7 +723,8 @@ function hasScopedNumberMatch(claim, claimWords, cvNumberContexts) {
   const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS : 1;
   const shared = (words) => words.filter((w) => claimWords.includes(w) && !UNIT_WORDS.has(w)).length;
   const sameContext = claim.kind === 'scope-figure'
-    ? (words) => claimWords.every((w) => UNIT_WORDS.has(w) || words.includes(w))
+    // A token with a digit is the figure itself ("250k"), already compared by value.
+    ? (words) => claimWords.every((w) => UNIT_WORDS.has(w) || /\p{N}/u.test(w) || words.includes(w))
     : (words) => shared(words) >= needed;
   return occurrences(0).some((first) => sameContext(first.words)
     && claim.values.every((_, i) => occurrences(i).some((o) => o.sentence === first.sentence)));

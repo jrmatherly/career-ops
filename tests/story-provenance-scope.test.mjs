@@ -165,3 +165,7 @@ test('every word of a Scope item has to be in the cv.md sentence, and a code bef
   assert.deepEqual(scopeOf('CAD 2M budget', 'Owned USD $2M budget.').existing, []);
   assert.deepEqual(scopeOf('USD 2M budget', 'Owned USD $2M budget.').existing, ['USD 2M budget']);
 });
+
+test('a number glued to its magnitude is not a context word', () => {
+  assert.deepEqual(scopeOf('$250K budget', 'Owned a $250,000 budget.').existing, ['$250K budget']);
+});
