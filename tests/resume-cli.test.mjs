@@ -81,14 +81,15 @@ test('adopt on a Pandoc-style cv.md prints a diff and writes only with --confirm
   assert.equal(dry.status, 0, dry.stderr);
   assert.match(dry.stdout, /^-## \*\*\[Work Experience\]\{\.smallcaps\}\*\*$/m);
   assert.match(dry.stdout, /^\+## Work Experience$/m);
-  assert.match(dry.stdout, /^\+### Acme -- City$/m, 'the # CV line sets the dash');
+  assert.match(dry.stdout, /^\+### Acme — City$/m, 'the entry heading keeps its own dash, not the # CV line\'s');
   assert.equal(read(root, 'cv.md'), pandoc, 'cv.md untouched without --confirm');
   assert.equal(existsSync(join(root, 'data', 'resume.json')), false);
 
   const confirmed = run(root, 'adopt', '--confirm');
   assert.equal(confirmed.status, 0, confirmed.stderr);
   const cv = read(root, 'cv.md');
-  assert.match(cv, /^### Acme -- City\n\n\*\*Title\*\*\n2020 -- 2024\n/m);
+  assert.match(cv, /^# CV -- Pat Example\n/);
+  assert.match(cv, /^### Acme — City\n\n\*\*Title\*\*\n2020 -- 2024\n/m);
   assert.equal(read(root, 'cv.md.bak'), pandoc);
   assert.equal(JSON.parse(read(root, 'data/resume.json')).careerOps.cvSha256, sha256(cv));
 }));
