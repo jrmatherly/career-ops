@@ -207,7 +207,8 @@ export async function patchScheduledJob(id: string, raw: unknown): Promise<Sched
       throw new ScheduledJobValidationError("Invalid status.");
     }
     const fields = parseScheduledJobInput(input, current);
-    await assertHoldBuilds(fields.evaluate);
+    // Only a body that sends evaluate settings: pausing a job must not be refused over a hold stored earlier.
+    if (input.evaluate !== undefined) await assertHoldBuilds(fields.evaluate);
     const startChanged = fields.startAt !== current.startAt;
     const cadenceChanged = fields.every !== current.every || fields.unit !== current.unit || fields.timezone !== current.timezone;
     Object.assign(current, fields, input.status ? { status: input.status } : {}, { updatedAt: new Date().toISOString() });

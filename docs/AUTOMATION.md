@@ -301,12 +301,14 @@ and leave both empty to evaluate every location.
   hold does not admit. The test is the workplace policy in
   [WORKPLACE_GEOGRAPHY.md](WORKPLACE_GEOGRAPHY.md), given the location and
   title from the row's scan history. A posting that says only "Remote", one
-  with no location, and one in another city are all held.
+  with no location, and one in another city are all held. So is a remote
+  posting that names only a state (`Remote - CO`): it needs the country.
 - **A held row is not dropped.** It stays in the Inbox with its rank and a
   **Held: location** badge, and the ledger records it as `skipped` with the
   reason `held-location`. Evaluate it from the Inbox when you want it.
 - **A held row is not weighed again.** Changing the hold later does not
-  release rows it already held.
+  release rows it already held, and a row queued before the hold was set is
+  still evaluated.
 - **A hold that cannot be read queues nothing.** The form refuses a country it
   does not know. If the stored hold is unusable anyway (a file edited by hand),
   the run's message starts with "Location hold:" and says nothing was queued.
@@ -322,8 +324,12 @@ A scheduled **portals** scan can read only some of the sources in
 - A job that names no group reads every entry that has no `group:`. Once one
   entry has a group, this applies to a job that uses the file's filters too:
   the runner gives the scanner a temporary copy without the grouped entries.
-- A job that names a group no enabled entry has fails with the group's name,
-  so a typo is not a quiet run that found nothing.
+- A job fails, before the scanner starts, when any group it names has no
+  enabled entry (the message names that group), and when it names no group
+  while every enabled entry has one. A typo is not a quiet run that found
+  nothing.
+- `group:` takes a name. A number counts as its name; a list or a mapping
+  fails the run with the entry's name.
 - The full ATS sweep reads no entries from `portals.yml` and ignores groups.
   So does `node scan.mjs` run by hand, which reads every entry.
 

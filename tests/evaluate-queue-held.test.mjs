@@ -40,6 +40,12 @@ test('a held row is never returned by drainPlan', withRoot(async (root) => {
   assert.deepEqual(drainPlan(root, { jobId: 'job-1', rankThreshold: 3.5 }), []);
 }));
 
+test('a row first skipped as unranked is held once a later pass ranks it', withRoot(async (root) => {
+  await queueCandidates(root, job, [{ url: A }]);
+  assert.equal(await queueCandidates(root, { ...job, held: new Set([A]) }, [{ url: A, rank: 4.2 }]), 0);
+  assert.deepEqual(states(root), { [A]: ['skipped', HELD_LOCATION] });
+}));
+
 test('a held row is not weighed again by a later pass without the hold', withRoot(async (root) => {
   await queueCandidates(root, { ...job, held: new Set([A]) }, [{ url: A, rank: 4.2 }]);
   assert.equal(await queueCandidates(root, job, [{ url: A, rank: 4.2 }]), 0);

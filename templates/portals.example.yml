@@ -2473,8 +2473,8 @@ search_queries:
 # read only some sources: a scan that names "weekly" reads the entries with
 # group: weekly, and nothing else. An entry with no group belongs to every
 # scheduled scan that names no group. Works on tracked_companies and job_boards
-# entries. `node scan.mjs` run by hand, and the full ATS sweep, read every
-# entry whatever its group.
+# entries. `node scan.mjs` run by hand reads every entry whatever its group.
+# The full ATS sweep reads no entries from this file, so groups do not apply.
 #
 #   - name: BigCo
 #     careers_url: https://jobs.lever.co/bigco

@@ -222,7 +222,9 @@ function jobPortals(job, base) {
 }
 
 const SOURCE_LISTS = ["tracked_companies", "job_boards"];
-const groupOf = (entry) => (isMapping(entry) && typeof entry.group === "string" ? entry.group.trim().toLowerCase() : "");
+// YAML reads `group: 2026` as a number, so a number is its own name.
+const isGroupName = (group) => typeof group === "string" || typeof group === "number";
+const groupOf = (entry) => (isMapping(entry) && isGroupName(entry.group) ? String(entry.group).trim().toLowerCase() : "");
 
 /**
  * The config a portals scan reads for a job's source groups: with no groups,
@@ -241,8 +243,24 @@ export function selectSourceGroups(config, groups) {
   return next;
 }
 
-// The scanner's rule (resolveEntries in scan.mjs): an entry is skipped only on `enabled: false`.
-const hasEnabledSource = (config) => SOURCE_LISTS.some((key) => Array.isArray(config[key]) && config[key].some((entry) => isMapping(entry) && entry.enabled !== false));
+/**
+ * The config a portals scan reads for `groups`, or a thrown reason the run
+ * must not start: a selection that leaves nothing enabled would be a green run
+ * that scanned nothing. `enabled: false` is the scanner's own skip rule.
+ */
+function sourcesForGroups(config, groups) {
+  const entries = SOURCE_LISTS.flatMap((key) => (Array.isArray(config[key]) ? config[key].filter(isMapping) : []));
+  const unnamed = entries.find((entry) => entry.group != null && !isGroupName(entry.group));
+  if (unnamed) throw new Error(`portals.yml: "${unnamed.name}" has a group that is not a name. Write group: <name>.`);
+  const enabledGroups = new Set(entries.filter((entry) => entry.enabled !== false).map(groupOf));
+  const missing = groups.filter((group) => !enabledGroups.has(group.toLowerCase()));
+  if (missing.length) throw new Error(`No enabled source is in ${missing.map((group) => `"${group}"`).join(", ")}. Tag an entry with group: in portals.yml.`);
+  const selected = selectSourceGroups(config, groups);
+  if (selected !== config && !groups.length && !enabledGroups.has("")) {
+    throw new Error("Every enabled source in portals.yml has a group, and this scan names none. Name a group on the scan, or remove group: from an entry.");
+  }
+  return selected;
+}
 
 function writeJobTemp(root, jobId, prefix, ext, text) {
   if (!isSafeScheduledId(jobId)) throw new Error("Invalid scheduled job identifier.");
@@ -273,8 +291,8 @@ function coreEnv(root) {
  * spawn error is retryable just like a non-zero scanner exit, while cleanup
  * still runs before the next attempt. A scanner that ran into the timeout is
  * not retried: the same sweep would hit the same limit, three times over. An
- * unreadable portals.yml, an empty title list or a source group no enabled
- * entry is in is not retried either; all are checked once before the loop. A
+ * unreadable portals.yml, an empty title list or a source selection that
+ * leaves no enabled entry (sourcesForGroups) is not retried either; all are checked once before the loop. A
  * portals scan whose source groups remove an entry gets an overlay even when
  * the job uses the file's filters, or it would scan every group.
  */
@@ -286,9 +304,9 @@ export function executeJob(root, job, options = {}) {
   let finalAttempt = MAX_ATTEMPTS;
   const fromFile = job.filtersFrom === "file";
   const basePortals = portalsPath(root);
-  process.stderr.write(`portals: ${basePortals} (${fromFile ? "file" : "overlay"})\n`);
   let config;
   let overlay = !fromFile;
+  const logPortals = () => process.stderr.write(`portals: ${basePortals} (${overlay ? "overlay" : "file"})\n`);
   try {
     const base = readPortals(basePortals);
     config = fromFile ? base : jobPortals(job, base);
@@ -300,17 +318,15 @@ export function executeJob(root, job, options = {}) {
     }
     // The full engine reads no entries from portals.yml, so groups do not apply to it.
     if (job.engine === "portals") {
-      const groups = cleanChips(job.sourceGroups);
-      const selected = selectSourceGroups(config, groups);
-      if (groups.length && !hasEnabledSource(selected)) {
-        throw new Error(`No enabled source is in ${groups.map((group) => `"${group}"`).join(", ")}. Tag an entry with group: in portals.yml.`);
-      }
+      const selected = sourcesForGroups(config, cleanChips(job.sourceGroups));
       overlay ||= selected !== config;
       config = selected;
     }
   } catch (error) {
+    logPortals();
     return { state: "failed", attempt: 1, rolesFound: 0, durationMs: Date.now() - startedAt, message: scanFailureMessage({ error }) };
   }
+  logPortals();
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let tempPortals = null;
@@ -552,11 +568,11 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     const autoJobIds = new Set(evaluatingJobs(store).filter((other) => other.evaluate.mode === "auto").map((other) => other.id));
     let held;
     let holdProblem;
-    if (job.evaluate.hold) {
+    if (job.evaluate.hold !== undefined) {
       // The store does not validate a hold, so one edited by hand can be unusable. Queue nothing then: a hold that cannot be read must not let every location through.
       try {
         const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
-        held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold)) });
+        held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {})) });
       } catch (error) {
         holdProblem = `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was queued.`;
       }

@@ -71,7 +71,8 @@ test("a job with no hold queues all four", async () => {
   await withRoot(AUTO, ({ run }) => assert.equal(run.autoQueued, 4));
 });
 
-for (const [label, hold] of [["an unknown country", { ...HOLD, remoteCountries: ["Atlantis"] }], ["an empty object", {}], ["a string", "Springfield"]]) {
+for (const [label, hold] of [["an unknown country", { ...HOLD, remoteCountries: ["Atlantis"] }], ["an empty object", {}], ["a string", "Springfield"], ["null", null], ["false", false],
+  ["an empty home area", { ...HOLD, onsiteLocations: [] }], ["two empty lists", { onsiteLocations: [], remoteCountries: [] }]]) {
   test(`a hold edited by hand to ${label} queues nothing and says why on the run`, async () => {
     await withRoot({ ...AUTO, hold }, ({ root, run }) => {
       assert.deepEqual(ledgerStates(root), {});

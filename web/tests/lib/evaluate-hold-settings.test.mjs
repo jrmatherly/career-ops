@@ -45,6 +45,9 @@ test("Review sends the mode alone, so a stored hold survives Auto to Review to A
   const auto = scheduledEvaluate(evaluateBody({ ...evaluateForm(review), mode: "auto" }, review), review);
   assert.deepEqual(auto.hold, HOLD);
 });
+test("the Auto form sends a hold typed into its two lists", () => {
+  assert.deepEqual(evaluateBody({ mode: "auto", rankThreshold: "3.5", maxPerRun: "5", holdOnsite: ["Springfield"], holdRemote: ["United States"] }), { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD });
+});
 test("clearing both chip lists in Auto removes the hold", () => {
   const next = scheduledEvaluate(evaluateBody({ ...evaluateForm(base), holdOnsite: [], holdRemote: [] }, base), base);
   assert.equal("hold" in next, false);

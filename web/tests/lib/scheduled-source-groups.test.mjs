@@ -16,8 +16,8 @@ test("no groups selects the entries with no group", () => assert.deepEqual(names
 test("a named group selects its entries, ignoring case and spaces", () => assert.deepEqual(names(selectSourceGroups(config, ["weekly"])), ["Fixture Beta", "Fixture Gamma"]));
 test("two groups select both", () => assert.deepEqual(names(selectSourceGroups(config, ["weekly", "heavy"])), ["Fixture Beta", "Fixture Gamma", "Fixture Board"]));
 test("a config with no group anywhere is returned as is", () => { const plain = { tracked_companies: [{ name: "Fixture Alpha" }] }; assert.equal(selectSourceGroups(plain, []), plain); });
-test("a group that is empty or not a string counts as no group, and a list that is not an array is left alone", () => {
-  const odd = { tracked_companies: [{ name: "Fixture Alpha", group: "" }, { name: "Fixture Beta", group: 3 }], job_boards: "none" };
+test("an empty or null group counts as no group, and a list that is not an array is left alone", () => {
+  const odd = { tracked_companies: [{ name: "Fixture Alpha", group: "" }, { name: "Fixture Beta", group: null }], job_boards: "none" };
   assert.equal(selectSourceGroups(odd, []), odd);
 });
 test("the input config is not changed", () => { selectSourceGroups(config, ["weekly"]); assert.equal(config.tracked_companies.length, 3); });
@@ -73,6 +73,51 @@ test("a job naming a group no enabled entry has fails once, with the group's nam
     assert.ok(result.message.includes(`No enabled source is in "${groups[0]}". Tag an entry with group: in portals.yml.`), result.message);
     assert.equal(seen, null, "the scanner was not started");
   }
+});
+test("a custom job with no groups also skips the grouped entry, and keeps its filters", () => {
+  const { seen } = run(GROUPED, { filtersFrom: "custom", filters: { positive: ["architect"], sinceDays: 3 } });
+  assert.deepEqual(seen.config.tracked_companies.map((e) => e.name), ["Fixture Alpha"]);
+  assert.deepEqual(seen.config.title_filter.positive, ["architect"]);
+});
+test("one misspelled group beside a good one fails the run and names only the bad one", () => {
+  const { result, seen } = run(GROUPED, { filtersFrom: "file", sourceGroups: ["weekly", "wekly"] });
+  assert.equal(result.state, "failed");
+  assert.equal(result.attempt, 1);
+  assert.ok(result.message.includes('No enabled source is in "wekly". Tag an entry with group: in portals.yml.'), result.message);
+  assert.equal(seen, null);
+});
+test("a job naming no group fails when every enabled entry has one", () => {
+  const { result, seen } = run(PORTALS("  - name: Fixture Beta\n    group: weekly\n"), { filtersFrom: "file" });
+  assert.equal(result.state, "failed");
+  assert.ok(result.message.includes("Every enabled source in portals.yml has a group, and this scan names none."), result.message);
+  assert.equal(seen, null);
+});
+test("a file with no enabled entry and no group is scanned as before", () => {
+  const { result, seen } = run(PORTALS("  - name: Fixture Alpha\n    enabled: false\n"), { filtersFrom: "file" });
+  assert.equal(result.state, "success");
+  assert.equal(seen.base, true);
+});
+test("a numeric group is its name, and any other shape fails the run with the entry's name", () => {
+  const { seen } = run(PORTALS("  - name: Fixture Alpha\n  - name: Fixture Beta\n    group: 2026\n"), { filtersFrom: "file", sourceGroups: ["2026"] });
+  assert.deepEqual(seen.config.tracked_companies.map((e) => e.name), ["Fixture Beta"]);
+  const bad = run(PORTALS("  - name: Fixture Alpha\n  - name: Fixture Beta\n    group: [daily, weekly]\n"), { filtersFrom: "file" });
+  assert.equal(bad.result.state, "failed");
+  assert.ok(bad.result.message.includes('"Fixture Beta" has a group that is not a name'), bad.result.message);
+  assert.equal(bad.seen, null);
+});
+test("the run log says overlay when groups make the runner write one for a file job", () => {
+  const lines = [];
+  const write = process.stderr.write;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-source-groups-log-"));
+  fs.writeFileSync(path.join(root, "portals.yml"), GROUPED);
+  process.stderr.write = (chunk) => { lines.push(String(chunk)); return true; };
+  try {
+    executeJob(root, { id: JOB, engine: "portals", filtersFrom: "file", filters: { sinceDays: 3 } }, { spawnFn: () => ({ status: 0, stdout: "", stderr: "" }) });
+  } finally {
+    process.stderr.write = write;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  assert.equal(lines.join(""), `portals: ${path.join(root, "portals.yml")} (overlay)\n`);
 });
 test("the full engine ignores groups", () => {
   const { seen } = run(GROUPED, { engine: "full", filtersFrom: "file", sourceGroups: ["wekly"], filters: { sinceDays: 3, ats: ["lever"], limitPerAts: 5 } });
