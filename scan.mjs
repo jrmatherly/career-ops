@@ -38,7 +38,10 @@
  */
 
 import './lib/settings-env.mjs'; // saved settings; must stay the first import
-import { buildWorkplacePolicy, isCountryKeyword } from './providers/_country.mjs';
+import {
+  buildWorkplacePolicy, isCountryKeyword,
+  USPS_STATES, US_STATE_NAMES_ALSO_COUNTRIES, compileUsStateAbbrev,
+} from './providers/_country.mjs';
 import {
   closeSync,
   existsSync,
@@ -522,107 +525,6 @@ function compileLocationKeywordList(value) {
 // consulted when always_allow already names the United States as a country,
 // so EU-targeted configs (no US token) keep their previous semantics.
 const US_COUNTRY_ALWAYS_ALLOW = new Set(['united states', 'usa', 'u.s.', 'u.s.a.']);
-const USPS_STATES = Object.freeze([
-  Object.freeze(['alabama', 'al']),
-  Object.freeze(['alaska', 'ak']),
-  Object.freeze(['arizona', 'az']),
-  Object.freeze(['arkansas', 'ar']),
-  Object.freeze(['california', 'ca']),
-  Object.freeze(['colorado', 'co']),
-  Object.freeze(['connecticut', 'ct']),
-  Object.freeze(['delaware', 'de']),
-  Object.freeze(['florida', 'fl']),
-  Object.freeze(['georgia', 'ga']),
-  Object.freeze(['hawaii', 'hi']),
-  Object.freeze(['idaho', 'id']),
-  Object.freeze(['illinois', 'il']),
-  Object.freeze(['indiana', 'in']),
-  Object.freeze(['iowa', 'ia']),
-  Object.freeze(['kansas', 'ks']),
-  Object.freeze(['kentucky', 'ky']),
-  Object.freeze(['louisiana', 'la']),
-  Object.freeze(['maine', 'me']),
-  Object.freeze(['maryland', 'md']),
-  Object.freeze(['massachusetts', 'ma']),
-  Object.freeze(['michigan', 'mi']),
-  Object.freeze(['minnesota', 'mn']),
-  Object.freeze(['mississippi', 'ms']),
-  Object.freeze(['missouri', 'mo']),
-  Object.freeze(['montana', 'mt']),
-  Object.freeze(['nebraska', 'ne']),
-  Object.freeze(['nevada', 'nv']),
-  Object.freeze(['new hampshire', 'nh']),
-  Object.freeze(['new jersey', 'nj']),
-  Object.freeze(['new mexico', 'nm']),
-  Object.freeze(['new york', 'ny']),
-  Object.freeze(['north carolina', 'nc']),
-  Object.freeze(['north dakota', 'nd']),
-  Object.freeze(['ohio', 'oh']),
-  Object.freeze(['oklahoma', 'ok']),
-  Object.freeze(['oregon', 'or']),
-  Object.freeze(['pennsylvania', 'pa']),
-  Object.freeze(['rhode island', 'ri']),
-  Object.freeze(['south carolina', 'sc']),
-  Object.freeze(['south dakota', 'sd']),
-  Object.freeze(['tennessee', 'tn']),
-  Object.freeze(['texas', 'tx']),
-  Object.freeze(['utah', 'ut']),
-  Object.freeze(['vermont', 'vt']),
-  Object.freeze(['virginia', 'va']),
-  Object.freeze(['washington', 'wa']),
-  Object.freeze(['west virginia', 'wv']),
-  Object.freeze(['wisconsin', 'wi']),
-  Object.freeze(['wyoming', 'wy']),
-]);
-
-// 2-letter codes: comma-state (", OH" / ",OH, USA") or a trailing token
-// ("Dublin OH", Workday URL hint "dublin oh"). Not a generic word-boundary —
-// English "in"/"or"/"me" in "Remote, Belgium or France" must not impersonate
-// Indiana/Oregon/Maine. State *names* still use compileLocationKeyword.
-// Unicode letters and marks are part of the token: "Montréal" is not "AL".
-function compileUsStateAbbrev(abbr) {
-  const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`(?:,\\s*${escaped}(?![\\p{L}\\p{M}\\p{N}])|(?:^|[^\\p{L}\\p{M}\\p{N}])${escaped}[^\\p{L}\\p{M}\\p{N}]*$)`, 'u');
-  return (lower) => placesWithoutCountryCode(lower).some((place) => re.test(place));
-}
-
-// "City, Region, CC" ends in an ISO country code, and several of those are
-// also USPS codes: "Bengaluru, Karnataka, IN" read as Indiana and "Toronto,
-// ON, CA" as California, so always_allow beat the user's own block entry.
-// A two-letter last part after two or more parts is the country slot. So is
-// the last part of "Austin TX, US" or "Perth WA, AU", where a state code ends
-// the city part. "Santa Fe, NM" and "Dublin, OH" keep their state. "LA, CA"
-// is two state codes, so the last part is the state, not a country. So is
-// a state code written twice, as in "Brooklyn, NY, NY". A place
-// with a country slot other than US has no US state at all, so "Perth WA, AU"
-// does not read as Washington. Providers join several places with "; "
-// (Lever) or " · " (Jobvite), and each place gets its own check, so the TX in
-// "Austin TX · Toronto, ON, CA" counts even though it is not at the end.
-const USPS_CODES = new Set(USPS_STATES.map(([, abbr]) => abbr));
-
-function placesWithoutCountryCode(lower) {
-  return lower.split(/[;·]/).flatMap((place) => {
-    const parts = place.split(',');
-    const code = parts.at(-1).trim();
-    if (parts.length < 2 || !/^\p{L}{2}$/u.test(code)) return [place];
-    if (parts.length === 2) {
-      const cityTail = /(?:^|[^\p{L}\p{M}\p{N}])(\p{L}{2})\s*$/u.exec(parts[0]);
-      if (!cityTail || !USPS_CODES.has(cityTail[1])) return [place];
-      if (USPS_CODES.has(code)) return [place];
-    } else if (USPS_CODES.has(code) && parts.at(-2).trim() === code) {
-      return [place];
-    }
-    return code === 'us' ? [parts.slice(0, -1).join(',')] : [];
-  });
-}
-
-// A state name that is also a country cannot beat the user's own `block`:
-// "Tbilisi, Georgia" is the country, and reading "Georgia" as always_allow let
-// it through a filter that blocked "Tbilisi". Such a name counts at the `allow`
-// tier instead, so "Atlanta, Georgia" still passes and a blocked Georgian city
-// does not. The 2-letter code is unambiguous and stays in always_allow, so
-// "Dublin, GA" still beats a blocked "Dublin".
-const US_STATE_NAMES_ALSO_COUNTRIES = new Set(['georgia']);
 
 const US_STATE_ALWAYS_ALLOW_MATCHERS = USPS_STATES.flatMap(([name, abbr]) => [
   ...(US_STATE_NAMES_ALSO_COUNTRIES.has(name) ? [] : [compileLocationKeyword(name)]),

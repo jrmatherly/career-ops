@@ -435,6 +435,14 @@ Plan: `docs/superpowers/plans/completed/2026-11-13-pdf-atomic-write-data-root-le
 | `tests/generate-pdf-atomic-write.test.mjs` imports `generate-pdf.mjs` with no data-root pin | `import './helpers.mjs'` before the renderer is imported | ADAPT | Keep our hunk until upstream has it. Pinned by `tests/rendering-suites-pin-data-root.test.mjs`, a fork test: KEEP. Offer it upstream as a bug fix. |
 | `tests/README.md` says a new test is safe by default | "The suite's data root" says a suite is covered under the runner or when it imports `helpers.mjs`, adds the in-process import rule, and gives the clone audit command | ADAPT | Keep our hunks. |
 
+### Scheduled scan source groups and location hold (2026-11-14)
+
+Plan: `docs/superpowers/plans/2026-11-14-scheduled-scan-groups-and-location-hold.md`. Findings: `docs/superpowers/research/2026-11-14-scheduled-scan-groups-and-location-hold/findings.md`.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| `providers/_country.mjs` reads a two-letter US state code in a location as the ISO country with the same letters, and "Georgia" as the country; `scan.mjs` defines `USPS_STATES`, `compileUsStateAbbrev`, `placesWithoutCountryCode` and `US_STATE_NAMES_ALSO_COUNTRIES` | those four live in and are exported from `providers/_country.mjs`, `scan.mjs` imports them, and `readUsStates` rewrites a state to the United States before the on-site and remote country checks when the policy allows the United States | ADAPT | An upstream bug fix, not offered yet: offer it as its own PR. An upstream hunk to the state table or matcher lands in `providers/_country.mjs`, not `scan.mjs`. Pinned by `tests/workplace-policy-us-states.test.mjs`, a fork test: KEEP. `docs/WORKPLACE_GEOGRAPHY.md` carries one bullet for it: keep ours. |
+
 ## Decision log template
 
 ```markdown
