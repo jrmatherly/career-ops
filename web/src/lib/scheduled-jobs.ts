@@ -9,6 +9,7 @@ import {
 import { nextScheduledRun } from "./scheduled-cadence.mjs";
 import { assertScheduledJobBody, scheduledEvaluate, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
+import { holdPolicyProblem } from "./core/workplace-policy.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
@@ -19,6 +20,8 @@ export type EvaluateSettings = {
   enabledAt: string;
   rankThreshold: number;
   maxPerRun: number;
+  /** Auto mode queues only postings this workplace policy admits; the rest are ranked and held. */
+  hold?: { onsiteLocations: string[]; remoteCountries: string[] };
 };
 
 export type ScheduledJob = {
@@ -146,7 +149,13 @@ export function getScheduledJob(id: string): ScheduledJob | undefined {
   return read().jobs.find((job) => job.id === id);
 }
 
+async function assertHoldBuilds(evaluate: EvaluateSettings | undefined): Promise<void> {
+  const problem = await holdPolicyProblem(evaluate?.hold);
+  if (problem) throw new ScheduledJobValidationError(problem);
+}
+
 export async function createScheduledJob(fields: JobFields): Promise<ScheduledJob> {
+  await assertHoldBuilds(fields.evaluate);
   return withScheduledStore(storeFile(), (store: Store) => {
     const now = new Date().toISOString();
     const job: ScheduledJob = {
@@ -183,7 +192,7 @@ export async function updateScheduledJob(
 
 export async function patchScheduledJob(id: string, raw: unknown): Promise<ScheduledJob | null> {
   if (!isSafeScheduledId(id)) return null;
-  return withScheduledStore(storeFile(), (store: Store) => {
+  return withScheduledStore(storeFile(), async (store: Store) => {
     const current = store.jobs.find((item) => item.id === id && item.status !== "deleted");
     if (!current) return null;
     let input: Record<string, unknown>;
@@ -193,6 +202,7 @@ export async function patchScheduledJob(id: string, raw: unknown): Promise<Sched
       throw new ScheduledJobValidationError("Invalid status.");
     }
     const fields = parseScheduledJobInput(input, current);
+    await assertHoldBuilds(fields.evaluate);
     const startChanged = fields.startAt !== current.startAt;
     const cadenceChanged = fields.every !== current.every || fields.unit !== current.unit || fields.timezone !== current.timezone;
     Object.assign(current, fields, input.status ? { status: input.status } : {}, { updatedAt: new Date().toISOString() });

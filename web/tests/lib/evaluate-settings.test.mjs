@@ -47,7 +47,7 @@ test("the modal sends Off only to turn stored settings off, and the Auto numbers
   assert.equal(evaluateBody({ mode: "off", rankThreshold: "3.5", maxPerRun: "5" }, undefined), undefined, "a job without settings stays without them");
   assert.deepEqual(evaluateBody({ mode: "off", rankThreshold: "", maxPerRun: "5" }, stored), { mode: "off" }, "a hidden bad field does not block Off");
   assert.deepEqual(evaluateBody({ mode: "review", rankThreshold: "", maxPerRun: "x" }, undefined), { mode: "review" }, "nor Review");
-  assert.deepEqual(evaluateBody({ mode: "auto", rankThreshold: "9", maxPerRun: "0" }, undefined), { mode: "auto", rankThreshold: 5, maxPerRun: 1 });
+  assert.deepEqual(evaluateBody({ mode: "auto", rankThreshold: "9", maxPerRun: "0" }, undefined), { mode: "auto", rankThreshold: 5, maxPerRun: 1, hold: null });
   assert.throws(() => evaluateBody({ mode: "auto", rankThreshold: "", maxPerRun: "5" }, stored), /Invalid rank threshold\./);
 });
 
@@ -95,11 +95,11 @@ test("a queued entry links to the UTC date of its first queued row", () => {
 });
 
 test("the edit modal seeds the form from the stored settings, and a job without them reads as Off with the defaults", () => {
-  assert.deepEqual(evaluateForm({ mode: "auto", enabledAt: "2026-11-09", rankThreshold: 4, maxPerRun: 3 }), { mode: "auto", rankThreshold: "4", maxPerRun: "3" });
-  assert.deepEqual(evaluateForm({ mode: "review", enabledAt: "2026-11-09", rankThreshold: 3.5, maxPerRun: 5 }), { mode: "review", rankThreshold: "3.5", maxPerRun: "5" });
-  assert.deepEqual(evaluateForm(undefined), { mode: "off", rankThreshold: "3.5", maxPerRun: "5" });
+  assert.deepEqual(evaluateForm({ mode: "auto", enabledAt: "2026-11-09", rankThreshold: 4, maxPerRun: 3 }), { mode: "auto", rankThreshold: "4", maxPerRun: "3", holdOnsite: [], holdRemote: [] });
+  assert.deepEqual(evaluateForm({ mode: "review", enabledAt: "2026-11-09", rankThreshold: 3.5, maxPerRun: 5 }), { mode: "review", rankThreshold: "3.5", maxPerRun: "5", holdOnsite: [], holdRemote: [] });
+  assert.deepEqual(evaluateForm(undefined), { mode: "off", rankThreshold: "3.5", maxPerRun: "5", holdOnsite: [], holdRemote: [] });
   // Seeded as stored: a hand-edited value outside the bounds reaches the form unchanged and is clamped on save.
-  assert.deepEqual(evaluateForm({ mode: "auto", enabledAt: "2026-11-09", rankThreshold: 3.55, maxPerRun: 99 }), { mode: "auto", rankThreshold: "3.55", maxPerRun: "99" });
+  assert.deepEqual(evaluateForm({ mode: "auto", enabledAt: "2026-11-09", rankThreshold: 3.55, maxPerRun: 99 }), { mode: "auto", rankThreshold: "3.55", maxPerRun: "99", holdOnsite: [], holdRemote: [] });
 });
 
 test("the panel links a ledger URL only when it is http(s)", () => {

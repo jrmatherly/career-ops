@@ -171,7 +171,7 @@ export function CreateJobModal({
   );
 }
 
-export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string };
+export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string; holdOnsite: string[]; holdRemote: string[] };
 
 export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onChange: (value: EvaluateForm) => void }) {
   const id = useId();
