@@ -750,7 +750,7 @@ If score is greater than or equal to the threshold:
 7. Select the most relevant projects and proof points.
 8. Reorder experience bullets by relevance.
 9. Build a 6-8 item competency grid.
-10. Inject keywords ethically into existing achievements; never invent skills or metrics.
+10. Use the JD's own terms in existing achievements where they truthfully apply; never invent skills or metrics.
 11. Write the JSON payload (`modes/pdf.md`, "JSON Input Schema"; consent travels as its field, absent when there is none) to `output/cv-candidate-{{REPORT_NUM}}-{company-slug}.json`, then run `node build-cv-html.mjs output/cv-candidate-{{REPORT_NUM}}-{company-slug}.json output/cv-candidate-{{REPORT_NUM}}-{company-slug}.html {template path from step 1}`. The script fills every placeholder, `{{CONSENT}}` included, and owns the HTML escaping, so never emit markup yourself. Write HTML to `output/cv-candidate-{{REPORT_NUM}}-{company-slug}.html` only through that command.
     The report number goes first in every path of this step: `{company-slug}` alone
     collides when the same company has two postings evaluated on the same day, and the
@@ -774,7 +774,7 @@ ATS rules:
 - Standard section headers.
 - No critical information in images, SVGs, headers, or footers.
 - UTF-8 selectable text.
-- Keywords distributed naturally across summary, experience, skills, and projects.
+- JD terms appear where the matching work is described, across summary, experience, skills, and projects. Never repeat a term to raise a count.
 
 Design rules:
 

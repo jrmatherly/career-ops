@@ -47,7 +47,9 @@ If no source was given, ask the user for one.
    inferred, but shown in the preview; only ask the user when it's genuinely
    ambiguous.
 5. **Write ATS bullets from the extracted facts** — 2–4 concise, quantified-where-the-
-   source-supports-it bullets, matching the bullet style already used in `cv.md`.
+   source-supports-it bullets (in plain words where it does not, following the
+   number rules in `modes/heuristics/recruiter-side.md`), matching the bullet
+   style already used in `cv.md`.
    For a **project**, also compose an `article-digest.md` block (`## <Name> — <tagline>`
    with `**Hero metrics:**`, `**Architecture:**`, `**Key decisions:**`,
    `**Proof points:**`), filling only what the source supports.

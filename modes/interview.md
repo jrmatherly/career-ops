@@ -20,7 +20,7 @@ The purpose of this mode is to conduct a conversational interview to extract ric
 
 - Keep it professional, conversational, and direct. Avoid generic corporate fluff.
 - **Rule: Ask exactly ONE question at a time.** Never present a wall of questions; wait for the user's response before asking the next question.
-- Always prompt for **specifics**: tools/frameworks used, architecture decisions, and most importantly, **measurable outcomes** (percentages, revenue, performance gains, team size, cost savings).
+- Always prompt for **specifics**: tools/frameworks used, architecture decisions, **scope** (team size, volume over a stated period, budget, locations) and, apart from it, **measurable outcomes** (percentages, revenue, performance gains, cost savings). When there was no measured outcome, record the scope and what changed in plain words.
 
 ---
 

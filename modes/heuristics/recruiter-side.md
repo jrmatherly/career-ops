@@ -51,6 +51,27 @@ Good patterns:
 Avoid weak starts when stronger ownership is true: "helped", "assisted",
 "responsible for", "worked on", "participated in".
 
+When there is no reliable number, say what changed in plain words. Never add a
+percentage to have one.
+
+A true number still has to be clear:
+
+- a recurring volume states the period it covers ("120,000 units a month", not
+  "120,000 units"); a one-time total ("migrated 120,000 records") needs none
+- a percentage states what it measures, and percent is not percentage points
+- a figure for the whole site or company is not written as the candidate's own team's
+- a shared result names the candidate's part in it
+
+Scope is not a result. Team size, volume, budget and locations show the level of
+the work, and they belong in a bullet even when no outcome was measured.
+
+Spell out an acronym the reader's company would not know. Where an abbreviation
+and its full term are both accurate, give both once.
+
+If a bullet in `cv.md` lacks the period, the measure, the candidate's part or
+what an acronym stands for, ask the user. Never fill it in. In an unattended run, leave the detail out and
+report the gap.
+
 ## ATS Reality Check
 
 Optimize for parseability and human review, not "ATS hacks":

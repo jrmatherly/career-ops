@@ -662,10 +662,10 @@ After saving the report and recording in the tracker, append a cover letter draf
 {1 paragraph from cv.md summary, adapted to JD domain and required competencies}
 
 **Key achievements** *(selected from cv.md — exact wording preserved)*
-- **{lead from cv.md},** {impact sentence with metric}.
-- **{lead from cv.md},** {impact sentence with metric}.
-- **{lead from cv.md},** {impact sentence with metric}.
-- **{lead from cv.md},** {impact sentence with metric}.
+- **{lead from cv.md},** {impact sentence, with its metric when cv.md has one}.
+- **{lead from cv.md},** {impact sentence, with its metric when cv.md has one}.
+- **{lead from cv.md},** {impact sentence}.
+- **{lead from cv.md},** {impact sentence}.
 
 **Problems I will solve** *(placeholder — requires company research + your input)*
 > To be completed: what challenges does {company} face that you'd address? How would you approach them?

@@ -53,15 +53,15 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
 7. Detect role archetype → adapt framing
 8. Before tailoring, optionally compare the new JD with the latest tailored CV or JD. Resolve the application/report first with `node find.mjs {report-or-tracker-number}`. Use the resolved report/JD snapshot as `{new-jd.txt}` and the referenced prior CV or prior JD as `{previous-jd-or-cv.txt}`; if either source cannot be located, do not silently reuse a CV. Run `npm run jd:similarity -- {new-jd.txt} {previous-jd-or-cv.txt}` and display the `decision` and `score`. Reuse is allowed only when the recommendation is `reuse` or the user explicitly overrides it; `reuse-with-edits` still requires the listed edits, and `regenerate` requires the normal tailoring flow.
 9. Build an internal recruiter-side risk map from the JD using `modes/heuristics/recruiter-side.md`: likely doubts, matching evidence, and which document section should address each doubt
-10. Rewrite Professional Summary by injecting JD keywords + the candidate's exit narrative from config/profile.yml → narrative.exit_story and the "Your Exit Narrative" section in modes/_profile.md; use the populated user source(s), adapted to the target role domain, and never invent an exit or founder story. Read `modes/_writing.md` first; only its Tier 1 voice rules apply to CV text
+10. Rewrite Professional Summary around the role this JD describes, using the JD's own terms where they truthfully name what the candidate did, + the candidate's exit narrative from config/profile.yml → narrative.exit_story and the "Your Exit Narrative" section in modes/_profile.md; use the populated user source(s), adapted to the target role domain, and never invent an exit or founder story. Read `modes/_writing.md` first; only its Tier 1 voice rules apply to CV text
 11. Select top 3-4 most relevant projects for the job. If `cv.md` carries an Awards / Honors section, populate `awards[]` with the entries that support this role — for an early-career candidate a contest medal or dean's list often outranks a thin project. Omit the key when there is nothing to list and the section disappears entirely; never invent an award to fill it
 12. Reorder experience bullets by JD relevance and by the risk map: strongest matching evidence first
 13. Build competency grid from JD requirements (6-8 keyword phrases), prioritizing `existing` and `supportedByResume` skills from Step 4 — never a `gap` skill
-14. Inject keywords naturally into existing achievements (NEVER invent)
+14. Use the JD's own term where it truthfully names what the candidate did (NEVER invent). A keyword is not a qualification: never add one the achievement does not support.
 15. Apply the six-second clarity gate from `modes/heuristics/recruiter-side.md`: top third must make target role, strongest fit, and proof obvious
 16. Read `candidate.full_name` from `config/profile.yml` → normalize to kebab-case lowercase (e.g. "John Doe" → "john-doe") → `{candidate}`
 17. Build the render payload (see the **JSON Input Schema** below) from the tailored content — emit compact structured JSON, **not** full HTML markup — and write it to `/tmp/cv-{candidate}-{company}.json` — if a report number is already assigned for this run (auto-pipeline, batch, or any parallel fan-out per AGENTS.md "Parallel fan-outs"), include it: `/tmp/cv-{candidate}-{report}-{company}.json`. Two parallel agents handling the same company on the same day (two reqs at one employer) otherwise write the *same* temp path and can silently read each other's JSON. Wherever a later step names `/tmp/cv-{candidate}-{company}.json` (or its `-ats` variant), use this same path, including the `-{report}` segment when present.
-17a. Run the zero-LLM title-consistency check before rendering anything: `node cv-title-check.mjs /tmp/cv-{candidate}[-{report}]-{company}.json --summary`. This pairs each `experience[]` entry in the payload against `cv.md`'s own entry for the same `{company, dates}` and flags any `role` that no longer matches cv.md's canonical title string exactly (case/whitespace normalized only — never a fuzzy or "close enough" match). This is narrower than Step 4's skill-gap check and does not replace it: reordering bullets, reframing the summary, and injecting JD keywords into achievements are legitimate reformulation; a job **title** silently drifting to a more senior-sounding one for the exact same job is not, and is the one thing this check exists to catch.
+17a. Run the zero-LLM title-consistency check before rendering anything: `node cv-title-check.mjs /tmp/cv-{candidate}[-{report}]-{company}.json --summary`. This pairs each `experience[]` entry in the payload against `cv.md`'s own entry for the same `{company, dates}` and flags any `role` that no longer matches cv.md's canonical title string exactly (case/whitespace normalized only — never a fuzzy or "close enough" match). This is narrower than Step 4's skill-gap check and does not replace it: reordering bullets, reframing the summary, and describing achievements in the JD's own terms are legitimate reformulation; a job **title** silently drifting to a more senior-sounding one for the exact same job is not, and is the one thing this check exists to catch.
     - `⚠️` output means at least one title mismatch was found. For each one, surface it before continuing:
 
       > ⚠️ **Title mismatch:** [Render in {language.output}: state that the tailored CV's stated title for "{company} ({dates})" differs from cv.md's canonical title for that same job; quote both title strings verbatim as literal data — never translate or paraphrase them — as cv.md's title "{cvTitle}" and the tailored CV's title "{tailoredTitle}"; then ask whether this is intentional framing to keep or unintended drift to revert to cv.md's title. Never silently pick one side.]
@@ -82,7 +82,7 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
     - This is a warning, not a hard gate, before HTML is even built. `verify-cv-facts.mjs` (step 19) blocks *fabrication* — a claim absent from cv.md; this check flags the opposite failure, which fabrication-checking cannot see: cv.md content silently *lost* or *reordered* while tailoring. It catches an experience entry's company descriptor (`"Austin, TX · Series B fintech"`) getting dropped down to a bare city/state, and an experience entry (most often the Career Break) rendered out of cv.md's own chronological order.
     - It recognizes `## Experience`, `## Work Experience`, `## Professional Experience`, `## Employment History` and `## Work History` sections whose `### Company {—|–|--|-} Location[ · descriptor]` headers use an em dash, en dash, double hyphen, or single hyphen, written plain or as Pandoc Markdown (`## **[Experience]{.smallcaps}**`, `### **Co** --- City`); a `cv.md` written another way reports `UNVERIFIED`, not a violation. If it warns of a real finding, use judgment: fix the payload to match cv.md's descriptor text and entry order if the loss was unintentional, or proceed if it was a deliberate tailoring choice (e.g. the descriptor genuinely doesn't fit this JD). A structural pass, warn, or `UNVERIFIED` result always exits 0 and never blocks step 18 — but a CLI/input error (a missing or unreadable payload/source file, invalid JSON, or a malformed payload shape) exits 1, meaning the check itself failed to run; fix the invocation rather than treating that as just another warning.
     - This checks structure only (order, descriptor presence) — it does not check every field cv.md carries (e.g. skills-category selection or education descriptions are a judgment call per role, not a hard gate). Still diff the full payload against cv.md's actual content once before building the HTML: carry over every skills category unless there's a specific reason to drop one for the role, and keep education `description` text rather than compressing entries to bare title/org/year.
-    - When `data/resume.json` exists, also run `node resume.mjs check --json` and report its findings as advisory, never as a gate. It reads the resume model (absorbing `cv.md` first, exit 3 while that absorb is not lossless), not the payload, and reports the 23 Reactive Resume Check rules by `id`, `severity` and `path`: contact details, dates that will not parse or run backwards, layout and typography, section headings, experience entries without a description. Show the user each `error` finding and the score; `warning` and `info` findings go in one line each. It exits 0 whatever it finds. Skip this line silently when `data/resume.json` does not exist.
+    - When `data/resume.json` exists, also run `node resume.mjs check --json` and report its findings as advisory, never as a gate. It reads the resume model (absorbing `cv.md` first, exit 3 while that absorb is not lossless), not the payload, and reports the 23 Reactive Resume Check rules and career-ops's two bullet rules by `id`, `severity` and `path`: contact details, dates that will not parse or run backwards, layout and typography, section headings, experience entries without a description, bullets that open with a duty or run long. Show the user each `error` finding and the score; `warning` and `info` findings go in one line each. It exits 0 whatever it finds. Skip this line silently when `data/resume.json` does not exist.
 18. Run `node build-cv-html.mjs /tmp/cv-{candidate}[-{report}]-{company}.json {html-path} {template}`, where `{html-path}` is the active bundle's `cv/tailored/vNNN/cv.html` or `output/cv-{candidate}-{report}-{company}.html` for a one-off CV (omit `-{report}` only when no report number exists at all, never for a batch or parallel run), and `{template}` is the path printed by **Selecting the template** below (omit it to use the base template). The script owns every tag, CSS class, and HTML escaping. Keep the HTML outside temporary storage because the dashboard's `D` hotkey regenerates from it.
 19. Run the fact gate against the generated HTML: `node verify-cv-facts.mjs {html-path}`
     - This is a hard gate before PDF rendering.
@@ -134,10 +134,10 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
 - No critical info in PDF headers/footers (ATS ignores them)
 - UTF-8, selectable text (not rasterized)
 - No nested tables
-- Distributed JD keywords: Summary (top 5), first bullet of each role, Skills section
+- JD terms appear where the matching work is described: the summary, the bullets that did that work, and Skills. Never repeat a term to raise a count.
 - No hidden text, keyword stuffing, or white-font tricks. Optimize for parseability plus human review.
 
-The bullets above are the rules. `templates/ats-rules.yml` carries the parseability bullets as data (not the optional-sections or distributed-keywords bullets) — it carries the severity of each and, for each, the **"must not flag"** contract: what a check for that rule must stay quiet about. Read it before changing a rule or reading a lint finding; a rule cannot be added, removed, or silenced without that file changing, and each entry quotes the bullet above that it enforces, so the two cannot drift apart.
+The bullets above are the rules. `templates/ats-rules.yml` carries the parseability bullets as data (not the optional-sections or JD-terms bullets) — it carries the severity of each and, for each, the **"must not flag"** contract: what a check for that rule must stay quiet about. Read it before changing a rule or reading a lint finding; a rule cannot be added, removed, or silenced without that file changing, and each entry quotes the bullet above that it enforces, so the two cannot drift apart.
 
 **Optional template lint:** `node cv-templates.mjs lint cv [template-name]` checks a CV or cover-letter template against those rules and prints findings as JSON. Advisory, never a blocker: it exits 0 whatever it finds, and it never gates a render. Three rules are implemented today — nested tables, hidden text, and the standard-header enumeration. The rest are in the YAML with no detector, reported under `skipped` with the reason, and they are open items rather than passes.
 
@@ -151,7 +151,7 @@ The `ats` mode also has an earlier, **payload**-level stage (`ats-payload.mjs`),
 
 - The summary should answer: "What role is this person targeting, and why this one?"
 - The first screen should show 1-2 proof points that map to the JD's highest-risk requirements.
-- Bullets should emphasize outcomes, systems, users, or business effects rather than task history.
+- Bullets should emphasize outcomes, systems, users, or business effects rather than task history. A bullet says what the candidate did, how, and what happened as a result. See `modes/heuristics/recruiter-side.md`.
 - Logistics such as location, work authorization, salary, and availability belong in the CV only when appropriate for the market and profile; otherwise handle them in form answers or recruiter scripts.
 
 ## PDF Design
@@ -167,7 +167,7 @@ The `ats` mode also has an earlier, **payload**-level stage (`ats-payload.mjs`),
 ## Section order (optimized "6-second recruiter scan")
 
 1. Header (large name, gradient, contact, portfolio link)
-2. Professional Summary (3-4 lines, keyword-dense)
+2. Professional Summary (3-4 lines: what kind of professional this is and why this role)
 3. Core Competencies (6-8 keyword phrases in flex-grid)
 4. Work Experience (reverse chronological)
 5. Projects (top 3-4 most relevant)
@@ -231,7 +231,7 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
     "awards": "Awards & Honors",
     "skills": "Skills"
   },
-  "summary": "Personalized summary with JD keywords injected (honest vs cv.md).",
+  "summary": "Personalized summary in the JD's own terms (honest vs cv.md).",
   "competencies": ["RAG Pipelines", "LLMOps", "Kubernetes & Docker"],
   "experience": [
     {
@@ -240,7 +240,7 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
       "location": "Remote",
       "context": "Early-stage startup, ~40 people; acquired by BigCo in 2023.",
       "dates": "June 2022 - Present",
-      "bullets": ["Achievement bullet with JD keywords injected", "Another quantified-impact bullet"]
+      "bullets": ["Achievement bullet in the JD's own terms", "Another bullet: what was done, how, and the result"]
     }
   ],
   "projects": [
@@ -280,9 +280,9 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
 | `candidate.photo` | string | Opt-in profile photo (#264): a local path or `data:` URL. Empty/absent emits **no `<img>`**, rendering pixel-for-pixel identical to the photoless layout (US/UK/many-market ATS penalize photos; opt in for DACH/European markets). |
 | `candidate.photo_style` | string | Optional photo framing: `rounded` (default), `circle`, or `square`. Read it from `candidate.photo_style` in `config/profile.yml`; invalid values fail before HTML is written. |
 | `sections` | object | Optional localized section titles; any omitted key falls back to the English default shown above. |
-| `summary` | string | Personalized summary with keywords. Supports `**…**` emphasis (see **Markdown bold** below). |
+| `summary` | string | Personalized summary in the JD's own terms. Supports `**…**` emphasis (see **Markdown bold** below). |
 | `competencies` | string[] | 6-8 keyword phrases → competency tags. |
-| `experience[]` | object | `company`, `role`, `location` (optional), `context` (optional), `dates`, `bullets` (reordered, keyword-injected; `**…**` emphasis supported). `context` is an un-bulleted italic line rendered directly under the role, for one line of background about the company (stage, size, an acquisition), not an achievement. Use only facts already in `cv.md`: when it states none for that role, omit `context` rather than write one. Keep it short; keep achievements in `bullets`. `paragraphs` (optional): `[{ "text": "…", "before": N }]` for a paragraph `cv.md` places after one or more bullets of that role; `before` is the number of entries in this payload's `bullets` that come ahead of it, and it renders in that place with no bullet marker. Use it only to keep such a paragraph where `cv.md` has it, never for an achievement and never for a paragraph `cv.md` does not have. Optional section — omit the key or pass `[]` and the whole block is dropped, header included. Only for candidates with no professional history to list (students, new graduates, career changers); never drop it to hide a gap. |
+| `experience[]` | object | `company`, `role`, `location` (optional), `context` (optional), `dates`, `bullets` (reordered, in the JD's own terms; `**…**` emphasis supported). `context` is an un-bulleted italic line rendered directly under the role, for one line of background about the company (stage, size, an acquisition), not an achievement. Use only facts already in `cv.md`: when it states none for that role, omit `context` rather than write one. Keep it short; keep achievements in `bullets`. `paragraphs` (optional): `[{ "text": "…", "before": N }]` for a paragraph `cv.md` places after one or more bullets of that role; `before` is the number of entries in this payload's `bullets` that come ahead of it, and it renders in that place with no bullet marker. Use it only to keep such a paragraph where `cv.md` has it, never for an achievement and never for a paragraph `cv.md` does not have. Optional section — omit the key or pass `[]` and the whole block is dropped, header included. Only for candidates with no professional history to list (students, new graduates, career changers); never drop it to hide a gap. |
 | `projects[]` | object | `name`, `url` (optional project/repo link), `badge` (optional), `tech` (optional), `description` (a `bullets` array is also accepted and joined into the description line). |
 | `education[]` | object | `title` (degree), `org` (institution), `location` (optional, city/state), `year`, `description` (optional). |
 | `certifications[]` | object | `title`, `org`, `year`. |
@@ -378,10 +378,10 @@ c. If mapping fails, show the user what was found and ask for guidance
 #### Step 3 — Generate tailored content
 
 Same content generation as the HTML flow (Steps 1-15 above):
-- Rewrite Professional Summary with JD keywords + exit narrative
+- Rewrite Professional Summary around the role, in the JD's own terms + exit narrative
 - Reorder experience bullets by JD relevance
 - Select top competencies from JD requirements
-- Inject keywords naturally (NEVER invent)
+- Use the JD's own term where it truthfully names what the candidate did (NEVER invent). A keyword is not a qualification: never add one the achievement does not support.
 
 **IMPORTANT — Character budget rule:** Each replacement text MUST be approximately the same length as the original text it replaces (within ±15% character count). If tailored content is longer, condense it. The Canva design has fixed-size text boxes — longer text causes overlapping with adjacent elements. Count the characters in each original element from Step 2 and enforce this budget when generating replacements.
 

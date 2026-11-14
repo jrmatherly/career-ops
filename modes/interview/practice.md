@@ -94,6 +94,8 @@ Keep feedback tight. One or two things to sharpen per answer — not a full rewr
 
 **Flag vocabulary gaps explicitly.** Expert interviewers notice imprecise language. When the candidate uses a vague term where a precise one exists, call it out by name.
 
+**The behavioral checks.** For a "tell me about a time" question, check these before the feedback, and put the one or two that matter most under "What to sharpen": the candidate said what they would do, not what they did. Their own part is unclear because every sentence says "we". They told a strong story that answered a different question. They gave so little detail that the problem or the reasoning cannot be seen. They added background that raises a new concern and was not asked for. Quote the sentence that shows it. If none applies, say nothing about them.
+
 **The Reflection check.** For behavioral stories, always check: did they include a Reflection? ("What I'd do differently / what I learned.") This is the senior-candidate signal. If it's missing, prompt once after feedback: "What would you do differently knowing what you know now?"
 
 **Two-minute rule.** If an answer runs past two minutes, note it. Interviewers stop listening. The fix is almost always to state the answer first, then explain — not to cut content. *In a typed session you cannot time delivery — substitute a structure check instead:* flag answers that bury the headline (more than 4–5 sentences of setup before the point lands) and tell the candidate: pacing and filler words can only be diagnosed out loud — record yourself or run this question again verbally.
