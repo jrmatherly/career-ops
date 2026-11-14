@@ -521,8 +521,8 @@ function compileLocationKeywordList(value) {
     });
 }
 
-// Frozen USPS state-name + abbreviation table. Not a world gazetteer: only
-// consulted when always_allow already names the United States as a country,
+// State matchers built from the USPS table in providers/_country.mjs. Not a
+// world gazetteer: only consulted when always_allow already names the United States as a country,
 // so EU-targeted configs (no US token) keep their previous semantics.
 const US_COUNTRY_ALWAYS_ALLOW = new Set(['united states', 'usa', 'u.s.', 'u.s.a.']);
 

@@ -282,7 +282,7 @@ export function buildWorkplacePolicy(policy) {
     // Explicit structured countries narrow a covering region. Europe + UK-only
     // never implies Spain. Multiple genuine eligible countries including Spain
     // are allowed. No timezone token is an eligibility signal.
-    const geoLoc = geographyText(homeCodes.has('US') ? readUsStates(loc) : loc);
+    const geoLoc = geographyText(loc);
     const locationCountries = countries(geoLoc, true);
     if (locationCountries.size && ![...locationCountries].some(c => homeCodes.has(c))) return fail('remote_country_restricted');
     const remoteDescription = description.split(/[.!?;\n]+/).some(clause => /\b(?:work remotely|work remote|remote work|remote role|work from home|work from)\b/.test(clause) && supportsHomeGeography(clause));
@@ -351,7 +351,7 @@ export const USPS_STATES = Object.freeze([
 // 2-letter codes: comma-state (", OH" / ",OH, USA") or a trailing token
 // ("Dublin OH", Workday URL hint "dublin oh"). Not a generic word-boundary —
 // English "in"/"or"/"me" in "Remote, Belgium or France" must not impersonate
-// Indiana/Oregon/Maine. State *names* still use compileLocationKeyword.
+// Indiana/Oregon/Maine. scan.mjs matches state *names* with its own keyword matcher.
 // Unicode letters and marks are part of the token: "Montréal" is not "AL".
 export function compileUsStateAbbrev(abbr) {
   const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -373,7 +373,7 @@ export function compileUsStateAbbrev(abbr) {
 // "Austin TX · Toronto, ON, CA" counts even though it is not at the end.
 const USPS_CODES = new Set(USPS_STATES.map(([, abbr]) => abbr));
 
-export function placesWithoutCountryCode(lower) {
+function placesWithoutCountryCode(lower) {
   return lower.split(/[;·]/).flatMap((place) => {
     const parts = place.split(',');
     const code = parts.at(-1).trim();
@@ -395,6 +395,7 @@ export function placesWithoutCountryCode(lower) {
 // tier instead, so "Atlanta, Georgia" still passes and a blocked Georgian city
 // does not. The 2-letter code is unambiguous and stays in always_allow, so
 // "Dublin, GA" still beats a blocked "Dublin".
+// That tiering is scan.mjs's. readUsStates below uses the same set for the home place.
 export const US_STATE_NAMES_ALSO_COUNTRIES = new Set(['georgia']);
 
 const US_STATE_CODES = USPS_STATES.map(([, abbr]) => ({
@@ -408,9 +409,12 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
   joined: new RegExp(`[,:-]\\s*${escape(name)}(?![\\p{L}\\p{N}])|(?<![\\p{L}\\p{N}])${escape(name)}\\s*[,:-]`, 'gu'),
 }));
 
-/** A folded location with each US state written as "united states", so "IL"
- * is not Israel and "Atlanta, Georgia" is not the country. A place that also
- * names a foreign country is left alone: "UK or DE" stays Germany.
+/** A folded location with its US state codes, and the state names that are
+ * also countries, written as "united states", so the home place in "Chicago,
+ * IL" is not Israel and "Atlanta, Georgia" is not the country. A place that
+ * also names a foreign country is left alone. Only the on-site check reads it:
+ * a state is never evidence that a remote posting is open to the United
+ * States, since "Berlin, DE" and "Perth, WA" look the same as a US place.
  */
 function readUsStates(loc) {
   return loc.split(/([·|;/])/).map((place) => {

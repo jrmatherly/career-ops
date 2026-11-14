@@ -52,13 +52,16 @@ as its default; a supplied nonempty country list must name a recognized country.
   prose uses country names, aliases or an ISO token after explicit geography
   such as `must be based in PT` or `work remotely from PT`. Ordinary words such
   as `us` or `by` cannot establish remote-country eligibility.
-- When the policy allows the United States, a US state in a location is the
-  United States: a two-letter code after a comma or at the end of a place
-  (`Chicago, IL`, `Remote - CO`) and a state name attached to another place
-  part (`Atlanta, Georgia`). `IL` is then not Israel and `CO` is not Colombia.
-  A state name alone in its place (`Georgia`) stays the country, and so does a
-  code in a place that also names a foreign country. A policy that does not
-  allow the United States reads these as before.
+- When the policy allows the United States, a US state beside an allowed
+  onsite location is the United States: a two-letter code after a comma, at
+  the end of a place or opening it (`Chicago, IL`, `GA-ATLANTA, 1 MAIN ST`),
+  and `Georgia` attached to another place part (`Atlanta, Georgia`). `IL` is
+  then not Israel. `Georgia` alone in its place stays the country, and so does
+  a code in a place that also names a foreign country. This applies to the
+  onsite check only. A state never confirms a remote role: `Remote - CO` and
+  `Remote, California` stay unconfirmed, because `Berlin, DE` and `Perth, WA`
+  read the same as a US place. A policy that does not allow the United States
+  reads all of these as before.
 - Timezone abbreviations in hours/overlap wording do not count as countries.
   A region qualified by "where we have a hiring presence" needs separate
   evidence that the allowed remote country is eligible.
