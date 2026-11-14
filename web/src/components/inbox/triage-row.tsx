@@ -92,6 +92,7 @@ export function TriageRow({
           {location && <span className="truncate" title={job.location}>{location}</span>}
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
+          {job.held && <Badge tone="info" title="Ranked, not auto-evaluated. Its location is not confirmed remote or in your home area.">Held: location</Badge>}
           {job.gated ? (
             <Badge tone="bad">Gated: {job.gated}</Badge>
           ) : rankLabel && (

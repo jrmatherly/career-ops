@@ -64,3 +64,24 @@ export function markGated(jobs, ledgerEntries) {
     return reason ? { ...job, gated: reason } : job;
   });
 }
+
+/** The ledger reason of a row a job's location hold kept back: HELD_LOCATION in lib/evaluate-queue.mjs. */
+export const HELD_REASON = "held-location";
+
+/**
+ * Marks each posting a scheduled job ranked and held for its location, by the
+ * posting identity markGated uses.
+ *
+ * @template {{ url: string }} T
+ * @param {T[]} jobs
+ * @param {{ url?: string, state?: string, reason?: string }[]} ledgerEntries
+ * @returns {(T & { held?: boolean })[]}
+ */
+export function markHeld(jobs, ledgerEntries) {
+  const held = new Set(ledgerEntries
+    .filter((entry) => entry?.state === "skipped" && entry.reason === HELD_REASON)
+    .map((entry) => canonicalJobKey(entry.url))
+    .filter(Boolean));
+  if (!held.size) return jobs;
+  return jobs.map((job) => (held.has(canonicalJobKey(job.url)) ? { ...job, held: true } : job));
+}
