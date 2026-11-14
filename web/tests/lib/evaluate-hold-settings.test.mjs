@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 
 import { holdPolicy, scheduledEvaluate } from "../../src/lib/scheduled-job-input.mjs";
 import { evaluateBody, evaluateForm, evaluateModeLabel } from "../../src/lib/evaluate-settings.mjs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { holdPolicyProblem } from "../../src/lib/core/workplace-policy.mjs";
+
+// Passed in, not taken from the cwd: this suite runs from web/ and from the checkout root.
+const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const HOLD = { onsiteLocations: ["Springfield"], remoteCountries: ["United States"] };
 const base = scheduledEvaluate({ mode: "auto", hold: HOLD }, undefined);
@@ -57,7 +62,7 @@ test("holdPolicy is the gate's policy shape", () => {
   assert.deepEqual(holdPolicy(HOLD), { onsite_locations: ["Springfield"], remote_countries: ["United States"] });
 });
 test("holdPolicyProblem names an unknown country and accepts a known one", async () => {
-  assert.equal(await holdPolicyProblem({ onsiteLocations: ["Springfield"], remoteCountries: ["Atlantis"] }), '"Remote from" must name a country, such as United States.');
-  assert.equal(await holdPolicyProblem(HOLD), null);
+  assert.equal(await holdPolicyProblem({ onsiteLocations: ["Springfield"], remoteCountries: ["Atlantis"] }, CODE_ROOT), '"Remote from" must name a country, such as United States.');
+  assert.equal(await holdPolicyProblem(HOLD, CODE_ROOT), null);
   assert.equal(await holdPolicyProblem(undefined), null);
 });
