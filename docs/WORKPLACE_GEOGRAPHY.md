@@ -79,3 +79,13 @@ ambiguous location wording may withhold an eligible role; review the original
 posting before changing your policy. The policy belongs in user-owned
 `portals.yml`; updates preserve it, and no existing Inbox/history rows are
 rewritten automatically.
+
+## Holding instead of dropping
+
+The policy above drops an ineligible posting at scan time. A dashboard
+scheduled scan can use the same check without dropping anything: its location
+hold, set on the job in Auto mode, keeps an ineligible posting in the Inbox,
+ranked and marked **Held: location**, and only skips its automatic evaluation.
+The hold has its own two lists (home area and remote countries) and does not
+read `location_filter.workplace_policy`. See "Location hold" in
+[AUTOMATION.md](AUTOMATION.md).
