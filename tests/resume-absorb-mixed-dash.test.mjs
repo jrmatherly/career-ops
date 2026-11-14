@@ -95,3 +95,17 @@ test('an en dash in each place is kept where the others use --', () => {
   assert.equal(absorbsLossless(cv('# CV -- Pat Example', '', ...job(EN), '- did x', '', ...project('--'))).dash, EN);
   assert.equal(absorbsLossless(cv('# CV -- Pat Example', '', ...job(), '- did x', '', ...project(EN))).rowDash, EN);
 });
+
+test('an undashed first row leaves the rows\' dash to the first dashed one', () => {
+  const style = absorbsLossless(cv('# CV -- Pat Example', '', ...job(), '- did x', '', '## Projects', '', '- **One** (2020)', `- **Tool** (2021) ${EM} A CLI.`));
+  assert.equal(style.rowDash, EM);
+});
+
+test('list rows that use two dashes are refused and the second is named, not rewritten', () => {
+  for (const second of [EN, EM]) {
+    const md = cv('# CV -- Pat Example', '', ...job(), '- did x', '', ...project('--'), '', '## Certifications', '', `- **CKA**, CNCF (2022) ${second} Kubernetes admin`);
+    const { lossless, report } = absorb(md, null);
+    assert.equal(lossless, false, second);
+    assert.deepEqual(report.unparsed.map((u) => u.text), [`- **CKA**, CNCF (2022) ${second} Kubernetes admin`], second);
+  }
+});
