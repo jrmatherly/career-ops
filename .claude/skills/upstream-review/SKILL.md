@@ -417,7 +417,7 @@ Plan: `docs/superpowers/plans/completed/2026-11-11-deployment-config-review.md`.
 
 ### Recruiter advice follow-ups (2026-11-13)
 
-Plan: `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`. Findings: `docs/superpowers/research/2026-11-13-recruiter-advice-review/findings.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-13-recruiter-advice-follow-ups.md`. Findings: `docs/superpowers/research/2026-11-13-recruiter-advice-review/findings.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
@@ -428,7 +428,7 @@ Plan: `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`. Findin
 
 ### PDF atomic-write test data-root leak (2026-11-13)
 
-Plan: `docs/superpowers/plans/2026-11-13-pdf-atomic-write-data-root-leak.md`. Findings: `docs/superpowers/research/2026-11-13-pdf-index-test-leak/findings.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-13-pdf-atomic-write-data-root-leak.md`. Findings: `docs/superpowers/research/2026-11-13-pdf-index-test-leak/findings.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |

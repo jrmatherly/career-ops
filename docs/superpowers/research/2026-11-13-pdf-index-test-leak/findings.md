@@ -78,7 +78,7 @@ An earlier quick-suite run the same evening also reported one failure. Its log w
 
 ## Outcomes
 
-Plan: `docs/superpowers/plans/2026-11-13-pdf-atomic-write-data-root-leak.md`. Branch: `feat/recruiter-advice-and-test-leak`.
+Plan: `docs/superpowers/plans/completed/2026-11-13-pdf-atomic-write-data-root-leak.md`. Branch: `feat/recruiter-advice-and-test-leak`.
 
 | Finding | Outcome |
 |---------|---------|

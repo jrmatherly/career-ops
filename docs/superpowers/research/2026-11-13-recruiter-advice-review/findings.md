@@ -68,7 +68,7 @@ Found in the plan's review on 2026-11-13. The instruction A1 names in `modes/pdf
 
 ## Outcomes
 
-Recorded 2026-11-13 from the branch `feat/recruiter-advice-and-test-leak` (first named `feat/recruiter-advice-follow-ups`), plan `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`. Jason confirmed the four decisions in session on 2026-11-13: D1, D3 and D4 are not built, every copy of the keyword rule changes, the two bullet rules count toward the Check score, and the cover draft in `modes/oferta.md` is aligned with `modes/cover.md`.
+Recorded 2026-11-13 from the branch `feat/recruiter-advice-and-test-leak` (first named `feat/recruiter-advice-follow-ups`), plan `docs/superpowers/plans/completed/2026-11-13-recruiter-advice-follow-ups.md`. Jason confirmed the four decisions in session on 2026-11-13: D1, D3 and D4 are not built, every copy of the keyword rule changes, the two bullet rules count toward the Check score, and the cover draft in `modes/oferta.md` is aligned with `modes/cover.md`.
 
 | # | Outcome | Pinned by |
 |---|---------|-----------|
