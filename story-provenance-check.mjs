@@ -305,11 +305,12 @@ function readFigure(text, start, end, limit = end + 60) {
   let value = toNumber(text.slice(start, end));
   let { currency } = leadingCurrency(text, start);
   if (eat(/^\s?(?:%|per\s?cent\b)/i)) return { value, currency, unit: '%', textEnd: at };
-  eat(/^(?:[-–]|[ \t]+to[ \t]+)\d[\d,]*(?:\.\d+)?(?![\d,])/i);
+  eat(/^(?:[ \t]*[-–][ \t]*|[ \t]+to[ \t]+)\d[\d,]*(?:\.\d+)?(?![\d,])/i);
   const magnitude = eat(/^(?:(k|mm|m|bn|b)(?![\p{L}\p{N}])|[ \t]?(thousand|million|billion)(?!\p{L}))/iu);
   if (magnitude) value *= MAGNITUDES[(magnitude[1] ?? magnitude[2]).toLowerCase()];
   const trailing = eat(/^[ \t]?(?:([$€£¥])|(usd|eur|gbp|jpy|cad|aud|chf)(?!\p{L}))/iu);
-  if (trailing) currency ??= (trailing[1] ?? trailing[2]).toUpperCase();
+  // An ISO code says more than a sign: "$2M USD" is USD, not any dollar.
+  if (trailing) currency = trailing[2]?.toUpperCase() ?? currency ?? trailing[1];
   const word = eat(/^(?:-|\+?[ \t]*)(\p{L}+)/u);
   const unit = word && !NOT_A_UNIT.has(word[1].toLowerCase()) ? normalizeUnit(foldForContext(word[1])) : null;
   return { value, currency, unit, textEnd: at };

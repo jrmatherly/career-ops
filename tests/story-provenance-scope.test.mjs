@@ -74,6 +74,8 @@ test('a magnitude is part of the number, and a currency written after it still h
   assert.deepEqual(scopeOf('2M EUR budget', 'Managed a 2M EUR budget.').existing, ['2M EUR budget']);
   assert.deepEqual(scopeOf('USD 2M budget', 'Managed a EUR 2M budget.').existing, []);
   assert.deepEqual(scopeOf('USD 2M budget', 'Managed a USD 2M budget.').existing, ['USD 2M budget']);
+  assert.deepEqual(scopeOf('$2M USD budget', 'Managed a $2M CAD budget.').existing, []);
+  assert.deepEqual(scopeOf('$2M USD budget', 'Managed a $2M USD budget.').existing, ['$2M USD budget']);
 });
 
 test('a range is two figures, and a word such as "to" is never a unit', () => {
@@ -83,6 +85,11 @@ test('a range is two figures, and a word such as "to" is never a unit', () => {
   const dashed = scopeOf('8-12 associates', 'Led 12 associates.');
   assert.deepEqual(dashed.existing, ['12 associates']);
   assert.deepEqual([...dashed.supportedByResume, ...dashed.derivedUnverified], ['8-12 associates']);
+  for (const range of ['8 – 12 associates', '8 - 12 associates']) {
+    const spaced = scopeOf(range, 'Led 12 associates.');
+    assert.deepEqual(spaced.existing, ['12 associates']);
+    assert.deepEqual([...spaced.supportedByResume, ...spaced.derivedUnverified], [range]);
+  }
 });
 
 test('years and identifiers on a Scope line are not claims', () => {
