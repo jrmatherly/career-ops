@@ -5,7 +5,7 @@ import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.LOCATION_HOLD_TEST_URL;
-test("a held posting keeps its rank in the Inbox, and the job form shows and validates the hold", {
+test("a held posting keeps its rank in the Inbox, and the job form shows the hold and the source groups", {
   skip: liveServerSkip("LOCATION_HOLD_TEST_URL"), timeout: 60_000,
 }, async (t) => {
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname));
@@ -24,6 +24,7 @@ test("a held posting keeps its rank in the Inbox, and the job form shows and val
 
   await settled(page, () => page.goto(`${url}/scheduled-scans`));
   await page.getByText("other locations held").waitFor();
+  await page.getByText("Groups: weekly", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Options for Fixture hold scan" }).click();
   await page.getByText("Edit Scan").click();
   const dialog = page.getByRole("dialog");
@@ -31,6 +32,8 @@ test("a held posting keeps its rank in the Inbox, and the job form shows and val
   await dialog.getByText("Remote from", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Remove Springfield" }).waitFor();
   await dialog.getByRole("button", { name: "Remove United States" }).waitFor();
+  await dialog.getByText("Source groups", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "Remove weekly" }).waitFor();
 
   // A country the gate does not know is refused by the route and named in the form.
   await dialog.getByRole("button", { name: "Remove United States" }).click();

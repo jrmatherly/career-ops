@@ -10,6 +10,7 @@ import { nextScheduledRun } from "./scheduled-cadence.mjs";
 import { assertScheduledJobBody, scheduledEvaluate, scheduledFiltersFrom } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
 import { holdPolicyProblem } from "./core/workplace-policy.mjs";
+import { cleanChips } from "./clean-chips.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
@@ -31,6 +32,8 @@ export type ScheduledJob = {
   engine: ScanEngine;
   filtersFrom?: FiltersFrom;
   evaluate?: EvaluateSettings;
+  /** The portals.yml entry groups a portals scan reads; none means the entries with no `group:`. */
+  sourceGroups?: string[];
   filters: ExploreFilters;
   timezone: string;
   startAt: string;
@@ -65,7 +68,7 @@ export type JobRun = {
 
 type QueueItem = { id: string; jobId: string; queuedAt: string };
 type Store = { jobs: ScheduledJob[]; runs: JobRun[]; queue: QueueItem[] };
-type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "evaluate" | "filters" | "timezone" | "startAt" | "every" | "unit">;
+type JobFields = Pick<ScheduledJob, "name" | "engine" | "filtersFrom" | "evaluate" | "sourceGroups" | "filters" | "timezone" | "startAt" | "every" | "unit">;
 
 export class ScheduledJobValidationError extends Error {
   constructor(message: string) {
@@ -131,12 +134,14 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Invalid evaluate settings.");
   }
+  if (input.sourceGroups !== undefined && !Array.isArray(input.sourceGroups)) throw new ScheduledJobValidationError("Invalid source groups.");
+  const sourceGroups = input.sourceGroups === undefined ? base?.sourceGroups ?? [] : cleanChips(input.sourceGroups);
   const filters = parseExplorePatch(
     (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>,
     base?.filters || DEFAULT_FILTERS,
   );
 
-  return { name, engine, filtersFrom, ...(evaluate ? { evaluate } : {}), unit, every, timezone, startAt, filters };
+  return { name, engine, filtersFrom, ...(evaluate ? { evaluate } : {}), sourceGroups, unit, every, timezone, startAt, filters };
 }
 
 export function listScheduledJobs(): Pick<Store, "jobs" | "runs"> {

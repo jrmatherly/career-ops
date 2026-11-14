@@ -2467,6 +2467,18 @@ search_queries:
 #   - name: BigCo
 #     careers_url: https://jobs.lever.co/bigco
 #     timeout_ms: 60000
+#
+# ── group (optional, per entry) ───────────────────────────────────────
+# Puts the entry in a named source group, so a dashboard scheduled scan can
+# read only some sources: a scan that names "weekly" reads the entries with
+# group: weekly, and nothing else. An entry with no group belongs to every
+# scheduled scan that names no group. Works on tracked_companies and job_boards
+# entries. `node scan.mjs` run by hand, and the full ATS sweep, read every
+# entry whatever its group.
+#
+#   - name: BigCo
+#     careers_url: https://jobs.lever.co/bigco
+#     group: weekly
 
 tracked_companies:
 

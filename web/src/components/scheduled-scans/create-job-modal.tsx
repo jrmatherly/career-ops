@@ -23,6 +23,7 @@ export function CreateJobModal({
   const [engine, setEngine] = useState<ScanEngine>("full");
   const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
   const [evaluate, setEvaluate] = useState<EvaluateForm>(evaluateForm());
+  const [sourceGroups, setSourceGroups] = useState<string[]>([]);
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({
@@ -43,9 +44,10 @@ export function CreateJobModal({
     setError("");
 
     try {
-      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate) }));
+      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate), sourceGroups }));
       // The next new job starts Off rather than inheriting this one's evaluations.
       setEvaluate(evaluateForm());
+      setSourceGroups([]);
 
       onCreated();
       onClose();
@@ -138,6 +140,15 @@ export function CreateJobModal({
               </div>
             </div>
           </div>
+
+
+          {engine === "portals" && (
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Source groups</p>
+              <KeywordField ariaLabel="Source groups" values={sourceGroups} tone="inc" placeholder="weekly…" onChange={setSourceGroups} />
+              <p className="mt-1 text-xs text-faint">Leave empty to scan every source that has no group. To move a source to another scan, add group: &lt;name&gt; to its entry in portals.yml and name that group here.</p>
+            </div>
+          )}
 
           <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
 

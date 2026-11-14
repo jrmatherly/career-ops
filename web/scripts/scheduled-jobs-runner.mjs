@@ -221,6 +221,29 @@ function jobPortals(job, base) {
   return base;
 }
 
+const SOURCE_LISTS = ["tracked_companies", "job_boards"];
+const groupOf = (entry) => (isMapping(entry) && typeof entry.group === "string" ? entry.group.trim().toLowerCase() : "");
+
+/**
+ * The config a portals scan reads for a job's source groups: with no groups,
+ * the entries that have no `group:`; with groups, the entries in one of them
+ * (trimmed, case-folded). Returns `config` itself when no entry is removed.
+ */
+export function selectSourceGroups(config, groups) {
+  const wanted = new Set(cleanChips(groups).map((group) => group.toLowerCase()));
+  const selected = (entry) => (wanted.size ? wanted.has(groupOf(entry)) : !groupOf(entry));
+  let next = config;
+  for (const key of SOURCE_LISTS) {
+    if (!Array.isArray(config[key])) continue;
+    const kept = config[key].filter(selected);
+    if (kept.length !== config[key].length) next = { ...next, [key]: kept };
+  }
+  return next;
+}
+
+// The scanner's rule (resolveEntries in scan.mjs): an entry is skipped only on `enabled: false`.
+const hasEnabledSource = (config) => SOURCE_LISTS.some((key) => Array.isArray(config[key]) && config[key].some((entry) => isMapping(entry) && entry.enabled !== false));
+
 function writeJobTemp(root, jobId, prefix, ext, text) {
   if (!isSafeScheduledId(jobId)) throw new Error("Invalid scheduled job identifier.");
   const tempDir = path.join(root, "data", "tmp");
@@ -250,8 +273,10 @@ function coreEnv(root) {
  * spawn error is retryable just like a non-zero scanner exit, while cleanup
  * still runs before the next attempt. A scanner that ran into the timeout is
  * not retried: the same sweep would hit the same limit, three times over. An
- * unreadable portals.yml or an empty title list is not retried either; both are
- * checked once before the loop.
+ * unreadable portals.yml, an empty title list or a source group no enabled
+ * entry is in is not retried either; all are checked once before the loop. A
+ * portals scan whose source groups remove an entry gets an overlay even when
+ * the job uses the file's filters, or it would scan every group.
  */
 
 export function executeJob(root, job, options = {}) {
@@ -263,6 +288,7 @@ export function executeJob(root, job, options = {}) {
   const basePortals = portalsPath(root);
   process.stderr.write(`portals: ${basePortals} (${fromFile ? "file" : "overlay"})\n`);
   let config;
+  let overlay = !fromFile;
   try {
     const base = readPortals(basePortals);
     config = fromFile ? base : jobPortals(job, base);
@@ -272,6 +298,16 @@ export function executeJob(root, job, options = {}) {
         ? `Scheduled scans require title keywords in portals.yml ${emptyKey} when a job uses the file's filters`
         : `Scheduled scans require title keywords in the job or portals.yml ${emptyKey}.`);
     }
+    // The full engine reads no entries from portals.yml, so groups do not apply to it.
+    if (job.engine === "portals") {
+      const groups = cleanChips(job.sourceGroups);
+      const selected = selectSourceGroups(config, groups);
+      if (groups.length && !hasEnabledSource(selected)) {
+        throw new Error(`No enabled source is in ${groups.map((group) => `"${group}"`).join(", ")}. Tag an entry with group: in portals.yml.`);
+      }
+      overlay ||= selected !== config;
+      config = selected;
+    }
   } catch (error) {
     return { state: "failed", attempt: 1, rolesFound: 0, durationMs: Date.now() - startedAt, message: scanFailureMessage({ error }) };
   }
@@ -279,7 +315,7 @@ export function executeJob(root, job, options = {}) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let tempPortals = null;
     try {
-      if (!fromFile) tempPortals = writeJobPortals(root, job.id, config);
+      if (overlay) tempPortals = writeJobPortals(root, job.id, config);
       const command = buildScanCommand(job);
       const result = spawnFn(
         process.execPath,
