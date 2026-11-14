@@ -525,6 +525,8 @@ function buildCvNumberContexts(cvText) {
   let m;
   while ((m = re.exec(cvText)) !== null) {
     const end = m.index + m[0].length;
+    // As on a Scope line: the 7 of "24/7" and the year of "FY2023" count nothing. A glued currency code ("USD2M") does.
+    if (/[\p{L}/.]/u.test(cvText[m.index - 1] ?? '') && !leadingCurrency(cvText, m.index).currency) continue;
     const { value, currency, unit } = readFigure(cvText, m.index, end);
     const occurrence = {
       currency,

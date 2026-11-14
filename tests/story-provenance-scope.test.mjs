@@ -106,6 +106,10 @@ test('years and identifiers on a Scope line are not claims', () => {
   const all = Object.values(scopeOf('FY2023 budget $2M, since 2021 pilots, March 2022 launch, 24/7 coverage, v2 platform, Jan 2021 to present', 'Wrote reports.')).flat();
   assert.deepEqual(all, []);
   assert.deepEqual(scopeOf('2000 customers', 'Supported 2000 customers on the platform.').existing, ['2000 customers']);
+  // The same identifiers in cv.md are not evidence of a count.
+  assert.deepEqual(scopeOf('7 support engineers', 'Provided 24/7 support for engineers.').existing, []);
+  assert.deepEqual(scopeOf('2023 budget lines', 'Owned FY2023 budget lines.').existing, []);
+  assert.deepEqual(scopeOf('USD 2M budget', 'Managed a USD2M budget.').existing, ['USD 2M budget']);
 });
 
 test('a grouped number before a comma is whole, and number lists in prose read as before', () => {
