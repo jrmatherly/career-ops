@@ -23,7 +23,8 @@ import { cleanChips } from "../src/lib/clean-chips.mjs";
 import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
 import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
-import { candidateSince, candidatesFor, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { candidateSince, candidatesFor, heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -513,7 +514,20 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     const { queueCandidates } = await import("../../lib/evaluate-queue.mjs");
     const rows = pendingRows(readText(pipelinePath)).filter((row) => passed.has(row.url));
     const autoJobIds = new Set(evaluatingJobs(store).filter((other) => other.evaluate.mode === "auto").map((other) => other.id));
-    autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds }, rows);
+    let held;
+    let holdProblem;
+    if (job.evaluate.hold) {
+      // The store does not validate a hold, so one edited by hand can be unusable. Queue nothing then: a hold that cannot be read must not let every location through.
+      try {
+        const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
+        held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold)) });
+      } catch (error) {
+        holdProblem = `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was queued.`;
+      }
+    }
+    // In front of the pass's own message, never in its place: runToRank keeps the run due only while the message ends with RANK_WAITING.
+    if (holdProblem) evalMessage = [holdProblem, evalMessage].filter(Boolean).join(" ");
+    else autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds, held }, rows);
   }
   if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage || lastRun.autoQueued !== autoQueued) {
     await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage, autoQueued });
