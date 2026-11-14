@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.3.0...career-ops-v2.3.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **resume:** a cv.md that mixes dash styles absorbs losslessly ([#89](https://github.com/jrmatherly/career-ops/issues/89)) ([4a2d9d5](https://github.com/jrmatherly/career-ops/commit/4a2d9d570ddd73a8ddf8046ecb3055ed77f5400c))
+
 ## [2.3.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.2.1...career-ops-v2.3.0) (2026-11-14)
 
 
