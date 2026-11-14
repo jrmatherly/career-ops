@@ -25,7 +25,7 @@ Each is one line to overturn.
 
 ## Global Constraints
 
-- This work lands on the existing branch `feat/recruiter-advice-and-test-leak`, in the worktree `/Users/jason/dev/career-ops-recruiter-advice-and-test-leak`, beside the recruiter advice follow-ups. Jason decided this on 2026-11-13. One PR covers both. Do not cut a new branch or worktree. No merge without Jason's word in-session.
+- This work lands on the existing branch `feat/recruiter-advice-and-test-leak`, in the sibling worktree `../career-ops-recruiter-advice-and-test-leak`, beside the recruiter advice follow-ups. Jason decided this on 2026-11-13. One PR covers both. Do not cut a new branch or worktree. No merge without Jason's word in-session.
 - This plan and its findings file are committed on `main`, and the branch is rebased onto that commit. If the worktree has no findings file, rebase the branch onto `main` first.
 - The worktree already has `node_modules` and `web/node_modules`. If either is missing, clone it before running tests: `cp -c -R ../career-ops/node_modules node_modules`.
 - No product file changes. `generate-pdf.mjs` is not edited.

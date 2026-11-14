@@ -13,7 +13,7 @@ The fix is one import in that suite. A small structural test keeps the next rend
 A `node test-all.mjs --quick` run on a feature branch ended with:
 
 ```
-❌ the test run changed the real data root (/Users/jason/dev/career-ops-recruiter-advice):
+❌ the test run changed the real data root (<the worktree>):
      added    data/pdf-index.tsv
 ```
 
