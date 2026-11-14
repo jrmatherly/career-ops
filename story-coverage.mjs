@@ -86,15 +86,21 @@ if (isMainModule(import.meta.url)) {
   const content = readFileSync(bankPath, 'utf-8');
   const stories = parseStories(content);
   // An entry the parser cannot read would otherwise show up as a prompt with no story.
-  const { blocks, tableRows } = splitStoryBlocks(content);
+  const { blocks, tableRows, trailing } = splitStoryBlocks(content);
   const unreadable = [
     ...tableRows.map((row) => ({ line: row.line, reason: 'table row' })),
+    ...trailing.map((cut) => ({ line: cut.line, reason: `text after a ${cut.after} inside "${blocks[cut.story]?.title || '(untitled)'}" is not read` })),
     ...blocks.filter((block) => !isValidStory(block)).map((block) => ({ line: block.line, reason: `"${block.title || '(untitled)'}" has no **A (Action):** line` })),
   ];
   if (unreadable.length) {
     console.error(`⚠️  ${unreadable.length} ${unreadable.length === 1 ? 'entry' : 'entries'} in ${bankPath} cannot be read and ${unreadable.length === 1 ? 'counts' : 'count'} toward nothing below:`);
     for (const entry of unreadable) console.error(`   - line ${entry.line}: ${entry.reason}`);
     console.error('   Ask your agent to convert them to the format in templates/story-bank.template.md.\n');
+  }
+  // Twelve "none" rows would read as twelve real gaps, and the plan mode acts on each.
+  if (!stories.length) {
+    console.error(`Error: no story could be read from ${bankPath}.`);
+    process.exit(1);
   }
   const prompts = coverage(stories);
   const pending = pendingStories(stories);

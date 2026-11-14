@@ -23,7 +23,12 @@ const namesRenderer = (source) => {
 };
 const pinsDataRoot = (source) => {
   const code = stripJsComments(source);
-  return /['"](?:\.\.?\/)+helpers\.mjs['"]/.test(code) || /\bCAREER_OPS_ROOT\b/.test(code);
+  const helpers = code.search(/['"](?:\.\.?\/)+helpers\.mjs['"]/);
+  // A static import of the renderer above the helpers resolves the data root first.
+  const renderer = code.search(/^import\b[^;]*generate-pdf\.mjs['"]/m);
+  if (helpers >= 0) return renderer < 0 || helpers < renderer;
+  // Set, as an assignment or an env key for a child. Reading it pins nothing.
+  return /\bCAREER_OPS_ROOT\s*[:=](?!=)/.test(code);
 };
 
 test('the two checks read code, not comments', () => {
@@ -33,6 +38,11 @@ test('the two checks read code, not comments', () => {
   assert.equal(pinsDataRoot("import '../helpers.mjs';"), true);
   assert.equal(pinsDataRoot('const env = { ...process.env, CAREER_OPS_ROOT: dir };'), true);
   assert.equal(pinsDataRoot('// CAREER_OPS_ROOT is inherited from the runner\nconst x = 1;'), false);
+  assert.equal(pinsDataRoot('const unused = process.env.CAREER_OPS_ROOT;'), false);
+  assert.equal(pinsDataRoot("if (process.env.CAREER_OPS_ROOT === dir) run();"), false);
+  assert.equal(pinsDataRoot('process.env.CAREER_OPS_ROOT = dir;'), true);
+  assert.equal(pinsDataRoot("import './helpers.mjs';\nimport { renderBatch } from '../generate-pdf.mjs';"), true);
+  assert.equal(pinsDataRoot("import { renderBatch } from '../generate-pdf.mjs';\nimport './helpers.mjs';"), false);
 });
 
 test('every suite that renders in-process pins a data root', () => {

@@ -122,3 +122,39 @@ test('a grouped number before a comma is whole, and number lists in prose read a
   assert.deepEqual(prose('Onboarded 1,500-person division.'), ['1,500-person']);
   assert.deepEqual(prose('Cut processing from 1,500 hours to 2 hours.'), ['1,500 hours to 2 hours']);
 });
+
+test('a magnitude multiplies exactly, in every spelling', () => {
+  assert.deepEqual(scopeOf('$2.01M budget', 'Owned a $2,010,000 budget.').existing, ['$2.01M budget']);
+  assert.deepEqual(scopeOf('$2,050,000 budget', 'Owned a $2.05M budget.').existing, ['$2,050,000 budget']);
+  assert.deepEqual(scopeOf('$40K budget', 'Owned a $40,000 budget.').existing, ['$40K budget']);
+  assert.deepEqual(scopeOf('$3bn budget', 'Owned a $3 billion budget.').existing, ['$3bn budget']);
+  assert.deepEqual(scopeOf('40 thousand units', 'Shipped 40,000 units.').existing, ['40 thousand units']);
+});
+
+test('a Scope figure with a short noun verifies against the same figure in cv.md', () => {
+  assert.deepEqual(scopeOf('$2M ARR', 'Grew $2M ARR.').existing, ['$2M ARR']);
+  assert.deepEqual(scopeOf('8 PMs', 'Managed 8 PMs.').existing, ['8 PMs']);
+  assert.deepEqual(scopeOf('8 PMs', 'Managed 8 QAs.').existing, []);
+});
+
+test('a sign agrees with each code it stands for and no other', () => {
+  assert.deepEqual(scopeOf('€2M budget', 'Managed a 2M EUR budget.').existing, ['€2M budget']);
+  assert.deepEqual(scopeOf('£2M budget', 'Managed a GBP 2M budget.').existing, ['£2M budget']);
+  assert.deepEqual(scopeOf('$2M budget', 'Managed a 2M CAD budget.').existing, ['$2M budget']);
+  assert.deepEqual(scopeOf('$2M budget', 'Managed a 2M EUR budget.').existing, []);
+});
+
+test('items split on a semicolon too, each keeps its own context, and a bulleted Scope line is read', () => {
+  for (const scope of ['$2M budget, 5 regions', '$2M budget; 5 regions']) {
+    const got = scopeOf(scope, 'Generated $2M revenue across 5 regions.');
+    assert.deepEqual(got.existing, ['5 regions']);
+    assert.deepEqual(got.derivedUnverified, ['$2M budget']);
+  }
+  const bulleted = ['### [Ops] Evening shift', '- **Scope:** 8 associates', '**A (Action):** Led the shift.'].join('\n');
+  assert.deepEqual(claims(classifyStoryBank(bulleted, 'Led 8 associates.').existing), ['8 associates']);
+});
+
+test('a connective after a number is not its unit', () => {
+  assert.deepEqual(Object.values(scopeOf('3 of the 5 sites', 'Wrote reports.')).flat(), ['5 sites']);
+  assert.deepEqual(Object.values(scopeOf('120 units per month', 'Wrote reports.')).flat(), ['120 units']);
+});

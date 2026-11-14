@@ -13,7 +13,7 @@ Every story is a `### ` block in exactly this shape. The readers match it litera
 - Do not add a `**Provenance:**` line when writing from an evaluation: an evaluation does not get to vouch for its own figures. Without a marker, `story-provenance-check.mjs` sorts each figure by `cv.md`: `existing` when the same number appears there in context, `supportedByResume` when `cv.md` supports the fact but not the number, otherwise `derived-unverified`.
 - When the user answers for a story's figures, add `**Provenance:**` followed by exactly one of `source: cv.md`, `user-stated YYYY-MM-DD` or `user-cannot-confirm`, alone on its line. Any text after the value makes the readers ignore the marker.
 - A story can be recorded before its result is known. Write `pending` as the Result, and `node story-coverage.mjs` lists it until you fill it in.
-- `**Scope:**` is optional. `story-provenance-check.mjs` checks every figure on it against `cv.md`, like any other figure in the story.
+- `**Scope:**` is optional. Write each figure as a number followed by what it counts ("8 associates", "$2M budget"), separated by commas. `story-provenance-check.mjs` checks each one against `cv.md`. A figure written the other way round ("team of 8", "budget: $2M") is not read. Elsewhere in a story it checks only percentages, hour ranges and headcounts.
 - Other single-line `**Label:** value` lines are allowed and ignored by the readers. Keep tables and `#`/`##` headings out of a story, since the readers stop at them, and keep code fences out too, since their content is skipped.
 
 ```markdown
@@ -21,7 +21,7 @@ Every story is a `### ` block in exactly this shape. The readers match it litera
 **Source:** Report #NNN — Company — Role
 **S (Situation):** The context, in one line.
 **T (Task):** What you were responsible for.
-**Scope:** Team size, volume over a stated period, budget or locations, only as cv.md states them.
+**Scope:** N associates, N units a month, $N budget, N sites. Each a number then what it counts, only as cv.md states them.
 **A (Action):** What you did, specifically.
 **R (Result):** What changed, with figures only if they are in cv.md. Write "pending" when it cannot be measured yet.
 **Reflection:** What you learned or would do differently.

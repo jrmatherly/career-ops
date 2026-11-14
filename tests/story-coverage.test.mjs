@@ -97,3 +97,30 @@ test('the CLI reports twelve prompts and the pending story, and exits 1 on a mis
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('the CLI refuses a bank with no story, names text cut off by a table, and lists a pending result', () => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'story-coverage-')));
+  try {
+    const path = join(dir, 'story-bank.md');
+    const run = (...args) => spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf-8' });
+
+    writeFileSync(path, 'Notes only, no story yet.\n');
+    const empty = run('--story-bank', path);
+    assert.equal(empty.status, 1);
+    assert.match(empty.stderr, /no story/i);
+    assert.equal(empty.stdout, '');
+
+    writeFileSync(path, [
+      '### [Team] The stakeholder conflict', '**A (Action):** Mediated.', '**R (Result):** pending',
+      '| a | b |', '|---|---|', '| 1 | 2 |',
+      '**Best for questions about:** conflict',
+    ].join('\n'));
+    const cut = run('--story-bank', path);
+    assert.equal(cut.status, 0, cut.stderr);
+    assert.match(cut.stderr, /line 7: text after a table inside "The stakeholder conflict" is not read/);
+    assert.match(cut.stdout, /\(score \d, no tag match\)/);
+    assert.match(cut.stdout, /Result still pending:\n {2}line 1 {2}The stakeholder conflict/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

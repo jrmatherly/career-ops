@@ -128,9 +128,9 @@
  * Deliberately not exhaustive — matches jd-skill-gap.mjs's design stance
  * that under-extraction is recoverable (the user can still read the story)
  * while over-extraction would misreport narrative prose as a "claim". Five
- * patterns, each documented at its declaration below, plus every figure on a
- * story's `**Scope:**` line (scopeClaims()), which is a line of figures and
- * not prose:
+ * patterns, each documented at its declaration below, plus each number on a
+ * story's `**Scope:**` line that is followed by the noun it counts
+ * (scopeClaims()), since that is a line of figures and not prose:
  *
  *   percent      \d+(\.\d+)?%                      "cut costs 40%"
  *   plus-noun     \d+\+\s+word                       "500+ employees"
@@ -141,9 +141,10 @@
  *                 on a Scope line only
  *
  * In every pattern a number may be a grouped thousand ("1,500 employees"),
- * and a match must start on a whole number. readFigure() reads a figure's
- * value (magnitude applied), currency and unit the same way in a claim and in
- * cv.md. A claim is `existing` only against a cv.md number of the same value,
+ * and a match must start on a whole number. readFigure() reads a Scope
+ * figure's value (magnitude applied), currency and unit the same way it reads
+ * cv.md; the five patterns read their own value and unit, and only a currency
+ * written before the number. A claim is `existing` only against a cv.md number of the same value,
  * unit and currency: a currency written on one side only is a mismatch, and
  * a sign agrees with the codes it can stand for ("$" with USD, CAD or AUD).
  *
@@ -158,7 +159,9 @@
  *     this for generated CVs; story-bank.md is authored in the profile's
  *     language, so this is a smaller gap here, but still a gap)
  *   - a bare number with no adjacent noun/unit ("trained 40 in Q1")
- *   - on a Scope line: a figure written after its noun ("budget $2M"), a
+ *   - on a Scope line: a percentage spelled out ("40 percent"), a figure
+ *     written after its noun ("budget $2M" is skipped at the end of an item,
+ *     and otherwise takes the next word as its noun), a
  *     year after a month or a word such as "since" ("since 2021"), and a
  *     number glued to a letter, slash or dot ("FY2023", "24/7", "v2.1"). A
  *     year with no such cue ("2021 rollout") is read as a count and shows
@@ -240,7 +243,8 @@ const CLAIM_PATTERNS = [
 
 const HOUR_UNITS = new Set(['h', 'hr', 'hrs', 'hour', 'hours']);
 // Units that say how much but not of what (see hasScopedNumberMatch()), and
-// the words that spell them, which are never context.
+// the words that are never context: the ones that spell those units,
+// magnitudes ("million") and currency codes.
 const UNITS_WITHOUT_METRIC = new Set(['%', 'hour']);
 const UNIT_WORDS = new Set([...HOUR_UNITS, 'percent', 'cent', 'thousand', 'million', 'billion', 'usd', 'eur', 'gbp', 'jpy', 'cad', 'aud', 'chf']);
 const METRIC_CONTEXT_WORDS = 2;
@@ -290,8 +294,8 @@ const NOT_A_UNIT = new Set(['to', 'of', 'and', 'or', 'per', 'in', 'a', 'an', 'th
  * upward and is not two years. A code after a sign wins ("$2M USD" is USD).
  * `unit` is null when nothing unit-like follows: "2019 – 2024 rollout"
  * verifies nothing for 2019, and neither does "8 to".
- * Story claims and cv.md are both read through this, so they compare like with
- * like.
+ * Scope-line claims and cv.md are both read through this, so they compare like
+ * with like. The five patterns read their own value and unit.
  * @param {string} text
  * @param {number} start
  * @param {number} end - index just past the number
@@ -314,7 +318,8 @@ function readFigure(text, start, end, limit = end + 60) {
   const isYear = (s) => /^(?:19|20)\d\d$/.test(s);
   if (upper && toNumber(upper[1]) > value && !(isYear(upper[1]) && isYear(text.slice(start, end)))) at += upper[0].length;
   const magnitude = eat(/^(?:(k|mm|m|bn|b)(?![\p{L}\p{N}])|[ \t]?(thousand|million|billion)(?!\p{L}))/iu);
-  if (magnitude) value *= MAGNITUDES[(magnitude[1] ?? magnitude[2]).toLowerCase()];
+  // toPrecision: 2.01 * 1e6 is 2009999.9999999998, which would miss "2,010,000".
+  if (magnitude) value = Number((value * MAGNITUDES[(magnitude[1] ?? magnitude[2]).toLowerCase()]).toPrecision(15));
   const trailing = eat(/^[ \t]?(?:([$€£¥])|(usd|eur|gbp|jpy|cad|aud|chf)(?!\p{L}))/iu);
   // An ISO code says more than a sign: "$2M USD" is USD, not any dollar.
   if (trailing) currency = trailing[2]?.toUpperCase() ?? currency ?? trailing[1];
@@ -459,7 +464,7 @@ const DATED_YEAR_RE = /(?<!\p{L})(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct
 const SCOPE_LINE_RE = /^[ \t]*(?:[-*+>][ \t]+)?\*\*Scope:\*\*[ \t]*(.+)$/gim;
 
 /**
- * Every figure on a `**Scope:**` line that no pattern above already read. The patterns stay narrow because story
+ * Each number on a `**Scope:**` line that is followed by its noun and that no pattern above already read. The patterns stay narrow because story
  * prose is full of numbers that are not claims; a Scope line holds only scale figures, so each number that counts
  * something is a claim. Each comma- or semicolon-separated item is read on its own, context words included: on
  * "$2M budget, 5 regions" the regions say nothing about the budget.
@@ -525,7 +530,7 @@ function buildCvNumberContexts(cvText) {
   let m;
   while ((m = re.exec(cvText)) !== null) {
     const end = m.index + m[0].length;
-    // As on a Scope line: the 7 of "24/7" and the year of "FY2023" count nothing. A glued currency code ("USD2M") does.
+    // As on a Scope line, the 7 of "24/7" and the year of "FY2023" count nothing. Unlike a Scope line, a glued currency code ("USD2M") is read here.
     if (/[\p{L}/.]/u.test(cvText[m.index - 1] ?? '') && !leadingCurrency(cvText, m.index).currency) continue;
     const { value, currency, unit } = readFigure(cvText, m.index, end);
     const occurrence = {
@@ -680,6 +685,10 @@ function hasContextOverlap(words, cvText) {
   return words.some((w) => bounded(w).test(haystack));
 }
 
+// The ISO codes a sign can stand for. "$2M" agrees with "$2M USD" and with "2M CAD", never with "€2M".
+const SIGN_CODES = { $: ['USD', 'CAD', 'AUD'], '€': ['EUR'], '£': ['GBP'], '¥': ['JPY'] };
+const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || SIGN_CODES[b]?.includes(a));
+
 /**
  * Whether cv.md has the claim's numbers in ONE sentence, each counting the
  * claim's unit, with enough shared context words to be the same metric — the
@@ -695,19 +704,20 @@ function hasContextOverlap(words, cvText) {
  * deploy time 40%" and "The team reduced incident rate 40%" share "team" and
  * nothing about the metric, so these need METRIC_CONTEXT_WORDS shared words,
  * and the unit's own words ("hours", "percent") never count toward them.
- * @param {{values: number[], units: string[]}} claim
+ *
+ * A Scope figure is a number and its noun and nothing else, so the noun is
+ * the context: cv.md counting the same number of the same noun is the match,
+ * whatever the noun's length ("8 PMs", "$2M ARR").
+ * @param {{kind?: string, values: number[], units: string[], currency?: string|null}} claim
  * @param {string[]} claimWords
  * @param {ReturnType<typeof buildCvNumberContexts>} cvNumberContexts
  * @returns {boolean}
  */
-// The ISO codes a sign can stand for. "$2M" agrees with "$2M USD" and with "2M CAD", never with "€2M".
-const SIGN_CODES = { $: ['USD', 'CAD', 'AUD'], '€': ['EUR'], '£': ['GBP'], '¥': ['JPY'] };
-const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || SIGN_CODES[b]?.includes(a));
-
 function hasScopedNumberMatch(claim, claimWords, cvNumberContexts) {
   const occurrences = (i) => (cvNumberContexts.get(claim.values[i]) || [])
     .filter((o) => o.unit === claim.units[i] && sameCurrency(o.currency, claim.currency ?? null));
-  const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS : 1;
+  const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS
+    : claim.kind === 'scope-figure' ? 0 : 1;
   const shared = (words) => words.filter((w) => claimWords.includes(w) && !UNIT_WORDS.has(w)).length;
   return occurrences(0).some((first) => shared(first.words) >= needed
     && claim.values.every((_, i) => occurrences(i).some((o) => o.sentence === first.sentence)));

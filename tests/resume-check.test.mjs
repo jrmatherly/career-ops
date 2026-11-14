@@ -735,3 +735,10 @@ test('nested, unclosed and glyph-led list items are each read as their own bulle
 test('every rule id is produced by some fixture above', () => {
   assert.deepEqual(CHECK_RULE_IDS.filter((id) => !seen.has(id)), []);
 });
+
+test('a long bullet is flagged in a resume that is not in English', () => {
+  const data = parsed(sample());
+  data.metadata.page.locale = 'de-DE';
+  data.sections.experience.items[0].description = `<ul><li>${'a'.repeat(241)}</li></ul>`;
+  assert.equal(lint(data).findings.filter((f) => f.id === 'LONG_BULLET').length, 1);
+});
