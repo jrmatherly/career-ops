@@ -96,3 +96,17 @@ Recorded 2026-11-13 on the branch `fix/post-deploy-follow-ups`. "Fixed" means fi
 | C6 | Left. The writer that made cells starting with "; " was fixed in PR 72, and the eight rows were repaired by hand. D3 checks it on the next evaluation. |
 | D1 to D7 | Open. Each needs an event or the owner's go; the plan's "After the merge" table names the trigger. D2 is read from `droppedSalary` on the next sweep's run once C5 is deployed. |
 | E | Unchanged. |
+
+## Live, after the 2.2.1 deploy
+
+Measured 2026-11-14 00:02Z on `https://career.matherly.net` (career-ops 2.2.1, web 1.3.0, home-cluster 97320c7), signed in, at 1280 by 900 with real data. Sizes are `getBoundingClientRect()` of every match inside `main`, using the selectors in the plan's Task 1 table.
+
+| Item | Route | Matches | Smallest, width by height |
+|------|-------|---------|---------------------------|
+| A1 | `/explore` chip remove button | 33 | 24 by 24. The chip is 23.4 tall, as before the fix. |
+| A2 | `/pipeline` "Select all N" | 1 | 69.6 by 24 |
+| A3 | `/pipeline?tab=ALL` tailored CV link | 6 | 47.3 by 24 |
+| A4 | `/followups` company link | 3 | 122.4 by 24 |
+| A5 | `/` "See all" | 1 | 83.0 by 24. The fresh matches link; the follow-ups link did not render, since no more follow-ups were due than the page lists. |
+
+Not measured here: the same controls at phone width, the second inbox text button beside "Select all N", and the follow-ups "See all" link. D1 to D6 stay open.
