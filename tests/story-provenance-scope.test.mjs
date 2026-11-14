@@ -76,6 +76,12 @@ test('a magnitude is part of the number, and a currency written after it still h
   assert.deepEqual(scopeOf('USD 2M budget', 'Managed a USD 2M budget.').existing, ['USD 2M budget']);
   assert.deepEqual(scopeOf('$2M USD budget', 'Managed a $2M CAD budget.').existing, []);
   assert.deepEqual(scopeOf('$2M USD budget', 'Managed a $2M USD budget.').existing, ['$2M USD budget']);
+  // A sign and a code it can stand for agree; a sign and another currency's code do not.
+  assert.deepEqual(scopeOf('$2M USD budget', 'Managed a $2M budget.').existing, ['$2M USD budget']);
+  assert.deepEqual(scopeOf('$2M budget', 'Managed a $2M USD budget.').existing, ['$2M budget']);
+  assert.deepEqual(scopeOf('USD 2M budget', 'Managed a $2M budget.').existing, ['USD 2M budget']);
+  assert.deepEqual(scopeOf('€2M budget', 'Managed a $2M USD budget.').existing, []);
+  assert.deepEqual(scopeOf('2M budget', 'Managed a $2M budget.').existing, []);
 });
 
 test('a range is two figures, and a word such as "to" is never a unit', () => {
@@ -90,6 +96,10 @@ test('a range is two figures, and a word such as "to" is never a unit', () => {
     assert.deepEqual(spaced.existing, ['12 associates']);
     assert.deepEqual([...spaced.supportedByResume, ...spaced.derivedUnverified], [range]);
   }
+  // A dash before a smaller number is a separator, and two years are dates: neither lends its unit to the first number.
+  assert.deepEqual(scopeOf('5 - 3 engineers', 'Led 5 engineers.').existing, []);
+  assert.deepEqual(scopeOf('12 teams', 'Engineers: 12 - 3 teams.').existing, []);
+  assert.deepEqual(Object.values(scopeOf('2019 – 2024 rollout', 'Wrote reports.')).flat(), ['2024 rollout']);
 });
 
 test('years and identifiers on a Scope line are not claims', () => {

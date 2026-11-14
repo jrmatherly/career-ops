@@ -144,7 +144,8 @@
  * and a match must start on a whole number. readFigure() reads a figure's
  * value (magnitude applied), currency and unit the same way in a claim and in
  * cv.md. A claim is `existing` only against a cv.md number of the same value,
- * unit and currency: a currency written on one side only is a mismatch.
+ * unit and currency: a currency written on one side only is a mismatch, and
+ * a sign agrees with the codes it can stand for ("$" with USD, CAD or AUD).
  *
  * Known gaps (not covered, intentionally, to keep the pattern set legible
  * and low-noise — same tradeoff jd-skill-gap.mjs's SKILL_TOKEN_RE makes):
@@ -285,8 +286,10 @@ const NOT_A_UNIT = new Set(['to', 'of', 'and', 'or', 'per', 'in', 'a', 'an', 'th
  * (a sign or ISO code before or after it), and the unit it counts:
  * `%`, or the next word through a hyphen or a `+` ("15-person", "500+
  * customers"). The lower bound of a range takes the upper bound's unit ("8 to
- * 12 associates", "8-12 associates"). `unit` is null when nothing unit-like
- * follows: "2019 – 2024" verifies nothing, and neither does "8 to".
+ * 12 associates", "8-12 associates", "8 – 12 associates"), when the range runs
+ * upward and is not two years. A code after a sign wins ("$2M USD" is USD).
+ * `unit` is null when nothing unit-like follows: "2019 – 2024 rollout"
+ * verifies nothing for 2019, and neither does "8 to".
  * Story claims and cv.md are both read through this, so they compare like with
  * like.
  * @param {string} text
@@ -305,7 +308,11 @@ function readFigure(text, start, end, limit = end + 60) {
   let value = toNumber(text.slice(start, end));
   let { currency } = leadingCurrency(text, start);
   if (eat(/^\s?(?:%|per\s?cent\b)/i)) return { value, currency, unit: '%', textEnd: at };
-  eat(/^(?:[ \t]*[-–][ \t]*|[ \t]+to[ \t]+)\d[\d,]*(?:\.\d+)?(?![\d,])/i);
+  // A range runs upward and is not two years: in "5 - 3 engineers" the dash
+  // is a separator, and "2019 – 2024" is a date.
+  const upper = text.slice(at, limit).match(/^(?:[ \t]*[-–][ \t]*|[ \t]+to[ \t]+)(\d[\d,]*(?:\.\d+)?)(?![\d,])/i);
+  const isYear = (s) => /^(?:19|20)\d\d$/.test(s);
+  if (upper && toNumber(upper[1]) > value && !(isYear(upper[1]) && isYear(text.slice(start, end)))) at += upper[0].length;
   const magnitude = eat(/^(?:(k|mm|m|bn|b)(?![\p{L}\p{N}])|[ \t]?(thousand|million|billion)(?!\p{L}))/iu);
   if (magnitude) value *= MAGNITUDES[(magnitude[1] ?? magnitude[2]).toLowerCase()];
   const trailing = eat(/^[ \t]?(?:([$€£¥])|(usd|eur|gbp|jpy|cad|aud|chf)(?!\p{L}))/iu);
@@ -691,9 +698,13 @@ function hasContextOverlap(words, cvText) {
  * @param {ReturnType<typeof buildCvNumberContexts>} cvNumberContexts
  * @returns {boolean}
  */
+// The ISO codes a sign can stand for. "$2M" agrees with "$2M USD" and with "2M CAD", never with "€2M".
+const SIGN_CODES = { $: ['USD', 'CAD', 'AUD'], '€': ['EUR'], '£': ['GBP'], '¥': ['JPY'] };
+const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || SIGN_CODES[b]?.includes(a));
+
 function hasScopedNumberMatch(claim, claimWords, cvNumberContexts) {
   const occurrences = (i) => (cvNumberContexts.get(claim.values[i]) || [])
-    .filter((o) => o.unit === claim.units[i] && o.currency === (claim.currency ?? null));
+    .filter((o) => o.unit === claim.units[i] && sameCurrency(o.currency, claim.currency ?? null));
   const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS : 1;
   const shared = (words) => words.filter((w) => claimWords.includes(w) && !UNIT_WORDS.has(w)).length;
   return occurrences(0).some((first) => shared(first.words) >= needed
