@@ -12,21 +12,23 @@
 
 ## Decisions for Jason before execution
 
-Three of the four D findings are recommended against. Each is one line to overturn.
+Three of the four D findings are recommended against, and two choices below change what gets built. Each is one line to overturn.
 
 | Finding | Recommendation | Why |
 |---|---|---|
-| D1, outcomes by CV template | Do not build. | `data/pdf-index.tsv` is read positionally by `find.mjs`, `outcome.mjs` and the web reader (`generate-pdf.mjs:1641-1648`), so a template column is a schema change across four readers. The tracker holds about 100 rows and few sent applications, so a per-template rate would be noise. |
+| D1, outcomes by CV template | Do not build. | The tracker holds about 100 rows and few sent applications, so a per-template rate would be noise. The cost is modest and is not the reason: `data/pdf-index.tsv` is read by position, and a trailing column is the established safe change (`generate-pdf.mjs:1641-1648`), plus a reader in `analyze-patterns.mjs`. |
 | D3, single-column detector | Do not build. | Upstream declined it in writing (`templates/ats-rules.yml:48-52`): a heuristic that fires on a correct template teaches people to ignore the lint. All ten shipped templates are declared one column in `lib/resume/template-layouts.mjs`. |
 | D4, Core Competencies by default | Leave as built. | It is upstream's deliberate six-second-scan design, and `pdf --ats` already folds it for parsers. Changing the default diverges every rendered CV from upstream's. |
 | D2, accomplishment journal | Build, small. | Task 5 lets the story bank hold a story whose result is pending, and Task 6 lists them. No new file or mode. |
+| The keyword rule's other copies | Change them too (Task 1, Step 7). | `modes/text.md`, `modes/latex.md`, `modes/latex-tex.md`, `batch/batch-prompt.md`, `openai-tailor.mjs` and the web `pdf` worker prompt each restate "inject keywords". Left alone, the web worker and batch runs would keep the old instruction while `modes/pdf.md` says the new one. Say so to keep the change to `modes/pdf.md` only. |
+| The Check score | Accept the drop. | The score is passed rules over applicable rules (`lib/resume/check.mjs:505-511`), whatever the severity. With 25 rules, a CV with one weak bullet scores 96, and with one weak and one long bullet 92. Both rules can be ignored per finding or with `--ignore`. Say so to keep the two rules out of the score. |
 
 ## Global Constraints
 
 - One branch, `feat/recruiter-advice-follow-ups`, in a sibling worktree. One PR. No merge without Jason's word in-session.
 - English modes only. The translated mode sets under `modes/{lang}/` are not edited. Add no `#` heading to any mode file, since `i18n-drift.mjs` compares heading structure.
 - New mode copy matches the punctuation of the lines around it. `modes/interview-prep.md` and `modes/pdf.md` separate a label from its text with ` — `, and `modes/heuristics/recruiter-side.md` uses none.
-- `i18n-drift.mjs` is advisory and always exits 0. Save `node i18n-drift.mjs --summary` before the first mode edit and compare it after each mode task. The two outputs must be identical.
+- `i18n-drift.mjs` is advisory and always exits 0. It compares heading levels only, and only for files the translated sets also hold (here `interview/practice.md` and `interview/plan.md`). Save `node i18n-drift.mjs --summary` before the first mode edit and compare it after each mode task. Identical output proves no heading was added by accident, and nothing more.
 - Mode wording never weakens the fact rules: "NEVER invent", the fact gate and the Source-of-Truth Boundary stay word for word.
 - No personal data. Test fixtures use fictional people and companies only.
 - A new test is its own file under `tests/*.test.mjs`. No `process.exit()` in a discovered suite.
@@ -38,8 +40,9 @@ Three of the four D findings are recommended against. Each is one line to overtu
 ## Review Focus
 
 - **A bullet that opens with a weak phrase inside a sentence that owns the work.** "Responsible for" at the start is flagged. "Led the team responsible for billing" is not. Task 4 tests both.
+- **Two weak bullets in one role.** A finding's key is its rule id and pointer, and the web Check panel pins and ignores by key (`web/src/components/resume/check-panel.tsx:76-82`). Two findings with one key would collide, so each rule reports once per description, with a count. Task 4 tests it.
 - **A long bullet in a language with no spaces, or a bullet that is one long URL.** The length rule counts characters of visible text, so a CJK bullet trips it sooner than an English one. It is `info` severity and can be ignored per rule with `--ignore`. Task 4 tests that a link's `href` does not count toward the length.
-- **A story bank with no tags.** Every prompt then scores on body words only, and most read as thin. The report must say "thin", never "covered", for a score under 3. Task 6 tests a tagless bank.
+- **A story bank with no tags.** A prompt can then match on title and body words alone, and a title hit plus a body hit scores 3. The report must say "thin" for any score under 3 and must print the score beside "covered", so a covered-by-wording match is visible. Task 6 tests a body-only match.
 - **A story whose result reads "pending" in another case or with a trailing note.** "Pending", "pending: Q1 numbers" and "PENDING" all count. "The pending migration shipped" does not. Task 5 tests all four.
 - **A user whose `_custom.md` already asks for scripted answers.** `modes/_custom.md` overrides style defaults. The new "prepare, do not memorise" line is a default, so it must be worded as one and not as a rule that outranks house rules. Task 2's copy says "by default".
 
@@ -48,8 +51,9 @@ Three of the four D findings are recommended against. Each is one line to overtu
 ### Task 1: CV and cover wording (A1, A4, B2, B3, B4)
 
 **Files:**
-- Modify: `modes/pdf.md:56`, `:60`, `:137`, `:154`, `:170`, `:243`, `:384`
-- Modify: `modes/cover.md:206`
+- Modify: `modes/pdf.md:56`, `:60`, `:137`, `:140`, `:154`, `:170`, `:234`, `:243`, `:381`, `:384`
+- Modify: `modes/cover.md:206`, `:210`, `:239-242`, `:276`
+- Modify (the rule's other copies, Step 7): `modes/text.md:20`, `:23`, `modes/latex.md:16`, `:19`, `:65`, `modes/latex-tex.md:46`, `batch/batch-prompt.md:753`, `openai-tailor.mjs:240`, `web/src/lib/run-prompts.mjs:252`
 - Modify: `modes/heuristics/recruiter-side.md:51-52` (append after the weak-starts sentence)
 - Modify: `modes/add.md:49-50`
 - Modify: `modes/interview.md:23`
@@ -77,8 +81,16 @@ test('the CV mode asks for a relevant summary, not a keyword-dense one', () => {
 });
 
 test('no mode asks for a metric in every bullet', () => {
-  assert.ok(!mode('cover.md').includes('at least one metric per bullet'));
+  const cover = mode('cover.md');
+  assert.ok(!cover.includes('at least one metric per bullet'));
+  assert.ok(!/impact( sentence)? with metric/.test(cover));
   assert.ok(!mode('pdf.md').includes('Another quantified-impact bullet'));
+});
+
+test('no copy of the CV rules still says to inject keywords', () => {
+  const root = (rel) => readFileSync(fileURLToPath(new URL(`../${rel}`, import.meta.url)), 'utf-8');
+  const copies = ['modes/pdf.md', 'modes/text.md', 'modes/latex.md', 'modes/latex-tex.md', 'batch/batch-prompt.md', 'openai-tailor.mjs', 'web/src/lib/run-prompts.mjs'];
+  for (const rel of copies) assert.ok(!/inject(ing|ed)?\b[^.\n]{0,24}keywords|keywords injected/i.test(root(rel)), rel);
 });
 
 test('the bullet heuristics cover plain words, number hygiene, scope and acronyms', () => {
@@ -96,7 +108,7 @@ test('the bullet heuristics cover plain words, number hygiene, scope and acronym
 - [ ] **Step 2: Run it and see it fail**
 
 Run: `node --test tests/recruiter-advice-wording.test.mjs`
-Expected: three failures, the first on `keyword-dense`.
+Expected: four failures, the first on `keyword-dense`.
 
 - [ ] **Step 3: Edit `modes/pdf.md`**
 
@@ -105,13 +117,18 @@ Expected: three failures, the first on `keyword-dense`.
 | 56 | "Rewrite Professional Summary by injecting JD keywords + the candidate's exit narrative…" | "Rewrite Professional Summary around the role this JD describes, using the JD's own terms where they truthfully name what the candidate did, + the candidate's exit narrative…" (rest of the line unchanged) |
 | 60 and 384 | "Inject keywords naturally into existing achievements (NEVER invent)" and "Inject keywords naturally (NEVER invent)" | "Use the JD's own term where it truthfully names what the candidate did (NEVER invent). A keyword is not a qualification: never add one the achievement does not support." |
 | 137 | "Distributed JD keywords: Summary (top 5), first bullet of each role, Skills section" | "JD terms appear where the matching work is described: the summary, the bullets that did that work, and Skills. Never repeat a term to raise a count." |
+| 140 | "(not the optional-sections or distributed-keywords bullets)" | "(not the optional-sections or JD-terms bullets)" |
 | 154 | "Bullets should emphasize outcomes, systems, users, or business effects rather than task history." | Keep, and append: "A bullet says what the candidate did, how, and what happened as a result. See `modes/heuristics/recruiter-side.md`." |
 | 170 | "Professional Summary (3-4 lines, keyword-dense)" | "Professional Summary (3-4 lines: what kind of professional this is and why this role)" |
+| 234 | `"summary": "Personalized summary with JD keywords injected (honest vs cv.md).",` | `"summary": "Personalized summary in the JD's own terms (honest vs cv.md).",` |
 | 243 | `"bullets": ["Achievement bullet with JD keywords injected", "Another quantified-impact bullet"]` | `"bullets": ["Achievement bullet in the JD's own terms", "Another bullet: what was done, how, and the result"]` |
+| 381 | "Rewrite Professional Summary with JD keywords + exit narrative" | "Rewrite Professional Summary around the role, in the JD's own terms + exit narrative" |
 
-- [ ] **Step 4: Edit `modes/cover.md:206`**
+- [ ] **Step 4: Edit `modes/cover.md`**
 
-"Pick the 4-5 highest-scoring, with at least one metric per bullet" becomes "Pick the 4-5 highest-scoring. Prefer a bullet whose result is stated, with its metric when cv.md has one".
+Line 206: "Pick the 4-5 highest-scoring, with at least one metric per bullet" becomes "Pick the 4-5 highest-scoring. Prefer a bullet whose result is stated, with its metric when cv.md has one".
+
+Lines 210 and 276 still require a metric in every bullet and would contradict line 206. "one sentence of impact with metric" becomes "one sentence of impact, with its metric when cv.md has one". "impact sentence with metric" at 276 becomes "impact sentence, with its metric when cv.md has one". In the four example lines at 239-242, "impact sentence with metric." becomes "impact sentence." on the last two, so the example shows both shapes.
 
 - [ ] **Step 5: Append to `modes/heuristics/recruiter-side.md` after line 52**
 
@@ -142,24 +159,44 @@ ask the user. Never fill it in.
 
 `interview.md`: "…and most importantly, **measurable outcomes** (percentages, revenue, performance gains, team size, cost savings)." becomes "…**scope** (team size, volume over a stated period, budget, locations) and, apart from it, **measurable outcomes** (percentages, revenue, performance gains, cost savings). When there was no measured outcome, record the scope and what changed in plain words."
 
-- [ ] **Step 7: Run the test**
+- [ ] **Step 7: Bring the rule's other copies into line.** Each keeps its own surrounding words and its "NEVER invent" clause.
+
+| File and line | Now | Becomes |
+|---|---|---|
+| `modes/text.md:20`, `modes/latex.md:16` | "Rewrite Professional Summary injecting JD keywords (same rules as `pdf` mode — NEVER invent skills)" | "Rewrite Professional Summary around the role, in the JD's own terms (same rules as `pdf` mode — NEVER invent skills)" |
+| `modes/text.md:23` | "Inject keywords naturally into existing achievements (NEVER invent)" | "Use the JD's own term where it truthfully names what the candidate did (NEVER invent)" |
+| `modes/latex.md:19` | "Inject keywords naturally into existing achievements" | "Use the JD's own term where it truthfully names what the candidate did (NEVER invent)" |
+| `modes/latex.md:65` | "Achievement bullet with JD keywords injected" | "Achievement bullet in the JD's own terms" |
+| `modes/latex-tex.md:46` | "Inject keywords into existing achievements — **NEVER invent skills**" | "Use the JD's own terms in existing achievements where they truthfully apply — **NEVER invent skills**" |
+| `batch/batch-prompt.md:753` | "Inject keywords ethically into existing achievements; never invent skills or metrics." | "Use the JD's own terms in existing achievements where they truthfully apply; never invent skills or metrics." |
+| `openai-tailor.mjs:240` | "Inject keywords naturally by reformulating the real experience using JD vocabulary." | "Reformulate the real experience in JD vocabulary where it truthfully applies. A keyword is not a qualification." |
+| `web/src/lib/run-prompts.mjs:252` | "inject the JD's keywords into the summary + first bullets" | "use the JD's own terms in the summary and bullets where they truthfully name the work" |
+
+The heading "## Keyword Injection Strategy" at `modes/latex.md:182` stays. Its body already says to reformulate existing experience only, and renaming a heading is out of bounds here.
+
+- [ ] **Step 8: Run the test**
 
 Run: `node --test tests/recruiter-advice-wording.test.mjs`
-Expected: PASS, 3 tests.
+Expected: PASS, 4 tests.
 
-- [ ] **Step 8: Check nothing else pinned the old wording**
+- [ ] **Step 9: Check nothing else pinned the old wording**
 
-Run: `grep -rnE "keyword-dense|Distributed JD keywords|at least one metric per bullet" tests batch docs modes --include='*.md' --include='*.mjs' | grep -v "^modes/[a-z-]*/"`
-Expected: no output. A hit under `tests/` is a drift guard to update in this commit.
+Run: `grep -rnE "keyword-dense|Distributed JD keywords|at least one metric per bullet|with metric|[Ii]nject(ing)? (the JD's )?keywords" tests web/tests batch docs modes web/src .agents .claude/skills --include='*.md' --include='*.mjs' --include='*.ts' --include='*.tsx' | grep -vE "^docs/superpowers/|^modes/[a-z]{2}(-[A-Z]{2})?/|^tests/recruiter-advice-wording"`
+Expected: no output. The filter drops this plan and its findings, the translated mode sets, and the new test. A hit under `tests/` or `web/tests/` is a drift guard to update in this commit.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Run the suites that read the changed prompts**
+
+Run: `node --test tests/*batch*.test.mjs`, and in `web/`: `node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/run-prompts*.test.mjs` if such a file exists.
+Expected: PASS.
+
+- [ ] **Step 11: Commit**
 
 ```bash
-git add modes/pdf.md modes/cover.md modes/heuristics/recruiter-side.md modes/add.md modes/interview.md tests/recruiter-advice-wording.test.mjs
+git add modes/pdf.md modes/cover.md modes/text.md modes/latex.md modes/latex-tex.md modes/heuristics/recruiter-side.md modes/add.md modes/interview.md batch/batch-prompt.md openai-tailor.mjs web/src/lib/run-prompts.mjs tests/recruiter-advice-wording.test.mjs
 git commit -m "docs(modes): CV bullets say what was done, how and the result, not a keyword count"
 ```
 
-### Task 2: Interview prep prepares points, not scripts (A2, A3, C3, C4, C5)
+### Task 2: Interview prep prepares points, not scripts (A2, A3, C3, C4, C5, C6)
 
 **Files:**
 - Modify: `modes/interview-prep.md:196`, `:200-208`, `:213`, `:229`
@@ -194,23 +231,20 @@ Expected: FAIL on `draft candidate-specific answers`.
 "draft candidate-specific answers using" becomes "prepare candidate-specific answers using". Then add one paragraph after that paragraph:
 
 ```markdown
-By default, give the candidate points and evidence, not a script. For each
-question write the point to land, the one or two proof points that carry it, and
-the role's need it speaks to. Write full sentences only for a figure, a name or a
-phrase that has to be exact. Tell the candidate to practise saying the points
-several ways, since a memorised answer breaks on the first follow-up.
+By default, give the candidate points and evidence, not a script. For each question write the point to land, the one or two proof points that carry it, and the role's need it speaks to. Write full sentences only for a figure, a name or a phrase that has to be exact. Tell the candidate to practise saying the points several ways, since a memorised answer breaks on the first follow-up.
 ```
+
+One line, like the paragraphs around it.
 
 - [ ] **Step 4: Edit lines 200-208**
 
 Keep the four-part list. Replace the lead-in "For every answer, use result-first framing:" with:
 
 ```markdown
-One shape per kind of answer. A behavioural question takes a story in STAR
-order, with its Reflection when the story has one, as the story bank holds it.
-Lead with the Result in one sentence, then tell it. Every other answer (a
-motivation, a design choice, an opinion) uses result-first framing:
+One shape per kind of answer. A behavioural question takes a story in STAR order, with its Reflection when the story has one, as the story bank holds it. Lead with the Result in one sentence, then tell it. Every other answer (a motivation, a design choice, an opinion) uses result-first framing:
 ```
+
+Write it as one line, as shown. The test matches a phrase that a hard wrap would split.
 
 - [ ] **Step 5: Replace the first bullet at line 213 with three**
 
@@ -227,7 +261,7 @@ motivation, a design choice, an opinion) uses result-first framing:
 - [ ] **Step 7: Run the test and the drift check**
 
 Run: `node --test tests/recruiter-advice-wording.test.mjs && node i18n-drift.mjs --summary`
-Expected: PASS, 4 tests. The drift summary is identical to the one saved before the first mode edit.
+Expected: PASS, 5 tests. The drift summary is identical to the one saved before the first mode edit.
 
 - [ ] **Step 8: Commit**
 
@@ -265,13 +299,15 @@ Expected: FAIL on `**The behavioural checks.**`.
 - [ ] **Step 3: Insert the paragraph**
 
 ```markdown
-**The behavioural checks.** For a "tell me about a time" question, check these before the feedback and name any that apply under "What to sharpen": the candidate said what they would do, not what they did. Their own part is unclear because every sentence says "we". They told a strong story that answered a different question. They gave so little detail that the problem or the reasoning cannot be seen. They added background that raises a new concern and was not asked for. Quote the sentence that shows it. If none applies, say nothing about them.
+**The behavioural checks.** For a "tell me about a time" question, check these before the feedback, and put the one or two that matter most under "What to sharpen": the candidate said what they would do, not what they did. Their own part is unclear because every sentence says "we". They told a strong story that answered a different question. They gave so little detail that the problem or the reasoning cannot be seen. They added background that raises a new concern and was not asked for. Quote the sentence that shows it. If none applies, say nothing about them.
 ```
+
+The cap matches `modes/interview/practice.md:84`, which allows one or two things to sharpen per answer.
 
 - [ ] **Step 4: Run the test and the drift check**
 
 Run: `node --test tests/recruiter-advice-wording.test.mjs && node i18n-drift.mjs --summary`
-Expected: PASS, 5 tests, and the same drift summary as before.
+Expected: PASS, 6 tests, and the same drift summary as before.
 
 - [ ] **Step 5: Commit**
 
@@ -283,13 +319,15 @@ git commit -m "docs(interview): practice feedback names the common behavioural m
 ### Task 4: Bullet lint rules (B1)
 
 **Files:**
-- Modify: `lib/resume/check.mjs` (two `CATALOG` rows after `FRAGMENTED_ENTRY`, one rule function, one call in the experience walk near line 345)
-- Modify: `tests/resume-check.test.mjs`
-- Modify: `docs/SCRIPTS.md:33` (rule count)
+- Modify: `lib/resume/check.mjs` (two `CATALOG` rows after `FRAGMENTED_ENTRY`, the comment at line 14, one rule function, one call in the experience walk near line 345)
+- Modify: `tests/resume-check.test.mjs` (two new tests, and the rule count at lines 573, 582 and 611)
+- Modify: `docs/SCRIPTS.md:33`, `docs/MIGRATING_FROM_REACTIVE_RESUME.md:42`, `.claude/skills/upstream-review/SKILL.md:163` (rule count)
 
 **Interfaces:**
-- Produces: rule ids `WEAK_BULLET_START` and `LONG_BULLET`, both `severity: 'info'`, `category: 'writing'`, with `params: { text }` (the bullet's first 60 characters) and, for `LONG_BULLET`, `params.length`. Pointer: `${item.pointer}/description`.
-- Constants: `MAX_BULLET_LENGTH = 240`. `WEAK_BULLET_START = /^(responsible for|helped|assisted|worked on|participated in|duties included)\b/i`, the list from `modes/heuristics/recruiter-side.md:51-52` plus "duties included".
+- Produces: rule ids `WEAK_BULLET_START` and `LONG_BULLET`, both `severity: 'info'`, `category: 'writing'`. Each rule reports at most once per description: `params: { text, count }`, where `text` is the first offending bullet cut to 60 characters and `count` is how many bullets in that description offend. `LONG_BULLET` adds `params.length`, the first offender's length.
+- Pointer: `${item.pointer}/description` for the entry's own description, and `${item.pointer}/roles/${index}/description` for a role's. One finding per rule per pointer keeps `findingKey` unique, which the web Check panel needs to pin and ignore one finding at a time.
+- A description is linted when it holds at least one `<li>`. A paragraph-only description is skipped, since it is not a bullet.
+- Constants: `MAX_BULLET_LENGTH = 240`. `WEAK_BULLET_START = /^(responsible for|helped|assisted|worked on|participated in)\b/i`, the list at `modes/heuristics/recruiter-side.md:51-52`.
 
 - [ ] **Step 1: Write the failing tests** in `tests/resume-check.test.mjs`, using the file's existing `parsed` (line 23), `sample` (line 28) and `lint` (line 58) helpers. Go through `lint`, since the last test in the file requires every catalog id to have been produced by a fixture. The sample's descriptions are `<ul><li><p>…</p></li></ul>`, and the tests below replace item 0's:
 
@@ -301,7 +339,23 @@ test('a bullet that opens with a duty phrase is flagged, and the same words mid-
   const found = lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START');
   assert.equal(found.length, 1);
   assert.equal(found[0].params.text, 'Responsible for billing disputes.');
+  assert.equal(found[0].params.count, 1);
   assert.equal(found[0].severity, 'info');
+});
+
+test('two weak bullets in one role are one finding with a count, and a lone bullet is still checked', () => {
+  const data = parsed(sample());
+  data.sections.experience.items[0].description = '<ul><li>Helped with releases.</li><li>Worked on billing.</li></ul>';
+  data.sections.experience.items[1].description = '<ul><li>Assisted the support team.</li></ul>';
+  const found = lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START');
+  assert.deepEqual(found.map((f) => f.params.count), [2, 1]);
+  assert.equal(new Set(found.map((f) => f.key)).size, 2);
+});
+
+test('a description written as a paragraph is not linted as a bullet', () => {
+  const data = parsed(sample());
+  data.sections.experience.items[0].description = '<p>Responsible for the billing platform.</p>';
+  assert.deepEqual(lint(data).findings.filter((f) => f.id === 'WEAK_BULLET_START'), []);
 });
 
 test('a bullet over 240 characters is flagged, and a link target does not count', () => {
@@ -311,6 +365,7 @@ test('a bullet over 240 characters is flagged, and a link target does not count'
   data.sections.experience.items[0].description = `<ul><li>${long}</li><li>${linked}</li></ul>`;
   const found = lint(data).findings.filter((f) => f.id === 'LONG_BULLET');
   assert.equal(found.length, 1);
+  assert.equal(found[0].params.count, 1);
   assert.equal(found[0].params.length, long.length);
 });
 ```
@@ -318,30 +373,38 @@ test('a bullet over 240 characters is flagged, and a link target does not count'
 - [ ] **Step 2: Run them and see them fail**
 
 Run: `node --test tests/resume-check.test.mjs`
-Expected: the two new tests fail with 0 findings. The existing coverage test at line 671 still passes, since it only requires every catalog id to be exercised.
+Expected: the weak-start, count and long-bullet tests fail with 0 findings, and the paragraph test passes already. If the sample has no second experience item, the count test adds one with the file's existing helpers.
 
 - [ ] **Step 3: Add the two `CATALOG` rows**
 
 ```js
-WEAK_BULLET_START: { severity: 'info', category: 'writing', message: (p) => `"${p.text}" opens with a duty, not an action. Say what you did, how, and what happened as a result.`, fix: 'Rewrite the bullet' },
-LONG_BULLET: { severity: 'info', category: 'writing', message: (p) => `"${p.text}" runs to ${p.length} characters. A bullet past about two lines usually holds two accomplishments.`, fix: 'Split the bullet' },
+WEAK_BULLET_START: { severity: 'info', category: 'writing', message: (p) => `"${p.text}" opens with a duty, not an action${p.count > 1 ? `, and so do ${p.count - 1} more in this entry` : ''}. Say what you did, how, and what happened as a result.`, fix: 'Rewrite the bullet' },
+LONG_BULLET: { severity: 'info', category: 'writing', message: (p) => `"${p.text}" runs to ${p.length} characters${p.count > 1 ? `, and ${p.count - 1} more in this entry are over ${MAX_BULLET_LENGTH}` : ''}. A bullet past about two lines usually holds two accomplishments.`, fix: 'Split the bullet' },
 ```
 
-- [ ] **Step 4: Implement `bulletFindings(item) -> finding[]`** in `lib/resume/check.mjs`, called for each visible experience item and each of its roles. It reads `linesOf(description)`, which already returns visible text per bullet, and emits at most one finding per rule per line. A description with a single line is a paragraph, not a bullet list, and is skipped.
+Also change the comment above `CATALOG` at line 14 from "One row per rule, in RR's catalog order." to "One row per rule, in RR's catalog order. WEAK_BULLET_START and LONG_BULLET are career-ops's own."
 
-- [ ] **Step 5: Run the suite**
+- [ ] **Step 4: Implement `bulletFindings(description, pointer) -> finding[]`** in `lib/resume/check.mjs`. Call it for each visible experience item's description and for each of its roles' descriptions, with the pointers named under Interfaces. It returns nothing unless the description holds an `<li>`. It reads `linesOf(description)`, which returns each bullet's visible text and drops a link's `href`.
+
+- [ ] **Step 5: Update the three rule-count assertions.** `tests/resume-check.test.mjs:573` and `:611` assert `report.totalRules` is 23, and `:582` matches "of 23 rules pass". All three become 25.
+
+- [ ] **Step 6: Run the suite**
 
 Run: `node --test tests/resume-check.test.mjs`
 Expected: PASS. The fixtures' longest bullet is 150 characters and none opens with a duty phrase (measured 2026-11-13), so the zero-finding assertions at lines 68 and 101 hold.
 
-- [ ] **Step 6: Update `docs/SCRIPTS.md:33`**
+- [ ] **Step 7: Update the rule count in three docs**
 
-"Report the 23 Reactive Resume Check rules" becomes "Report the 23 Reactive Resume Check rules and two of career-ops's own for bullets (`WEAK_BULLET_START`, `LONG_BULLET`)".
+- `docs/SCRIPTS.md:33`: "Report the 23 Reactive Resume Check rules" becomes "Report the 23 Reactive Resume Check rules and two of career-ops's own for bullets (`WEAK_BULLET_START`, `LONG_BULLET`)".
+- `docs/MIGRATING_FROM_REACTIVE_RESUME.md:42`: "lists the 23 Reactive Resume Check rules" gains "and two career-ops bullet rules".
+- `.claude/skills/upstream-review/SKILL.md:163`: after "Reactive Resume's 23 Check rules", add "plus `WEAK_BULLET_START` and `LONG_BULLET`, which are ours and have no Reactive Resume source".
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Check the web panel.** In `web/`, run `npm run build` and the browser suite that covers the resume Check panel (`node tests/browser-suites.mjs <name>`, where the name is the suite that opens the CV page). Expected: PASS, with no duplicate-key warning in its console output.
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add lib/resume/check.mjs tests/resume-check.test.mjs docs/SCRIPTS.md
+git add lib/resume/check.mjs tests/resume-check.test.mjs docs/SCRIPTS.md docs/MIGRATING_FROM_REACTIVE_RESUME.md .claude/skills/upstream-review/SKILL.md
 git commit -m "feat(resume): the check flags a bullet that opens with a duty or runs past two lines"
 ```
 
@@ -354,7 +417,7 @@ git commit -m "feat(resume): the check flags a bullet that opens with a duty or 
 
 **Interfaces:**
 - Produces: `STORY_FIELDS.scope = ['Scope']`. `parseStories()` entries gain `scope: string` (empty when absent) and `resultPending: boolean`.
-- Produces: `export function isResultPending(result: string): boolean` in `lib/story-bank.mjs`. True when the trimmed result is `pending`, case-insensitive, alone or followed by `:` or `(`.
+- Produces: `export function isResultPending(result: string): boolean` in `lib/story-bank.mjs`. True when the trimmed result matches `/^pending(\s*[:(].*)?$/i`: the word alone, or followed by a colon or an opening bracket with optional space before it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -381,12 +444,12 @@ Expected: FAIL, `scope` is `undefined` and `isResultPending` is not exported.
 
 - [ ] **Step 3: Implement** `STORY_FIELDS.scope`, the two new `parseStories` fields, and `isResultPending`.
 
-- [ ] **Step 4: Edit the template.** In the entry block, add `**Scope:** Team size, volume over a stated period, budget or locations. Optional.` between Task and Action. Change the Result line to `**R (Result):** What changed, with figures only if they are in cv.md. Write "pending" when it cannot be measured yet.` Add one rule to the list above it: "A story can be recorded before its result is known. Write `pending` as the Result, and `node story-coverage.mjs` lists it until you fill it in."
+- [ ] **Step 4: Edit the template.** In the entry block, add `**Scope:** Team size, volume over a stated period, budget or locations, only as cv.md states them. Optional.` between Task and Action. The limit matters: `story-provenance-check.mjs` classifies figures it recognises ("15-person", "40%", "500+ customers") but returned no claim for "8 associates, 120,000 units a month, $2M budget, 3 sites" when run on 2026-11-13, so the template line is what keeps an unbacked scope figure out. Also reword rule line 15, "Other single-line `**Label:** value` lines are allowed and ignored by the readers", to "Other single-line `**Label:** value` lines are allowed. The readers use `**Scope:**` and ignore the rest". Change the Result line to `**R (Result):** What changed, with figures only if they are in cv.md. Write "pending" when it cannot be measured yet.` Add one rule to the list above it: "A story can be recorded before its result is known. Write `pending` as the Result, and `node story-coverage.mjs` lists it until you fill it in."
 
 - [ ] **Step 5: Run the story suites**
 
 Run: `node --test tests/story-bank-contract.test.mjs tests/story-provenance-gates.test.mjs tests/match-star-flags.test.mjs`
-Expected: PASS. A `pending` result holds no figure, so the provenance checker has nothing to classify.
+Expected: PASS. A `pending` result holds no figure, so the provenance checker has nothing to classify. The three modes that write stories (`modes/interview-prep.md:286`, `modes/interview/debrief.md:141`, and Block F of `modes/oferta.md`) all point at the template for the format, so they pick up `Scope` and `pending` without an edit.
 
 - [ ] **Step 6: Commit**
 
@@ -424,7 +487,7 @@ The twelve prompts, as `id` and `prompt`:
 | `working-style` | working with a different working style |
 | `missed-goal` | a goal you failed to achieve failure |
 
-Status rule: `best.score >= 3` is `covered` (one tag hit, or more), `1` or `2` is `thin`, and no story scoring above 0 is `none` with `best: null`.
+Status rule: `best.score >= 3` is `covered`, `1` or `2` is `thin`, and no story scoring above 0 is `none` with `best: null`. A tag hit scores 3, a title hit 2 and a body hit 1 (`match-star.mjs:104-126`), so a story with no tags can still reach `covered` on a title hit plus a body hit. The report prints the score beside every `covered` and `thin` row so the reader can tell.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -449,10 +512,15 @@ test('a tagged story covers its prompt, and an empty bank covers none', () => {
   assert.ok(coverage([]).every((r) => r.status === 'none' && r.best === null));
 });
 
-test('a story with no tags is thin at best, never covered', () => {
-  const stories = bank(['### [Ops] Shift work', '**A (Action):** Fixed a process.', '**R (Result):** Faster.']);
-  const row = coverage(stories).find((r) => r.id === 'process-improvement');
-  assert.equal(row.status, 'thin');
+test('a body-only match is thin, and a title plus body match is covered with its score', () => {
+  const thin = coverage(bank(['### [Ops] Shift work', '**A (Action):** Fixed a process.', '**R (Result):** Faster.']))
+    .find((r) => r.id === 'process-improvement');
+  assert.equal(thin.status, 'thin');
+  assert.equal(thin.best.score, 1);
+  const covered = coverage(bank(['### [Ops] Process cleanup', '**A (Action):** Rebuilt the intake process.', '**R (Result):** Faster.']))
+    .find((r) => r.id === 'process-improvement');
+  assert.equal(covered.status, 'covered');
+  assert.equal(covered.best.score, 3);
 });
 
 test('stories with a pending result are listed by title and line', () => {
@@ -466,7 +534,7 @@ test('stories with a pending result are listed by title and line', () => {
 Run: `node --test tests/story-coverage.test.mjs`
 Expected: FAIL, cannot find module `../story-coverage.mjs`.
 
-- [ ] **Step 3: Implement `story-coverage.mjs`.** `coverage` scores every story with `score(story, tokenize(prompt), [])` and keeps the highest. The CLI prints one line per prompt (`covered`, `thin` or `none`, with the best story's title), then the pending list, then a count line. `--json` prints `{ prompts: [...], pending: [...] }`. The entry-point guard is `isMainModule(import.meta.url)`, and flags go through the same `validateFlags` helper `match-star.mjs` uses.
+- [ ] **Step 3: Implement `story-coverage.mjs`.** `coverage` scores every story with `score(story, tokenize(prompt), [])` and keeps the highest. The CLI prints one line per prompt (`covered`, `thin` or `none`, with the best story's title), then the pending list, then a count line. `--json` prints `{ prompts: [...], pending: [...] }`. The entry-point guard is `isMainModule(import.meta.url)`. Flags go through `validateFlags` from `lib/cli-flags.mjs` with `{ valueFlags: ['--story-bank'], requireOperand: true }`. `tests/validate-flags-value-operand.test.mjs` fails a caller that declares `valueFlags` without that option or an entry in its own-guard list. Importing `match-star.mjs` reads `process.argv` and calls `getCareerOpsRoot()` at load but runs no CLI, so the import is safe.
 
 - [ ] **Step 4: Add a CLI test** to the same file: write a two-story bank to a temp dir, run `node story-coverage.mjs --json --story-bank <path>` with `spawnSync`, and assert exit 0, 12 prompt rows and the pending title. Run a second time with a missing path and assert exit 1.
 
@@ -475,7 +543,7 @@ Expected: FAIL, cannot find module `../story-coverage.mjs`.
 Run: `node --test tests/story-coverage.test.mjs && node validate-system-paths-coverage.mjs`
 Expected: PASS, and no orphan reported once `story-coverage.mjs` is in `config/local-paths.txt`.
 
-- [ ] **Step 6: Document it.** `docs/SCRIPTS.md`: `| node story-coverage.mjs [--json] [--story-bank <path>] | Which of twelve common behavioural prompts your story bank covers, covers thinly or misses, and which stories still have a pending result. Read-only. |`. `modes/interview/plan.md`: under "Block 4 — Behavioral stories" (line 107), add "Run `node story-coverage.mjs` first and put any prompt it reports as `none` on the plan as a story to draft with the user."
+- [ ] **Step 6: Document it.** `docs/SCRIPTS.md`: `| node story-coverage.mjs [--json] [--story-bank <path>] | Which of twelve common behavioural prompts your story bank covers, covers thinly or misses, and which stories still have a pending result. Read-only. |`. `modes/interview/plan.md`: at the end of the "Research check — before drafting Block 4" paragraph (line 78), add "Also run `node story-coverage.mjs`, and put any prompt it reports as `none` in Block 4 as a story to draft with the user." Line 107 is inside the fenced output template at lines 91-128, so an instruction there would print in the user's plan."
 
 - [ ] **Step 7: Commit**
 
@@ -490,7 +558,9 @@ git commit -m "feat(interview): story-coverage reports which common behavioural 
 - Modify: `.claude/skills/upstream-review/SKILL.md` (deviations table)
 - Modify: `docs/superpowers/research/2026-11-13-recruiter-advice-review/findings.md` (Outcomes)
 
-- [ ] **Step 1: Add the deviations rows.** One row for the mode hunks (`modes/pdf.md`, `modes/cover.md`, `modes/heuristics/recruiter-side.md`, `modes/add.md`, `modes/interview.md`, `modes/interview-prep.md`, `modes/interview/practice.md`, `modes/interview/plan.md`): ADAPT, keep our hunks, pinned by `tests/recruiter-advice-wording.test.mjs`. One row for `templates/story-bank.template.md` and `lib/story-bank.mjs` (the `Scope` field and the pending result): ADAPT, pinned by `tests/story-bank-contract.test.mjs`. One row for `docs/SCRIPTS.md` only if the existing append-only row does not already cover it.
+- [ ] **Step 1: Add the deviations rows.** One row for the mode and prompt hunks (`modes/pdf.md`, `modes/cover.md`, `modes/text.md`, `modes/latex.md`, `modes/latex-tex.md`, `modes/heuristics/recruiter-side.md`, `modes/add.md`, `modes/interview.md`, `modes/interview-prep.md`, `modes/interview/practice.md`, `modes/interview/plan.md`, `batch/batch-prompt.md`, `openai-tailor.mjs`): ADAPT, keep our hunks, pinned by `tests/recruiter-advice-wording.test.mjs`. One row for `templates/story-bank.template.md` and `lib/story-bank.mjs` (the `Scope` field and the pending result): ADAPT, pinned by `tests/story-bank-contract.test.mjs`.
+
+`tests/fork-deviations-covered.test.mjs` will only demand the `templates/story-bank.template.md` row. `modes/`, `tests/`, `lib/` and `docs/` are already named in the table as directory tokens, so a forgotten modes row passes the test. Check the modes row by eye.
 
 - [ ] **Step 2: Fill in Outcomes** in the findings file: one row per finding, with "fixed in this branch" and its test, "not built" with the reason from the decisions table, or "advice not taken up". Commit `docs(research): record the outcome of each recruiter-advice finding`.
 
@@ -509,4 +579,6 @@ Expected: all pass, and the drift summary matches the saved one. The deviations 
 - A lint for bullets per role. The advice calls seven to ten a judgment call, and a count rule would fire on honest CVs.
 - A lint for ambiguous numbers. Telling a volume with no period from one with a period is a heuristic. Task 1 makes it an instruction to ask the user.
 - The translated mode sets. They keep their current wording until a translation pass.
+- Teaching `story-provenance-check.mjs` to classify scope figures such as "8 associates" or "3 sites". Task 5's template line carries the rule for now. It is worth its own change, since AGENTS.md asks that a scope claim from the story bank trace to a primary file.
+- A lint for a role described in one duty-only paragraph. Task 4 lints bullets only.
 - A live check that a rendered CV reads differently. Mode wording changes what an agent writes, and this plan's tests pin the wording, not the agent's output. The first CV generated after the merge is the real check.

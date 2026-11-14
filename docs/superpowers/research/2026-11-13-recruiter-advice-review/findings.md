@@ -41,13 +41,14 @@ Not inspected: the web resume editor, any rendered PDF, and `modes/interview-red
 | C3 | "Why did you leave" has no answer of its own, no guidance for a layoff, and no comparison of the candidate's reasons with this role's known downsides. | Merged into the walk-through at `modes/interview-prep.md:213`. "Laid off" appears nowhere in the prep modes. | confirmed |
 | C4 | The opening answer has a length and nothing else: no shape, no guidance for a career changer. | `modes/interview-prep.md:213` | confirmed |
 | C5 | Questions to ask the interviewer are tied to what the team shipped, not to the candidate's own deal-breakers. | `modes/interview-prep.md:229` | confirmed |
+| C6 | "What are you looking for in your next job" has no answer of its own. The recruiter pack flags deal-breakers for routing, and nothing checks that the answer states the candidate's real preferences where the role does not meet them. | `modes/interview-prep.md:211-219` | confirmed |
 
 ## D. Smaller opportunities
 
 | # | Finding | Evidence | Status |
 |---|---------|----------|--------|
-| D1 | Outcomes are reported by archetype and ATS vendor, never by CV template or tailoring choice. | `analyze-patterns.mjs`, `stats.mjs`; `data/pdf-index.tsv` has no template column and is read positionally (`generate-pdf.mjs:1641-1648`) | confirmed |
-| D2 | Nothing captures an accomplishment outside an application, or marks a result as not yet measurable. The "journal" in `calibrate.mjs` is the application-outcome log. | `calibrate.mjs:63`, `modes/outcome.md:66` | reported |
+| D1 | Outcomes are reported by archetype and ATS vendor, never by CV template or tailoring choice. | `analyze-patterns.mjs`, `stats.mjs`; `data/pdf-index.tsv` has no template column. It is read by position, and a trailing column is the safe way to add one (`generate-pdf.mjs:1641-1648`). | confirmed |
+| D2 | Nothing captures an accomplishment outside an application, or marks a result as not yet measurable. The "journal" in `calibrate.mjs` is the application-outcome log. | `calibrate.mjs:63`, `modes/outcome.md:67` | confirmed |
 | D3 | The single-column lint rule has no detector. Upstream left it out on purpose and wrote down why: a heuristic that fires on a correct template teaches people to ignore the lint. | `templates/ats-rules.yml:42-52` | confirmed |
 | D4 | The default template emits a Core Competencies section that the project's own `--ats` path folds into Skills. | `modes/pdf.md:104`, `:171` | reported |
 
@@ -60,6 +61,10 @@ No invented facts, with a hard fact gate. Newest-first experience, enforced. A p
 - Stacked contact lines, and Skills ahead of Certifications. One recruiter's preference against a deliberate order.
 - STAR without Reflection. Reflection is one line and a fair seniority signal.
 - Several wordings per bullet. A product feature of the articles' sponsor, not advice.
+
+## Copies of the keyword rule
+
+Found in the plan's review on 2026-11-13. The instruction A1 names in `modes/pdf.md` is restated in `modes/text.md:20` and `:23`, `modes/latex.md:16`, `:19` and `:65`, `modes/latex-tex.md:46`, `batch/batch-prompt.md:753`, `openai-tailor.mjs:240` and the web `pdf` worker prompt at `web/src/lib/run-prompts.mjs:252`. `modes/cover.md:210`, `:239-242` and `:276` also require a metric in every bullet, beside the line A4 names.
 
 ## Outcomes
 
