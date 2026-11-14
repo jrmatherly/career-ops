@@ -158,3 +158,10 @@ test('a connective after a number is not its unit', () => {
   assert.deepEqual(Object.values(scopeOf('3 of the 5 sites', 'Wrote reports.')).flat(), ['5 sites']);
   assert.deepEqual(Object.values(scopeOf('120 units per month', 'Wrote reports.')).flat(), ['120 units']);
 });
+
+test('every word of a Scope item has to be in the cv.md sentence, and a code before a sign is kept', () => {
+  assert.deepEqual(scopeOf('8 support engineers', 'Handled 8 support tickets.').existing, []);
+  assert.deepEqual(scopeOf('8 support engineers', 'Led 8 support engineers.').existing, ['8 support']);
+  assert.deepEqual(scopeOf('CAD 2M budget', 'Owned USD $2M budget.').existing, []);
+  assert.deepEqual(scopeOf('USD 2M budget', 'Owned USD $2M budget.').existing, ['USD 2M budget']);
+});

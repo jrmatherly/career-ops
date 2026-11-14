@@ -213,7 +213,7 @@ run every suite that way in a throwaway clone and list what changed:
 ```bash
 audit=$(mktemp -d) && git clone -q --local . "$audit" && cd "$audit" \
   && cp -c -R "$OLDPWD/node_modules" node_modules \
-  && { env -u CAREER_OPS_ROOT -u CAREER_OPS_DATA_DIR -u CAREER_OPS_TEST_DATA_ROOT \
+  && { env -u CAREER_OPS_ROOT -u CAREER_OPS_DATA_DIR -u CAREER_OPS_TEST_DATA_ROOT -u CAREER_OPS_TRACKER \
        node --test --test-concurrency=10 "tests/**/*.test.mjs" > /dev/null 2>&1; \
        git status --short --ignored | grep -v node_modules; }
 ```

@@ -275,9 +275,12 @@ const toNumber = (digits) => parseFloat(digits.replace(/,/g, ''));
 
 /** The currency written just before the number at `start`: a sign ("$2M") or an ISO code ("USD 2M"), or null. */
 function leadingCurrency(text, start) {
-  if (/[$€£¥]/.test(text[start - 1] ?? '')) return { currency: text[start - 1], length: 1 };
-  const code = text.slice(Math.max(0, start - 5), start).match(/(?<!\p{L})(usd|eur|gbp|jpy|cad|aud|chf)[ \t]?$/iu);
-  return code ? { currency: code[1].toUpperCase(), length: code[0].length } : { currency: null, length: 0 };
+  // A code before a sign wins: "USD $2M" is USD, not any dollar.
+  const sign = /[$€£¥]/.test(text[start - 1] ?? '') ? text[start - 1] : '';
+  const at = start - sign.length;
+  const code = text.slice(Math.max(0, at - 5), at).match(/(?<!\p{L})(usd|eur|gbp|jpy|cad|aud|chf)[ \t]?$/iu);
+  if (code) return { currency: code[1].toUpperCase(), length: code[0].length + sign.length };
+  return { currency: sign || null, length: sign.length };
 }
 
 const MAGNITUDES = { k: 1e3, m: 1e6, mm: 1e6, b: 1e9, bn: 1e9, thousand: 1e3, million: 1e6, billion: 1e9 };
@@ -705,9 +708,10 @@ const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || 
  * nothing about the metric, so these need METRIC_CONTEXT_WORDS shared words,
  * and the unit's own words ("hours", "percent") never count toward them.
  *
- * A Scope figure is a number and its noun and nothing else, so the noun is
- * the context: cv.md counting the same number of the same noun is the match,
- * whatever the noun's length ("8 PMs", "$2M ARR").
+ * A Scope item is a number and what it counts and nothing else, so the whole
+ * item is the context: every content word of it has to be in the cv.md
+ * sentence. "8 support engineers" is not "8 support tickets", and a noun too
+ * short to be a content word ("8 PMs", "$2M ARR") matches on its unit alone.
  * @param {{kind?: string, values: number[], units: string[], currency?: string|null}} claim
  * @param {string[]} claimWords
  * @param {ReturnType<typeof buildCvNumberContexts>} cvNumberContexts
@@ -716,10 +720,12 @@ const sameCurrency = (a, b) => a === b || Boolean(SIGN_CODES[a]?.includes(b) || 
 function hasScopedNumberMatch(claim, claimWords, cvNumberContexts) {
   const occurrences = (i) => (cvNumberContexts.get(claim.values[i]) || [])
     .filter((o) => o.unit === claim.units[i] && sameCurrency(o.currency, claim.currency ?? null));
-  const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS
-    : claim.kind === 'scope-figure' ? 0 : 1;
+  const needed = claim.units.every((u) => UNITS_WITHOUT_METRIC.has(u)) ? METRIC_CONTEXT_WORDS : 1;
   const shared = (words) => words.filter((w) => claimWords.includes(w) && !UNIT_WORDS.has(w)).length;
-  return occurrences(0).some((first) => shared(first.words) >= needed
+  const sameContext = claim.kind === 'scope-figure'
+    ? (words) => claimWords.every((w) => UNIT_WORDS.has(w) || words.includes(w))
+    : (words) => shared(words) >= needed;
+  return occurrences(0).some((first) => sameContext(first.words)
     && claim.values.every((_, i) => occurrences(i).some((o) => o.sentence === first.sentence)));
 }
 
