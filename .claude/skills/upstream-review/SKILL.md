@@ -426,6 +426,15 @@ Plan: `docs/superpowers/plans/2026-11-13-recruiter-advice-follow-ups.md`. Findin
 | `STORY_FIELDS` in `lib/story-bank.mjs` has seven fields and `parseStories` returns them; `templates/story-bank.template.md` shows Source, S, T, A, R, Reflection and tags | `STORY_FIELDS.scope`, `scope` and `resultPending` on each parsed story, and `isResultPending`; the template shows an optional `**Scope:**` line limited to what `cv.md` states, and "pending" as a Result | ADAPT | Keep our hunks. Pinned by `tests/story-bank-contract.test.mjs` ("a story may carry a Scope line", "a result is pending only when the field says so"). `story-coverage.mjs` is a fork file in `config/local-paths.txt`, reads `resultPending`, and has a row in `docs/SCRIPTS.md`. `tests/recruiter-advice-wording.test.mjs`, `tests/story-coverage.test.mjs` and `tests/story-provenance-scope.test.mjs` are fork tests: KEEP. |
 | `story-provenance-check.mjs` has five claim patterns over `\d+`, reads the unit after a cv.md number with `unitAfter`, and does not look at a `**Scope:**` line or at currency | `story-provenance-check.mjs` reads every figure on a `**Scope:**` line as a `scope-figure` claim (`scopeClaims`), one comma-separated item at a time. `readFigure` replaces `unitAfter`: a claim and a `cv.md` number compare by value with its magnitude applied, currency and counted noun, and a grouped thousand such as "120,000" is one number in every pattern. Pinned by `tests/story-provenance-scope.test.mjs`. The same figures in story prose stay unread, as upstream's narrow patterns intend. A currency written on one side only is a mismatch, for every pattern. | ADAPT | Keep our hunks: `readFigure`, `scopeClaims`, `wordsOf`, the whole-number check in `extractClaims`, the `currency` field on claims and cv.md occurrences, and the header's pattern and known-gap lists. Re-ground against upstream's patterns on a merge: a new upstream pattern has to go through the whole-number check too. |
 
+### PDF atomic-write test data-root leak (2026-11-13)
+
+Plan: `docs/superpowers/plans/2026-11-13-pdf-atomic-write-data-root-leak.md`. Findings: `docs/superpowers/research/2026-11-13-pdf-index-test-leak/findings.md`.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| `tests/generate-pdf-atomic-write.test.mjs` imports `generate-pdf.mjs` with no data-root pin | `import './helpers.mjs'` before the renderer is imported | ADAPT | Keep our hunk until upstream has it. Pinned by `tests/rendering-suites-pin-data-root.test.mjs`, a fork test: KEEP. Offer it upstream as a bug fix. |
+| `tests/README.md` says a new test is safe by default | "The suite's data root" says a suite is covered under the runner or when it imports `helpers.mjs`, adds the in-process import rule, and gives the clone audit command | ADAPT | Keep our hunks. |
+
 ## Decision log template
 
 ```markdown
