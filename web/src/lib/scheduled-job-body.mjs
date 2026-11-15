@@ -7,11 +7,12 @@ const FILE_LISTS = ["positive", "negative", "allow", "block", "blockHard", "alwa
  *
  * @param {{ name: string, engine?: string, filtersFrom?: "custom" | "file", filters: Record<string, unknown>,
  *   every: number, unit: string, timezone?: string, startAt?: string,
- *   evaluate?: { mode: "off" | "review" | "auto", rankThreshold?: number, maxPerRun?: number } }} fields
+ *   evaluate?: { mode: "off" | "review" | "auto", rankThreshold?: number, maxPerRun?: number },
+ *   sourceGroups?: string[] }} fields
  */
-export function scheduledJobBody({ name, engine, filtersFrom = "custom", filters, every, unit, timezone, startAt, evaluate }) {
+export function scheduledJobBody({ name, engine, filtersFrom = "custom", filters, every, unit, timezone, startAt, evaluate, sourceGroups }) {
   const sent = filtersFrom === "file"
     ? Object.fromEntries(Object.entries(filters).filter(([key]) => !FILE_LISTS.includes(key)))
     : filters;
-  return { name, engine, filtersFrom, filters: sent, every, unit, timezone, startAt, evaluate };
+  return { name, engine, filtersFrom, filters: sent, every, unit, timezone, startAt, evaluate, sourceGroups };
 }

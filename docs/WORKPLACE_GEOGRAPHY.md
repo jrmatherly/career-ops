@@ -52,6 +52,21 @@ as its default; a supplied nonempty country list must name a recognized country.
   prose uses country names, aliases or an ISO token after explicit geography
   such as `must be based in PT` or `work remotely from PT`. Ordinary words such
   as `us` or `by` cannot establish remote-country eligibility.
+- When the policy's onsite countries include the United States (`onsite_countries`,
+  or `remote_countries` when that is not set), a US state written directly
+  beside an allowed onsite location is not read as a foreign country:
+  `Chicago, IL`, `Atlanta GA`, `Atlanta, Georgia`, `Albuquerque, New
+  Mexico`, and a code before the name when a street address follows or nothing does
+  (`GA-ATLANTA, 1 MAIN ST`, `GA-ATLANTA`). `IL` is then not Israel. Such a place is judged
+  alone, so another office in the posting (`Atlanta, GA · London, UK`) does
+  not make it foreign, and any country it still names decides (`Dublin, GA -
+  IE` stays Ireland). A state anywhere else is not read: `Vancouver, BC, CA`
+  and `CA-BC-Richmond` stay Canada. Without a state beside the name, the
+  whole location decides, as before. This applies to the onsite check only.
+  A state never confirms a remote role: `Remote - CO` and
+  `Remote, California` are not eligible, because `Berlin, DE` and `Perth, WA`
+  read the same as a US place. A policy that does not allow the United States
+  reads all of these as before.
 - Timezone abbreviations in hours/overlap wording do not count as countries.
   A region qualified by "where we have a hiring presence" needs separate
   evidence that the allowed remote country is eligible.
@@ -72,3 +87,13 @@ ambiguous location wording may withhold an eligible role; review the original
 posting before changing your policy. The policy belongs in user-owned
 `portals.yml`; updates preserve it, and no existing Inbox/history rows are
 rewritten automatically.
+
+## Holding instead of dropping
+
+The policy above drops an ineligible posting at scan time. A dashboard
+scheduled scan can use the same check without dropping anything: its location
+hold, set on the job in Auto mode, keeps an ineligible posting in the Inbox,
+ranked and marked **Held: location**, and only skips its automatic evaluation.
+The hold has its own two lists (home area and remote countries) and does not
+read `location_filter.workplace_policy`. See "Location hold" in
+[AUTOMATION.md](AUTOMATION.md).

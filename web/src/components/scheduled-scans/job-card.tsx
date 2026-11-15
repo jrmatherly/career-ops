@@ -155,6 +155,7 @@ export function JobCard({
           )}
         </div>
 
+        {!isFull && !!job.sourceGroups?.length && <p className="text-xs text-faint">Groups: {job.sourceGroups.join(", ")}</p>}
         {job.filtersFrom === "file" ? (
           <p className="text-xs text-faint">uses portals.yml</p>
         ) : positiveList.length > 0 && (

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Edit3, Loader2, X } from "lucide-react";
 import type { FiltersFrom, ScheduledJob, ScanEngine } from "@/lib/scheduled-jobs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
-import { FilterBuilder } from "@/components/explore/filter-builder";
+import { FilterBuilder, KeywordField } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
 import { EvaluateFields, FiltersFromToggle, type EvaluateForm } from "@/components/scheduled-scans/create-job-modal";
 import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
@@ -26,6 +26,7 @@ export function EditJobModal({
   const [engine, setEngine] = useState<ScanEngine>("full");
   const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
   const [evaluate, setEvaluate] = useState<EvaluateForm>(evaluateForm());
+  const [sourceGroups, setSourceGroups] = useState<string[]>([]);
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({ ...DEFAULT_FILTERS, ats: [...DEFAULT_FILTERS.ats] });
@@ -39,6 +40,7 @@ export function EditJobModal({
       setEngine(job.engine || "full");
       setFiltersFrom(job.filtersFrom || "custom");
       setEvaluate(evaluateForm(job.evaluate));
+      setSourceGroups(job.sourceGroups || []);
       setEvery(job.every || 6);
       setUnit(job.unit || "hours");
       // Merge job's persisted filters on top of defaults so all fields are defined
@@ -64,7 +66,7 @@ export function EditJobModal({
     setError("");
 
     try {
-      await updateScheduledJobRequest(job.id, scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate, job.evaluate) }));
+      await updateScheduledJobRequest(job.id, scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate, job.evaluate), sourceGroups }));
 
       onUpdated();
       onClose();
@@ -152,6 +154,15 @@ export function EditJobModal({
               </div>
             </div>
           </div>
+
+
+          {engine === "portals" && (
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Source groups</p>
+              <KeywordField ariaLabel="Source groups" values={sourceGroups} tone="inc" placeholder="weekly…" onChange={setSourceGroups} />
+              <p className="mt-1 text-xs text-faint">Leave empty to scan every source that has no group. To move a source to another scan, add group: &lt;name&gt; to its entry in portals.yml and name that group here.</p>
+            </div>
+          )}
 
           <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
 

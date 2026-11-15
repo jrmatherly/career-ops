@@ -111,6 +111,8 @@ export type InboxJob = {
   addedAt?: string;
   /** The reason the auto-mode drain gated this posting (the ledger's, such as `dealbreaker`), set by markGated. */
   gated?: string;
+  /** A scheduled job ranked this posting and its location hold kept it out of auto-evaluation, set by markHeld. */
+  held?: boolean;
 };
 
 /** Parse data/pipeline.md. The row grammar and its labeled-segment handling

@@ -4,6 +4,12 @@ import { pathToFileURL } from 'node:url';
 import * as yaml from 'js-yaml';
 import { resolveCodeRoot } from './code-root.mjs';
 import { isMapping } from '../portals-config.mjs';
+import { holdPolicy } from '../scheduled-job-input.mjs';
+
+async function coreGateBuilder(codeRoot) {
+  const url = pathToFileURL(path.join(codeRoot, 'providers', '_country.mjs')).href;
+  return (await import(/* webpackIgnore: true */ url)).buildWorkplacePolicy;
+}
 
 /** Synchronous shape-only mirror of the core's workplacePolicyFromConfig,
  * parity-tested so Discover cannot turn broken config into an absent policy.
@@ -26,7 +32,18 @@ export async function loadWorkplacePolicy(root, codeRoot = resolveCodeRoot(proce
   catch (error) { if (error.code === 'ENOENT') return () => ({ eligible: true, reason: 'policy_absent' }); throw error; }
   const policy = workplacePolicyConfig(config);
   if (policy === undefined) return () => ({ eligible: true, reason: 'policy_absent' });
-  const url = pathToFileURL(path.join(codeRoot, 'providers', '_country.mjs')).href;
-  const { buildWorkplacePolicy } = await import(/* webpackIgnore: true */ url);
-  return buildWorkplacePolicy(policy);
+  return (await coreGateBuilder(codeRoot))(policy);
+}
+
+/** Why the core gate refuses a scheduled job's location hold, in the form's words, or null when it builds (or there is none). */
+export async function holdPolicyProblem(hold, codeRoot = resolveCodeRoot(process.cwd(), process.env)) {
+  if (!hold) return null;
+  const buildWorkplacePolicy = await coreGateBuilder(codeRoot);
+  try {
+    buildWorkplacePolicy(holdPolicy(hold));
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.startsWith('workplace_policy.remote_countries') ? '"Remote from" must name a country, such as United States.' : message;
+  }
 }

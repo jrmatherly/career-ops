@@ -291,6 +291,53 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
 
 Check the queue with `node evaluate-queue.mjs dump --json`.
 
+#### Location hold
+
+An Auto job can evaluate only postings that are confirmed remote or in your
+home area, and hold the rest for you. In the job form, Auto mode shows two
+fields: **Home area** (places you would work on-site or hybrid) and **Remote
+from** (countries you can work remotely from). Fill both to turn the hold on,
+and leave both empty to evaluate every location.
+
+- **What is held.** A ranked row at or above the threshold whose location the
+  hold does not admit. The test is the workplace policy in
+  [WORKPLACE_GEOGRAPHY.md](WORKPLACE_GEOGRAPHY.md), given the location and
+  title from the row's scan history. A posting that says only "Remote", one
+  with no location, and one in another city are all held. So is a remote
+  posting that names only a state (`Remote - CO`): it needs the country.
+- **A held row is not dropped.** It stays in the Inbox with its rank and a
+  **Held: location** badge, and the ledger records it as `skipped` with the
+  reason `held-location`. Evaluate it from the Inbox when you want it.
+- **A held row is not weighed again.** Changing the hold later does not
+  release rows it already held. A row queued before the hold was set is
+  checked again when its turn to be evaluated comes, and held then.
+- **A hold that cannot be read queues nothing.** The form refuses a country it
+  does not know. If the stored hold is unusable anyway (a file edited by hand),
+  the run's message starts with "Location hold:" and says nothing was queued.
+  Correct the hold and the next tick queues that run's rows, unless the rank
+  pass also failed: then they wait for the job's next scan.
+
+#### Source groups
+
+A scheduled **portals** scan can read only some of the sources in
+`portals.yml`, so a heavy source can run weekly while the rest run daily.
+
+- Add `group: <name>` to a `tracked_companies` or `job_boards` entry.
+- In the job form, name the groups under **Source groups**. The job card shows
+  them.
+- A job that names no group reads every entry that has no `group:`. Once one
+  entry has a group, this applies to a job that uses the file's filters too:
+  the runner gives the scanner a temporary copy without the grouped entries.
+- A job fails, before the scanner starts, when any group it names has no
+  enabled entry (the message names that group), and when it names no group
+  while every enabled entry has one. A typo is not a quiet run that found
+  nothing.
+- `group:` takes a name. A number counts as its name; a list or a mapping
+  fails the run with the entry's name.
+- The full ATS sweep reads no entries from `portals.yml` and ignores groups.
+  So does `node scan.mjs` run by hand, which reads every entry.
+
+
 ---
 
 ## 3. Automate the follow-up sweep

@@ -19,11 +19,21 @@ export function clampEvaluate(input) {
 /**
  * The `evaluate` a modal sends: undefined (keep what is stored) when the form is Off and
  * the job has no settings to turn off; the mode alone for Off and Review, so the hidden
- * Auto fields are neither validated nor changed; clamped numbers for Auto.
+ * Auto fields are neither validated nor changed; clamped numbers for Auto, with the
+ * location hold from the two chip lists, or null when both are empty, so clearing them removes it.
  */
 export function evaluateBody(form, stored) {
   if (form.mode === "off" && !stored) return undefined;
-  return evaluateFieldsVisible(form.mode) ? clampEvaluate(form) : { mode: form.mode };
+  if (!evaluateFieldsVisible(form.mode)) return { mode: form.mode };
+  const onsiteLocations = form.holdOnsite ?? [];
+  const remoteCountries = form.holdRemote ?? [];
+  // A stored hold the form cannot show in full (a store edited by hand) is kept until its fields are edited: the runner refuses it and says why.
+  const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string");
+  const unreadable = stored?.hold !== undefined && !(strings(stored.hold?.onsiteLocations) && strings(stored.hold?.remoteCountries));
+  const shown = evaluateForm(stored);
+  const same = (left, right) => left.length === right.length && left.every((item, i) => item === right[i]);
+  if (unreadable && same(onsiteLocations, shown.holdOnsite) && same(remoteCountries, shown.holdRemote)) return clampEvaluate(form);
+  return { ...clampEvaluate(form), hold: onsiteLocations.length || remoteCountries.length ? { onsiteLocations, remoteCountries } : null };
 }
 
 /** The job card's mode badge, or null when evaluation is off. */
@@ -33,7 +43,7 @@ export function evaluateModeLabel(evaluate) {
   const { rankThreshold: threshold, maxPerRun: max } = evaluate;
   // A store edited by hand may lack a field or hold null or text; name the gap instead of printing NaN or 0.0.
   if (!Number.isFinite(threshold) || !Number.isFinite(max)) return "Auto, settings unreadable; open Edit and save";
-  return `Auto, rank ${threshold.toFixed(1)} and above, ${max} per run`;
+  return `Auto, rank ${threshold.toFixed(1)} and above, ${max} per run${evaluate.hold ? ", other locations held" : ""}`;
 }
 
 /** The modal's explanation line: Review and Auto share the rank sentence, Auto adds its API-text limit; null for Off. */
@@ -73,9 +83,15 @@ export function addedLink(entry) {
   return typeof at === "string" && /^\d{4}-\d{2}-\d{2}/.test(at) ? `/pipeline?added=${at.slice(0, 10)}` : null;
 }
 
+// A store edited by hand can hold a number or a string here; the form shows no chips for it.
+const chipList = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === "string") : []);
+
 /** The modal's form state for a job's stored settings; no settings reads as Off with the defaults shown. */
 export function evaluateForm(stored) {
-  return { mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5) };
+  return {
+    mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5),
+    holdOnsite: chipList(stored?.hold?.onsiteLocations), holdRemote: chipList(stored?.hold?.remoteCountries),
+  };
 }
 
 /** A ledger URL the panel may link to: http(s) only, since the ledger stores whatever the scan found. */

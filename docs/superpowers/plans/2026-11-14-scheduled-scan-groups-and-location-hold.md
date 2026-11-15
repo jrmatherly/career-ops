@@ -28,9 +28,9 @@
 | A held posting | Ranked, written to the ledger as `skipped` / `held-location`, never queued | Owner, 2026-11-14 |
 | The location test | The existing workplace policy gate, not a new matcher | Research, measured on 1,514 rows |
 | A blank or bare-`Remote` location | Held. The gate already treats it as unconfirmed | Research |
-| A US state in a location, under a policy that allows the United States | Read as the United States. `GA`, `CA`, `CO`, `IL` and `MA`, for example, are no longer Gabon, Canada, Colombia, Israel and Morocco. The same holds for every USPS code that is also an ISO code (`DE`, `AL`, `ID` and others) | Research, prototype measured |
-| How a state code is recognized | The scanner's existing matcher (`compileUsStateAbbrev` with `placesWithoutCountryCode` in `scan.mjs`), not a new token rule. It already keeps `in`, `or` and `me` from reading as states and reads the last part of `City, Region, CC` as a country | This plan, 2026-11-14 review |
-| `Remote, CA` under a United States policy | California. A Canadian posting spells the country out. The same trade applies to `Remote - DE` and `Remote, IN`: a posting that means Germany or India by the bare code is auto-evaluated once, which costs one evaluation | This plan |
+| A US state written directly beside the home place, under a policy that allows the United States | Taken out before the country check, so `GA`, `CA`, `CO`, `IL` and `MA`, for example, are not Gabon, Canada, Colombia, Israel and Morocco there. It is never read as the United States, and a state anywhere else in the location is not read at all (as built, 2026-11-14) | Research, prototype measured |
+| How a state is recognized (on-site check only) | By its position: right after the home place name, or right before it when a street address follows (`compileHomeState` in `providers/_country.mjs`). The build first reused the scanner's matcher, which three review rounds showed admits `Vancouver, BC, CA - HQ` and `CA-BC-Richmond`; the scanner keeps that matcher for its own `always_allow` | This plan, 2026-11-14 review |
+| A state in a remote location (`Remote, CA`, `Remote - CO`, `Remote - Berlin, DE`) | Not evidence of the United States. The posting stays held unless it names the country. Changed during the build, 2026-11-14: `Berlin, DE` and `Perth, WA` read the same as a US place, and the spec already holds a state-limited remote label. Measured on the 1,514 rows: 268 eligible, against 212 on `main` and 293 under the looser rule, and no row eligible on `main` is held | Build review, 2026-11-14 |
 | Where the hold is configured | On the job, under `evaluate.hold`, shown only in Auto mode | This plan |
 | How a source joins a scan | `group: <name>` on the entry in `portals.yml`; a job lists the groups it scans | This plan |
 | A job with no groups | Scans every enabled entry that has no `group:` | This plan |
@@ -52,6 +52,8 @@ Task 0 carries its own inputs: a home place written `City, ST`, a multi-office p
 ### Task 0: The workplace gate reads a US state as the United States
 
 The hold is only as good as the gate. Today, under a policy whose countries are the United States, `Springfield, IL` is rejected with `onsite_country_restricted` because `IL` is also Israel's ISO code, and `Remote - CO` with `remote_country_restricted` (Colombia). On the hosted instance, with the rule below prototyped in front of the unchanged gate, 84 rows moved from held to eligible and none moved the other way, and 87 of the 91 rows that name a home-area city were eligible afterwards (spec, "Measurement: US states").
+
+> **As built, 2026-11-14.** Only the on-site check changed, and it removes a state written directly beside the home place instead of reading it as the United States (`compileHomeState` in `providers/_country.mjs`). The remote check and its `supportsHome` call are as on `main`, and the `Remote - CO` test below was replaced by tests that hold a state-only remote location. The decision table above has the reason and the measurement. The text below is the plan as it was written.
 
 **Files:**
 - Modify: `providers/_country.mjs` (`buildWorkplacePolicy`: the on-site check at `:276-280`, the remote check at `:286-287` and the `supportsHome(geoLoc)` call on the remote return at `:292`; add the exported state list and matcher)
@@ -300,7 +302,7 @@ Exact copy:
 | Inbox badge | `Held: location` |
 | Badge `title` | `Ranked, not auto-evaluated. Its location is not confirmed remote or in your home area.` |
 | First field label, Auto mode | `Home area` |
-| Its helper | `Places you would work on-site or hybrid. A posting there is auto-evaluated.` |
+| Its helper | `Places you would work on-site or hybrid, one per entry and without the state: a comma starts a new entry. A posting there is auto-evaluated.` |
 | Second field label | `Remote from` |
 | Its helper | `Countries you can work remotely from. A posting that says only "Remote" is held.` |
 | Line above both fields | `Leave both empty to auto-evaluate every location.` |

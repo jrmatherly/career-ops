@@ -38,7 +38,7 @@
  */
 
 import './lib/settings-env.mjs'; // saved settings; must stay the first import
-import { buildWorkplacePolicy, isCountryKeyword } from './providers/_country.mjs';
+import { buildWorkplacePolicy, isCountryKeyword, USPS_STATES } from './providers/_country.mjs';
 import {
   closeSync,
   existsSync,
@@ -518,62 +518,10 @@ function compileLocationKeywordList(value) {
     });
 }
 
-// Frozen USPS state-name + abbreviation table. Not a world gazetteer: only
-// consulted when always_allow already names the United States as a country,
+// The USPS table (providers/_country.mjs) is not a world gazetteer: its matchers
+// below are only consulted when always_allow already names the United States as a country,
 // so EU-targeted configs (no US token) keep their previous semantics.
 const US_COUNTRY_ALWAYS_ALLOW = new Set(['united states', 'usa', 'u.s.', 'u.s.a.']);
-const USPS_STATES = Object.freeze([
-  Object.freeze(['alabama', 'al']),
-  Object.freeze(['alaska', 'ak']),
-  Object.freeze(['arizona', 'az']),
-  Object.freeze(['arkansas', 'ar']),
-  Object.freeze(['california', 'ca']),
-  Object.freeze(['colorado', 'co']),
-  Object.freeze(['connecticut', 'ct']),
-  Object.freeze(['delaware', 'de']),
-  Object.freeze(['florida', 'fl']),
-  Object.freeze(['georgia', 'ga']),
-  Object.freeze(['hawaii', 'hi']),
-  Object.freeze(['idaho', 'id']),
-  Object.freeze(['illinois', 'il']),
-  Object.freeze(['indiana', 'in']),
-  Object.freeze(['iowa', 'ia']),
-  Object.freeze(['kansas', 'ks']),
-  Object.freeze(['kentucky', 'ky']),
-  Object.freeze(['louisiana', 'la']),
-  Object.freeze(['maine', 'me']),
-  Object.freeze(['maryland', 'md']),
-  Object.freeze(['massachusetts', 'ma']),
-  Object.freeze(['michigan', 'mi']),
-  Object.freeze(['minnesota', 'mn']),
-  Object.freeze(['mississippi', 'ms']),
-  Object.freeze(['missouri', 'mo']),
-  Object.freeze(['montana', 'mt']),
-  Object.freeze(['nebraska', 'ne']),
-  Object.freeze(['nevada', 'nv']),
-  Object.freeze(['new hampshire', 'nh']),
-  Object.freeze(['new jersey', 'nj']),
-  Object.freeze(['new mexico', 'nm']),
-  Object.freeze(['new york', 'ny']),
-  Object.freeze(['north carolina', 'nc']),
-  Object.freeze(['north dakota', 'nd']),
-  Object.freeze(['ohio', 'oh']),
-  Object.freeze(['oklahoma', 'ok']),
-  Object.freeze(['oregon', 'or']),
-  Object.freeze(['pennsylvania', 'pa']),
-  Object.freeze(['rhode island', 'ri']),
-  Object.freeze(['south carolina', 'sc']),
-  Object.freeze(['south dakota', 'sd']),
-  Object.freeze(['tennessee', 'tn']),
-  Object.freeze(['texas', 'tx']),
-  Object.freeze(['utah', 'ut']),
-  Object.freeze(['vermont', 'vt']),
-  Object.freeze(['virginia', 'va']),
-  Object.freeze(['washington', 'wa']),
-  Object.freeze(['west virginia', 'wv']),
-  Object.freeze(['wisconsin', 'wi']),
-  Object.freeze(['wyoming', 'wy']),
-]);
 
 // 2-letter codes: comma-state (", OH" / ",OH, USA") or a trailing token
 // ("Dublin OH", Workday URL hint "dublin oh"). Not a generic word-boundary —

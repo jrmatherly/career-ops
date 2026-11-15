@@ -1,0 +1,99 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { holdPolicy, scheduledEvaluate } from "../../src/lib/scheduled-job-input.mjs";
+import { evaluateBody, evaluateForm, evaluateModeLabel } from "../../src/lib/evaluate-settings.mjs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { holdPolicyProblem } from "../../src/lib/core/workplace-policy.mjs";
+
+// Passed in, not taken from the cwd: this suite runs from web/ and from the checkout root.
+const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+
+const HOLD = { onsiteLocations: ["Springfield"], remoteCountries: ["United States"] };
+const base = scheduledEvaluate({ mode: "auto", hold: HOLD }, undefined);
+
+test("a hold with both lists is stored, cleaned", () => {
+  const stored = scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: [" Springfield ", "springfield"], remoteCountries: ["United States"] } }, undefined);
+  assert.deepEqual(stored.hold, HOLD);
+});
+test("a body with no hold keeps the stored one", () => {
+  assert.deepEqual(scheduledEvaluate({ mode: "auto" }, base).hold, HOLD);
+});
+test("a null hold removes it", () => {
+  assert.equal("hold" in scheduledEvaluate({ mode: "auto", hold: null }, base), false);
+});
+test("two empty lists remove it", () => {
+  assert.equal("hold" in scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: [], remoteCountries: [] } }, base), false);
+});
+test("one empty list is refused", () => {
+  const message = { message: "A location hold needs both a home area and a remote country." };
+  assert.throws(() => scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: ["Springfield"], remoteCountries: [] } }, base), message);
+  assert.throws(() => scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: [], remoteCountries: ["United States"] } }, base), message);
+});
+test("a hold that is not an object of two lists is refused", () => {
+  for (const hold of ["Springfield", ["Springfield"], { onsiteLocations: "Springfield", remoteCountries: ["United States"] }, { onsiteLocations: ["Springfield"] }]) {
+    assert.throws(() => scheduledEvaluate({ mode: "auto", hold }, base), { message: "Invalid location hold." });
+  }
+});
+test("a hold whose entries all clean away is refused, not read as no hold", () => {
+  for (const hold of [{ onsiteLocations: ["!!!"], remoteCountries: ["??"] }, { onsiteLocations: [5], remoteCountries: [6] }, { onsiteLocations: [" "], remoteCountries: ["United States"] }]) {
+    assert.throws(() => scheduledEvaluate({ mode: "auto", hold }, base), { message: "Invalid location hold." });
+  }
+});
+test("a job with no hold stores no hold key", () => {
+  assert.equal("hold" in scheduledEvaluate({ mode: "auto" }, undefined), false);
+});
+
+test("Review sends the mode alone, so a stored hold survives Auto to Review to Auto", () => {
+  const review = scheduledEvaluate(evaluateBody({ ...evaluateForm(base), mode: "review" }, base), base);
+  const auto = scheduledEvaluate(evaluateBody({ ...evaluateForm(review), mode: "auto" }, review), review);
+  assert.deepEqual(auto.hold, HOLD);
+});
+test("the Auto form sends a hold typed into its two lists", () => {
+  assert.deepEqual(evaluateBody({ mode: "auto", rankThreshold: "3.5", maxPerRun: "5", holdOnsite: ["Springfield"], holdRemote: ["United States"] }), { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD });
+});
+test("clearing both chip lists in Auto removes the hold", () => {
+  const next = scheduledEvaluate(evaluateBody({ ...evaluateForm(base), holdOnsite: [], holdRemote: [] }, base), base);
+  assert.equal("hold" in next, false);
+});
+test("the form shows a stored hold and empty lists for none", () => {
+  assert.deepEqual([evaluateForm(base).holdOnsite, evaluateForm(base).holdRemote], [["Springfield"], ["United States"]]);
+  assert.deepEqual([evaluateForm().holdOnsite, evaluateForm().holdRemote], [[], []]);
+});
+test("a stored hold whose lists are not lists shows no chips", () => {
+  const form = evaluateForm({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } });
+  assert.deepEqual([form.holdOnsite, form.holdRemote], [[], []]);
+});
+test("saving the form over a stored hold it cannot show keeps that hold, so the runner still refuses it", () => {
+  const stored = { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } };
+  assert.equal("hold" in evaluateBody(evaluateForm(stored), stored), false);
+  const partly = { ...stored, hold: { onsiteLocations: ["Springfield", 42], remoteCountries: ["United States"] } };
+  assert.equal("hold" in evaluateBody(evaluateForm(partly), partly), false, "an unchanged save keeps it");
+  assert.deepEqual(evaluateBody({ ...evaluateForm(partly), holdOnsite: ["Shelbyville"] }, partly).hold, { onsiteLocations: ["Shelbyville"], remoteCountries: ["United States"] }, "an edit replaces it");
+  const remote = { ...stored, hold: { onsiteLocations: ["Springfield"], remoteCountries: "United States" } };
+  assert.equal("hold" in evaluateBody(evaluateForm(remote), remote), false, "an unreadable remote list is kept too");
+  assert.deepEqual(evaluateBody({ ...evaluateForm(remote), holdRemote: ["United States"] }, remote).hold, HOLD, "and correcting it is sent");
+  const mixed = { ...stored, hold: { onsiteLocations: [42], remoteCountries: [] } };
+  assert.equal("hold" in evaluateBody(evaluateForm(mixed), mixed), false);
+  assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored).hold, HOLD);
+});
+test("a stored hold of null, which the runner refuses, survives every save that does not edit it", () => {
+  const stored = { mode: "auto", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5, hold: null };
+  assert.equal(scheduledEvaluate(evaluateBody(evaluateForm(stored), stored), stored).hold, null, "an unchanged Auto save");
+  assert.equal(scheduledEvaluate(evaluateBody({ ...evaluateForm(stored), mode: "review" }, stored), stored).hold, null, "a switch to Review");
+  assert.deepEqual(scheduledEvaluate(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored), stored).hold, HOLD, "an edit replaces it");
+});
+test("the card badge names the hold", () => {
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD }), "Auto, rank 3.5 and above, 5 per run, other locations held");
+  assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5 }), "Auto, rank 3.5 and above, 5 per run");
+});
+
+test("holdPolicy is the gate's policy shape", () => {
+  assert.deepEqual(holdPolicy(HOLD), { onsite_locations: ["Springfield"], remote_countries: ["United States"] });
+});
+test("holdPolicyProblem names an unknown country and accepts a known one", async () => {
+  assert.equal(await holdPolicyProblem({ onsiteLocations: ["Springfield"], remoteCountries: ["Atlantis"] }, CODE_ROOT), '"Remote from" must name a country, such as United States.');
+  assert.equal(await holdPolicyProblem(HOLD, CODE_ROOT), null);
+  assert.equal(await holdPolicyProblem(undefined), null);
+});

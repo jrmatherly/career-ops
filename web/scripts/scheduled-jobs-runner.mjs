@@ -23,7 +23,8 @@ import { cleanChips } from "../src/lib/clean-chips.mjs";
 import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
 import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
-import { candidateSince, candidatesFor, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { candidateSince, candidatesFor, heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -220,6 +221,47 @@ function jobPortals(job, base) {
   return base;
 }
 
+const SOURCE_LISTS = ["tracked_companies", "job_boards"];
+// YAML reads `group: 2026` as a number, so a number is its own name.
+const isGroupName = (group) => typeof group === "string" || typeof group === "number";
+const groupOf = (entry) => (isMapping(entry) && isGroupName(entry.group) ? String(entry.group).trim().toLowerCase() : "");
+
+/**
+ * The config a portals scan reads for a job's source groups: with no groups,
+ * the entries that have no `group:`; with groups, the entries in one of them
+ * (trimmed, case-folded). Returns `config` itself when no entry is removed.
+ */
+export function selectSourceGroups(config, groups) {
+  const wanted = new Set(cleanChips(groups).map((group) => group.toLowerCase()));
+  const selected = (entry) => (wanted.size ? wanted.has(groupOf(entry)) : !groupOf(entry));
+  let next = config;
+  for (const key of SOURCE_LISTS) {
+    if (!Array.isArray(config[key])) continue;
+    const kept = config[key].filter(selected);
+    if (kept.length !== config[key].length) next = { ...next, [key]: kept };
+  }
+  return next;
+}
+
+/**
+ * The config a portals scan reads for `groups`, or a thrown reason the run
+ * must not start: a named group with no enabled entry, or no group named when
+ * every enabled entry has one, would be a green run that scanned nothing. `enabled: false` is the scanner's own skip rule.
+ */
+function sourcesForGroups(config, groups) {
+  const entries = SOURCE_LISTS.flatMap((key) => (Array.isArray(config[key]) ? config[key].filter(isMapping) : []));
+  const unnamed = entries.find((entry) => entry.group != null && !isGroupName(entry.group));
+  if (unnamed) throw new Error(`portals.yml: "${unnamed.name ?? "an entry with no name"}" has a group that is not a name. Write group: <name>.`);
+  const enabledGroups = new Set(entries.filter((entry) => entry.enabled !== false).map(groupOf));
+  const missing = groups.filter((group) => !enabledGroups.has(group.toLowerCase()));
+  if (missing.length) throw new Error(`No enabled source is in ${missing.map((group) => `"${group}"`).join(", ")}. Tag an entry with group: in portals.yml.`);
+  const selected = selectSourceGroups(config, groups);
+  if (selected !== config && !groups.length && !enabledGroups.has("")) {
+    throw new Error("Every enabled source in portals.yml has a group, and this scan names none. Name a group on the scan, or remove group: from an entry.");
+  }
+  return selected;
+}
+
 function writeJobTemp(root, jobId, prefix, ext, text) {
   if (!isSafeScheduledId(jobId)) throw new Error("Invalid scheduled job identifier.");
   const tempDir = path.join(root, "data", "tmp");
@@ -249,8 +291,10 @@ function coreEnv(root) {
  * spawn error is retryable just like a non-zero scanner exit, while cleanup
  * still runs before the next attempt. A scanner that ran into the timeout is
  * not retried: the same sweep would hit the same limit, three times over. An
- * unreadable portals.yml or an empty title list is not retried either; both are
- * checked once before the loop.
+ * unreadable portals.yml, an empty title list or a source selection that
+ * leaves no enabled entry (sourcesForGroups) is not retried either; all are checked once before the loop. A
+ * portals scan whose source groups remove an entry gets an overlay even when
+ * the job uses the file's filters, or it would scan every group.
  */
 
 export function executeJob(root, job, options = {}) {
@@ -260,8 +304,9 @@ export function executeJob(root, job, options = {}) {
   let finalAttempt = MAX_ATTEMPTS;
   const fromFile = job.filtersFrom === "file";
   const basePortals = portalsPath(root);
-  process.stderr.write(`portals: ${basePortals} (${fromFile ? "file" : "overlay"})\n`);
   let config;
+  let overlay = !fromFile;
+  const logPortals = () => process.stderr.write(`portals: ${basePortals} (${overlay ? "overlay" : "file"})\n`);
   try {
     const base = readPortals(basePortals);
     config = fromFile ? base : jobPortals(job, base);
@@ -271,14 +316,27 @@ export function executeJob(root, job, options = {}) {
         ? `Scheduled scans require title keywords in portals.yml ${emptyKey} when a job uses the file's filters`
         : `Scheduled scans require title keywords in the job or portals.yml ${emptyKey}.`);
     }
+    // The full engine reads no entries from portals.yml, so groups do not apply to it.
+    if (job.engine === "portals") {
+      const stored = job.sourceGroups;
+      // cleanChips would read a number or a mapping as no groups, and the scan would quietly read the ungrouped set.
+      if (stored != null && typeof stored !== "string" && !(Array.isArray(stored) && stored.every((group) => typeof group === "string"))) {
+        throw new Error("This scan's source groups are not a list of names. Open Edit and save the scan.");
+      }
+      const selected = sourcesForGroups(config, cleanChips(stored));
+      overlay ||= selected !== config;
+      config = selected;
+    }
   } catch (error) {
+    logPortals();
     return { state: "failed", attempt: 1, rolesFound: 0, durationMs: Date.now() - startedAt, message: scanFailureMessage({ error }) };
   }
+  logPortals();
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let tempPortals = null;
     try {
-      if (!fromFile) tempPortals = writeJobPortals(root, job.id, config);
+      if (overlay) tempPortals = writeJobPortals(root, job.id, config);
       const command = buildScanCommand(job);
       const result = spawnFn(
         process.execPath,
@@ -424,6 +482,8 @@ const RANK_MAX_PER_PASS = 50;
 const evaluatingJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate && job.evaluate.mode !== "off");
 
 const RANK_WAITING = " rows wait for the next rank pass.";
+const HOLD_PROBLEM = "Location hold: ";
+const NOTHING_QUEUED = ". Nothing was queued.";
 
 // A job's newest run needs a pass once it has finished, until one records its
 // counts. A failed pass is not retried each tick, so a broken CLI is not paid
@@ -431,7 +491,10 @@ const RANK_WAITING = " rows wait for the next rank pass.";
 function runToRank(store, job) {
   const lastRun = store.runs.find((run) => run.jobId === job.id);
   if (!lastRun || lastRun.state === "queued" || lastRun.state === "running") return null;
-  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) ? lastRun : null;
+  // A run whose hold could not be built stays due too, so correcting the hold queues its rows. Only when the hold is the
+  // whole message: with a rank failure behind it, a tick would start the ranker again.
+  const holdOnly = lastRun.evalMessage?.startsWith(HOLD_PROBLEM) && lastRun.evalMessage.endsWith(NOTHING_QUEUED);
+  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) || holdOnly ? lastRun : null;
 }
 
 /*
@@ -513,7 +576,20 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     const { queueCandidates } = await import("../../lib/evaluate-queue.mjs");
     const rows = pendingRows(readText(pipelinePath)).filter((row) => passed.has(row.url));
     const autoJobIds = new Set(evaluatingJobs(store).filter((other) => other.evaluate.mode === "auto").map((other) => other.id));
-    autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds }, rows);
+    let held;
+    let holdProblem;
+    if (job.evaluate.hold !== undefined) {
+      // The store does not validate a hold, so one edited by hand can be unusable. Queue nothing then: a hold that cannot be read must not let every location through.
+      try {
+        const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
+        held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {})) });
+      } catch (error) {
+        holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}${NOTHING_QUEUED}`;
+      }
+    }
+    // In front of the pass's own message, never in its place: runToRank reads the end of the message to tell rows still waiting from a failed pass.
+    if (holdProblem) evalMessage = [holdProblem, evalMessage].filter(Boolean).join(" ");
+    else autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds, held }, rows);
   }
   if (lastRun.ranked !== ranked || lastRun.evalMessage !== evalMessage || lastRun.autoQueued !== autoQueued) {
     await recordStepCounts(storePath, lastRun.id, { ranked, evalMessage, autoQueued });

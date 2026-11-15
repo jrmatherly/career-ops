@@ -5,7 +5,7 @@ import { CalendarPlus, Loader2, Sparkles, X } from "lucide-react";
 import type { EvaluateSettings, FiltersFrom, ScanEngine } from "@/lib/scheduled-jobs";
 import { clampEvaluate, evaluateBody, evaluateFieldsVisible, evaluateForm, evaluateCaveat } from "@/lib/evaluate-settings.mjs";
 import { DEFAULT_FILTERS, type ExploreFilters } from "@/lib/explore";
-import { FilterBuilder } from "@/components/explore/filter-builder";
+import { FilterBuilder, KeywordField } from "@/components/explore/filter-builder";
 import { Modal } from "@/components/ui/modal";
 import { scheduledJobBody } from "@/lib/scheduled-job-body.mjs";
 import { cadenceMinimum, cadenceValueForUnit, createScheduledJobRequest } from "@/lib/scheduled-job-client.mjs";
@@ -23,6 +23,7 @@ export function CreateJobModal({
   const [engine, setEngine] = useState<ScanEngine>("full");
   const [filtersFrom, setFiltersFrom] = useState<FiltersFrom>("custom");
   const [evaluate, setEvaluate] = useState<EvaluateForm>(evaluateForm());
+  const [sourceGroups, setSourceGroups] = useState<string[]>([]);
   const [every, setEvery] = useState(6);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
   const [filters, setFilters] = useState<ExploreFilters>({
@@ -43,9 +44,10 @@ export function CreateJobModal({
     setError("");
 
     try {
-      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate) }));
+      await createScheduledJobRequest(scheduledJobBody({ name, engine, filtersFrom, filters, every, unit, evaluate: evaluateBody(evaluate), sourceGroups }));
       // The next new job starts Off rather than inheriting this one's evaluations.
       setEvaluate(evaluateForm());
+      setSourceGroups([]);
 
       onCreated();
       onClose();
@@ -139,6 +141,15 @@ export function CreateJobModal({
             </div>
           </div>
 
+
+          {engine === "portals" && (
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Source groups</p>
+              <KeywordField ariaLabel="Source groups" values={sourceGroups} tone="inc" placeholder="weekly…" onChange={setSourceGroups} />
+              <p className="mt-1 text-xs text-faint">Leave empty to scan every source that has no group. To move a source to another scan, add group: &lt;name&gt; to its entry in portals.yml and name that group here.</p>
+            </div>
+          )}
+
           <FiltersFromToggle value={filtersFrom} onChange={setFiltersFrom} />
 
           {/* ─── Reuse FilterBuilder from Explore ─── */}
@@ -171,7 +182,7 @@ export function CreateJobModal({
   );
 }
 
-export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string };
+export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string; holdOnsite: string[]; holdRemote: string[] };
 
 export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onChange: (value: EvaluateForm) => void }) {
   const id = useId();
@@ -204,6 +215,19 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
             <div>
               <label htmlFor={`${id}-max`} className="mb-1 block text-[13px] font-medium text-foreground">Evaluations per run (1 to 20)</label>
               <input id={`${id}-max`} type="number" min={1} max={20} step={1} value={value.maxPerRun} onChange={(e) => onChange({ ...value, maxPerRun: e.target.value })} onBlur={clampShown} className={field} />
+            </div>
+          </div>
+          <p className="text-xs text-faint">Leave both empty to auto-evaluate every location.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Home area</p>
+              <KeywordField ariaLabel="Home area" values={value.holdOnsite} tone="inc" placeholder="Springfield…" onChange={(holdOnsite) => onChange({ ...value, holdOnsite })} />
+              <p className="mt-1 text-xs text-faint">Places you would work on-site or hybrid, one per entry and without the state: a comma starts a new entry. A posting there is auto-evaluated.</p>
+            </div>
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Remote from</p>
+              <KeywordField ariaLabel="Remote from" values={value.holdRemote} tone="inc" placeholder="United States…" onChange={(holdRemote) => onChange({ ...value, holdRemote })} />
+              <p className="mt-1 text-xs text-faint">Countries you can work remotely from. A posting that says only &quot;Remote&quot; is held.</p>
             </div>
           </div>
         </>
