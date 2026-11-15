@@ -165,7 +165,19 @@ test("a posting whose text has not come for a day is skipped, not retried foreve
   assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).final], ["skipped", "no-text", true]);
   assert.equal(posts.length, 0);
   assert.match(stderr.join(""), /no posting text for .* in a day/);
-  await drain({ fetchJd: async () => assert.fail("a skipped row is not fetched again"), now: hours(26) });
+  let fetched = 0;
+  await drain({ fetchJd: async () => { fetched += 1; return null; }, now: hours(26) });
+  assert.equal(fetched, 0, "a skipped row is not fetched again");
+});
+
+test("a changed no-text reason does not start the day again", async (t) => {
+  const { drain, state } = await withDrainRoot(t, { urls: [url(1)] });
+  const hours = (n) => () => T0 + n * 60 * 60 * 1000;
+  await drain({ fetchJd: async () => null });
+  await drain({ fetchJd: async () => { throw new Error("socket hang up"); }, now: hours(23) });
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["queued", "no-text: socket hang up"]);
+  await drain({ fetchJd: async () => null, now: hours(25) });
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "no-text"]);
 });
 
 test("a NUL in the posting text is stripped before the POST", async (t) => {

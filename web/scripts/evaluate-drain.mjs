@@ -355,7 +355,11 @@ export async function runDrain({
           // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
           // Compared in the form the ledger stores, or a message with a newline would never match.
           const reason = tsvCell(`no-text: ${why}`);
-          const waitedMs = entry.reason === reason ? now() - Date.parse(entry.rows.at(-1).at) : 0;
+          // Counted from the first no-text row since the posting last had text, so an
+          // offline tick or a changed error message does not start the day again.
+          const sinceText = entry.rows.slice(entry.rows.findLastIndex((row) => row.state === "running") + 1);
+          const first = sinceText.find((row) => row.reason?.startsWith("no-text: "));
+          const waitedMs = first ? now() - Date.parse(first.at) : 0;
           if (waitedMs > NO_TEXT_GIVE_UP_MS) {
             log(`job ${job.id}: no posting text for ${url} in a day (${why}); it is skipped`);
             await append("skipped", "no-text");
