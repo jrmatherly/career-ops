@@ -427,8 +427,12 @@ function readUsStates(loc, onsite) {
       if (state.matches(place) || state.leads.test(place)) next = next.replace(state.token, 'united states');
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, 'united states'));
-    // Names and three-letter codes only: a two-letter read would take the "ST" of a street address for a country.
-    const foreign = [...countries(next), ...next.split(/[,;/|()\s-]+/).filter(token => /^[a-z]{3}$/.test(token)).map(token => ALPHA3_TO_ALPHA2[token.toUpperCase()])];
+    // Names, three-letter codes and a two-letter code in parentheses only: a bare two-letter read would take the "ST" of a street address for a country.
+    const foreign = [
+      ...countries(next),
+      ...next.split(/[,;/|()\s-]+/).filter(token => /^[a-z]{3}$/.test(token)).map(token => ALPHA3_TO_ALPHA2[token.toUpperCase()]),
+      ...[...next.matchAll(/\(([a-z]{2})\)/g)].filter(match => countryNameFromIso(match[1])).map(match => match[1].toUpperCase()),
+    ];
     return next === place || foreign.some(code => code && code !== 'US') ? place : next;
   }).join('');
 }
