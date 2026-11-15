@@ -404,11 +404,12 @@ const US_STATE_CODES = USPS_STATES.map(([, abbr]) => ({
   matches: compileUsStateAbbrev(abbr),
   // "GA-SPRINGFIELD, 1 MAIN ST": some boards open a place with the state.
   leads: new RegExp(`^\\s*${abbr}-`),
-  token: new RegExp(word(abbr).source, 'gu'),
+  // Not global: only the first occurrence is the state, so the second "DE" of "Dublin, DE - DE" stays Germany.
+  token: word(abbr),
 }));
 const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
   name,
-  joined: new RegExp(`[,:-]\\s*${escape(name)}(?![\\p{L}\\p{N}])|(?<![\\p{L}\\p{N}])${escape(name)}\\s*[,:-]`, 'gu'),
+  joined: new RegExp(`[,:-]\\s*${escape(name)}(?![\\p{L}\\p{N}])|(?<![\\p{L}\\p{N}])${escape(name)}\\s*[,:-]`, 'u'),
 }));
 
 /** The places of a folded location that hold one of `onsite`, with their US
@@ -430,8 +431,8 @@ function homePlaces(loc, onsite) {
     for (const state of US_STATE_CODES) {
       const leads = state.leads.test(core);
       if (!leads && !state.matches(core)) continue;
-      // "GA-SPRINGFIELD, 1 MAIN ST": a street address after the comma is dropped, since its "ST" is not a country.
-      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d.*$/, '') : place).replace(state.token, ' ') });
+      // "GA-SPRINGFIELD, 1 MAIN ST": the street address part is dropped, since its "ST" is not a country.
+      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d[^,]*/, '') : place).replace(state.token, ' ') });
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) {
       const at = place.search(joined);

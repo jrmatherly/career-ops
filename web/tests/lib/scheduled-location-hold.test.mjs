@@ -104,6 +104,31 @@ test("correcting a broken hold queues the rows on the next pass, without another
   });
 });
 
+test("a broken hold beside a failed rank pass does not start the ranker again each tick", async () => {
+  let calls = 0;
+  const failing = () => { calls += 1; return { status: 1, stdout: "", stderr: "ranker: boom\n" }; };
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-location-hold-"));
+  const storePath = path.join(root, "data", "scheduled-jobs.json");
+  fs.mkdirSync(path.join(root, "data"));
+  fs.writeFileSync(path.join(root, "data", "pipeline.md"), `## Pending\n- [ ] ${urlOf("remote")} | Fixture Alpha | Platform Lead\n`);
+  fs.writeFileSync(path.join(root, "data", "scan-history.tsv"), `url\tfirst_seen\tportal\ttitle\tcompany\tstatus\tlocation\n${urlOf("remote")}\t${DAY}\tboards\tPlatform Lead\tFixture Alpha\tadded\tRemote, United States\n`);
+  fs.writeFileSync(storePath, JSON.stringify({
+    jobs: [{ id: JOB, name: "Hold", status: "active", engine: "full", filters: {}, timezone: "UTC", startAt: NOW, every: 1, unit: "days", createdAt: NOW, updatedAt: NOW, evaluate: { ...AUTO, hold: { ...HOLD, remoteCountries: ["Atlantis"] } } }],
+    runs: [{ id: RUN, jobId: JOB, at: NOW, state: "success", attempt: 1, rolesFound: 1 }],
+    queue: [],
+  }));
+  const write = process.stderr.write;
+  process.stderr.write = () => true;
+  try {
+    await rankPass(root, storePath, { spawnFn: failing });
+    await rankPass(root, storePath, { spawnFn: failing });
+  } finally {
+    process.stderr.write = write;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  assert.equal(calls, 1);
+});
+
 test("review mode with a hold writes no ledger row and no message", async () => {
   await withRoot({ ...AUTO, mode: "review", hold: HOLD }, ({ root, run }) => {
     assert.deepEqual(ledgerStates(root), {});

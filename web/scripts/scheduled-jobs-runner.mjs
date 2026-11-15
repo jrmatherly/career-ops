@@ -478,6 +478,7 @@ const evaluatingJobs = (store) => store.jobs.filter((job) => job.status === "act
 
 const RANK_WAITING = " rows wait for the next rank pass.";
 const HOLD_PROBLEM = "Location hold: ";
+const NOTHING_QUEUED = ". Nothing was queued.";
 
 // A job's newest run needs a pass once it has finished, until one records its
 // counts. A failed pass is not retried each tick, so a broken CLI is not paid
@@ -485,8 +486,10 @@ const HOLD_PROBLEM = "Location hold: ";
 function runToRank(store, job) {
   const lastRun = store.runs.find((run) => run.jobId === job.id);
   if (!lastRun || lastRun.state === "queued" || lastRun.state === "running") return null;
-  // A run whose hold could not be built stays due too: its rows are ranked, so a tick costs no ranker call, and correcting the hold queues them.
-  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) || lastRun.evalMessage?.startsWith(HOLD_PROBLEM) ? lastRun : null;
+  // A run whose hold could not be built stays due too, so correcting the hold queues its rows. Only when the hold is the
+  // whole message: with a rank failure behind it, a tick would start the ranker again.
+  const holdOnly = lastRun.evalMessage?.startsWith(HOLD_PROBLEM) && lastRun.evalMessage.endsWith(NOTHING_QUEUED);
+  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) || holdOnly ? lastRun : null;
 }
 
 /*
@@ -576,7 +579,7 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
         const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
         held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {})) });
       } catch (error) {
-        holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}. Nothing was queued.`;
+        holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}${NOTHING_QUEUED}`;
       }
     }
     // In front of the pass's own message, never in its place: runToRank keeps the run due only while the message ends with RANK_WAITING.

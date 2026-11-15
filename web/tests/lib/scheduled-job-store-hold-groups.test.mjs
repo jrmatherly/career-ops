@@ -19,7 +19,7 @@ test.after(() => {
 });
 
 await import("../helpers/web-ts-alias-loader.mjs");
-const { createScheduledJob, getScheduledJob, parseScheduledJobInput, patchScheduledJob, ScheduledJobValidationError } = await import("../../src/lib/scheduled-jobs.ts");
+const { createScheduledJob, getScheduledJob, listScheduledJobs, parseScheduledJobInput, patchScheduledJob, ScheduledJobValidationError } = await import("../../src/lib/scheduled-jobs.ts");
 
 const HOLD = { onsiteLocations: ["Springfield"], remoteCountries: ["United States"] };
 const body = (extra = {}) => ({ name: "Fixture scan", engine: "portals", every: 1, unit: "days", timezone: "UTC", startAt: "2026-11-08T00:00:00.000Z", ...extra });
@@ -35,8 +35,9 @@ test("source groups are cleaned, and anything but a list is refused", () => {
 
 test("create refuses a hold the gate cannot build and writes no job", async () => {
   const fields = parseScheduledJobInput(body({ evaluate: { mode: "auto", hold: { ...HOLD, remoteCountries: ["Atlantis"] } } }));
+  const before = listScheduledJobs().jobs.length;
   await assert.rejects(createScheduledJob(fields), (error) => error instanceof ScheduledJobValidationError && /Remote from/.test(error.message));
-  assert.equal(fs.existsSync(storeFile), false);
+  assert.equal(listScheduledJobs().jobs.length, before);
 });
 
 test("an edit that omits the hold and the groups keeps both, and an empty list clears the groups", async () => {
