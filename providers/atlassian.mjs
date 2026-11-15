@@ -17,7 +17,7 @@ import { coerceId } from './_ids.mjs';
 // for the human-facing link). detect() also claims any www.atlassian.com
 // careers URL so auto-detection works without the explicit field.
 
-const LISTINGS_URL = 'https://www.atlassian.com/endpoint/careers/listings';
+export const LISTINGS_URL = 'https://www.atlassian.com/endpoint/careers/listings';
 const ALLOWED_HOST = 'www.atlassian.com';
 
 /** @param {string} url */

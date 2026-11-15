@@ -47,6 +47,34 @@ import { PATH_BREAKING_CHAR, PATH_BREAKING_CHAR_ENCODED_ONCE } from './providers
 import { resolveHibobTenant } from './providers/hibob.mjs';
 import { atsVendorOf } from './ats-vendor.mjs';
 import { linkedInJobId, linkedInGuestUrl } from './lib/linkedin-url.mjs';
+import { EIGHTFOLD_HOST_RE } from './providers/eightfold.mjs';
+import { LISTINGS_URL as ATLASSIAN_LISTINGS_URL } from './providers/atlassian.mjs';
+
+// shortcut: a branded Eightfold host cannot be recognised by pattern (providers/eightfold.mjs
+// trusts one only when a portals entry names it), so only the hosts listed here resolve; add one
+// when a board on it needs JD text.
+const EIGHTFOLD_BRANDED_HOSTS = new Set(['apply.careers.microsoft.com']);
+// The portal hosts in Atlassian's listings feed on 2026-11-15.
+const ATLASSIAN_ICIMS_HOST_RE = /^(?:[a-z0-9-]+-atlassian|careers-americas|campus-americas)\.icims\.com$/;
+
+/**
+ * The listings-feed item whose posting or apply URL is this iCIMS host and job id, or null.
+ * Host and id together, because an id alone could name another employer's posting.
+ * @param {unknown} feed
+ * @param {{ host: string, id: string }} parts
+ */
+export function findAtlassianListing(feed, { host, id }) {
+  if (!Array.isArray(feed)) return null;
+  const names = (raw) => {
+    try {
+      const u = new URL(raw);
+      return u.hostname === host && u.pathname.split('/')[1] === 'jobs' && u.pathname.split('/')[2] === id;
+    } catch {
+      return false;
+    }
+  };
+  return feed.find((j) => j && (names(j.portalJobPost?.portalUrl) || names(j.applyUrl))) ?? null;
+}
 
 const TIMEOUT_MS = 8_000;
 // Arbeitsagentur: the hexadecimal digits of an encoded character can be in either case.
@@ -99,6 +127,9 @@ function isSafeValue(v) {
 //   `api404Authoritative` — defaults to true (a 404/410 means gone). Set to
 //                  false when the provider's public API can 404 a posting that
 //                  is still genuinely live elsewhere (see the `lever` entry).
+//   `jdTextOnly` — the API serves JD text but says nothing about liveness, so
+//                  checkLivenessViaApi and isAtsPosting skip the entry (see the
+//                  `eightfold` entry).
 const ATS_PROVIDERS = [
   {
     id: 'greenhouse-embedded',
@@ -408,6 +439,41 @@ const ATS_PROVIDERS = [
         ? { result: 'expired', code: 'hibob_api_gone', reason: 'HiBob answers 404 for the posting while the tenant board answers 200' }
         : null;
     },
+  },
+  {
+    id: 'eightfold',
+    // {tenant}.eightfold.ai or a listed branded host, at /careers?pid={pid}[&domain=]
+    // or /careers/job/{pid}. Measured 2026-11-15: the per-position v2 endpoint answers
+    // 200 on a classic tenant and a PCSX one, and also, with the full record, for
+    // netapp 44227933, whose page says it may have closed. A 200 is no proof of
+    // life, so liveness stays with the browser, which reads that message.
+    jdTextOnly: true,
+    match(u) {
+      if (!EIGHTFOLD_HOST_RE.test(u.hostname) && !EIGHTFOLD_BRANDED_HOSTS.has(u.hostname)) return null;
+      const m = u.pathname.match(/^\/careers(?:\/job\/(\d+))?\/?$/);
+      const pid = m && (m[1] || u.searchParams.get('pid'));
+      if (!pid || !/^\d+$/.test(pid)) return null;
+      const domain = u.searchParams.get('domain');
+      return domain ? { host: u.hostname, pid, domain } : { host: u.hostname, pid };
+    },
+    api: ({ host, pid, domain }) => `https://${host}/api/apply/v2/jobs/${pid}${domain ? `?domain=${domain}` : ''}`,
+  },
+  {
+    id: 'atlassian-icims',
+    // Atlassian's iCIMS posting pages, {portal}.icims.com/jobs/{id}/{slug}/job. Two of
+    // its portals are on hosts other employers may share, so the host alone proves
+    // nothing: the posting counts as Atlassian's only when the feed lists this host
+    // and id, and the request goes to the feed's fixed host, never to iCIMS. Liveness
+    // stays with the browser, so other employers' postings on those hosts keep the
+    // answer they had and never cost a 2 MB feed read.
+    jdTextOnly: true,
+    match(u) {
+      if (!ATLASSIAN_ICIMS_HOST_RE.test(u.hostname)) return null;
+      const m = u.pathname.match(/^\/jobs\/(\d+)(?:\/[^/]+)?\/job\/?$/);
+      return m ? { host: u.hostname, id: m[1] } : null;
+    },
+    api: () => ATLASSIAN_LISTINGS_URL,
+    timeoutMs: 20_000,
   },
   {
     id: 'arbeitsagentur',
@@ -1106,6 +1172,7 @@ export function resolveAtsApi(rawUrl) {
       interpretStatuses: provider.interpretStatuses,
       api404Authoritative: provider.api404Authoritative !== false,
       interpretBoard: provider.interpretBoard,
+      jdTextOnly: provider.jdTextOnly === true,
     };
   }
   return null;
@@ -1113,7 +1180,8 @@ export function resolveAtsApi(rawUrl) {
 
 /** True if `url` is an ATS posting we can check via API (lets callers stay lazy about the browser). */
 export function isAtsPosting(url) {
-  return resolveAtsApi(url) !== null;
+  const resolved = resolveAtsApi(url);
+  return resolved !== null && !resolved.jdTextOnly;
 }
 
 // ATS ids whose public API returns the actual JD body (not just a liveness
@@ -1131,15 +1199,20 @@ export function isAtsPosting(url) {
 // Workable canonical and share links expose description, requirements and benefits
 // on the per-posting v2 API, after the existing guarded account-resolution hop.
 // HireHive's per-posting API carries the description HTML.
-// Microsoft and LinkedIn are on ATS_PROVIDERS
-// for liveness only — their public endpoints answer search/status, never body
-// text — so they are deliberately excluded here; see fetch-jd.mjs / the
+// Eightfold's per-position API carries `job_description` (PCSX: `jobDescription`),
+// and Atlassian's listings feed carries each posting's overview, responsibilities
+// and qualifications.
+// LinkedIn is on ATS_PROVIDERS
+// for liveness only — its public endpoint answers status, never body
+// text — so it is deliberately excluded here; see fetch-jd.mjs / the
 // fetch*Jd() family in browser-extract.mjs for the per-provider fetchers.
 //
 // One ATS per line, in alphabetical order: PRs that add different ATSes then
 // touch different lines, which reduces merge conflicts.
 export const JD_TEXT_API_ATS = new Set([
   'ashby',
+  'atlassian-icims',
+  'eightfold',
   'greenhouse',
   'greenhouse-embedded',
   'hibob',
@@ -1181,7 +1254,7 @@ export async function checkLivenessViaApi(url, { boardCache } = {}) {
     return null;
   }
   const resolved = resolveAtsApi(url);
-  if (!resolved) return null;
+  if (!resolved || resolved.jdTextOnly) return null;
   const { ats, apiUrl, method, body, parts, interpret, interpretStatuses, timeoutMs, throttleMs, accept, headers, followEmbed, api404Authoritative, interpretBoard } = resolved;
   const cacheBoard = Boolean(boardCache && interpretBoard);
   // Checked before the throttle: a board already in hand costs no request.

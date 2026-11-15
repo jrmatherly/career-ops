@@ -466,6 +466,12 @@ Decision log: `.upstream-review/reviews/2026-11-15-review.md` (375 commits, `033
 | `tests/plugins-recheck-window.test.mjs` counts written lines with `l.includes(DONE)` (e418149e); `web/tests/lib/apply-cv-resolver.test.mjs` writes a stub `tracker-utils.mjs` with temp paths interpolated through `JSON.stringify` (d9ec2b20, 794981f3) | the count splits on the URL, and the stub resolves its two files from `import.meta.url` | ADAPT (owner, 2026-11-15) | CodeQL flagged the three new lines on PR 93 (`js/incomplete-url-substring-sanitization`, `js/bad-code-sanitization`). Test fixtures, not shipped code; patched so the check passes. Take upstream's other changes to both files; if upstream rewrites these lines, take theirs and re-check CodeQL. |
 | `docs/SUPPORTED_JOB_BOARDS.md` has a TurboHire provider row | the fork's "Evaluated, not supported" TurboHire row is removed | ADOPT | Upstream now ships the provider. |
 
+### Job-text routes for Eightfold and Atlassian (2026-11-15)
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+| `JD_TEXT_API_ATS` has 12 ids; `resolveAtsApi` has no Eightfold or Atlassian entry, so a scheduled evaluation skips their postings as `no-api-text` | `liveness-api.mjs`: the `eightfold` and `atlassian-icims` entries in `ATS_PROVIDERS`, `EIGHTFOLD_BRANDED_HOSTS`, `ATLASSIAN_ICIMS_HOST_RE`, `findAtlassianListing`, the `jdTextOnly` provider field (resolved field, the guard in `checkLivenessViaApi`, and `isAtsPosting`), both ids in `JD_TEXT_API_ATS` and its comment. `browser-extract.mjs`: `fetchEightfoldJd`, `fetchAtlassianJd`, their two `JD_FETCHERS` keys and the `findAtlassianListing` import. `providers/eightfold.mjs` exports `EIGHTFOLD_HOST_RE` and `providers/atlassian.mjs` exports `LISTINGS_URL` | KEEP | Fork feature. Liveness for both is unchanged (`jdTextOnly`): an Eightfold v2 200 also answers for a closed posting. Pinned by `tests/jd-text-eightfold.test.mjs`, `tests/jd-text-atlassian.test.mjs` and the two `ATS_URL_SHAPES` rows in `tests/browser-extract.test.mjs`. An upstream route for either ATS is a comparison review; an upstream id added to the set merges beside ours. |
+
 ## Decision log template
 
 ```markdown

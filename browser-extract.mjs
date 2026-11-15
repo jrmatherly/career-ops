@@ -49,7 +49,7 @@ import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
-import { resolveAtsApi, JD_TEXT_API_ATS } from './liveness-api.mjs';
+import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
 import { decodeEntities } from './providers/_html-entities.mjs';
 import { HTML_TAG_RE } from './providers/_html-to-text.mjs';
@@ -1022,6 +1022,84 @@ async function fetchWorkableJd(resolved, postingUrl, textCap, timeoutMs) {
 }
 
 /**
+ * Eightfold position: v2 `/api/apply/v2/jobs/{pid}` first, then PCSX
+ * `/api/pcsx/position_details`, the order providers/eightfold.mjs tries its two
+ * API generations. Both stay on the host resolveAtsApi already pinned.
+ */
+async function fetchEightfoldJd(resolved, postingUrl, textCap, timeoutMs) {
+  const { host, pid, domain } = resolved.parts;
+  const pcsx = new URL(`https://${host}/api/pcsx/position_details`);
+  pcsx.searchParams.set('position_id', pid);
+  if (domain) pcsx.searchParams.set('domain', domain);
+  pcsx.searchParams.set('hl', 'en');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    for (const [apiUrl, pick] of [[resolved.apiUrl, (j) => j], [pcsx.href, (j) => j?.data]]) {
+      if (rejectPrivateOrInvalid(apiUrl)) return null;
+      // Both requests share one budget: a first one that spent it leaves none for the second.
+      controller.signal.throwIfAborted();
+      const res = await fetch(apiUrl, {
+        headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (!res.ok) { await discard(res); continue; }
+      let job;
+      try { job = pick(await res.json()); } catch { continue; }
+      if (!job || String(job.id) !== pid) continue;
+      const body = jdHtmlToText(job.job_description ?? job.jobDescription);
+      if (!body) continue;
+      const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+      const locations = [...new Set([str(job.location), ...(Array.isArray(job.locations) ? job.locations.map(str) : [])].filter(Boolean))];
+      return {
+        url: postingUrl,
+        title: compactText(str(job.name), 300),
+        text: compactText([locations.length ? `Location: ${locations.join(' | ')}` : '', body].filter(Boolean).join('\n\n'), textCap),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Atlassian posting: its item in the public listings feed, matched by iCIMS host and job id. */
+async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
+  if (rejectPrivateOrInvalid(resolved.apiUrl)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(resolved.apiUrl, {
+      headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    if (!res.ok) return await discard(res);
+    const job = findAtlassianListing(await res.json(), resolved.parts);
+    if (!job) return null;
+    const blocks = [['overview', 'Overview'], ['responsibilities', 'Responsibilities'], ['qualifications', 'Qualifications']]
+      .map(([key, label]) => [label, jdHtmlToText(job[key])])
+      .filter(([, body]) => body)
+      .map(([label, body]) => `${label}:\n${body}`);
+    if (!blocks.length) return null;
+    const locations = (Array.isArray(job.locations) ? job.locations : [])
+      .map((l) => String(l).replace(/\s+/g, ' ').trim()).filter(Boolean);
+    return {
+      url: postingUrl,
+      title: compactText(typeof job.title === 'string' ? job.title : '', 300),
+      text: compactText([locations.length ? `Location: ${locations.join(' | ')}` : '', ...blocks].filter(Boolean).join('\n\n'), textCap),
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * ats id → fetcher. THE routing table `fetchJdViaKnownApi` dispatches through,
  * exported so the owned test can assert its key set IS `JD_TEXT_API_ATS`.
  *
@@ -1057,6 +1135,8 @@ export const JD_FETCHERS = {
   hirehive: (resolved, url, textCap, timeoutMs) =>
     fetchHireHiveJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
   hibob: fetchHibobJd,
+  eightfold: fetchEightfoldJd,
+  'atlassian-icims': fetchAtlassianJd,
 };
 
 /**
