@@ -312,6 +312,7 @@ and leave both empty to evaluate every location.
 - **A hold that cannot be read queues nothing.** The form refuses a country it
   does not know. If the stored hold is unusable anyway (a file edited by hand),
   the run's message starts with "Location hold:" and says nothing was queued.
+  Correct the hold and the next tick queues that run's rows.
 
 #### Source groups
 

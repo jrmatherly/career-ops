@@ -477,6 +477,7 @@ const RANK_MAX_PER_PASS = 50;
 const evaluatingJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate && job.evaluate.mode !== "off");
 
 const RANK_WAITING = " rows wait for the next rank pass.";
+const HOLD_PROBLEM = "Location hold: ";
 
 // A job's newest run needs a pass once it has finished, until one records its
 // counts. A failed pass is not retried each tick, so a broken CLI is not paid
@@ -484,7 +485,8 @@ const RANK_WAITING = " rows wait for the next rank pass.";
 function runToRank(store, job) {
   const lastRun = store.runs.find((run) => run.jobId === job.id);
   if (!lastRun || lastRun.state === "queued" || lastRun.state === "running") return null;
-  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) ? lastRun : null;
+  // A run whose hold could not be built stays due too: its rows are ranked, so a tick costs no ranker call, and correcting the hold queues them.
+  return lastRun.ranked === undefined || lastRun.evalMessage?.endsWith(RANK_WAITING) || lastRun.evalMessage?.startsWith(HOLD_PROBLEM) ? lastRun : null;
 }
 
 /*
@@ -574,7 +576,7 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
         const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
         held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {})) });
       } catch (error) {
-        holdProblem = `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was queued.`;
+        holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}. Nothing was queued.`;
       }
     }
     // In front of the pass's own message, never in its place: runToRank keeps the run due only while the message ends with RANK_WAITING.

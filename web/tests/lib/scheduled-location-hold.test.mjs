@@ -89,6 +89,21 @@ test("a hold that cannot be built keeps the waiting message, so the run stays du
   }, extra);
 });
 
+test("correcting a broken hold queues the rows on the next pass, without another scan", async () => {
+  await withRoot({ ...AUTO, hold: { ...HOLD, remoteCountries: ["Atlantis"] } }, async ({ root }) => {
+    const storePath = path.join(root, "data", "scheduled-jobs.json");
+    const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+    store.jobs[0].evaluate.hold = HOLD;
+    fs.writeFileSync(storePath, JSON.stringify(store));
+    await rankPass(root, storePath, { spawnFn: fakeRanker });
+    assert.deepEqual(ledgerStates(root), { remote: "queued", home: "queued", elsewhere: "skipped:held-location", blank: "skipped:held-location" });
+    const run = readScheduledStore(storePath).runs.find((item) => item.id === RUN);
+    assert.deepEqual([run.autoQueued, run.evalMessage], [2, undefined]);
+    await rankPass(root, storePath, { spawnFn: fakeRanker });
+    assert.equal(readLedger(root).flatMap((entry) => entry.rows).length, 4, "a pass after that appends nothing");
+  });
+});
+
 test("review mode with a hold writes no ledger row and no message", async () => {
   await withRoot({ ...AUTO, mode: "review", hold: HOLD }, ({ root, run }) => {
     assert.deepEqual(ledgerStates(root), {});

@@ -275,8 +275,10 @@ export function buildWorkplacePolicy(policy) {
       && (REMOTE.test(loc) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
     if (!remote) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
-      const found = countries(localCodes.has('US') ? homePlaces(loc, onsite) : loc, true);
-      if (found.size && ![...found].some(c => localCodes.has(c))) return fail('onsite_country_restricted');
+      const abroad = (text) => { const found = countries(text, true); return found.size > 0 && ![...found].some(c => localCodes.has(c)); };
+      // One home place in an allowed country is enough: "Chicago, IL · Dublin, Ireland" passes through Chicago.
+      const places = localCodes.has('US') ? homePlaces(loc, onsite) : [];
+      if ((places.length ? places : [loc]).every(abroad)) return fail('onsite_country_restricted');
       return { eligible: true, reason: 'onsite_location_allowed' };
     }
     // Explicit structured countries narrow a covering region. Europe + UK-only
@@ -414,7 +416,9 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
  * home place in "Chicago, IL" is not Israel and "Atlanta, Georgia" is not the
  * country. A state is only ever removed, never read as the United States:
  * whatever country the home place still names decides, and another office in
- * the same posting does not. Only the on-site check reads it.
+ * the same posting does not. At most one state is taken from a place, so the
+ * second code of "Dublin, GA - DE" stays a country. Only the on-site check
+ * reads it.
  */
 function homePlaces(loc, onsite) {
   // Split where the scanner does. "/" and "|" also join a place to its country ("Dublin / Ireland").
@@ -426,8 +430,9 @@ function homePlaces(loc, onsite) {
       // "GA-SPRINGFIELD, 1 MAIN ST": a street address after the comma is dropped, since its "ST" is not a country.
       if (state.leads.test(core)) next = next.replace(/,\s*\d.*$/, '').replace(state.token, ' ');
       else if (state.matches(core)) next = next.replace(state.token, ' ');
+      if (next !== place) break;
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, ' '));
     return next;
-  }).join(' · ');
+  });
 }
