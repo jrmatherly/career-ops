@@ -33,6 +33,7 @@ test('a country slot after the state name keeps the place foreign', () => {
 });
 test('a three-letter country code after the state keeps the place foreign', () => {
   assert.deepEqual(verdict(us, 'Springfield, IL, CAN'), { eligible: false, reason: 'onsite_country_restricted' });
+  assert.deepEqual(verdict(us, 'Springfield, IL (CA)'), { eligible: false, reason: 'onsite_country_restricted' });
 });
 test('the home place beside a foreign-looking second place is still the home place', () => {
   assert.equal(verdict(us, 'Springfield, IL / Tel Aviv, IL').eligible, true);

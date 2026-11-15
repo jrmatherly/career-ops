@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { heldForLocation } from "../../src/lib/core/evaluate-candidates.mjs";
+import { addedHistory, heldForLocation } from "../../src/lib/core/evaluate-candidates.mjs";
 
 const gate = (location) => ({ eligible: /remote, united states|springfield/i.test(location) });
 const history = [
@@ -24,6 +24,10 @@ test("the last added row for a URL decides", () => {
 });
 test("a tracking parameter on the pending URL still finds its history row", () => {
   assert.equal(heldForLocation({ rows: [{ url: "https://example.com/a?utm_source=x" }], scanHistoryRows: history, gate }).size, 0);
+});
+test("a prebuilt history index gives the same answer", () => {
+  const added = addedHistory(history);
+  assert.deepEqual([...heldForLocation({ rows: urls("a", "b", "d"), added, gate })], ["https://example.com/b", "https://example.com/d"]);
 });
 test("the gate is given the history row's location and title", () => {
   const seen = [];

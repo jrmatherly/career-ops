@@ -431,7 +431,7 @@ function readUsStates(loc, onsite) {
     const foreign = [
       ...countries(next),
       ...next.split(/[,;/|()\s-]+/).filter(token => /^[a-z]{3}$/.test(token)).map(token => ALPHA3_TO_ALPHA2[token.toUpperCase()]),
-      ...[...next.matchAll(/\(([a-z]{2})\)/g)].filter(match => countryNameFromIso(match[1])).map(match => match[1].toUpperCase()),
+      ...[...place.matchAll(/\(([a-z]{2})\)/g)].filter(match => countryNameFromIso(match[1])).map(match => match[1].toUpperCase()),
     ];
     return next === place || foreign.some(code => code && code !== 'US') ? place : next;
   }).join('');

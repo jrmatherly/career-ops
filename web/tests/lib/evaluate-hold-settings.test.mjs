@@ -60,6 +60,11 @@ test("a stored hold whose lists are not lists shows no chips", () => {
   const form = evaluateForm({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } });
   assert.deepEqual([form.holdOnsite, form.holdRemote], [[], []]);
 });
+test("saving the form over a stored hold it cannot show keeps that hold, so the runner still refuses it", () => {
+  const stored = { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } };
+  assert.equal("hold" in evaluateBody(evaluateForm(stored), stored), false);
+  assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored).hold, HOLD);
+});
 test("the card badge names the hold", () => {
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD }), "Auto, rank 3.5 and above, 5 per run, other locations held");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5 }), "Auto, rank 3.5 and above, 5 per run");

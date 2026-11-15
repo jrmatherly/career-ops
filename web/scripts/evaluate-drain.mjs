@@ -12,7 +12,7 @@ import http from "node:http";
 import path from "node:path";
 import { readScheduledStore } from "../src/lib/scheduled-jobs-store.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
-import { heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { addedHistory, heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
 import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
@@ -87,8 +87,8 @@ function locationHold(root, job) {
   if (job.evaluate.hold === undefined) return null;
   try {
     const gate = buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {}));
-    const scanHistoryRows = scanHistoryDataLines(readText(path.join(root, "data", "scan-history.tsv"))).filter((line) => line.trim()).map(parseScanHistoryLine);
-    return { holds: (url) => heldForLocation({ rows: [{ url }], scanHistoryRows, gate }).size > 0 };
+    const added = addedHistory(scanHistoryDataLines(readText(path.join(root, "data", "scan-history.tsv"))).filter((line) => line.trim()).map(parseScanHistoryLine));
+    return { holds: (url) => heldForLocation({ rows: [{ url }], added, gate }).size > 0 };
   } catch (error) {
     return { problem: `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was evaluated.` };
   }
