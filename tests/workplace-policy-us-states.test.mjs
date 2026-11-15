@@ -32,6 +32,8 @@ test('a country slot after the state name keeps the place foreign', () => {
   assert.equal(verdict(dublin, 'Dublin, ON, CA (Hybrid)').eligible, false);
   assert.equal(verdict(dublin, 'Dublin, Georgia, IE - Hybrid').eligible, false);
   assert.equal(verdict(dublin, 'Dublin, GA - IE').eligible, false);
+  assert.deepEqual(verdict(dublin, 'GA-Dublin, Ireland'), { eligible: false, reason: 'onsite_country_restricted' });
+  assert.deepEqual(verdict(dublin, 'Dublin / Ireland'), { eligible: false, reason: 'onsite_country_restricted' });
   assert.equal(verdict(dublin, 'Dublin, OH - Hybrid').eligible, true);
   assert.equal(verdict(dublin, 'Dublin, OH (Hybrid)').eligible, true);
   assert.equal(verdict(dublin, 'Dublin, Georgia, US').eligible, true);
@@ -41,7 +43,11 @@ test('a three-letter country code after the state keeps the place foreign', () =
   assert.deepEqual(verdict(us, 'Springfield, IL (CA)'), { eligible: false, reason: 'onsite_country_restricted' });
 });
 test('the home place beside a foreign-looking second place is still the home place', () => {
-  assert.equal(verdict(us, 'Springfield, IL / Tel Aviv, IL').eligible, true);
+  assert.equal(verdict(us, 'Springfield, IL · Tel Aviv, IL').eligible, true);
+});
+// "/" also joins a place to its country, so it does not split places; this posting stays held, as on main.
+test('places joined by a slash are read as one place', () => {
+  assert.equal(verdict(us, 'Springfield, IL / Tel Aviv, IL').eligible, false);
 });
 for (const location of ['Remote in Europe', 'Springfield or Remote', 'Remote (OK to work anywhere)', 'Remote - Toronto, ON, CA', 'Remote, Bengaluru, Karnataka, IN', 'Remote - UK or DE']) {
   test(`${location} is not confirmed as the United States`, () => assert.equal(verdict(us, location).eligible, false));

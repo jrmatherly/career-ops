@@ -417,13 +417,14 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
  * the same posting does not. Only the on-site check reads it.
  */
 function homePlaces(loc, onsite) {
-  return loc.split(/[·|;/]/).filter(place => has(place, onsite)).map((place) => {
+  // Split where the scanner does. "/" and "|" also join a place to its country ("Dublin / Ireland").
+  return loc.split(/[·;]/).filter(place => has(place, onsite)).map((place) => {
     // A trailing "(Hybrid)" or "- Hybrid" must not hide the country slot of "Dublin, ON, CA (Hybrid)" from the state matcher.
     const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+\p{L}{3,}[\p{L} ]*)\s*$/u, '');
     let next = place;
     for (const state of US_STATE_CODES) {
-      // "GA-SPRINGFIELD, 1 MAIN ST": what follows the comma is a street address, whose "ST" is not a country.
-      if (state.leads.test(core)) next = next.split(',')[0].replace(state.token, ' ');
+      // "GA-SPRINGFIELD, 1 MAIN ST": a street address after the comma is dropped, since its "ST" is not a country.
+      if (state.leads.test(core)) next = next.replace(/,\s*\d.*$/, '').replace(state.token, ' ');
       else if (state.matches(core)) next = next.replace(state.token, ' ');
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, ' '));
