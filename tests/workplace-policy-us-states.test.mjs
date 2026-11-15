@@ -33,6 +33,8 @@ test('a country slot after the state name keeps the place foreign', () => {
   assert.equal(verdict(dublin, 'Dublin, Georgia, IE - Hybrid').eligible, false);
   assert.equal(verdict(dublin, 'Dublin, GA - IE').eligible, false);
   assert.equal(verdict(dublin, 'Dublin, GA - DE').eligible, false);
+  assert.equal(verdict(dublin, 'Dublin, OH - Georgia').eligible, false);
+  assert.equal(verdict(buildWorkplacePolicy({ onsite_locations: ['Austin'], remote_countries: ['United States'] }), 'Austin, TX - CA').eligible, false);
   assert.deepEqual(verdict(dublin, 'GA-Dublin, Ireland'), { eligible: false, reason: 'onsite_country_restricted' });
   assert.deepEqual(verdict(dublin, 'Dublin / Ireland'), { eligible: false, reason: 'onsite_country_restricted' });
   assert.equal(verdict(dublin, 'Dublin, OH - Hybrid').eligible, true);

@@ -425,14 +425,18 @@ function homePlaces(loc, onsite) {
   return loc.split(/[·;]/).filter(place => has(place, onsite)).map((place) => {
     // A trailing "(Hybrid)" or "- Hybrid" must not hide the country slot of "Dublin, ON, CA (Hybrid)" from the state matcher.
     const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+\p{L}{3,}[\p{L} ]*)\s*$/u, '');
-    let next = place;
+    // The first state in the place is the one beside the city. Table order would take the "CA" of "Austin, TX - CA".
+    const states = [];
     for (const state of US_STATE_CODES) {
+      const leads = state.leads.test(core);
+      if (!leads && !state.matches(core)) continue;
       // "GA-SPRINGFIELD, 1 MAIN ST": a street address after the comma is dropped, since its "ST" is not a country.
-      if (state.leads.test(core)) next = next.replace(/,\s*\d.*$/, '').replace(state.token, ' ');
-      else if (state.matches(core)) next = next.replace(state.token, ' ');
-      if (next !== place) break;
+      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d.*$/, '') : place).replace(state.token, ' ') });
     }
-    for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, ' '));
-    return next;
+    for (const { name, joined } of US_STATE_NAMES_JOINED) {
+      const at = place.search(joined);
+      if (at >= 0) states.push({ at, take: () => place.replace(joined, match => match.replace(name, ' ')) });
+    }
+    return states.length ? states.sort((x, y) => x.at - y.at)[0].take() : place;
   });
 }
