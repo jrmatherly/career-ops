@@ -222,7 +222,7 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
             <div>
               <p className="mb-1 block text-[13px] font-medium text-foreground">Home area</p>
               <KeywordField ariaLabel="Home area" values={value.holdOnsite} tone="inc" placeholder="Springfield…" onChange={(holdOnsite) => onChange({ ...value, holdOnsite })} />
-              <p className="mt-1 text-xs text-faint">Places you would work on-site or hybrid. A posting there is auto-evaluated.</p>
+              <p className="mt-1 text-xs text-faint">Places you would work on-site or hybrid, one per entry and without the state: a comma starts a new entry. A posting there is auto-evaluated.</p>
             </div>
             <div>
               <p className="mb-1 block text-[13px] font-medium text-foreground">Remote from</p>

@@ -275,7 +275,7 @@ export function buildWorkplacePolicy(policy) {
       && (REMOTE.test(loc) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
     if (!remote) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
-      const found = countries(localCodes.has('US') ? readUsStates(loc) : loc, true);
+      const found = countries(localCodes.has('US') ? readUsStates(loc, onsite) : loc, true);
       if (found.size && ![...found].some(c => localCodes.has(c))) return fail('onsite_country_restricted');
       return { eligible: true, reason: 'onsite_location_allowed' };
     }
@@ -411,18 +411,23 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
 
 /** A folded location with its US state codes, and the state names that are
  * also countries, written as "united states", so the home place in "Chicago,
- * IL" is not Israel and "Atlanta, Georgia" is not the country. A place that
- * also names a foreign country is left alone. Only the on-site check reads it:
+ * IL" is not Israel and "Atlanta, Georgia" is not the country. Only a place
+ * that holds one of `onsite` is rewritten, so a state at another office is not
+ * evidence for the home place, and one that also names a foreign country is
+ * left alone. Only the on-site check reads it:
  * a state is never evidence that a remote posting is open to the United
  * States, since "Berlin, DE" and "Perth, WA" look the same as a US place.
  */
-function readUsStates(loc) {
+function readUsStates(loc, onsite) {
   return loc.split(/([·|;/])/).map((place) => {
+    if (!has(place, onsite)) return place;
     let next = place;
     for (const state of US_STATE_CODES) {
       if (state.matches(place) || state.leads.test(place)) next = next.replace(state.token, 'united states');
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, 'united states'));
-    return next === place || [...countries(next)].some(code => code !== 'US') ? place : next;
+    // Names and three-letter codes only: a two-letter read would take the "ST" of a street address for a country.
+    const foreign = [...countries(next), ...next.split(/[,;/|()\s-]+/).filter(token => /^[a-z]{3}$/.test(token)).map(token => ALPHA3_TO_ALPHA2[token.toUpperCase()])];
+    return next === place || foreign.some(code => code && code !== 'US') ? place : next;
   }).join('');
 }

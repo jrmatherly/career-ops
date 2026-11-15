@@ -20,6 +20,14 @@ test('a country code that opens a place is not a state', () => {
 test('a remote posting that names the United States beside a state is eligible, as before', () => {
   assert.deepEqual(verdict(us, 'Remote US - CO'), { eligible: true, reason: 'remote_region_allowed' });
 });
+test('a state at another office does not clear a foreign home-named place', () => {
+  const dublin = buildWorkplacePolicy({ onsite_locations: ['Dublin'], remote_countries: ['United States'] });
+  assert.deepEqual(verdict(dublin, 'Dublin, Ireland · Austin, TX'), { eligible: false, reason: 'onsite_country_restricted' });
+  assert.equal(verdict(dublin, 'Dublin, OH · Austin, TX').eligible, true);
+});
+test('a three-letter country code after the state keeps the place foreign', () => {
+  assert.deepEqual(verdict(us, 'Springfield, IL, CAN'), { eligible: false, reason: 'onsite_country_restricted' });
+});
 test('the home place beside a foreign-looking second place is still the home place', () => {
   assert.equal(verdict(us, 'Springfield, IL / Tel Aviv, IL').eligible, true);
 });

@@ -60,4 +60,6 @@ test("a job whose stored hold is unusable can still be paused", async () => {
   fs.writeFileSync(storeFile, JSON.stringify(store));
   await patchScheduledJob(job.id, { status: "paused" });
   assert.equal(getScheduledJob(job.id).status, "paused");
+  await patchScheduledJob(job.id, { evaluate: { mode: "off" } });
+  assert.equal(getScheduledJob(job.id).evaluate.mode, "off", "and switched out of Auto");
 });

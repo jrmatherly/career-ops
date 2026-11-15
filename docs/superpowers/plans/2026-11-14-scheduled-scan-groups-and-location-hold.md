@@ -302,7 +302,7 @@ Exact copy:
 | Inbox badge | `Held: location` |
 | Badge `title` | `Ranked, not auto-evaluated. Its location is not confirmed remote or in your home area.` |
 | First field label, Auto mode | `Home area` |
-| Its helper | `Places you would work on-site or hybrid. A posting there is auto-evaluated.` |
+| Its helper | `Places you would work on-site or hybrid, one per entry and without the state: a comma starts a new entry. A posting there is auto-evaluated.` |
 | Second field label | `Remote from` |
 | Its helper | `Countries you can work remotely from. A posting that says only "Remote" is held.` |
 | Line above both fields | `Leave both empty to auto-evaluate every location.` |

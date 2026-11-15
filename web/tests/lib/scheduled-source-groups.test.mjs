@@ -110,11 +110,14 @@ test("the run log says overlay when groups make the runner write one for a file 
   const write = process.stderr.write;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-source-groups-log-"));
   fs.writeFileSync(path.join(root, "portals.yml"), GROUPED);
+  const saved = process.env.CAREER_OPS_PORTALS;
+  delete process.env.CAREER_OPS_PORTALS;
   process.stderr.write = (chunk) => { lines.push(String(chunk)); return true; };
   try {
     executeJob(root, { id: JOB, engine: "portals", filtersFrom: "file", filters: { sinceDays: 3 } }, { spawnFn: () => ({ status: 0, stdout: "", stderr: "" }) });
   } finally {
     process.stderr.write = write;
+    if (saved !== undefined) process.env.CAREER_OPS_PORTALS = saved;
     fs.rmSync(root, { recursive: true, force: true });
   }
   assert.equal(lines.join(""), `portals: ${path.join(root, "portals.yml")} (overlay)\n`);
