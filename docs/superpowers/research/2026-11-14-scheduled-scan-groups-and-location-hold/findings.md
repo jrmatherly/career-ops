@@ -1,6 +1,6 @@
 # Scheduled scans: source groups and a location hold on auto-evaluation
 
-Research for `docs/superpowers/plans/2026-11-14-scheduled-scan-groups-and-location-hold.md`. Read on `main` at 1f2a2852 (career-ops 2.3.1), 2026-11-14. Every file and line below was read in the code unless it is marked unverified.
+Research for `docs/superpowers/plans/completed/2026-11-14-scheduled-scan-groups-and-location-hold.md`. Read on `main` at 1f2a2852 (career-ops 2.3.1), 2026-11-14. Every file and line below was read in the code unless it is marked unverified.
 
 ## What the owner asked for
 

@@ -437,7 +437,7 @@ Plan: `docs/superpowers/plans/completed/2026-11-13-pdf-atomic-write-data-root-le
 
 ### Scheduled scan source groups and location hold (2026-11-14)
 
-Plan: `docs/superpowers/plans/2026-11-14-scheduled-scan-groups-and-location-hold.md`. Findings: `docs/superpowers/research/2026-11-14-scheduled-scan-groups-and-location-hold/findings.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-14-scheduled-scan-groups-and-location-hold.md`. Findings: `docs/superpowers/research/2026-11-14-scheduled-scan-groups-and-location-hold/findings.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
