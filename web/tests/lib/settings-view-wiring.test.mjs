@@ -157,3 +157,10 @@ test("a template change reloads the Settings view, so its next profile save is n
   assert.match(gallery, /setPending\(null\);\s*setDraft\(""\);\s*profileChanged\(\);/, "after a duplicate, rename or delete");
   assert.match(view, /window\.addEventListener\(SETTINGS_SAVED_EVENT, reload\)/);
 });
+
+test("a profile save in the Settings view refreshes the gallery's default mark", () => {
+  const gallery = src("components/templates/templates-section.tsx");
+  assert.match(view, /if \(Object\.keys\(changes\)\.some\(\(id\) => id\.startsWith\("profile:"\)\)\) window\.dispatchEvent\(new Event\(PROFILE_SAVED_EVENT\)\);/);
+  assert.match(gallery, /window\.addEventListener\(PROFILE_SAVED_EVENT, reload\);/);
+  assert.match(gallery, /window\.removeEventListener\(PROFILE_SAVED_EVENT, reload\);/);
+});

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
+import { PROFILE_SAVED_EVENT, SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
 import type { SettingsGroup, SettingsResponse } from "@/lib/settings-form.mjs";
 import { pendingFromGroups, saveInOrder } from "@/lib/settings-changes.mjs";
 import { PluginStatus } from "./plugin-status";
@@ -78,6 +78,7 @@ export function SettingsView() {
         setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !Object.hasOwn(changes, id))));
         setErrors({});
         setNotice({ kind: "saved", text: done });
+        if (Object.keys(changes).some((id) => id.startsWith("profile:"))) window.dispatchEvent(new Event(PROFILE_SAVED_EVENT));
         return true;
       }
       if (res.status === 400 && body.errors) {

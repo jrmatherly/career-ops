@@ -184,6 +184,14 @@ for (const name of ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR"]) {
   });
 }
 
+test("a refused override names ~/career-ops-data when the code itself runs from a plugin copy", () => {
+  const { home, core } = pluginLayout();
+  assert.throws(
+    () => resolve(core, { HOME: home, CAREER_OPS_ROOT: path.join(core, "data-root") }),
+    (err) => err instanceof UnsafeDataRootError && err.message.endsWith(`career-ops uses ${path.join(home, "career-ops-data")}.`),
+  );
+});
+
 /** A symlink to `target` in a fresh tmpdir, or null where symlinks need privileges. */
 function linkTo(target) {
   const link = path.join(tmpdir(), "link-to-copy");

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { TemplateEditor } from "@/components/templates/template-editor";
-import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
+import { PROFILE_SAVED_EVENT, SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
 import { editLocks, editingAfterReload, latestOnly, loadFailureView, pendingAfterReload, settleChoice } from "@/lib/templates-state.mjs";
 
 // The CV templates the core resolves, each shown filled with a fictional resume
@@ -26,8 +26,9 @@ const COPY = {
   cover: { id: "cover-templates-heading", title: "Cover letter templates", note: "Previews use a made-up letter, not yours. The default is used for new cover letters." },
 } as const;
 
-// A template change rewrites config/profile.yml, so the Settings view has to
-// reload its revision or its next profile save is refused as stale.
+// A new default, or a rename of the default, rewrites config/profile.yml, so the
+// Settings view has to reload its revision or its next profile save is refused
+// as stale. Duplicate and delete leave the file alone; the reload is harmless.
 const profileChanged = () => window.dispatchEvent(new Event(SETTINGS_SAVED_EVENT));
 
 export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
@@ -76,7 +77,13 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
   useEffect(() => {
     const guard = guardRef.current;
     load();
-    return () => guard.stop();
+    // The Settings sections can change cv.template too; the list is current, so a failed reload keeps it.
+    const reload = () => load(true);
+    window.addEventListener(PROFILE_SAVED_EVENT, reload);
+    return () => {
+      window.removeEventListener(PROFILE_SAVED_EVENT, reload);
+      guard.stop();
+    };
   }, [load]);
 
   const choose = async (name: string) => {
