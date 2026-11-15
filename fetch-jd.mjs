@@ -35,6 +35,7 @@
 
 import { fetchJdViaKnownApi } from './browser-extract.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
+import { resolveAtsApi } from './liveness-api.mjs';
 import { fetchJdFromPage, markCappedAtsText } from './lib/jd-page-fetch.mjs';
 
 const TEXT_CAP = 20_000; // a batch report reads the whole JD; no token-budget reason to cap tighter
@@ -62,8 +63,14 @@ Options:
   // Tier 1: the ATS's public API. Tier 2: the page's own JSON-LD JobPosting, for
   // template-driven boards no API covers (Phenom, bespoke sites) whose visible
   // HTML carries no JD at all.
-  const result = (await fetchJdViaKnownApi(url, TEXT_CAP, TIMEOUT_MS, { textOnly: true }))
-    ?? (await fetchJdFromPage(url, TEXT_CAP, TIMEOUT_MS));
+  // A text-only API also answers for a closed posting, so its page is read beside it
+  // and a page that says closed wins. Closure only the rendered page shows is missed.
+  const fromPage = () => fetchJdFromPage(url, TEXT_CAP, TIMEOUT_MS);
+  const [api, page] = await Promise.all([
+    fetchJdViaKnownApi(url, TEXT_CAP, TIMEOUT_MS, { textOnly: true }),
+    resolveAtsApi(url)?.jdTextOnly ? fromPage() : undefined,
+  ]);
+  const result = (page?.closed ? page : api) ?? (page === undefined ? await fromPage() : page);
   // No stderr, by design: the caller's browser/WebFetch fallback is the
   // intended next step, and warning on every non-covered host would make the
   // normal path look broken.

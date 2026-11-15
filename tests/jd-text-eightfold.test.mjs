@@ -135,14 +135,27 @@ test('the experience filter reads a text-only board', async () => {
   assert.match(text, /V2_MARKER/);
 });
 
-test('fetch-jd.mjs prints a text-only board\'s text and exits 0', () => {
+function runFetchJd(pageHtml) {
   const dir = mkdtempSync(join(tmpdir(), 'fetch-jd-eightfold-'));
   try {
     const preload = join(dir, 'preload.mjs');
-    writeFileSync(preload, `globalThis.fetch = async () => new Response(${JSON.stringify(JSON.stringify(v2Job()))});`);
-    const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, fileURLToPath(new URL('../fetch-jd.mjs', import.meta.url)), BRANDED],
+    writeFileSync(preload, `globalThis.fetch = async (url) => String(url).includes('/api/')
+  ? new Response(${JSON.stringify(JSON.stringify(v2Job()))})
+  : new Response(${JSON.stringify(pageHtml)}, { headers: { 'content-type': 'text/html' } });`);
+    return spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, fileURLToPath(new URL('../fetch-jd.mjs', import.meta.url)), BRANDED],
       { encoding: 'utf8', timeout: 20000 });
-    assert.equal(result.status, 0, describeSpawn(result));
-    assert.match(result.stdout, /V2_MARKER/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('fetch-jd.mjs prints a text-only board\'s text and exits 0', () => {
+  const result = runFetchJd('<html><body><div id="app"></div></body></html>');
+  assert.equal(result.status, 0, describeSpawn(result));
+  assert.match(result.stdout, /V2_MARKER/);
+});
+
+test('fetch-jd.mjs reports a text-only posting closed when its page says so', () => {
+  const expired = { '@context': 'https://schema.org', '@type': 'JobPosting', title: 'Fixture Solutions Architect', validThrough: '2020-01-01', description: 'x' };
+  const result = runFetchJd(`<html><head><script type="application/ld+json">${JSON.stringify(expired)}</script></head><body></body></html>`);
+  assert.equal(result.status, 3, describeSpawn(result));
+  assert.match(result.stdout, /^CLOSED_POSTING JobPosting validThrough 2020-01-01/);
 });
