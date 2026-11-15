@@ -312,6 +312,12 @@ data/interview-prep/
 web/.next/
 web/out/
 
+# harvest-buildlist.mjs output — a generated, user-specific company list
+# (which companies YOU chose to track), and its --resume progress file.
+# Regenerate with `npm run harvest:buildlist`.
+buildlist-*.yml
+buildlist-*.yml.progress.json
+
 private/
 .codegraph/
 .remember/

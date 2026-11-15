@@ -63,6 +63,13 @@
 /.github/workflows/            @jrmatherly
 /docs/PLUGIN_REVIEW.md         @jrmatherly
 
+# Employer registry: community data kept in the repository (the updater does
+# not ship it to installs), plus the validator that judges it and the URL
+# builder it imports. This fork runs no employers-validate workflow.
+/employers/                    @jrmatherly
+/seeds/employers-validate.mjs  @jrmatherly
+/lib/ats-board-url.mjs         @jrmatherly
+
 # The experimental web UI.
 /web/ @jrmatherly
 

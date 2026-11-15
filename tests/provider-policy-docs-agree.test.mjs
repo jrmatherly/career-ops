@@ -11,15 +11,15 @@ console.log('\nprovider policy docs agree on rule 6');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf-8');
 const FORK_FILES = ['.claude/skills/add-provider/SKILL.md', '.claude/rules/providers.md'];
 const ROBOTS_GATE = /robots\.txt[^.\n]*(per path|checked|read per|is a stop)/i;
-const VISITOR = /not a gate|read like a visitor/i;
+const VISITOR = /not a gate|read what is public/i;
 
 const rule6 = {
-  'CONTRIBUTING.md': read('CONTRIBUTING.md').match(/^6\. \*\*.*$/m)?.[0] ?? '',
+  'CONTRIBUTING.md': read('CONTRIBUTING.md').match(/^6\. \*\*[\s\S]*?(?=\n\d+\. \*\*|\n#|(?![\s\S]))/m)?.[0] ?? '',
   'providers/ADDING_A_PROVIDER.md':
-    read('providers/ADDING_A_PROVIDER.md').match(/\*\*Read like a visitor \(rule 6\)\.\*\*[\s\S]*?(?:\n\n|$)/)?.[0] ?? '',
+    read('providers/ADDING_A_PROVIDER.md').match(/\*\*Read what is public, and say who is reading \(rule 6\)\.\*\*[\s\S]*?(?:\n\n|$)/)?.[0] ?? '',
 };
 
-if (/robots\.txt[^.\n]*not a gate/i.test(rule6['CONTRIBUTING.md'])) {
+if (/robots\.txt`? as a gate|robots\.txt[^.\n]*not a gate/i.test(rule6['CONTRIBUTING.md'])) {
   pass('CONTRIBUTING.md rule 6 says robots.txt is not a gate');
 } else {
   fail('CONTRIBUTING.md rule 6 no longer says robots.txt is not a gate: re-read upstream and update this test with the fork files');
@@ -37,6 +37,6 @@ for (const file of FORK_FILES) {
   const gate = lines.findIndex((line) => ROBOTS_GATE.test(line));
   if (gate === -1) pass(`${file} does not treat robots.txt as a gate`);
   else fail(`${file}:${gate + 1} still treats robots.txt as a gate: ${lines[gate].trim().slice(0, 120)}`);
-  if (VISITOR.test(text)) pass(`${file} states rule 6 as "read like a visitor"`);
-  else fail(`${file} does not state rule 6 as "read like a visitor"`);
+  if (VISITOR.test(text)) pass(`${file} states rule 6 as "read what is public"`);
+  else fail(`${file} does not state rule 6 as "read what is public"`);
 }

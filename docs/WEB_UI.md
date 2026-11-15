@@ -68,3 +68,9 @@ In Auto mode the form shows **Home area** and **Remote from**. With both filled,
 Both sources read `portals.yml` from the data root, or the file `CAREER_OPS_PORTALS` names. The runner writes `portals: <path> (file)` or `portals: <path> (overlay)` to stderr on each run. A missing or unreadable `portals.yml`, or an empty title list, fails the run at the first attempt with no retry.
 
 A custom job saved before 2026-11-08 keeps its meaning with three exceptions. An empty list used to clear the file's list for the run, and now it uses the file's list. For example, a job with no exclude terms used to drop the file's `title_filter.negative`, and now it keeps it. The copy also used to start from `<data root>/portals.yml` even when `CAREER_OPS_PORTALS` named another file, and now it starts from that file. A full-sweep job with no roles of its own used to copy `title_filter.positive` into `title_filter_full`, and now it uses the file's `title_filter_full.positive` or is refused when that list is empty.
+
+---
+
+## Keeping the Dashboard Running
+
+`npm run ui` serves the dashboard while its terminal is open. To have it start at login and restart if it exits, install it as a service for your own user with `node web/scripts/web-service.mjs install` (macOS launchd, Linux `systemd --user`, Windows Task Scheduler). See [Run as a login service](../web/README.md#run-as-a-login-service) for what it does and how to manage it.

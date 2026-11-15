@@ -23,6 +23,7 @@ if (ids.length > 0) {
 // text that may name another provider: "The Muse" -> themuse, and a name that
 // starts with the id ("Amazon / AWS") counts. Rows named otherwise are listed here.
 const CATALOG_ALIASES = {
+  'adp-myjobs': 'ADP Recruiting Management (myjobs)',
   'agentic-jobs': 'Agentic Engineering Jobs',
   applitrack: 'Frontline AppliTrack',
   csod: 'Cornerstone OnDemand',

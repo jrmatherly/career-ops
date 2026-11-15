@@ -51,8 +51,14 @@ const HEADING_LETTER = /^(?:Block\s+([A-Z])(?:[).:]|\s)|([A-Z])[).:])/i;
 
 /**
  * Display form of a section heading: author-letter prefix and the trailing
- * "(lead)" / "(verdict)" marker removed. Falls back to the original when
- * stripping would leave nothing.
+ * "(lead)" / "(verdict)" / "(draft)" marker removed. Falls back to the original
+ * when stripping would leave nothing.
+ *
+ * "(draft)" joins the list because the evaluation modes write it on the
+ * draft-answers block (#4272), and it is the first rule `parseDraftAnswersBlockH`
+ * finds that block by, in any language and under any letter (#3884). It is an
+ * authoring signal like the other two, so it is stripped here for the same
+ * reason: the reader needs it, the viewer must not see it.
  * @param {string} h
  * @returns {string}
  */
@@ -61,7 +67,7 @@ import { isStarTableHeader, parsePipeTable } from "./report-tables.mjs";
 export function cleanHeading(h) {
   const stripped = h
     .replace(HEADING_PREFIX, "")
-    .replace(/\s*\((?:lead|verdict)\)\s*$/i, "")
+    .replace(/\s*\((?:lead|verdict|draft)\)\s*$/i, "")
     .trim();
   return stripped || h.trim();
 }
@@ -114,8 +120,14 @@ export const APPLY_LINE = 4.0;
 /** The label a score under APPLY_LINE gets; Today collapses the group that carries it. */
 export const BELOW_APPLY_LINE = "Below the apply line";
 
-/** @param {unknown} legitimacy */
-function flaggedPosting(legitimacy) {
+/**
+ * Caution or suspicious legitimacy. Same tiers as the Today grouping and the
+ * quiet Apply control. A high-confidence or unknown tier is not flagged.
+ *
+ * @param {unknown} legitimacy
+ * @returns {boolean}
+ */
+export function flaggedPosting(legitimacy) {
   const s = String(legitimacy ?? "").toLowerCase();
   // Turkish reports (modes/tr/is-ilani.md) write the tier in Turkish:
   // Dikkatli İlerle (caution), Şüpheli (suspicious). Chinese reports

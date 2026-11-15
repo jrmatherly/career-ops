@@ -24,6 +24,7 @@ export function TriageRow({
   job,
   source,
   age,
+  reason,
   scored,
   selected,
   shortlisted,
@@ -36,6 +37,7 @@ export function TriageRow({
   job: InboxJob;
   source: AtsSource | null;
   age: number | null;
+  reason?: string;
   scored?: RowScore;
   selected: boolean;
   shortlisted: boolean;
@@ -102,6 +104,7 @@ export function TriageRow({
               {rankLabel}
             </span>
           )}
+          {reason ? <span className="text-muted">{reason}</span> : null}
         </p>
       </div>
 

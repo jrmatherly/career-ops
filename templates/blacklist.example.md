@@ -4,7 +4,8 @@ Your own do-not-apply list (user layer, opt-in). Copy this file to `data/blackli
 
 When `data/blacklist.md` exists:
 
-- `scan.mjs` (and `scan-ats-full.mjs`, `discover-ats.mjs`, `discover-new-companies.mjs`) skips postings from listed companies (matched case- and punctuation-insensitively) and reports the count in the run summary — `--include-blacklisted` bypasses the filter for auditing.
+- `scan.mjs` (and `scan-ats-full.mjs`) skips postings from listed companies (matched case- and punctuation-insensitively) and reports the count in the run summary — `--include-blacklisted` bypasses the filter for auditing.
+- `discover-ats.mjs` and `discover-new-companies.mjs` leave listed companies out: `discover-ats.mjs` never adds one to `portals.yml`, and both report how many they skipped.
 - The `auto-pipeline`, `oferta`, and `apply` modes stop on a match, quote your recorded reason, and ask for an explicit override before proceeding. Your call always wins.
 - A blacklist entry never changes any score anywhere — it is a gate, not a signal.
 

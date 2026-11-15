@@ -166,7 +166,7 @@ export function ScheduledJobsView() {
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground shadow-lg transition-all hover:bg-brand-200"
+            className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200"
           >
             <CalendarPlus className="size-4" />
             New scan
@@ -248,7 +248,7 @@ export function ScheduledJobsView() {
               filterTab === "all" ? "bg-brand text-brand-foreground shadow" : "text-muted hover:text-foreground"
             }`}
           >
-            All Scans ({jobsList.length})
+            All scans ({jobsList.length})
           </button>
           <button
             type="button"
@@ -291,7 +291,7 @@ export function ScheduledJobsView() {
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand-200"
           >
             <CalendarPlus className="size-3.5" /> New scan
           </button>

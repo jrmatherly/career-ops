@@ -75,6 +75,9 @@ throwsWith(() => stampMarkedLines('# x-release-please-version\n', '2.0.0'), /car
 const rootChangelog = config.packages['.']['changelog-path'];
 check(SYSTEM_PATHS.includes(rootChangelog), `${rootChangelog}, which the first release PR creates, is claimed by SYSTEM_PATHS`);
 check(!Object.values(config.packages).some((pkg) => 'release-as' in pkg), 'no release-as pin is left in the config (a one-shot pin would repeat the same version)');
+// Upstream publishes releases by hand (bbc3a74f); the fork's release-please must keep tagging.
+check(!('skip-github-release' in config) && !Object.values(config.packages).some((pkg) => 'skip-github-release' in pkg),
+  'release-please-config.json has no skip-github-release, so release-please still creates tags and releases');
 
 for (const argv of [['--root'], ['--root', '--check']]) {
   const r = spawnSync(NODE, [join(ROOT, 'scripts', 'stamp-version.mjs'), ...argv], { encoding: 'utf8' });

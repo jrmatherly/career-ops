@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/cn";
 import { useDeployment } from "@/components/deployment-context";
 import { CadenceSettings } from "@/components/followups/cadence-settings";
+import { TemplatesSection } from "@/components/templates/templates-section";
 import { persistCliId, readSavedCliId } from "@/lib/saved-cli";
 import { keepIfInstalled, pickDefaultInstalled } from "@/lib/cli-pick.mjs";
 import { CONFIG_KEY as STORAGE_KEY, writeConfig } from "@/lib/config-events.mjs";
@@ -347,6 +348,10 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
       </button>
 
       <CadenceSettings />
+
+      <TemplatesSection kind="cv" />
+
+      <TemplatesSection kind="cover" />
 
       <div className="mt-8 flex items-center gap-3">
         <button
