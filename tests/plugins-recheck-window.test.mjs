@@ -82,7 +82,8 @@ async function gateAndWriter(historyRows) {
     });
     // The writer is handed the posting whatever the gate said, to read its own verdict.
     await appendToPipeline([job], { pipelinePath, scanHistoryPath, historyPolicy: { ...POLICY, today: DAY } });
-    const written = readFileSync(pipelinePath, 'utf-8').split('\n').filter((l) => l.includes(DONE)).length > 1;
+    // Counted by splitting on the URL: a substring test on a URL reads to CodeQL as a host check.
+    const written = readFileSync(pipelinePath, 'utf-8').split(DONE).length - 1 > 1;
     return { admitted: jobs.length === 1, written };
   } finally {
     rmSync(dir, { recursive: true, force: true });

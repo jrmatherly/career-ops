@@ -139,8 +139,10 @@ test('generated CV uses the linked report identity when its application number d
     // alone; importing the full core here would require its separate packages.
     // The application, report and manifest lookups still use the real web code.
     writeFileSync(join(root, 'tracker-utils.mjs'), [
-      `export const resolveTrackerPath = () => ${JSON.stringify(join(root, 'data', 'applications.md'))};`,
-      `export const resolvePdfIndexPath = () => ${JSON.stringify(join(root, 'data', 'pdf-index.tsv'))};`,
+      // The stub finds its files from its own location, so no path is written into generated code.
+      "import { fileURLToPath } from 'node:url';",
+      "export const resolveTrackerPath = () => fileURLToPath(new URL('./data/applications.md', import.meta.url));",
+      "export const resolvePdfIndexPath = () => fileURLToPath(new URL('./data/pdf-index.tsv', import.meta.url));",
     ].join('\n'));
     writeFileSync(second.paths.finalPdf, 'second-role-pdf-bytes');
     writeFileSync(join(root, 'data', 'pdf-index.tsv'), [
@@ -261,8 +263,10 @@ test('resolveTailoredCv: an application number uploads the indexed PDF when an A
       '| 309 | 2026-07-01 | Acme | Engineer | 4.5/5 | Evaluated | | [018](../reports/018-acme-2026-07-01.md) | |',
     ].join('\n'));
     writeFileSync(join(root, 'tracker-utils.mjs'), [
-      `export const resolveTrackerPath = () => ${JSON.stringify(join(root, 'data', 'applications.md'))};`,
-      `export const resolvePdfIndexPath = () => ${JSON.stringify(join(root, 'data', 'pdf-index.tsv'))};`,
+      // The stub finds its files from its own location, so no path is written into generated code.
+      "import { fileURLToPath } from 'node:url';",
+      "export const resolveTrackerPath = () => fileURLToPath(new URL('./data/applications.md', import.meta.url));",
+      "export const resolvePdfIndexPath = () => fileURLToPath(new URL('./data/pdf-index.tsv', import.meta.url));",
     ].join('\n'));
 
     const styled = 'cv-jane-doe-018-acme-2026-07-26.pdf';
