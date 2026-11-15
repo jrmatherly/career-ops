@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Radar, Wrench } from "lucide-react";
+import { Loader2, Radar, Timer, Wrench } from "lucide-react";
 import { CompanyLogo } from "@/components/company-logo";
 import { useJobs, type Job } from "@/components/jobs/job-store";
 import { Tabs } from "@/components/ui/tabs";
@@ -11,7 +11,7 @@ import { formatWhen } from "@/lib/format-time.mjs";
 import { useHydrated } from "@/lib/use-hydrated";
 import type { WatchedCompany } from "@/lib/portals-config.mjs";
 import { showPortalsSetup } from "@/lib/portals-setup.mjs";
-import { boardTypes, filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
+import { requestDelayFromSeconds, boardTypes, filterPortals, healthOf, uncheckedCount, portalCounts, withToggles, withUnlisted, type PortalTab } from "@/lib/portals-view-model.mjs";
 
 type Company = { name: string; status: string; detail: string };
 type Health = Record<string, { status: string; detail: string }>;
@@ -51,6 +51,9 @@ export function PortalsView({
   const [pending, setPending] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [revision, setRevision] = useState(loaded);
+  // The least time between requests to each company, in ms; null is the board's own pace.
+  const [delays, setDelays] = useState(() => watched.map((c) => c.requestDelayMs ?? null));
+  const [pacing, setPacing] = useState<{ index: number; draft: string; error?: string } | null>(null);
   const { jobs, startJob } = useJobs();
 
   // map the agentic "fix-portal" workers to the company they're repairing
@@ -125,6 +128,38 @@ export function PortalsView({
       // Only while focus is still on a switch: the user may have moved on to the search field.
       if (document.activeElement?.getAttribute("role") === "switch" && view.current?.contains(document.activeElement)) refocusCompany.current = index;
       setToggleError(`${name}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function savePace(index: number, name: string, draft: string) {
+    if (pending) return;
+    const ms = requestDelayFromSeconds(draft);
+    if (ms === undefined) {
+      setPacing({ index, draft, error: "Enter a wait from 0.001 to 600 seconds, or leave it empty." });
+      return;
+    }
+    setPending(true);
+    try {
+      const r = await fetch("/api/portals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company: name, request_delay_ms: ms, revision }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
+      setRevision(body.revision);
+      setDelays((all) => all.with(index, ms));
+      // The form goes away, so focus returns to the button that opened it.
+      const active = document.activeElement;
+      // Only while focus is still in the form: the user may have moved on to the search field.
+      if (active === document.body || active?.closest("form")?.querySelector(`#pace-${index}`)) view.current?.querySelector<HTMLElement>(`[data-pace="${index}"]`)?.focus();
+      setPacing(null);
+    } catch (e) {
+      // Beside the field: the list is long, and the alert above it may be off screen.
+      const error = e instanceof Error ? e.message : String(e);
+      setPacing({ index, draft, error });
     } finally {
       setPending(false);
     }
@@ -222,7 +257,7 @@ export function PortalsView({
                 const h = healthOf(health, c.name);
                 const t = h ? (TONE[h.status] ?? TONE.skipped) : null;
                 return (
-                  <li key={"index" in c ? `${c.index}-${c.name}` : c.name} className="flex items-center gap-3 px-4 py-2.5">
+                  <li key={"index" in c ? `${c.index}-${c.name}` : c.name} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
                     <div className={cn("flex min-w-0 items-center gap-3", !c.enabled && "opacity-60")}>
                       <span title={t?.label} className={cn("size-1.5 shrink-0 rounded-full", t ? t.dot : "bg-border")} />
                       <CompanyLogo name={c.name} size={20} />
@@ -244,6 +279,22 @@ export function PortalsView({
                       {"index" in c && (
                       <button
                         type="button"
+                        aria-expanded={pacing?.index === c.index}
+                        aria-label={`Wait between requests to ${c.name}${delays[c.index] ? `, ${delays[c.index]! / 1000} seconds` : ""}`}
+                        data-pace={c.index}
+                        title="Wait between requests"
+                        // Not `disabled`, as the switch: a save in flight keeps its editor until it lands.
+                        aria-disabled={pending}
+                        onClick={() => !pending && setPacing(pacing?.index === c.index ? null : { index: c.index, draft: delays[c.index] ? String(delays[c.index]! / 1000) : "" })}
+                        className="inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1 text-xs text-muted transition-colors hover:text-brand-text max-sm:min-h-[44px] max-sm:min-w-[44px]"
+                      >
+                        <Timer className="size-3.5" aria-hidden />
+                        {delays[c.index] ? `${delays[c.index]! / 1000} s` : null}
+                      </button>
+                      )}
+                      {"index" in c && (
+                      <button
+                        type="button"
                         role="switch"
                         aria-checked={c.enabled}
                         aria-label={`Scan ${c.name}`}
@@ -257,6 +308,46 @@ export function PortalsView({
                       </button>
                       )}
                     </div>
+                    {"index" in c && pacing?.index === c.index && (
+                      <form
+                        className="flex basis-full flex-wrap items-center gap-2 text-xs text-muted"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          savePace(c.index, c.name, pacing.draft);
+                        }}
+                      >
+                        <label htmlFor={`pace-${c.index}`}>Wait between requests (seconds)</label>
+                        <input
+                          id={`pace-${c.index}`}
+                          type="number"
+                          min={0}
+                          max={600}
+                          step="any"
+                          autoFocus
+                          // A save in flight closes the editor when it lands, so the draft holds until then.
+                          readOnly={pending}
+                          value={pacing.draft}
+                          onChange={(e) => setPacing({ index: c.index, draft: e.target.value })}
+                          aria-describedby={`pace-help-${c.index}`}
+                          className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-base text-foreground sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 max-sm:min-h-[44px]"
+                        />
+                        <button
+                          type="submit"
+                          aria-disabled={pending}
+                          className="inline-flex min-h-6 items-center rounded-md border border-border px-2 py-1 text-xs text-foreground transition-colors hover:border-brand/40 aria-disabled:opacity-60 max-sm:min-h-[44px]"
+                        >
+                          Save
+                        </button>
+                        <span id={`pace-help-${c.index}`} className="text-faint">
+                          For a board that stops early on HTTP 429. Empty uses the board&apos;s own pace.
+                        </span>
+                        {pacing.error && (
+                          <p role="alert" className="basis-full text-rose-600 dark:text-rose-400">
+                            {pacing.error}
+                          </p>
+                        )}
+                      </form>
+                    )}
                   </li>
                 );
               })}

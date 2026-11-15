@@ -2579,6 +2579,17 @@ search_queries:
 #     careers_url: https://jobs.lever.co/bigco
 #     timeout_ms: 60000
 #
+# ── request_delay_ms (optional, per entry) ────────────────────────────
+# A board that rate-limits answers HTTP 429 partway through, and the scan then
+# reads only part of it. Slow the scan down for that entry only: each request
+# to it, a retry included, then starts at least this many milliseconds (1 to
+# 600000) after the one before. Every other entry keeps its pace. The Portals
+# page of the web app sets the same line, in seconds.
+#
+#   - name: BigCo
+#     careers_url: https://bigco.eightfold.ai/careers
+#     request_delay_ms: 10000
+#
 # ── group (optional, per entry) ───────────────────────────────────────
 # Puts the entry in a named source group, so a dashboard scheduled scan can
 # read only some sources: a scan that names "weekly" reads the entries with

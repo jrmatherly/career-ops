@@ -47,6 +47,7 @@ import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { applyEntryResponseCap } from './lib/entry-response-cap.mjs';
 import { applyEntryTimeout } from './lib/entry-timeout.mjs';
+import { applyEntryPacing } from './lib/entry-pacing.mjs';
 
 import { fetchJson as defaultFetchJson, fetchText as defaultFetchFullText, fetchTextHead as defaultFetchText, makeHttpCtx } from './providers/_http.mjs';
 import { ASHBY_MAX_BYTES, ASHBY_TIMEOUT_MS, buildEmbedUrl as ashbyEmbedUrl, parseEmbedAppData as parseAshbyEmbed } from './providers/ashby.mjs';
@@ -945,7 +946,7 @@ export async function verifyCompanies(
 }
 
 /**
- * Apply an entry's `timeout_ms` and `max_response_mb` to a ctx, as scan.mjs
+ * Apply an entry's `timeout_ms`, `max_response_mb` and `request_delay_ms` to a ctx, as scan.mjs
  * and audit-portals.mjs do, so the check reads a board with the same limits
  * the scan does. The ctx's fetchers are replaced in place; pass a copy when
  * it is shared.
@@ -955,7 +956,7 @@ export async function verifyCompanies(
  * @returns {any}
  */
 function withEntryLimits(ctx, entry) {
-  return applyEntryTimeout(applyEntryResponseCap(ctx, entry), entry);
+  return applyEntryPacing(applyEntryTimeout(applyEntryResponseCap(ctx, entry), entry), entry);
 }
 
 /**

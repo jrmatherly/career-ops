@@ -114,3 +114,24 @@ export function parsePortalHealth(text) {
   }
   return { checkedAt: saved.checkedAt, health };
 }
+
+// The scanner's own ceiling (lib/entry-pacing.mjs); a larger value is ignored there with a warning.
+export const MAX_REQUEST_DELAY_MS = 600_000;
+
+/** Whether the scanner would apply this `request_delay_ms`. @param {unknown} ms @returns {ms is number} */
+export const isRequestDelayMs = (ms) => Number.isInteger(ms) && /** @type {number} */ (ms) >= 1 && /** @type {number} */ (ms) <= MAX_REQUEST_DELAY_MS;
+
+/**
+ * The Portals page's seconds field as a `request_delay_ms`: null for an empty
+ * field or 0 (the board's own pace), undefined for anything the scanner would ignore.
+ *
+ * @param {string} draft
+ * @returns {number | null | undefined}
+ */
+export function requestDelayFromSeconds(draft) {
+  if (draft.trim() === "") return null;
+  const seconds = Number(draft);
+  if (seconds === 0) return null;
+  const ms = Math.round(seconds * 1000);
+  return isRequestDelayMs(ms) ? ms : undefined;
+}

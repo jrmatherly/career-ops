@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import * as yaml from "js-yaml";
-import { boardType } from "./portals-view-model.mjs";
+import { boardType, isRequestDelayMs, MAX_REQUEST_DELAY_MS } from "./portals-view-model.mjs";
+
+export { isRequestDelayMs, MAX_REQUEST_DELAY_MS };
 
 /**
  * A configuration error that lets the route distinguish a broken user-layer
@@ -235,17 +237,20 @@ export function companiesNamed(doc, name) {
 }
 
 /**
- * portals.yml text with one tracked company's `enabled:` set, every other line
- * and line ending byte for byte. Returns null when the file is not valid YAML,
- * when the name matches zero or several entries, when the entry is flow style,
- * or when the result does not parse to the intended document.
+ * portals.yml text with one scalar key of one tracked company set, or removed
+ * when `value` is null, every other line and line ending byte for byte. Returns
+ * null when the file is not valid YAML, when the name matches zero or several
+ * entries, when the entry is flow style, when the key to remove is on the
+ * entry's `- ` line, or when the result does not parse to the intended
+ * document. Removing a key the entry does not have returns the source unchanged.
  *
  * @param {string} source
  * @param {string} name
- * @param {boolean} enabled
+ * @param {string} key - A plain identifier: it goes into a RegExp and into the file as written.
+ * @param {boolean | number | null} value
  * @returns {string | null}
  */
-export function setCompanyEnabledText(source, name, enabled) {
+function setCompanyFieldText(source, name, key, value) {
   let doc;
   try {
     doc = yaml.load(source);
@@ -281,18 +286,27 @@ export function setCompanyEnabledText(source, name, enabled) {
   while (start > head + 1 && !opensEntry(lines[start])) start--;
   let stop = at + 1;
   while (stop < end && (isNote(lines[stop]) || indentOf(lines[stop]) >= indent.length)) stop++;
+  const keyLine = new RegExp(`^(\\s*(?:- )?)${key}:`);
   let flag = -1;
   let found = null;
   for (let i = start; i < stop && flag < 0; i++) {
-    found = lines[i].match(/^(\s*(?:- )?)enabled:/);
+    found = lines[i].match(keyLine);
     if (found && found[1].length === indent.length) flag = i;
   }
-  if (flag < 0) {
-    lines.splice(at + 1, 0, `${indent}enabled: ${enabled}`);
+  if (value === null) {
+    // A key on the entry's dash line opens the entry, so its line cannot go.
+    if (flag >= 0 && found[1].includes("-")) return null;
+    if (flag >= 0) {
+      lines.splice(flag, 1);
+      eols.splice(flag, 1);
+    }
+  } else if (flag < 0) {
+    lines.splice(at + 1, 0, `${indent}${key}: ${value}`);
     eols.splice(at, 0, eols[at] ?? eols[at - 1] ?? "\n");
-  } else lines[flag] = `${found[1]}enabled: ${enabled}${(lines[flag].match(/\s+#.*$/) ?? [""])[0]}`;
+  } else lines[flag] = `${found[1]}${key}: ${value}${(lines[flag].match(/\s+#.*$/) ?? [""])[0]}`;
   const text = lines.map((line, i) => line + (eols[i] ?? "")).join("");
-  companiesNamed(doc, name)[0].enabled = enabled;
+  if (value === null) delete companiesNamed(doc, name)[0][key];
+  else companiesNamed(doc, name)[0][key] = value;
   try {
     return isDeepStrictEqual(yaml.load(text), doc) ? text : null;
   } catch {
@@ -301,7 +315,24 @@ export function setCompanyEnabledText(source, name, enabled) {
 }
 
 /**
- * @typedef {{ name: string, enabled: boolean, host: string, board: string }} WatchedCompany
+ * portals.yml text with one tracked company's `enabled:` set. Null as setCompanyFieldText.
+ *
+ * @param {string} source @param {string} name @param {boolean} enabled
+ * @returns {string | null}
+ */
+export const setCompanyEnabledText = (source, name, enabled) => setCompanyFieldText(source, name, "enabled", enabled);
+
+/**
+ * portals.yml text with one tracked company's `request_delay_ms:` set, or the
+ * line removed when `ms` is null. Null as setCompanyFieldText.
+ *
+ * @param {string} source @param {string} name @param {number | null} ms
+ * @returns {string | null}
+ */
+export const setCompanyRequestDelayText = (source, name, ms) => setCompanyFieldText(source, name, "request_delay_ms", ms);
+
+/**
+ * @typedef {{ name: string, enabled: boolean, host: string, board: string, requestDelayMs?: number }} WatchedCompany
  */
 
 /**
@@ -323,6 +354,6 @@ export function watchedCompanies(doc) {
   return list
     .filter((c) => isMapping(c) && typeof c.name === "string" && c.name.trim())
     // The exact name: the Portals switch sends it back, and "Acme " is not "Acme".
-    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api), board: boardType(c) }))
+    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api), board: boardType(c), ...(isRequestDelayMs(c.request_delay_ms) ? { requestDelayMs: c.request_delay_ms } : {}) }))
     .sort((a, b) => Number(b.enabled) - Number(a.enabled));
 }
