@@ -1,5 +1,5 @@
-// Under a policy that allows the United States, a US state in a location is
-// the United States, not the ISO country that shares its letters or its name.
+// Under a policy that allows the United States, a US state written beside the
+// home place is not read as the ISO country that shares its letters or its name.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWorkplacePolicy } from '../providers/_country.mjs';
@@ -80,3 +80,37 @@ test('a policy without the United States reads CA as Canada, as before', () => {
   const es = buildWorkplacePolicy({ onsite_locations: ['Barcelona'], remote_countries: ['Spain'] });
   assert.deepEqual(verdict(es, 'Barcelona, CA'), { eligible: false, reason: 'onsite_country_restricted' });
 });
+
+// Held on main and must stay held: a state counts only directly beside the home place name.
+const policyFor = (home) => buildWorkplacePolicy({ onsite_locations: [home], remote_countries: ['United States'] });
+for (const [home, location] of [
+  ['Dublin', 'Dublin · London, United Kingdom · Paris, France'],
+  ['Athens', 'Athens; London, UK'],
+  ['Rome', 'Rome · Milan, Italy'],
+  ['Dublin', 'London, United Kingdom; Dublin; Amsterdam, Netherlands'],
+  ['Vancouver', 'Vancouver, BC, CA - HQ'],
+  ['Vancouver', 'Vancouver, BC, CA - 2 days'],
+  ['Vancouver', 'Vancouver, BC, CA +2 more'],
+  ['Vancouver', 'Vancouver, BC, CA, +2 more'],
+  ['Vancouver', 'Vancouver, BC, CA V6B 1A1'],
+  ['Cambridge', 'Cambridge, ON, CA | Hybrid'],
+  ['Cambridge', 'Cambridge, ON, CA [Hybrid]'],
+  ['Cambridge', 'Cambridge, ON, CA - Hybrid (3 days)'],
+  ['Vancouver', 'Vancouver BC, CA'],
+  ['Richmond', 'CA-BC-Richmond'],
+  ['Cambridge', 'CA-ON-Cambridge'],
+  ['Vancouver', 'CA-Vancouver, BC'],
+  ['Dublin', 'GA-Dublin, IE'],
+  ['Dublin', 'GA-Dublin, 1 Main St, IE'],
+]) {
+  test(`${location} is not the home place ${home} in the United States`, () => assert.equal(verdict(policyFor(home), location).eligible, false));
+}
+for (const [home, location] of [
+  ['Atlanta', 'Atlanta, GA · London, UK'],
+  ['Atlanta', 'Atlanta GA'],
+  ['Chicago', 'Chicago, Illinois · London, United Kingdom'],
+  ['Albuquerque', 'Albuquerque, New Mexico'],
+  ['Atlanta', 'GA-ATLANTA, 740 W PEACHTREE ST NW · IN-INDIANAPOLIS, 220 VIRGINIA AVE'],
+]) {
+  test(`${location} is the home place ${home}`, () => assert.deepEqual(verdict(policyFor(home), location), { eligible: true, reason: 'onsite_location_allowed' }));
+}

@@ -187,6 +187,7 @@ export function buildWorkplacePolicy(policy) {
   if (!onsite.length || !home.length) throw new Error('workplace_policy requires onsite_locations and remote_countries lists');
   const homeCodes = new Set(home.flatMap(v => [...countries(countryValue(v), true)]));
   if (!homeCodes.size) throw new Error('workplace_policy.remote_countries must name a country or ISO country code');
+  const homeStates = onsite.map(compileHomeState);
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
   // must not become eligibility evidence. Structured fields still accept ISO.
@@ -276,9 +277,10 @@ export function buildWorkplacePolicy(policy) {
     if (!remote) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
       const abroad = (text) => { const found = countries(text, true); return found.size > 0 && ![...found].some(c => localCodes.has(c)); };
-      // One home place in an allowed country is enough: "Chicago, IL · Dublin, Ireland" passes through Chicago.
-      const places = localCodes.has('US') ? homePlaces(loc, onsite) : [];
-      if ((places.length ? places : [loc]).every(abroad)) return fail('onsite_country_restricted');
+      // A home place with its US state written beside it is judged alone, so "Atlanta, GA · London, UK" passes through
+      // Atlanta and its "GA" is not Gabon. Without one, the whole location decides, as it always has.
+      const stated = localCodes.has('US') ? loc.split(/[·;]/).flatMap(place => homeStates.map(read => read(place)).filter(text => text !== null)) : [];
+      if (!stated.some(text => !abroad(text)) && abroad(loc)) return fail('onsite_country_restricted');
       return { eligible: true, reason: 'onsite_location_allowed' };
     }
     // Explicit structured countries narrow a covering region. Europe + UK-only
@@ -296,7 +298,7 @@ export function buildWorkplacePolicy(policy) {
   };
 }
 
-// USPS state names and codes, shared with scan.mjs's always_allow matchers.
+// USPS state names and codes. scan.mjs builds its always_allow matchers from the same table.
 export const USPS_STATES = Object.freeze([
   Object.freeze(['alabama', 'al']),
   Object.freeze(['alaska', 'ak']),
@@ -350,96 +352,31 @@ export const USPS_STATES = Object.freeze([
   Object.freeze(['wyoming', 'wy']),
 ]);
 
-// 2-letter codes: comma-state (", OH" / ",OH, USA") or a trailing token
-// ("Dublin OH", Workday URL hint "dublin oh"). Not a generic word-boundary —
-// English "in"/"or"/"me" in "Remote, Belgium or France" must not impersonate
-// Indiana/Oregon/Maine. scan.mjs matches state *names* with its own keyword matcher.
-// Unicode letters and marks are part of the token: "Montréal" is not "AL".
-export function compileUsStateAbbrev(abbr) {
-  const escaped = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`(?:,\\s*${escaped}(?![\\p{L}\\p{M}\\p{N}])|(?:^|[^\\p{L}\\p{M}\\p{N}])${escaped}[^\\p{L}\\p{M}\\p{N}]*$)`, 'u');
-  return (lower) => placesWithoutCountryCode(lower).some((place) => re.test(place));
-}
+// Longest first, so "west virginia" is not read as "virginia".
+const US_STATE_PATTERN = USPS_STATES.flat().sort((x, y) => y.length - x.length).map(escape).join('|');
+const US_STATE_CODE_PATTERN = USPS_STATES.map(([, abbr]) => abbr).join('|');
+// After a space, not a comma, these codes are more often the English word: "Dublin or London".
+const US_STATE_AFTER_SPACE = USPS_STATES.flat().filter(text => !['in', 'or', 'me', 'hi', 'ok', 'oh'].includes(text)).sort((x, y) => y.length - x.length).map(escape).join('|');
+const TWO_LETTER_WORD = /(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu;
 
-// "City, Region, CC" ends in an ISO country code, and several of those are
-// also USPS codes: "Bengaluru, Karnataka, IN" read as Indiana and "Toronto,
-// ON, CA" as California, so always_allow beat the user's own block entry.
-// A two-letter last part after two or more parts is the country slot. So is
-// the last part of "Austin TX, US" or "Perth WA, AU", where a state code ends
-// the city part. "Santa Fe, NM" and "Dublin, OH" keep their state. "LA, CA"
-// is two state codes, so the last part is the state, not a country. So is
-// a state code written twice, as in "Brooklyn, NY, NY". A place
-// with a country slot other than US has no US state at all, so "Perth WA, AU"
-// does not read as Washington. Providers join several places with "; "
-// (Lever) or " · " (Jobvite), and each place gets its own check, so the TX in
-// "Austin TX · Toronto, ON, CA" counts even though it is not at the end.
-const USPS_CODES = new Set(USPS_STATES.map(([, abbr]) => abbr));
-
-function placesWithoutCountryCode(lower) {
-  return lower.split(/[;·]/).flatMap((place) => {
-    const parts = place.split(',');
-    const code = parts.at(-1).trim();
-    if (parts.length < 2 || !/^\p{L}{2}$/u.test(code)) return [place];
-    if (parts.length === 2) {
-      const cityTail = /(?:^|[^\p{L}\p{M}\p{N}])(\p{L}{2})\s*$/u.exec(parts[0]);
-      if (!cityTail || !USPS_CODES.has(cityTail[1])) return [place];
-      if (USPS_CODES.has(code)) return [place];
-    } else if (USPS_CODES.has(code) && parts.at(-2).trim() === code) {
-      return [place];
-    }
-    return code === 'us' ? [parts.slice(0, -1).join(',')] : [];
-  });
-}
-
-// A state name that is also a country cannot beat the user's own `block`:
-// "Tbilisi, Georgia" is the country, and reading "Georgia" as always_allow let
-// it through a filter that blocked "Tbilisi". Such a name counts at the `allow`
-// tier instead, so "Atlanta, Georgia" still passes and a blocked Georgian city
-// does not. The 2-letter code is unambiguous and stays in always_allow, so
-// "Dublin, GA" still beats a blocked "Dublin".
-// That tiering is scan.mjs's. homePlaces below uses the same set for the home place.
-export const US_STATE_NAMES_ALSO_COUNTRIES = new Set(['georgia']);
-
-const US_STATE_CODES = USPS_STATES.map(([, abbr]) => ({
-  matches: compileUsStateAbbrev(abbr),
-  // "GA-SPRINGFIELD, 1 MAIN ST": some boards open a place with the state.
-  leads: new RegExp(`^\\s*${abbr}-`),
-  // Not global: only the first occurrence is the state, so the second "DE" of "Dublin, DE - DE" stays Germany.
-  token: word(abbr),
-}));
-const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
-  name,
-  joined: new RegExp(`[,:-]\\s*${escape(name)}(?![\\p{L}\\p{N}])|(?<![\\p{L}\\p{N}])${escape(name)}\\s*[,:-]`, 'u'),
-}));
-
-/** The places of a folded location that hold one of `onsite`, with their US
- * state codes, and the state names that are also countries, taken out, so the
- * home place in "Chicago, IL" is not Israel and "Atlanta, Georgia" is not the
- * country. A state is only ever removed, never read as the United States:
- * whatever country the home place still names decides, and another office in
- * the same posting does not. At most one state is taken from a place, so the
- * second code of "Dublin, GA - DE" stays a country. Only the on-site check
- * reads it.
+/** A reader for one onsite location name: given a folded place, the place with
+ * its US state taken out, or null when no state is written directly beside
+ * the name. Two forms count: the state right after the name ("Chicago, IL",
+ * "Atlanta GA", "Albuquerque, New Mexico") and a code right before it, when a
+ * street address follows or nothing does ("GA-ATLANTA, 740 W PEACHTREE ST NW";
+ * the address's own two-letter words are taken out too, since its "ST" is not
+ * a country). A state anywhere else is left alone: "Vancouver, BC, CA" and
+ * "CA-BC-Richmond" keep their country. The state is only removed, never read
+ * as the United States, so whatever country the place still names decides.
  */
-function homePlaces(loc, onsite) {
-  // Split where the scanner does. "/" and "|" also join a place to its country ("Dublin / Ireland").
-  return loc.split(/[·;]/).filter(place => has(place, onsite)).map((place) => {
-    // A trailing "(Hybrid)" or "- Hybrid" must not hide the country slot of "Dublin, ON, CA (Hybrid)" from the state matcher.
-    const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+\p{L}{3,}[\p{L} ]*)\s*$/u, '');
-    // The first state in the place is the one beside the city. Table order would take the "CA" of "Austin, TX - CA".
-    const states = [];
-    for (const state of US_STATE_CODES) {
-      const leads = state.leads.test(core);
-      if (!leads && !state.matches(core)) continue;
-      // "GA-SPRINGFIELD, 1 MAIN ST": in this form the state leads and a street address follows, so its other two-letter
-      // words ("ST", "NW") are not countries. A country written by name after it still counts.
-      const take = () => place.replace(state.token, ' ');
-      states.push({ at: place.search(state.token), take: leads ? () => take().replace(/(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu, ' ') : take });
-    }
-    for (const { name, joined } of US_STATE_NAMES_JOINED) {
-      const at = place.search(joined);
-      if (at >= 0) states.push({ at, take: () => place.replace(joined, match => match.replace(name, ' ')) });
-    }
-    return states.length ? states.sort((x, y) => x.at - y.at)[0].take() : place;
-  });
+function compileHomeState(home) {
+  const name = escape(home);
+  const after = new RegExp(`((?<![\\p{L}\\p{N}])${name})(?:\\s*,\\s*(?:${US_STATE_PATTERN})|\\s+(?:${US_STATE_AFTER_SPACE}))(?![\\p{L}\\p{N}])`, 'u');
+  const before = new RegExp(`^(\\s*)(?:${US_STATE_CODE_PATTERN})-(?=${name}(?![\\p{L}\\p{N}]))`, 'u');
+  return (place) => {
+    if (after.test(place)) return place.replace(after, '$1');
+    const parts = place.split(',');
+    if (!before.test(place) || (parts.length > 1 && !/\d/.test(parts[1]))) return null;
+    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : /\d/.test(part) ? part.replace(TWO_LETTER_WORD, ' ') : part)).join(',');
+  };
 }

@@ -70,6 +70,12 @@ test("saving the form over a stored hold it cannot show keeps that hold, so the 
   assert.equal("hold" in evaluateBody(evaluateForm(mixed), mixed), false);
   assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored).hold, HOLD);
 });
+test("a stored hold of null, which the runner refuses, survives every save that does not edit it", () => {
+  const stored = { mode: "auto", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5, hold: null };
+  assert.equal(scheduledEvaluate(evaluateBody(evaluateForm(stored), stored), stored).hold, null, "an unchanged Auto save");
+  assert.equal(scheduledEvaluate(evaluateBody({ ...evaluateForm(stored), mode: "review" }, stored), stored).hold, null, "a switch to Review");
+  assert.deepEqual(scheduledEvaluate(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored), stored).hold, HOLD, "an edit replaces it");
+});
 test("the card badge names the hold", () => {
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD }), "Auto, rank 3.5 and above, 5 per run, other locations held");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5 }), "Auto, rank 3.5 and above, 5 per run");

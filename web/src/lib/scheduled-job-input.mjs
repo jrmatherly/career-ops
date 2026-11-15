@@ -26,10 +26,9 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 /** The workplace policy (providers/_country.mjs) a stored hold stands for. */
 export const holdPolicy = (hold) => ({ onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries });
 
-// An absent hold keeps the stored one; null or two empty lists remove it.
-function scheduledHold(value, base) {
-  if (value === undefined) return base;
-  if (value === null) return undefined;
+// Null or two empty lists remove the hold.
+function scheduledHold(value) {
+  if (value === undefined || value === null) return undefined;
   if (typeof value !== "object" || !Array.isArray(value.onsiteLocations) || !Array.isArray(value.remoteCountries)) throw new Error("Invalid location hold.");
   const onsiteLocations = cleanChips(value.onsiteLocations);
   const remoteCountries = cleanChips(value.remoteCountries);
@@ -50,12 +49,14 @@ export function scheduledEvaluate(value, base, nowMs = Date.now()) {
     throw new Error("Invalid evaluate settings.");
   }
   const turnedOn = value.mode !== "off" && (!base || base.mode === "off");
-  const hold = scheduledHold(value.hold, base?.hold);
+  // A body with no hold keeps the stored one as it is, even one the runner refuses (null in a store edited by hand).
+  const kept = value.hold === undefined && base && "hold" in base;
+  const hold = kept ? base.hold : scheduledHold(value.hold);
   return {
     mode: value.mode,
     enabledAt: turnedOn || !base?.enabledAt ? hostLocalDate(nowMs) : base.enabledAt,
     rankThreshold: clamped(value.rankThreshold, base?.rankThreshold ?? 3.5, 1, 5, (n) => Math.round(n * 10) / 10, "rank threshold"),
     maxPerRun: clamped(value.maxPerRun, base?.maxPerRun ?? 5, 1, 20, Math.round, "evaluations per run"),
-    ...(hold ? { hold } : {}),
+    ...(kept || hold ? { hold } : {}),
   };
 }

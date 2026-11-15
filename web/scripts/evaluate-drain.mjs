@@ -322,6 +322,7 @@ export async function runDrain({
         hold ??= locationHold(root, job) ?? {};
         if (hold.problem) {
           touchedRuns.set(entry.runId, { drainMessage: hold.problem });
+          current = undefined;
           continue jobs;
         }
         if (hold.holds?.(url)) {
