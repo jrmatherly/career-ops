@@ -651,7 +651,7 @@ export async function fetchJdText(url, { boardCache, ctx = makeHttpCtx() } = {})
   if (!resolved || !JD_TEXT_API_ATS.has(resolved.ats)) return null;
   const normalize = JSON_JD[resolved.ats];
   if (!normalize) {
-    const result = await fetchJdViaKnownApi(url, JD_TEXT_CAP, JD_TIMEOUT_MS);
+    const result = await fetchJdViaKnownApi(url, JD_TEXT_CAP, JD_TIMEOUT_MS, { textOnly: true });
     if (!result) throw new Error(`${resolved.ats} JD fetch returned nothing`);
     return result.text;
   }

@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { resolveAtsApi, checkLivenessViaApi, isAtsPosting, JD_TEXT_API_ATS } from '../liveness-api.mjs';
 import { fetchJdViaKnownApi } from '../browser-extract.mjs';
 
+const TEXT_ONLY = { textOnly: true };
+
 const PID = '1970000000000001';
 const BRANDED = `https://apply.careers.microsoft.com/careers?pid=${PID}&domain=microsoft.com`;
 const BRANDED_V2 = `https://apply.careers.microsoft.com/api/apply/v2/jobs/${PID}?domain=microsoft.com`;
@@ -61,7 +63,7 @@ test('the v2 description comes back as text with title and locations', async () 
   const jd = await withFetch(async (url, opts) => {
     calls.push([String(url), opts.redirect]);
     return json(v2Job());
-  }, () => fetchJdViaKnownApi(BRANDED));
+  }, () => fetchJdViaKnownApi(BRANDED, undefined, undefined, TEXT_ONLY));
   assert.equal(jd.ats, 'eightfold');
   assert.equal(jd.url, BRANDED);
   assert.equal(jd.title, 'Fixture Solutions Architect');
@@ -77,7 +79,7 @@ test('a v2 miss falls back to the PCSX position endpoint on the same host', asyn
   const jd = await withFetch(async (url) => {
     calls.push(String(url));
     return String(url).includes('/api/pcsx/') ? json(pcsxJob()) : json({ message: 'Not authorized for PCSX' }, 403);
-  }, () => fetchJdViaKnownApi(BRANDED));
+  }, () => fetchJdViaKnownApi(BRANDED, undefined, undefined, TEXT_ONLY));
   assert.match(jd.text, /PCSX_MARKER fixture body\./);
   assert.deepEqual(calls, [BRANDED_V2, BRANDED_PCSX]);
 });
@@ -90,14 +92,14 @@ test('non-200s, another position and empty descriptions return null', async () =
     [json(v2Job({ job_description: '' })), json(pcsxJob({ jobDescription: '   ' }))],
     [new Response('<html>blocked</html>', { status: 200 }), new Response('nope', { status: 200 })],
   ]) {
-    const jd = await withFetch(async (url) => (String(url).includes('/api/pcsx/') ? pcsx : v2), () => fetchJdViaKnownApi(BRANDED));
+    const jd = await withFetch(async (url) => (String(url).includes('/api/pcsx/') ? pcsx : v2), () => fetchJdViaKnownApi(BRANDED, undefined, undefined, TEXT_ONLY));
     assert.equal(jd, null);
   }
 });
 
 test('the text cap is honoured', async () => {
   const long = `<p>${'fixture words '.repeat(2000)}</p>`;
-  const jd = await withFetch(async () => json(v2Job({ job_description: long })), () => fetchJdViaKnownApi(BRANDED, 500));
+  const jd = await withFetch(async () => json(v2Job({ job_description: long })), () => fetchJdViaKnownApi(BRANDED, 500, undefined, TEXT_ONLY));
   assert.ok(jd.text.length <= 501, `length ${jd.text.length}`);
 });
 
@@ -107,4 +109,16 @@ test('liveness stays with the browser: no API request, no verdict', async () => 
   assert.equal(verdict, null);
   assert.equal(sent, 0);
   assert.equal(isAtsPosting(BRANDED), false);
+});
+
+test('a reader that did not ask for text-only boards gets nothing and sends nothing', async () => {
+  let sent = 0;
+  const previous = globalThis.fetch;
+  globalThis.fetch = async () => { sent += 1; return new Response('{}'); };
+  try {
+    assert.equal(await fetchJdViaKnownApi(BRANDED), null);
+  } finally {
+    globalThis.fetch = previous;
+  }
+  assert.equal(sent, 0);
 });

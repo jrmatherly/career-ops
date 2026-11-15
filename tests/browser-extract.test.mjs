@@ -663,7 +663,7 @@ try {
         });
         return new Response(body, { status: 404 });
       };
-      seen.result = await fetchJdViaKnownApi(url);
+      seen.result = await fetchJdViaKnownApi(url, undefined, undefined, { textOnly: true });
       discards[resolveAtsApi(url)?.ats] = seen;
     }
   } finally {

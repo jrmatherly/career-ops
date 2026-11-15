@@ -34,6 +34,8 @@ const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
 // drain lock keeps a second drain from acting on that.
 const RUN_TIMEOUT_MS = 900_000;
 const HEALTH_TIMEOUT_MS = 5_000;
+// A posting whose text has not come for a day (96 ticks) is closed or unreadable, not slow.
+const NO_TEXT_GIVE_UP_MS = 24 * 60 * 60 * 1000;
 const TERMINAL = new Set(["done", "gated", "error"]);
 
 const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate?.mode === "auto");
@@ -210,7 +212,8 @@ export async function runDrain({
   root,
   storePath,
   baseUrl = process.env.CAREER_OPS_WEB_URL || "http://127.0.0.1:3000",
-  fetchJd = fetchJdViaKnownApi,
+  // The scan listed these postings as open, and the report says its verification is unconfirmed.
+  fetchJd = (url) => fetchJdViaKnownApi(url, undefined, undefined, { textOnly: true }),
   now = Date.now,
   env = process.env,
   runTimeoutMs = RUN_TIMEOUT_MS,
@@ -349,10 +352,16 @@ export async function runDrain({
         // The route refuses a NUL, which argv cannot carry; with it in, the same row would be refused every tick.
         const jdText = jd?.text?.replaceAll("\0", "");
         if (!jdText?.trim()) {
-          log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
           // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
           // Compared in the form the ledger stores, or a message with a newline would never match.
           const reason = tsvCell(`no-text: ${why}`);
+          const waitedMs = entry.reason === reason ? now() - Date.parse(entry.rows.at(-1).at) : 0;
+          if (waitedMs > NO_TEXT_GIVE_UP_MS) {
+            log(`job ${job.id}: no posting text for ${url} in a day (${why}); it is skipped`);
+            await append("skipped", "no-text");
+            continue;
+          }
+          log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
           if (entry.reason !== reason) await append("queued", reason);
           continue;
         }

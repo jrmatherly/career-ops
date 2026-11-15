@@ -1066,19 +1066,49 @@ async function fetchEightfoldJd(resolved, postingUrl, textCap, timeoutMs) {
   }
 }
 
+// The feed is about 2 MB and holds every Atlassian posting, so one download serves
+// every posting asked for in the next minute (a scan's experience filter, a drain tick).
+const ATLASSIAN_FEED_TTL_MS = 60_000;
+let atlassianFeed = null;
+
+/** Forget the cached Atlassian feed. For tests, which swap `fetch` between cases. */
+export function forgetAtlassianFeed() {
+  atlassianFeed = null;
+}
+
+/** The parsed listings feed, or null when it could not be read. A failed read is not kept. */
+function atlassianListings(apiUrl, timeoutMs) {
+  if (atlassianFeed && Date.now() - atlassianFeed.at < ATLASSIAN_FEED_TTL_MS) return atlassianFeed.promise;
+  const promise = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(apiUrl, {
+        headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (!res.ok) return await discard(res);
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+  const entry = { at: Date.now(), promise };
+  atlassianFeed = entry;
+  promise.then((feed) => {
+    if (!feed && atlassianFeed === entry) atlassianFeed = null;
+  });
+  return promise;
+}
+
 /** Atlassian posting: its item in the public listings feed, matched by iCIMS host and job id. */
 async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
   if (rejectPrivateOrInvalid(resolved.apiUrl)) return null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(resolved.apiUrl, {
-      headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
-      redirect: 'error',
-      signal: controller.signal,
-    });
-    if (!res.ok) return await discard(res);
-    const job = findAtlassianListing(await res.json(), resolved.parts);
+    const job = findAtlassianListing(await atlassianListings(resolved.apiUrl, timeoutMs), resolved.parts);
     if (!job) return null;
     const blocks = [['overview', 'Overview'], ['responsibilities', 'Responsibilities'], ['qualifications', 'Qualifications']]
       .map(([key, label]) => [label, jdHtmlToText(job[key])])
@@ -1094,8 +1124,6 @@ async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
     };
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -1149,13 +1177,19 @@ export const JD_FETCHERS = {
  * @param {string} url
  * @param {number} [textCap]
  * @param {number} [timeoutMs]
+ * @param {{ textOnly?: boolean }} [options] textOnly: also read boards whose API says
+ *   nothing about liveness (Eightfold, Atlassian). For callers that judge liveness
+ *   elsewhere, or only need the text.
  * @returns {Promise<{url: string, title: string, text: string, ats: string}|null>}
  *   null = not a JD_TEXT_API_ATS host, or the fetch/parse was inconclusive —
  *   caller should fall through to a browser-backed read.
  */
-export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs = WORKDAY_TIMEOUT_MS) {
+export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs = WORKDAY_TIMEOUT_MS, { textOnly = false } = {}) {
   const resolved = resolveAtsApi(url);
   if (!resolved || !JD_TEXT_API_ATS.has(resolved.ats)) return null;
+  // A text-only API also answers for a closed posting. A caller that reads the page to
+  // learn whether the posting is open must not get its text from here.
+  if (resolved.jdTextOnly && !textOnly) return null;
   const fetcher = JD_FETCHERS[resolved.ats];
   if (!fetcher) return null;
 

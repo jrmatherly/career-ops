@@ -154,6 +154,20 @@ test("a null or thrown posting-text fetch leaves the row queued with its reason,
   }
 });
 
+test("a posting whose text has not come for a day is skipped, not retried forever", async (t) => {
+  const { drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1)] });
+  const fetchJd = async () => null;
+  const hours = (n) => () => T0 + n * 60 * 60 * 1000;
+  await drain({ fetchJd });
+  await drain({ fetchJd, now: hours(23) });
+  assert.equal(state(url(1)).state, "queued", "under a day it still waits");
+  await drain({ fetchJd, now: hours(25) });
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).final], ["skipped", "no-text", true]);
+  assert.equal(posts.length, 0);
+  assert.match(stderr.join(""), /no posting text for .* in a day/);
+  await drain({ fetchJd: async () => assert.fail("a skipped row is not fetched again"), now: hours(26) });
+});
+
 test("a NUL in the posting text is stripped before the POST", async (t) => {
   const { drain, state, posts } = await withDrainRoot(t, { urls: [url(1)] });
   await drain({ fetchJd: async () => ({ text: "Posting\0 text." }) });

@@ -62,7 +62,7 @@ Options:
   // Tier 1: the ATS's public API. Tier 2: the page's own JSON-LD JobPosting, for
   // template-driven boards no API covers (Phenom, bespoke sites) whose visible
   // HTML carries no JD at all.
-  const result = (await fetchJdViaKnownApi(url, TEXT_CAP, TIMEOUT_MS))
+  const result = (await fetchJdViaKnownApi(url, TEXT_CAP, TIMEOUT_MS, { textOnly: true }))
     ?? (await fetchJdFromPage(url, TEXT_CAP, TIMEOUT_MS));
   // No stderr, by design: the caller's browser/WebFetch fallback is the
   // intended next step, and warning on every non-covered host would make the
