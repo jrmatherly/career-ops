@@ -456,16 +456,15 @@ const ATS_PROVIDERS = [
       const domain = u.searchParams.get('domain');
       return domain ? { host: u.hostname, pid, domain } : { host: u.hostname, pid };
     },
-    api: ({ host, pid, domain }) => `https://${host}/api/apply/v2/jobs/${pid}${domain ? `?domain=${domain}` : ''}`,
+    api: ({ host, pid, domain }) => `https://${host}/api/apply/v2/jobs/${pid}${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`,
   },
   {
     id: 'atlassian-icims',
     // Atlassian's iCIMS posting pages, {portal}.icims.com/jobs/{id}/{slug}/job. Two of
-    // its portals are on hosts other employers may share, so the host alone proves
-    // nothing: the posting counts as Atlassian's only when the feed lists this host
-    // and id, and the request goes to the feed's fixed host, never to iCIMS. Liveness
-    // stays with the browser, so other employers' postings on those hosts keep the
-    // answer they had and never cost a 2 MB feed read.
+    // its portals have generic names (careers-americas, campus-americas; both served
+    // Atlassian's own search page on 2026-11-15). The text comes only from a feed item
+    // with this host and id, and the request goes to the feed's fixed host, never to
+    // iCIMS. Liveness stays with the browser.
     jdTextOnly: true,
     match(u) {
       if (!ATLASSIAN_ICIMS_HOST_RE.test(u.hostname)) return null;
