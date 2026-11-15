@@ -14,7 +14,8 @@ export function CvPdfFileActions({ viewHref, className }: { viewHref: string; cl
       const res = await fetch(pdfRevealHref(viewHref), { method: "POST" });
       if (!res.ok) {
         const text = (await res.text()).trim();
-        setError(text || "Could not reveal the file.");
+        // 501 answers with the file's path, relative to the data folder, and nothing else.
+        setError(res.status === 501 && text ? `This computer cannot open a file manager. The file is at ${text}.` : text || "Could not reveal the file.");
       }
     } catch {
       setError("Could not reveal the file.");

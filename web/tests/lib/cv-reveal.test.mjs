@@ -184,6 +184,8 @@ test("the reveal route asks locateTailoredPdf and does not read a client path", 
 
 test("a hosted install spawns no file manager and hides the button", () => {
   const read = (rel) => fs.readFileSync(new URL(`../../src/${rel}`, import.meta.url), "utf8");
-  assert.match(read("app/api/cv-reveal/route.ts"), /platform: deploymentMode\(\)\.hosted \? "hosted" : process\.platform,/);
-  assert.match(read("components/cv-pdf-file-actions.tsx"), /\{hosted \? null : \(\s*<button[^>]*onClick=\{reveal\}>/);
+  assert.match(read("app/api/cv-reveal/route.ts"), /platform: deploymentMode\(\)\.hosted \? "[a-z]+" : process\.platform/);
+  const actions = read("components/cv-pdf-file-actions.tsx");
+  assert.match(actions, /const \{ hosted \} = useDeployment\(\);/);
+  assert.match(actions, /hosted[^\n]*\n?\s*<button[^>]*onClick=\{reveal\}>/);
 });

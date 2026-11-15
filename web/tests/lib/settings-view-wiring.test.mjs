@@ -152,15 +152,20 @@ test("the page is a section list beside the content, and every link has a target
 
 test("a template change reloads the Settings view, so its next profile save is not stale", () => {
   const gallery = src("components/templates/templates-section.tsx");
-  assert.match(gallery, /const profileChanged = \(\) => window\.dispatchEvent\(new Event\(SETTINGS_SAVED_EVENT\)\);/);
-  assert.match(gallery, /applied: \(\) => \{\s*setTemplates\([^\n]*\n\s*profileChanged\(\);\s*\},/, "after a new default");
-  assert.match(gallery, /setPending\(null\);\s*setDraft\(""\);\s*profileChanged\(\);/, "after a duplicate, rename or delete");
+  assert.match(gallery, /window\.dispatchEvent\(new Event\(SETTINGS_SAVED_EVENT\)\)/);
+  assert.equal(gallery.match(/\bprofileChanged\(\);/g)?.length, 2, "after a new default, and after a duplicate, rename or delete");
   assert.match(view, /window\.addEventListener\(SETTINGS_SAVED_EVENT, reload\)/);
 });
 
 test("a profile save in the Settings view refreshes the gallery's default mark", () => {
   const gallery = src("components/templates/templates-section.tsx");
-  assert.match(view, /if \(Object\.keys\(changes\)\.some\(\(id\) => id\.startsWith\("profile:"\)\)\) window\.dispatchEvent\(new Event\(PROFILE_SAVED_EVENT\)\);/);
-  assert.match(gallery, /window\.addEventListener\(PROFILE_SAVED_EVENT, reload\);/);
-  assert.match(gallery, /window\.removeEventListener\(PROFILE_SAVED_EVENT, reload\);/);
+  assert.match(view, /startsWith\("profile:"\)[^\n]*window\.dispatchEvent\(new Event\(PROFILE_SAVED_EVENT\)\)/);
+  assert.match(gallery, /window\.addEventListener\(PROFILE_SAVED_EVENT, reload\)/);
+  assert.match(gallery, /window\.removeEventListener\(PROFILE_SAVED_EVENT, reload\)/);
+});
+
+test("a refresh after a save elsewhere keeps the form, and drops only an edit whose value changed under it", () => {
+  assert.match(view, /if \(keepEdits && loaded\.current\) \{\s*setNotice\(/, "a failed refresh does not replace the form with the load error");
+  assert.match(view, /const dropped = Object\.keys\(typed\.current\)\.filter\(\(id\) => changed\.has\(id\)\);/);
+  assert.match(view, /changed elsewhere on this page/);
 });

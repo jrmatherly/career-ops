@@ -15,6 +15,13 @@ const BUTTON = "inline-flex items-center justify-center gap-2 rounded-full bg-br
 const QUIET = "rounded-full border border-border px-4 py-1.5 text-sm text-foreground transition-colors hover:bg-surface-hover disabled:opacity-60 max-sm:min-h-[44px]";
 const BANNER = "mb-6 rounded-xl border border-border bg-surface/40 p-4 text-sm text-muted";
 
+/** The ids whose saved value differs between two answers of GET /api/settings. */
+function changedIds(before: SettingsResponse, after: SettingsResponse): Set<string> {
+  const values = (r: SettingsResponse) => new Map(r.groups.flatMap((g) => g.settings).map((s) => [s.id, JSON.stringify(s.value ?? null)]));
+  const old = values(before);
+  return new Set([...values(after)].filter(([id, value]) => old.get(id) !== value).map(([id]) => id));
+}
+
 export function SettingsView() {
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -25,6 +32,11 @@ export function SettingsView() {
   // Saving several groups in a row needs each save's new revision before React re-renders with it.
   const revision = useRef<SettingsResponse["revision"] | null>(null);
   const saves = useRef(0);
+  // What the server last answered, to tell on a reload which settings changed under an unsaved edit.
+  const loaded = useRef<SettingsResponse | null>(null);
+  // The form as last rendered, for the reload, which runs outside a render.
+  const typed = useRef<Form>(form);
+  typed.current = form;
 
   // keepEdits: a save made elsewhere on the page changes the revision, not what the user has typed here.
   const load = useCallback(async (keepEdits = false): Promise<void> => {
@@ -35,6 +47,8 @@ export function SettingsView() {
       if (!res.ok) throw new Error(body.error ?? `The server answered ${res.status}.`);
       // Read before a save finished: its revision is already old, so read again.
       if (savesBefore !== saves.current) return load(true);
+      const before = loaded.current;
+      loaded.current = body;
       setData(body);
       revision.current = body.revision;
       setLoadError(null);
@@ -42,10 +56,26 @@ export function SettingsView() {
         setForm({});
         setErrors({});
         setNotice(null);
+      } else if (before) {
+        // The new revision would let an edit typed over the old value overwrite the change without a word.
+        const changed = changedIds(before, body);
+        const dropped = Object.keys(typed.current).filter((id) => changed.has(id));
+        if (dropped.length) {
+          const labels = new Map((body as SettingsResponse).groups.flatMap((g) => g.settings).map((s) => [s.id, s.label]));
+          setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !changed.has(id))));
+          setNotice({ kind: "error", text: `${dropped.map((id) => labels.get(id) ?? id).join(", ")} changed elsewhere on this page, so your unsaved edit to it was dropped.` });
+        }
       }
     } catch (e) {
+      const message = e instanceof Error ? e.message : "The settings could not be loaded.";
+      // A failed refresh after a save elsewhere keeps the form and what is typed in it.
+      if (keepEdits && loaded.current) {
+        setNotice({ kind: "error", text: `The settings could not be refreshed (${message}). Reload the page before saving.` });
+        return;
+      }
+      loaded.current = null;
       setData(null);
-      setLoadError(e instanceof Error ? e.message : "The settings could not be loaded.");
+      setLoadError(message);
     }
   }, []);
 
@@ -73,6 +103,7 @@ export function SettingsView() {
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
         setData(body);
+        loaded.current = body;
         revision.current = body.revision;
         saves.current += 1;
         setForm((f) => Object.fromEntries(Object.entries(f).filter(([id]) => !Object.hasOwn(changes, id))));
