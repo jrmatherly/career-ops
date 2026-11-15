@@ -105,6 +105,7 @@ for (const [home, location] of [
   ['Dublin', 'GA-Dublin, 1 Example St / IE'],
   ['Dublin', 'GA-Dublin, 1 Example St - IE'],
   ['Dublin', 'GA-Dublin, 1 Example St (IE)'],
+  ['Dublin', 'GA-Dublin, 1 Main St, IE D02 X285'],
 ]) {
   test(`${location} is not the home place ${home} in the United States`, () => assert.equal(verdict(policyFor(home), location).eligible, false));
 }

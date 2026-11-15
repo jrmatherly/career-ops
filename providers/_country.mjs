@@ -379,6 +379,6 @@ function compileHomeState(home) {
     if (after.test(place)) return place.replace(after, '$1');
     const parts = place.split(',');
     if (!before.test(place) || (parts.length > 1 && !/\d/.test(parts[1]))) return null;
-    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : /\d/.test(part) ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(',');
+    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : i === 1 ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(',');
   };
 }
