@@ -1,5 +1,40 @@
 # Changelog
 
+## [2.5.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.4.0...career-ops-v2.5.0) (2026-11-15)
+
+
+### Features
+
+* **liveness:** JD text routes for Eightfold and Atlassian postings ([ee5e5dd](https://github.com/jrmatherly/career-ops/commit/ee5e5dd2ba372daed75ac635af18cd85dce74030))
+* **liveness:** JD text routes for Eightfold and Atlassian postings ([bd65ff7](https://github.com/jrmatherly/career-ops/commit/bd65ff7a48e78eb05590d94776f8360452129500))
+
+
+### Bug Fixes
+
+* **apply:** report a closed Ashby posting when the page says "Job not found" ([#7097](https://github.com/jrmatherly/career-ops/issues/7097)) ([7d41185](https://github.com/jrmatherly/career-ops/commit/7d411851655ad4e52158eab483edb0ec496d59e1))
+* **calibrate:** count a row closed by close-stale as no_response ([#7102](https://github.com/jrmatherly/career-ops/issues/7102)) ([129959b](https://github.com/jrmatherly/career-ops/commit/129959bdbca242388f2e3cf72470563c83311249))
+* **eval:** exit 1 instead of aborting on Windows when an Ollama run fails ([#7096](https://github.com/jrmatherly/career-ops/issues/7096)) ([130d538](https://github.com/jrmatherly/career-ops/commit/130d538ce96cc6c76e1e28e2711b4bcf3eb56a44))
+* **liveness:** encode the Eightfold domain in the API URL, and say whose the generic iCIMS hosts are ([75f5e19](https://github.com/jrmatherly/career-ops/commit/75f5e191e9253cd0314ccf2b9aa5fa98079e7eb4))
+* **liveness:** fetch-jd.mjs lets the page close a posting a text-only API still answers for ([252a8b8](https://github.com/jrmatherly/career-ops/commit/252a8b85c8e3ff7a9b9c508ddf2b2e45decf3fa1))
+* **liveness:** text-only JD routes stay out of the page readers, the Atlassian feed is cached, and the drain gives up on a posting with no text ([2e33aa8](https://github.com/jrmatherly/career-ops/commit/2e33aa8115b1a8c05506bd0c03e64b4220b60f94))
+* **portals:** give Shiji Group's Zoho board a 60s timeout_ms ([#7104](https://github.com/jrmatherly/career-ops/issues/7104)) ([f4f77e9](https://github.com/jrmatherly/career-ops/commit/f4f77e944c19a8da048f107a3555dea3e7616d48))
+* **portals:** read Gong and Dialpad from their Greenhouse boards ([#7117](https://github.com/jrmatherly/career-ops/issues/7117)) ([c541c70](https://github.com/jrmatherly/career-ops/commit/c541c7084b70eb65c88b88774bd80833787f07ef))
+* **portals:** repoint Parloa and GetYourGuide to their Ashby boards ([#7087](https://github.com/jrmatherly/career-ops/issues/7087)) ([c7542ef](https://github.com/jrmatherly/career-ops/commit/c7542ef133050ae10f1a1e52c80cebacfec60645))
+* **precheck-duplicate:** match another spelling of the same posting URL ([#7086](https://github.com/jrmatherly/career-ops/issues/7086)) ([1ec8e22](https://github.com/jrmatherly/career-ops/commit/1ec8e22681b8ab74ebcf5ee41290a0f79ed46ced))
+* **scan-ats-full:** report exact checkpoint differences and reference --resume-if-compatible ([#7103](https://github.com/jrmatherly/career-ops/issues/7103)) ([#7116](https://github.com/jrmatherly/career-ops/issues/7116)) ([8184cc0](https://github.com/jrmatherly/career-ops/commit/8184cc027cb188ee2bf1156a506ab91a788c081b))
+* **update:** don't report up-to-date on main when the commit lookup fails ([#7098](https://github.com/jrmatherly/career-ops/issues/7098)) ([5c9fc94](https://github.com/jrmatherly/career-ops/commit/5c9fc9495e92550b50b570ae66f66f3f562590d8)), closes [#7095](https://github.com/jrmatherly/career-ops/issues/7095)
+* **url-key:** stop a re-evaluation from adding a second tracker row for the same posting ([#7084](https://github.com/jrmatherly/career-ops/issues/7084)) ([50ffd0e](https://github.com/jrmatherly/career-ops/commit/50ffd0e840bd0be231779c48999589c431fa4904))
+* **web:** a changed no-text reason does not restart the drain's one-day wait ([c7489f5](https://github.com/jrmatherly/career-ops/commit/c7489f5448ae65585f68cace668d3e94db787778))
+* **web:** a profile save refreshes the template gallery, and review fixes for the sync ([f849c01](https://github.com/jrmatherly/career-ops/commit/f849c01f65dd9b9c5fa90150fbd9d0595eaa7dac))
+* **web:** no "Show in Finder" on a hosted install, and the job not-found page uses the page frame ([a248519](https://github.com/jrmatherly/career-ops/commit/a248519c765662e68f384cae014d7d4c49eef713))
+* **web:** the drain gives up on a posting only after four tries over a day ([039d7ae](https://github.com/jrmatherly/career-ops/commit/039d7ae2c32775fa38de9cbdd4495f733b593174))
+* **web:** the Settings form survives a failed refresh, and an edit overtaken by a gallery change is dropped with a notice ([2840695](https://github.com/jrmatherly/career-ops/commit/28406954fde58f85b4167868981a04271a89ca98))
+
+
+### Reverts
+
+* **upstream:** ask once for a star after the first report, and for the manifesto later ([4b6571d](https://github.com/jrmatherly/career-ops/commit/4b6571d1215632837279815a87833d32e4a4937b))
+
 ## [2.4.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.3.1...career-ops-v2.4.0) (2026-11-15)
 
 

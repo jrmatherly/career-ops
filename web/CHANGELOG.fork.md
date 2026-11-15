@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.6.0](https://github.com/jrmatherly/career-ops/compare/web-v1.5.0...web-v1.6.0) (2026-11-15)
+
+
+### Features
+
+* **explore:** fit filter, multi-key sort with direction, and list view for scan results ([#7061](https://github.com/jrmatherly/career-ops/issues/7061)) ([3a758d2](https://github.com/jrmatherly/career-ops/commit/3a758d257b049aed753af9ad07af44918a110869))
+* **liveness:** JD text routes for Eightfold and Atlassian postings ([ee5e5dd](https://github.com/jrmatherly/career-ops/commit/ee5e5dd2ba372daed75ac635af18cd85dce74030))
+
+
+### Bug Fixes
+
+* **apply:** report a closed Ashby posting when the page says "Job not found" ([#7097](https://github.com/jrmatherly/career-ops/issues/7097)) ([7d41185](https://github.com/jrmatherly/career-ops/commit/7d411851655ad4e52158eab483edb0ec496d59e1))
+* **liveness:** text-only JD routes stay out of the page readers, the Atlassian feed is cached, and the drain gives up on a posting with no text ([2e33aa8](https://github.com/jrmatherly/career-ops/commit/2e33aa8115b1a8c05506bd0c03e64b4220b60f94))
+* **url-key:** stop a re-evaluation from adding a second tracker row for the same posting ([#7084](https://github.com/jrmatherly/career-ops/issues/7084)) ([50ffd0e](https://github.com/jrmatherly/career-ops/commit/50ffd0e840bd0be231779c48999589c431fa4904))
+* **web:** a changed no-text reason does not restart the drain's one-day wait ([c7489f5](https://github.com/jrmatherly/career-ops/commit/c7489f5448ae65585f68cace668d3e94db787778))
+* **web:** a profile save refreshes the template gallery, and review fixes for the sync ([f849c01](https://github.com/jrmatherly/career-ops/commit/f849c01f65dd9b9c5fa90150fbd9d0595eaa7dac))
+* **web:** a template change reloads the Settings view ([14ff0b2](https://github.com/jrmatherly/career-ops/commit/14ff0b2cf30414f3ea926bdef0d33980a84ee5cd))
+* **web:** no "Show in Finder" on a hosted install, and the job not-found page uses the page frame ([a248519](https://github.com/jrmatherly/career-ops/commit/a248519c765662e68f384cae014d7d4c49eef713))
+* **web:** the drain gives up on a posting only after four tries over a day ([039d7ae](https://github.com/jrmatherly/career-ops/commit/039d7ae2c32775fa38de9cbdd4495f733b593174))
+* **web:** the Settings form survives a failed refresh, and an edit overtaken by a gallery change is dropped with a notice ([2840695](https://github.com/jrmatherly/career-ops/commit/28406954fde58f85b4167868981a04271a89ca98))
+
 ## [1.5.0](https://github.com/jrmatherly/career-ops/compare/web-v1.4.0...web-v1.5.0) (2026-11-15)
 
 
