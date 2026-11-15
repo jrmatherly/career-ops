@@ -1076,7 +1076,7 @@ export function forgetAtlassianFeed() {
   atlassianFeed = null;
 }
 
-/** The parsed listings feed, or null when it could not be read. A failed read is not kept. */
+/** The parsed listings feed, or null when it could not be read. Only a feed that is a list is kept. */
 function atlassianListings(apiUrl, timeoutMs) {
   if (atlassianFeed && Date.now() - atlassianFeed.at < ATLASSIAN_FEED_TTL_MS) return atlassianFeed.promise;
   const promise = (async () => {
@@ -1099,7 +1099,7 @@ function atlassianListings(apiUrl, timeoutMs) {
   const entry = { at: Date.now(), promise };
   atlassianFeed = entry;
   promise.then((feed) => {
-    if (!feed && atlassianFeed === entry) atlassianFeed = null;
+    if (!Array.isArray(feed) && atlassianFeed === entry) atlassianFeed = null;
   });
   return promise;
 }
@@ -1169,10 +1169,10 @@ export const JD_FETCHERS = {
 
 /**
  * Try every known JD-text-capable ATS API for one posting URL before anyone
- * reaches for a browser. This is the single dispatch point both this script's
- * own CLI (jd mode) and `fetch-jd.mjs` (the bash-callable front door) call —
- * one copy of the routing table, so the interactive and headless paths cannot
- * drift on which ATS is API-fetchable.
+ * reaches for a browser. This is the single dispatch point for every API JD
+ * read, so there is one copy of the routing table. Callers differ only in
+ * `textOnly`: jd mode leaves the text-only boards to the page, `fetch-jd.mjs`
+ * reads them.
  *
  * @param {string} url
  * @param {number} [textCap]
@@ -1181,8 +1181,9 @@ export const JD_FETCHERS = {
  *   nothing about liveness (Eightfold, Atlassian). For callers that judge liveness
  *   elsewhere, or only need the text.
  * @returns {Promise<{url: string, title: string, text: string, ats: string}|null>}
- *   null = not a JD_TEXT_API_ATS host, or the fetch/parse was inconclusive —
- *   caller should fall through to a browser-backed read.
+ *   null = not a JD_TEXT_API_ATS host, a text-only board read without
+ *   `textOnly`, or the fetch/parse was inconclusive — caller should fall
+ *   through to a browser-backed read.
  */
 export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs = WORKDAY_TIMEOUT_MS, { textOnly = false } = {}) {
   const resolved = resolveAtsApi(url);
@@ -1193,12 +1194,9 @@ export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs =
   const fetcher = JD_FETCHERS[resolved.ats];
   if (!fetcher) return null;
 
-  // `resolveAtsApi` carries a per-ATS timeout for the APIs that need one
-  // (Ashby: 20 s, liveness-api.mjs:113); without it a slow Ashby board that
-  // liveness waits for falls through here on the generic 15 s both callers
-  // pass. Same precedence liveness-api.mjs:357 applies to the same field —
-  // the resolved value wins, the argument is the fallback for every ATS that
-  // declares none.
+  // `resolveAtsApi` carries a per-ATS timeout for the APIs that need one (a slow
+  // Ashby board, the 2 MB Atlassian feed). It wins over the argument, as in
+  // checkLivenessViaApi, so a board liveness waits for is not cut short here.
   const budgetMs = resolved.timeoutMs || timeoutMs;
   const result = await fetcher(resolved, url, textCap, budgetMs);
   return result ? { ...result, ats: resolved.ats } : null;

@@ -34,8 +34,11 @@ const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
 // drain lock keeps a second drain from acting on that.
 const RUN_TIMEOUT_MS = 900_000;
 const HEALTH_TIMEOUT_MS = 5_000;
-// A posting whose text has not come for a day (96 ticks) is closed or unreadable, not slow.
+// A posting whose text has not come in four tries spread over a day is closed or unreadable, not slow.
+// A day alone is not enough: an offline dashboard or a spent daily cap can leave a row untried for that long.
 const NO_TEXT_GIVE_UP_MS = 24 * 60 * 60 * 1000;
+const NO_TEXT_GIVE_UP_TRIES = 4;
+const NO_TEXT_ROW_MS = NO_TEXT_GIVE_UP_MS / NO_TEXT_GIVE_UP_TRIES;
 const TERMINAL = new Set(["done", "gated", "error"]);
 
 const autoJobs = (store) => store.jobs.filter((job) => job.status === "active" && job.evaluate?.mode === "auto");
@@ -352,21 +355,22 @@ export async function runDrain({
         // The route refuses a NUL, which argv cannot carry; with it in, the same row would be refused every tick.
         const jdText = jd?.text?.replaceAll("\0", "");
         if (!jdText?.trim()) {
-          // Written once per new reason, so a posting that stays empty does not grow the ledger every tick.
           // Compared in the form the ledger stores, or a message with a newline would never match.
           const reason = tsvCell(`no-text: ${why}`);
-          // Counted from the first no-text row since the posting last had text, so an
-          // offline tick or a changed error message does not start the day again.
-          const sinceText = entry.rows.slice(entry.rows.findLastIndex((row) => row.state === "running") + 1);
-          const first = sinceText.find((row) => row.reason?.startsWith("no-text: "));
-          const waitedMs = first ? now() - Date.parse(first.at) : 0;
-          if (waitedMs > NO_TEXT_GIVE_UP_MS) {
+          // The no-text rows since the posting last had text. An offline tick or a
+          // changed error message between them does not start the day again.
+          const tries = entry.rows
+            .slice(entry.rows.findLastIndex((row) => row.state === "running") + 1)
+            .filter((row) => row.reason?.startsWith("no-text: "));
+          if (tries.length >= NO_TEXT_GIVE_UP_TRIES && now() - Date.parse(tries[0].at) > NO_TEXT_GIVE_UP_MS) {
             log(`job ${job.id}: no posting text for ${url} in a day (${why}); it is skipped`);
             await append("skipped", "no-text");
             continue;
           }
           log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
-          if (entry.reason !== reason) await append("queued", reason);
+          // A row per new reason and one each quarter day, so the rows count tries spread
+          // over the day and a posting that stays empty does not grow the ledger every tick.
+          if (entry.reason !== reason || now() - Date.parse(tries.at(-1).at) >= NO_TEXT_ROW_MS) await append("queued", reason);
           continue;
         }
 

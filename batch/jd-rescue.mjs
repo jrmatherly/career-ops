@@ -67,7 +67,7 @@ export { fromLdJson, fromEmbeddedDescription, ldJsonBlocks, wordCount };
  * (careers.example.com/job?gh_jid=1234567) serves a host page with no JD text
  * in it, and the posting lives on another origin, so no amount of parsing the
  * downloaded document can produce it. browser-extract.mjs already knows how to
- * ask the right API for every ATS in JD_TEXT_API_ATS (the same dispatch
+ * ask the right API for every ATS in JD_TEXT_API_ATS but the text-only boards (the same dispatch
  * fetch-jd.mjs and the `jd` mode use), so this strategy calls it rather than
  * carrying a second copy of the per-ATS code. A URL it does not recognise
  * answers null without any network request.

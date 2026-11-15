@@ -154,13 +154,15 @@ test("a null or thrown posting-text fetch leaves the row queued with its reason,
   }
 });
 
-test("a posting whose text has not come for a day is skipped, not retried forever", async (t) => {
+const hours = (n) => () => T0 + n * 60 * 60 * 1000;
+const noText = (u, state) => state(u).rows.filter((row) => row.reason?.startsWith("no-text: ")).length;
+
+test("a posting whose text has not come in four tries over a day is skipped, not retried forever", async (t) => {
   const { drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1)] });
   const fetchJd = async () => null;
-  const hours = (n) => () => T0 + n * 60 * 60 * 1000;
-  await drain({ fetchJd });
-  await drain({ fetchJd, now: hours(23) });
+  for (const h of [0, 1, 6, 12, 18, 23]) await drain({ fetchJd, now: hours(h) });
   assert.equal(state(url(1)).state, "queued", "under a day it still waits");
+  assert.equal(noText(url(1), state), 4, "one row each quarter day, not one each tick");
   await drain({ fetchJd, now: hours(25) });
   assert.deepEqual([state(url(1)).state, state(url(1)).reason, state(url(1)).final], ["skipped", "no-text", true]);
   assert.equal(posts.length, 0);
@@ -170,14 +172,51 @@ test("a posting whose text has not come for a day is skipped, not retried foreve
   assert.equal(fetched, 0, "a skipped row is not fetched again");
 });
 
+test("a day with too few tries in it does not skip the posting", async (t) => {
+  const { drain, state } = await withDrainRoot(t, { urls: [url(1)] });
+  const fetchJd = async () => null;
+  await drain({ fetchJd });
+  await drain({ fetchJd, now: hours(30) });
+  assert.equal(state(url(1)).state, "queued", "two tries a day apart are not four");
+  await drain({ fetchJd, now: hours(36) });
+  await drain({ fetchJd, now: hours(42) });
+  await drain({ fetchJd, now: hours(48) });
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "no-text"]);
+});
+
 test("a changed no-text reason does not start the day again", async (t) => {
   const { drain, state } = await withDrainRoot(t, { urls: [url(1)] });
-  const hours = (n) => () => T0 + n * 60 * 60 * 1000;
-  await drain({ fetchJd: async () => null });
-  await drain({ fetchJd: async () => { throw new Error("socket hang up"); }, now: hours(23) });
+  const empty = async () => null;
+  const broken = async () => { throw new Error("socket hang up"); };
+  await drain({ fetchJd: empty });
+  await drain({ fetchJd: broken, now: hours(8) });
+  await drain({ fetchJd: empty, now: hours(16) });
+  await drain({ fetchJd: broken, now: hours(23) });
   assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["queued", "no-text: socket hang up"]);
-  await drain({ fetchJd: async () => null, now: hours(25) });
+  await drain({ fetchJd: empty, now: hours(25) });
   assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "no-text"]);
+});
+
+test("a posting that had text and failed starts its wait again", async (t) => {
+  const { drain, state } = await withDrainRoot(t, { urls: [url(1)], answer: () => [{ type: "error", message: "the worker stopped" }] });
+  const empty = async () => null;
+  for (const h of [0, 6, 12, 18]) await drain({ fetchJd: empty, now: hours(h) });
+  await drain({ now: hours(20) });
+  assert.ok(state(url(1)).rows.some((row) => row.state === "running"), "the posting had text and ran");
+  assert.equal(state(url(1)).final, false);
+  await drain({ fetchJd: empty, now: hours(26) });
+  assert.equal(state(url(1)).state, "queued", "the tries before the run do not count");
+});
+
+test("with no fetchJd given, the drain reads a text-only board through its API", async (t) => {
+  const posting = "https://apply.careers.microsoft.com/careers?pid=1970000000000001&domain=microsoft.com";
+  const { drain, state, posts } = await withDrainRoot(t, { urls: [posting] });
+  const previous = globalThis.fetch;
+  t.after(() => { globalThis.fetch = previous; });
+  globalThis.fetch = async () => new Response(JSON.stringify({ id: 1970000000000001, name: "Fixture Architect", job_description: "<p>DRAIN_MARKER fixture body.</p>" }));
+  await drain({ fetchJd: undefined });
+  assert.match(posts[0].body.jdText, /DRAIN_MARKER fixture body\./);
+  assert.equal(state(posting).state, "evaluated");
 });
 
 test("a NUL in the posting text is stripped before the POST", async (t) => {

@@ -622,7 +622,7 @@ export function resolveExperienceFilter(block, profileYears) {
 // shared retry, which honours Retry-After on a 429. The remaining
 // JD_TEXT_API_ATS entries (an embed hop, an HTML page) use
 // fetchJdViaKnownApi as-is. Normalizers are browser-extract.mjs's own, so
-// fetch-jd.mjs, `browser-extract.mjs jd` and this read the same text.
+// fetch-jd.mjs and this read the same text.
 const JSON_JD = /** @type {Record<string, (json: any, resolved: any, url: string, cap: number) => {text: string}|null>} */ ({
   greenhouse: (json, _r, url, cap) => normalizeGreenhouseJob(json, url, cap),
   lever: (json, _r, url, cap) => normalizeLeverJob(json, url, cap),

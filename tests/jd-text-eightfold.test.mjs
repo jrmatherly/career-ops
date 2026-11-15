@@ -5,6 +5,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveAtsApi, checkLivenessViaApi, isAtsPosting, JD_TEXT_API_ATS } from '../liveness-api.mjs';
 import { fetchJdViaKnownApi } from '../browser-extract.mjs';
+import { fetchJdText } from '../jd-years.mjs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { describeSpawn } from './helpers/describe-spawn.mjs';
 
 const TEXT_ONLY = { textOnly: true };
 
@@ -121,4 +128,21 @@ test('a reader that did not ask for text-only boards gets nothing and sends noth
     globalThis.fetch = previous;
   }
   assert.equal(sent, 0);
+});
+
+test('the experience filter reads a text-only board', async () => {
+  const text = await withFetch(async () => json(v2Job()), () => fetchJdText(BRANDED));
+  assert.match(text, /V2_MARKER/);
+});
+
+test('fetch-jd.mjs prints a text-only board\'s text and exits 0', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fetch-jd-eightfold-'));
+  try {
+    const preload = join(dir, 'preload.mjs');
+    writeFileSync(preload, `globalThis.fetch = async () => new Response(${JSON.stringify(JSON.stringify(v2Job()))});`);
+    const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, fileURLToPath(new URL('../fetch-jd.mjs', import.meta.url)), BRANDED],
+      { encoding: 'utf8', timeout: 20000 });
+    assert.equal(result.status, 0, describeSpawn(result));
+    assert.match(result.stdout, /V2_MARKER/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

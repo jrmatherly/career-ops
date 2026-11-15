@@ -106,19 +106,28 @@ test('liveness on these hosts stays with the browser: no feed read, no verdict',
 
 test('one feed download serves every posting asked for within the minute', async () => {
   let sent = 0;
-  const other = 'https://careers-apac-atlassian.icims.com/jobs/90002/other-role/job';
-  const [a, b] = await withFetch(async () => { sent += 1; return json([item()]); }, async () => [
+  const [a, b] = await withFetch(async () => { sent += 1; return json([item(), other]); }, async () => [
     await fetchJdViaKnownApi(POSTING, undefined, undefined, TEXT_ONLY),
-    await fetchJdViaKnownApi(other, undefined, undefined, TEXT_ONLY),
+    await fetchJdViaKnownApi(other.portalJobPost.portalUrl, undefined, undefined, TEXT_ONLY),
   ]);
-  assert.ok(a?.text);
-  assert.equal(b, null, 'the feed fixture lists that id only as another item\'s apply URL host');
+  assert.match(a.text, /OVERVIEW_MARKER/);
+  assert.match(b.text, /OTHER_MARKER/);
   assert.equal(sent, 1);
 });
 
 test('a feed that could not be read is not kept for the next posting', async () => {
   let sent = 0;
   const jd = await withFetch(async () => { sent += 1; return sent === 1 ? json({}, 503) : json([item()]); }, async () => {
+    assert.equal(await fetchJdViaKnownApi(POSTING, undefined, undefined, TEXT_ONLY), null);
+    return fetchJdViaKnownApi(POSTING, undefined, undefined, TEXT_ONLY);
+  });
+  assert.ok(jd?.text);
+  assert.equal(sent, 2);
+});
+
+test('a feed that is not a list is not kept for the next posting', async () => {
+  let sent = 0;
+  const jd = await withFetch(async () => { sent += 1; return sent === 1 ? json({ message: 'maintenance' }) : json([item()]); }, async () => {
     assert.equal(await fetchJdViaKnownApi(POSTING, undefined, undefined, TEXT_ONLY), null);
     return fetchJdViaKnownApi(POSTING, undefined, undefined, TEXT_ONLY);
   });

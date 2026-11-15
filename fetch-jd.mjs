@@ -28,9 +28,9 @@
  * is read next (lib/jd-page-fetch.mjs, behind the same egress guard). Phenom and
  * bespoke career sites render the JD from script data, so their visible HTML is
  * a shell that any text conversion, WebFetch included, reports as empty.
- * Every API fetch runs through fetchJdViaKnownApi() in browser-extract.mjs
- * — the same dispatch its own `jd` mode uses — so this script and the
- * interactive extractor cannot drift on which ATS is API-fetchable.
+ * Every API fetch runs through fetchJdViaKnownApi() in browser-extract.mjs,
+ * the same dispatch its own `jd` mode uses, plus the text-only boards
+ * (Eightfold, Atlassian) that jd mode leaves to the page.
  */
 
 import { fetchJdViaKnownApi } from './browser-extract.mjs';
