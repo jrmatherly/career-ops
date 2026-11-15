@@ -53,11 +53,13 @@ as its default; a supplied nonempty country list must name a recognized country.
   such as `must be based in PT` or `work remotely from PT`. Ordinary words such
   as `us` or `by` cannot establish remote-country eligibility.
 - When the policy allows the United States, a US state beside an allowed
-  onsite location is the United States: a two-letter code after a comma, at
-  the end of a place or opening it (`Chicago, IL`, `GA-ATLANTA, 1 MAIN ST`),
-  and `Georgia` attached to another place part (`Atlanta, Georgia`). `IL` is
-  then not Israel. `Georgia` alone in its place stays the country, and so does
-  a code in a place that also names a foreign country. This applies to the
+  onsite location is not read as a foreign country: a two-letter code after a
+  comma, at the end of a place or opening it (`Chicago, IL`, `GA-ATLANTA, 1
+  MAIN ST`), and `Georgia` attached to another place part (`Atlanta,
+  Georgia`). `IL` is then not Israel. Any country the place still names
+  decides, so `Dublin, GA - IE` stays Ireland. Only the places that hold an
+  allowed onsite location are read, so another office in the same posting
+  (`Atlanta, GA · London, UK`) does not make it foreign. This applies to the
   onsite check only. A state never confirms a remote role: `Remote - CO` and
   `Remote, California` stay unconfirmed, because `Berlin, DE` and `Perth, WA`
   read the same as a US place. A policy that does not allow the United States

@@ -275,7 +275,7 @@ export function buildWorkplacePolicy(policy) {
       && (REMOTE.test(loc) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
     if (!remote) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
-      const found = countries(localCodes.has('US') ? readUsStates(loc, onsite) : loc, true);
+      const found = countries(localCodes.has('US') ? homePlaces(loc, onsite) : loc, true);
       if (found.size && ![...found].some(c => localCodes.has(c))) return fail('onsite_country_restricted');
       return { eligible: true, reason: 'onsite_location_allowed' };
     }
@@ -395,7 +395,7 @@ function placesWithoutCountryCode(lower) {
 // tier instead, so "Atlanta, Georgia" still passes and a blocked Georgian city
 // does not. The 2-letter code is unambiguous and stays in always_allow, so
 // "Dublin, GA" still beats a blocked "Dublin".
-// That tiering is scan.mjs's. readUsStates below uses the same set for the home place.
+// That tiering is scan.mjs's. homePlaces below uses the same set for the home place.
 export const US_STATE_NAMES_ALSO_COUNTRIES = new Set(['georgia']);
 
 const US_STATE_CODES = USPS_STATES.map(([, abbr]) => ({
@@ -409,31 +409,24 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
   joined: new RegExp(`[,:-]\\s*${escape(name)}(?![\\p{L}\\p{N}])|(?<![\\p{L}\\p{N}])${escape(name)}\\s*[,:-]`, 'gu'),
 }));
 
-/** A folded location with its US state codes, and the state names that are
- * also countries, written as "united states", so the home place in "Chicago,
- * IL" is not Israel and "Atlanta, Georgia" is not the country. Only a place
- * that holds one of `onsite` is rewritten, so a state at another office is not
- * evidence for the home place, and one that also names a foreign country is
- * left alone. Only the on-site check reads it:
- * a state is never evidence that a remote posting is open to the United
- * States, since "Berlin, DE" and "Perth, WA" look the same as a US place.
+/** The places of a folded location that hold one of `onsite`, with their US
+ * state codes, and the state names that are also countries, taken out, so the
+ * home place in "Chicago, IL" is not Israel and "Atlanta, Georgia" is not the
+ * country. A state is only ever removed, never read as the United States:
+ * whatever country the home place still names decides, and another office in
+ * the same posting does not. Only the on-site check reads it.
  */
-function readUsStates(loc, onsite) {
-  return loc.split(/([·|;/])/).map((place) => {
-    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read. A trailing "(Hybrid)" or "- Hybrid" does not hide the slot.
-    const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+[\p{L} ]+)\s*$/u, '');
-    if (!has(place, onsite) || !placesWithoutCountryCode(core).length) return place;
+function homePlaces(loc, onsite) {
+  return loc.split(/[·|;/]/).filter(place => has(place, onsite)).map((place) => {
+    // A trailing "(Hybrid)" or "- Hybrid" must not hide the country slot of "Dublin, ON, CA (Hybrid)" from the state matcher.
+    const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+\p{L}{3,}[\p{L} ]*)\s*$/u, '');
     let next = place;
     for (const state of US_STATE_CODES) {
-      if (state.matches(core) || state.leads.test(core)) next = next.replace(state.token, 'united states');
+      // "GA-SPRINGFIELD, 1 MAIN ST": what follows the comma is a street address, whose "ST" is not a country.
+      if (state.leads.test(core)) next = next.split(',')[0].replace(state.token, ' ');
+      else if (state.matches(core)) next = next.replace(state.token, ' ');
     }
-    for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, 'united states'));
-    // Names, three-letter codes and a two-letter code in parentheses only: a bare two-letter read would take the "ST" of a street address for a country.
-    const foreign = [
-      ...countries(next),
-      ...next.split(/[,;/|()\s-]+/).filter(token => /^[a-z]{3}$/.test(token)).map(token => ALPHA3_TO_ALPHA2[token.toUpperCase()]),
-      ...[...place.matchAll(/\(([a-z]{2})\)/g)].filter(match => countryNameFromIso(match[1])).map(match => match[1].toUpperCase()),
-    ];
-    return next === place || foreign.some(code => code && code !== 'US') ? place : next;
-  }).join('');
+    for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, ' '));
+    return next;
+  }).join(' · ');
 }

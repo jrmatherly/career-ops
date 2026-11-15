@@ -53,7 +53,7 @@ Task 0 carries its own inputs: a home place written `City, ST`, a multi-office p
 
 The hold is only as good as the gate. Today, under a policy whose countries are the United States, `Springfield, IL` is rejected with `onsite_country_restricted` because `IL` is also Israel's ISO code, and `Remote - CO` with `remote_country_restricted` (Colombia). On the hosted instance, with the rule below prototyped in front of the unchanged gate, 84 rows moved from held to eligible and none moved the other way, and 87 of the 91 rows that name a home-area city were eligible afterwards (spec, "Measurement: US states").
 
-> **As built, 2026-11-14.** Only the on-site check changed. The remote check and its `supportsHome` call are as on `main`, and the `Remote - CO` test below was replaced by tests that hold a state-only remote location. The decision table above has the reason and the measurement. The text below is the plan as it was written.
+> **As built, 2026-11-14.** Only the on-site check changed, and it removes the state from the home place instead of reading it as the United States (`homePlaces` in `providers/_country.mjs`). The remote check and its `supportsHome` call are as on `main`, and the `Remote - CO` test below was replaced by tests that hold a state-only remote location. The decision table above has the reason and the measurement. The text below is the plan as it was written.
 
 **Files:**
 - Modify: `providers/_country.mjs` (`buildWorkplacePolicy`: the on-site check at `:276-280`, the remote check at `:286-287` and the `supportsHome(geoLoc)` call on the remote return at `:292`; add the exported state list and matcher)
