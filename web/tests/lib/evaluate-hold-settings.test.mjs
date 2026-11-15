@@ -24,7 +24,7 @@ test("a null hold removes it", () => {
   assert.equal("hold" in scheduledEvaluate({ mode: "auto", hold: null }, base), false);
 });
 test("two empty lists remove it", () => {
-  assert.equal("hold" in scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: [" "], remoteCountries: [] } }, base), false);
+  assert.equal("hold" in scheduledEvaluate({ mode: "auto", hold: { onsiteLocations: [], remoteCountries: [] } }, base), false);
 });
 test("one empty list is refused", () => {
   const message = { message: "A location hold needs both a home area and a remote country." };
@@ -33,6 +33,11 @@ test("one empty list is refused", () => {
 });
 test("a hold that is not an object of two lists is refused", () => {
   for (const hold of ["Springfield", ["Springfield"], { onsiteLocations: "Springfield", remoteCountries: ["United States"] }, { onsiteLocations: ["Springfield"] }]) {
+    assert.throws(() => scheduledEvaluate({ mode: "auto", hold }, base), { message: "Invalid location hold." });
+  }
+});
+test("a hold whose entries all clean away is refused, not read as no hold", () => {
+  for (const hold of [{ onsiteLocations: ["!!!"], remoteCountries: ["??"] }, { onsiteLocations: [5], remoteCountries: [6] }, { onsiteLocations: [" "], remoteCountries: ["United States"] }]) {
     assert.throws(() => scheduledEvaluate({ mode: "auto", hold }, base), { message: "Invalid location hold." });
   }
 });
@@ -66,6 +71,9 @@ test("saving the form over a stored hold it cannot show keeps that hold, so the 
   const partly = { ...stored, hold: { onsiteLocations: ["Springfield", 42], remoteCountries: ["United States"] } };
   assert.equal("hold" in evaluateBody(evaluateForm(partly), partly), false, "an unchanged save keeps it");
   assert.deepEqual(evaluateBody({ ...evaluateForm(partly), holdOnsite: ["Shelbyville"] }, partly).hold, { onsiteLocations: ["Shelbyville"], remoteCountries: ["United States"] }, "an edit replaces it");
+  const remote = { ...stored, hold: { onsiteLocations: ["Springfield"], remoteCountries: "United States" } };
+  assert.equal("hold" in evaluateBody(evaluateForm(remote), remote), false, "an unreadable remote list is kept too");
+  assert.deepEqual(evaluateBody({ ...evaluateForm(remote), holdRemote: ["United States"] }, remote).hold, HOLD, "and correcting it is sent");
   const mixed = { ...stored, hold: { onsiteLocations: [42], remoteCountries: [] } };
   assert.equal("hold" in evaluateBody(evaluateForm(mixed), mixed), false);
   assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored).hold, HOLD);

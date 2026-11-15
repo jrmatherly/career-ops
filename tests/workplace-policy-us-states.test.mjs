@@ -1,5 +1,5 @@
-// Under a policy that allows the United States, a US state written beside the
-// home place is not read as the ISO country that shares its letters or its name.
+// Under a policy whose onsite countries include the United States, a US state written
+// beside the home place is not read as the ISO country that shares its letters or its name.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWorkplacePolicy } from '../providers/_country.mjs';
@@ -67,6 +67,15 @@ test('places joined by a slash are read as one place', () => {
 for (const location of ['Remote in Europe', 'Springfield or Remote', 'Remote (OK to work anywhere)', 'Remote - Toronto, ON, CA', 'Remote, Bengaluru, Karnataka, IN', 'Remote - UK or DE']) {
   test(`${location} is not confirmed as the United States`, () => assert.equal(verdict(us, location).eligible, false));
 }
+test('an onsite location that folds to nothing is refused, not matched against every posting', () => {
+  assert.throws(() => buildWorkplacePolicy({ onsite_locations: ['\uFF9E'], remote_countries: ['United States'] }), /requires onsite_locations and remote_countries lists/);
+  const mixed = buildWorkplacePolicy({ onsite_locations: ['\uFF9E', 'Springfield'], remote_countries: ['United States'] });
+  assert.equal(verdict(mixed, '').eligible, false);
+});
+test('the second home place of a policy is read too', () => {
+  const two = buildWorkplacePolicy({ onsite_locations: ['Dublin', 'Chicago'], remote_countries: ['United States'] });
+  assert.equal(verdict(two, 'Chicago, IL · Dublin, Ireland').eligible, true);
+});
 test('a posting listing the home place beside a foreign office is eligible', () => {
   assert.equal(verdict(us, 'Springfield, Georgia · London, United Kingdom · Cincinnati, Ohio').eligible, true);
 });
@@ -81,7 +90,7 @@ test('a policy without the United States reads CA as Canada, as before', () => {
   assert.deepEqual(verdict(es, 'Barcelona, CA'), { eligible: false, reason: 'onsite_country_restricted' });
 });
 
-// Held on main and must stay held: a state counts only directly beside the home place name.
+// A state counts only directly beside the home place name, so each of these keeps its foreign reading.
 const policyFor = (home) => buildWorkplacePolicy({ onsite_locations: [home], remote_countries: ['United States'] });
 for (const [home, location] of [
   ['Dublin', 'Dublin · London, United Kingdom · Paris, France'],
@@ -106,12 +115,26 @@ for (const [home, location] of [
   ['Dublin', 'GA-Dublin, 1 Example St - IE'],
   ['Dublin', 'GA-Dublin, 1 Example St (IE)'],
   ['Dublin', 'GA-Dublin, 1 Main St, IE D02 X285'],
+  ['Dublin', 'GA-Dublin, 1 Main St [IE]'],
+  ['Dublin', 'Dublin, GA [IE]'],
+  ['Dublin', 'Dublin, Co Dublin'],
+  ['Dublin', 'Dublin, Co Dublin, D02 X285'],
+  ['Dublin', 'Dublin, Co Dublin (Hybrid)'],
+  ['Dublin', 'Dublin, Co. Dublin · London, UK'],
+  ['Washington', 'Washington, Co Down'],
+  ['Dublin', 'Dublin, OH | Ireland'],
+  ['Dublin', 'Dublin, GA | London, UK'],
+  ['Dublin', 'Georgia-Dublin, 1 Main St'],
+  ['Dublin', 'Office: GA-Dublin, 1 Main St'],
 ]) {
   test(`${location} is not the home place ${home} in the United States`, () => assert.equal(verdict(policyFor(home), location).eligible, false));
 }
 for (const [home, location] of [
   ['Atlanta', 'Atlanta, GA · London, UK'],
   ['Atlanta', 'Atlanta GA'],
+  ['Atlanta', 'GA-ATLANTA'],
+  ['Atlanta', 'Atlanta Georgia · London, UK'],
+  ['Springfield', 'Springfield IN · Berlin, Germany'],
   ['Chicago', 'Chicago, Illinois · London, United Kingdom'],
   ['Albuquerque', 'Albuquerque, New Mexico'],
   ['Atlanta', 'GA-ATLANTA, 740 W PEACHTREE ST NW · IN-INDIANAPOLIS, 220 VIRGINIA AVE'],

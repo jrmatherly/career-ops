@@ -97,6 +97,25 @@ test("a file with no enabled entry and no group is scanned as before", () => {
   assert.equal(result.state, "success");
   assert.equal(seen.base, true);
 });
+test("a job naming the group scans a file where every source is grouped", () => {
+  const { result, seen } = run(PORTALS("  - name: Fixture Beta\n    group: weekly\n"), { filtersFrom: "file", sourceGroups: ["weekly"] });
+  assert.equal(result.state, "success");
+  assert.deepEqual(seen.config.tracked_companies.map((e) => e.name), ["Fixture Beta"]);
+});
+test("a group that only a job board has is scanned", () => {
+  const { result, seen } = run(`${PORTALS("  - name: Fixture Alpha\n")}job_boards:\n  - name: Fixture Board\n    group: heavy\n`, { filtersFrom: "file", sourceGroups: ["heavy"] });
+  assert.equal(result.state, "success");
+  assert.deepEqual([seen.config.tracked_companies, seen.config.job_boards.map((e) => e.name)], [[], ["Fixture Board"]]);
+});
+test("stored source groups that are not names fail the run instead of scanning the ungrouped set", () => {
+  for (const sourceGroups of [5, {}, [2026]]) {
+    const { result, seen } = run(GROUPED, { filtersFrom: "file", sourceGroups });
+    assert.equal(result.state, "failed");
+    assert.ok(result.message.includes("This scan's source groups are not a list of names"), result.message);
+    assert.equal(seen, null);
+  }
+  assert.deepEqual(run(GROUPED, { filtersFrom: "file", sourceGroups: "weekly" }).seen.config.tracked_companies.map((e) => e.name), ["Fixture Beta"], "one stored name is one group");
+});
 test("a numeric group is its name, and any other shape fails the run with the entry's name", () => {
   const { seen } = run(PORTALS("  - name: Fixture Alpha\n  - name: Fixture Beta\n    group: 2026\n"), { filtersFrom: "file", sourceGroups: ["2026"] });
   assert.deepEqual(seen.config.tracked_companies.map((e) => e.name), ["Fixture Beta"]);

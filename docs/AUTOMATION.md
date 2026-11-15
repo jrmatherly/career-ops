@@ -289,6 +289,8 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
   row left to try, or when the job leaves Auto. A row that waits for its
   posting text, or sits below a rank threshold you raised, shows no reason.
 
+Check the queue with `node evaluate-queue.mjs dump --json`.
+
 #### Location hold
 
 An Auto job can evaluate only postings that are confirmed remote or in your
@@ -335,7 +337,6 @@ A scheduled **portals** scan can read only some of the sources in
 - The full ATS sweep reads no entries from `portals.yml` and ignores groups.
   So does `node scan.mjs` run by hand, which reads every entry.
 
-Check the queue with `node evaluate-queue.mjs dump --json`.
 
 ---
 

@@ -518,8 +518,8 @@ function compileLocationKeywordList(value) {
     });
 }
 
-// State matchers built from the USPS table in providers/_country.mjs. Not a
-// world gazetteer: only consulted when always_allow already names the United States as a country,
+// The USPS table (providers/_country.mjs) is not a world gazetteer: its matchers
+// below are only consulted when always_allow already names the United States as a country,
 // so EU-targeted configs (no US token) keep their previous semantics.
 const US_COUNTRY_ALWAYS_ALLOW = new Set(['united states', 'usa', 'u.s.', 'u.s.a.']);
 

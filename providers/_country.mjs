@@ -82,7 +82,8 @@ export function countryNameFromIso(code) {
  */
 
 const fold = (v) => typeof v === 'string' ? v.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[–—−]/g, '-').replace(/\s+/g, ' ').trim() : '';
-const list = (v) => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()).map(fold) : [];
+// Blank after folding too: an entry that folds to nothing would match every posting.
+const list = (v) => Array.isArray(v) ? v.filter(x => typeof x === 'string').map(fold).filter(Boolean) : [];
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const word = (s) => new RegExp(`(?<![\\p{L}\\p{N}])${escape(s)}(?![\\p{L}\\p{N}])`, 'u');
 const has = (text, values) => values.some(v => word(v).test(text));
@@ -278,7 +279,7 @@ export function buildWorkplacePolicy(policy) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
       const abroad = (text) => { const found = countries(text, true); return found.size > 0 && ![...found].some(c => localCodes.has(c)); };
       // A home place with its US state written beside it is judged alone, so "Atlanta, GA · London, UK" passes through
-      // Atlanta and its "GA" is not Gabon. Without one, the whole location decides, as it always has.
+      // Atlanta and its "GA" is not Gabon. Without one, the whole location decides.
       const stated = localCodes.has('US') ? loc.split(/[·;]/).flatMap(place => homeStates.map(read => read(place)).filter(text => text !== null)) : [];
       if (!stated.some(text => !abroad(text)) && abroad(loc)) return fail('onsite_country_restricted');
       return { eligible: true, reason: 'onsite_location_allowed' };
@@ -352,13 +353,10 @@ export const USPS_STATES = Object.freeze([
   Object.freeze(['wyoming', 'wy']),
 ]);
 
-// Longest first, so "west virginia" is not read as "virginia".
-const US_STATE_PATTERN = USPS_STATES.flat().sort((x, y) => y.length - x.length).map(escape).join('|');
+const US_STATE_PATTERN = USPS_STATES.flat().map(escape).join('|');
 const US_STATE_CODE_PATTERN = USPS_STATES.map(([, abbr]) => abbr).join('|');
-// After a space, not a comma, these codes are more often the English word: "Dublin or London".
-const US_STATE_AFTER_SPACE = USPS_STATES.flat().filter(text => !['in', 'or', 'me', 'hi', 'ok', 'oh'].includes(text)).sort((x, y) => y.length - x.length).map(escape).join('|');
 // A street address ends at a slash, bar, bracket or spaced dash; what follows may name the country.
-const ADDRESS_HEAD = /^.*?(?=\s-\s|[/|(]|$)/;
+const ADDRESS_HEAD = /^.*?(?=\s-\s|[/|([]|$)/;
 const TWO_LETTER_WORD = /(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu;
 
 /** A reader for one onsite location name: given a folded place, the place with
@@ -373,12 +371,15 @@ const TWO_LETTER_WORD = /(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu;
  */
 function compileHomeState(home) {
   const name = escape(home);
-  const after = new RegExp(`((?<![\\p{L}\\p{N}])${name})(?:\\s*,\\s*(?:${US_STATE_PATTERN})|\\s+(?:${US_STATE_AFTER_SPACE}))(?![\\p{L}\\p{N}])`, 'u');
+  // A state ends its place part: a word after it means it is not one ("Dublin, Co Dublin" is a county, "Dublin or London" a word).
+  const after = new RegExp(`((?<![\\p{L}\\p{N}])${name})(?:\\s*,\\s*|\\s+)(?:${US_STATE_PATTERN})(?![\\p{L}\\p{N}])(?!\\.?\\s+\\p{L})`, 'u');
   const before = new RegExp(`^(\\s*)(?:${US_STATE_CODE_PATTERN})-(?=${name}(?![\\p{L}\\p{N}]))`, 'u');
+  // The country reader splits on parentheses, not square brackets, so "[IE]" is written as "(IE)".
+  const brackets = (text) => text.replace(/\[/g, '(').replace(/\]/g, ')');
   return (place) => {
-    if (after.test(place)) return place.replace(after, '$1');
+    if (after.test(place)) return brackets(place.replace(after, '$1'));
     const parts = place.split(',');
     if (!before.test(place) || (parts.length > 1 && !/\d/.test(parts[1]))) return null;
-    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : i === 1 ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(',');
+    return brackets(parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : i === 1 ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(','));
   };
 }

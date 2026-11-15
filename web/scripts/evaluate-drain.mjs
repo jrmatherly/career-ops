@@ -87,7 +87,10 @@ function locationHold(root, job) {
   if (job.evaluate.hold === undefined) return null;
   try {
     const gate = buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {}));
-    const added = addedHistory(scanHistoryDataLines(readText(path.join(root, "data", "scan-history.tsv"))).filter((line) => line.trim()).map(parseScanHistoryLine));
+    const history = path.join(root, "data", "scan-history.tsv");
+    // Read as empty, a missing file would hold every queued row for good.
+    if (!fs.existsSync(history)) throw new Error("data/scan-history.tsv is missing, so no location can be checked");
+    const added = addedHistory(scanHistoryDataLines(readText(history)).filter((line) => line.trim()).map(parseScanHistoryLine));
     return { holds: (url) => heldForLocation({ rows: [{ url }], added, gate }).size > 0 };
   } catch (error) {
     return { problem: `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was evaluated.` };
@@ -321,7 +324,10 @@ export async function runDrain({
         }
         hold ??= locationHold(root, job) ?? {};
         if (hold.problem) {
-          touchedRuns.set(entry.runId, { drainMessage: hold.problem });
+          // Every run this job leaves blocked gets the reason, not only the first row's.
+          const blocked = drainPlan(root, { jobId: job.id, rankThreshold: job.evaluate.rankThreshold, dailyCap: Infinity, now: now() });
+          for (const row of [entry, ...blocked]) touchedRuns.set(row.runId, { drainMessage: hold.problem });
+          log(`job ${job.id}: ${hold.problem}`);
           current = undefined;
           continue jobs;
         }

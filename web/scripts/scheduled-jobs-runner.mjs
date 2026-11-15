@@ -245,13 +245,13 @@ export function selectSourceGroups(config, groups) {
 
 /**
  * The config a portals scan reads for `groups`, or a thrown reason the run
- * must not start: a selection that leaves nothing enabled would be a green run
- * that scanned nothing. `enabled: false` is the scanner's own skip rule.
+ * must not start: a named group with no enabled entry, or no group named when
+ * every enabled entry has one, would be a green run that scanned nothing. `enabled: false` is the scanner's own skip rule.
  */
 function sourcesForGroups(config, groups) {
   const entries = SOURCE_LISTS.flatMap((key) => (Array.isArray(config[key]) ? config[key].filter(isMapping) : []));
   const unnamed = entries.find((entry) => entry.group != null && !isGroupName(entry.group));
-  if (unnamed) throw new Error(`portals.yml: "${unnamed.name}" has a group that is not a name. Write group: <name>.`);
+  if (unnamed) throw new Error(`portals.yml: "${unnamed.name ?? "an entry with no name"}" has a group that is not a name. Write group: <name>.`);
   const enabledGroups = new Set(entries.filter((entry) => entry.enabled !== false).map(groupOf));
   const missing = groups.filter((group) => !enabledGroups.has(group.toLowerCase()));
   if (missing.length) throw new Error(`No enabled source is in ${missing.map((group) => `"${group}"`).join(", ")}. Tag an entry with group: in portals.yml.`);
@@ -318,7 +318,12 @@ export function executeJob(root, job, options = {}) {
     }
     // The full engine reads no entries from portals.yml, so groups do not apply to it.
     if (job.engine === "portals") {
-      const selected = sourcesForGroups(config, cleanChips(job.sourceGroups));
+      const stored = job.sourceGroups;
+      // cleanChips would read a number or a mapping as no groups, and the scan would quietly read the ungrouped set.
+      if (stored != null && typeof stored !== "string" && !(Array.isArray(stored) && stored.every((group) => typeof group === "string"))) {
+        throw new Error("This scan's source groups are not a list of names. Open Edit and save the scan.");
+      }
+      const selected = sourcesForGroups(config, cleanChips(stored));
       overlay ||= selected !== config;
       config = selected;
     }
@@ -582,7 +587,7 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
         holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}${NOTHING_QUEUED}`;
       }
     }
-    // In front of the pass's own message, never in its place: runToRank keeps the run due only while the message ends with RANK_WAITING.
+    // In front of the pass's own message, never in its place: runToRank reads the end of the message to tell rows still waiting from a failed pass.
     if (holdProblem) evalMessage = [holdProblem, evalMessage].filter(Boolean).join(" ");
     else autoQueued = (autoQueued ?? 0) + await queueCandidates(root, { jobId: job.id, runId: lastRun.id, rankThreshold: job.evaluate.rankThreshold, autoJobIds, held }, rows);
   }

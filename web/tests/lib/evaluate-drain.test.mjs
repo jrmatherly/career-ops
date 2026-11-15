@@ -777,3 +777,49 @@ test("a hold that cannot be built evaluates nothing and leaves the rows queued",
   assert.equal(state(url(1)).state, "queued");
   assert.match(readScheduledStore(storePath).runs[0].drainMessage, /^Location hold: .*\. Nothing was evaluated\.$/);
 });
+
+test("a stored hold of null evaluates nothing at the drain", async (t) => {
+  const { root, drain, state, posts, storePath } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: null } });
+  historyOf(root, [[url(1), "Remote, United States"]]);
+  await drain();
+  assert.equal(posts.length, 0);
+  assert.equal(state(url(1)).state, "queued");
+  assert.match(readScheduledStore(storePath).runs[0].drainMessage, /^Location hold: .*\. Nothing was evaluated\.$/);
+});
+
+test("each job's hold is its own: a job with none evaluates what another job's hold keeps back", async (t) => {
+  const { root, drain, state, posts, storePath } = await withDrainRoot(t, { urls: [url(1)] });
+  const OTHER = "33333333-3333-4333-8333-333333333333";
+  const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  store.jobs.push({ ...store.jobs[0], id: OTHER, name: "Held", evaluate: { ...AUTO, hold: HOLD } });
+  store.runs.push({ id: "44444444-4444-4444-8444-444444444444", jobId: OTHER, at: "2026-11-08T11:00:00.000Z", state: "success", attempt: 1, rolesFound: 1 });
+  fs.writeFileSync(storePath, JSON.stringify(store));
+  fs.appendFileSync(path.join(root, "data", "pipeline.md"), `- [ ] ${url(2)} | Fictional Co | Engineer\n`);
+  await appendRow(root, { url: url(2), at: new Date(T0 - 60_000).toISOString(), jobId: OTHER, runId: "44444444-4444-4444-8444-444444444444", rank: 4.5, state: "queued", source: "rank-pass" });
+  historyOf(root, [[url(1), "Metropolis, NY"], [url(2), "Metropolis, NY"]]);
+  await drain();
+  assert.deepEqual(posts.map((post) => post.body.input), [url(1)]);
+  assert.deepEqual([state(url(1)).state, state(url(2)).state, state(url(2)).reason], ["evaluated", "skipped", "held-location"]);
+});
+
+test("a missing scan history holds nothing: the drain says why and leaves the rows queued", async (t) => {
+  const { drain, state, posts, storePath, stderr } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: HOLD } });
+  await drain();
+  assert.equal(posts.length, 0);
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["queued", ""]);
+  assert.match(readScheduledStore(storePath).runs[0].drainMessage, /^Location hold: .*scan-history\.tsv is missing.*Nothing was evaluated\.$/);
+  assert.match(stderr.join(""), /Location hold: /);
+});
+
+test("a hold that cannot be built is named on every run it leaves blocked", async (t) => {
+  const { root, drain, storePath } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: { ...HOLD, remoteCountries: ["Atlantis"] } } });
+  const EARLIER = "55555555-5555-4555-8555-555555555555";
+  const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  store.runs.push({ id: EARLIER, jobId: JOB, at: "2026-11-07T11:00:00.000Z", state: "success", attempt: 1, rolesFound: 1 });
+  fs.writeFileSync(storePath, JSON.stringify(store));
+  fs.appendFileSync(path.join(root, "data", "pipeline.md"), `- [ ] ${url(2)} | Fictional Co | Engineer\n`);
+  await appendRow(root, { url: url(2), at: new Date(T0 - 120_000).toISOString(), jobId: JOB, runId: EARLIER, rank: 4.0, state: "queued", source: "rank-pass" });
+  historyOf(root, [[url(1), "Remote, United States"], [url(2), "Remote, United States"]]);
+  await drain();
+  for (const run of readScheduledStore(storePath).runs) assert.match(run.drainMessage ?? "", /^Location hold: /, `run ${run.id}`);
+});

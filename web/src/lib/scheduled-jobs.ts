@@ -134,7 +134,9 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Invalid evaluate settings.");
   }
-  if (input.sourceGroups !== undefined && !Array.isArray(input.sourceGroups)) throw new ScheduledJobValidationError("Invalid source groups.");
+  if (input.sourceGroups !== undefined && !(Array.isArray(input.sourceGroups) && input.sourceGroups.every((group) => typeof group === "string"))) {
+    throw new ScheduledJobValidationError("Invalid source groups.");
+  }
   const sourceGroups = input.sourceGroups === undefined ? base?.sourceGroups ?? [] : cleanChips(input.sourceGroups);
   const filters = parseExplorePatch(
     (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>,

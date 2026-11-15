@@ -32,6 +32,8 @@ function scheduledHold(value) {
   if (typeof value !== "object" || !Array.isArray(value.onsiteLocations) || !Array.isArray(value.remoteCountries)) throw new Error("Invalid location hold.");
   const onsiteLocations = cleanChips(value.onsiteLocations);
   const remoteCountries = cleanChips(value.remoteCountries);
+  // Entries that all clean away are a bad hold, not an empty one: reading them as "no hold" would let every location through.
+  if ((value.onsiteLocations.length && !onsiteLocations.length) || (value.remoteCountries.length && !remoteCountries.length)) throw new Error("Invalid location hold.");
   if (!onsiteLocations.length && !remoteCountries.length) return undefined;
   if (!onsiteLocations.length || !remoteCountries.length) throw new Error("A location hold needs both a home area and a remote country.");
   return { onsiteLocations, remoteCountries };
