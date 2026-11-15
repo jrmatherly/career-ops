@@ -26,9 +26,9 @@ const body = (extra = {}) => ({ name: "Fixture scan", engine: "portals", every: 
 const storeFile = path.join(root, "data", "scheduled-jobs.json");
 
 test("source groups are cleaned, and anything but a list is refused", () => {
-  assert.deepEqual(parseScheduledJobInput(body({ sourceGroups: [" Weekly ", "weekly", ""] })).sourceGroups, ["Weekly"]);
+  assert.deepEqual(parseScheduledJobInput(body({ sourceGroups: [" Weekly ", "weekly"] })).sourceGroups, ["Weekly"]);
   assert.deepEqual(parseScheduledJobInput(body()).sourceGroups, []);
-  for (const sourceGroups of ["weekly", null, { weekly: true }, [2026], ["weekly", 3]]) {
+  for (const sourceGroups of ["weekly", null, { weekly: true }, [2026], ["weekly", 3], ["!!!"], ["weekly", " "]]) {
     assert.throws(() => parseScheduledJobInput(body({ sourceGroups })), { name: "ScheduledJobValidationError", message: "Invalid source groups." });
   }
 });

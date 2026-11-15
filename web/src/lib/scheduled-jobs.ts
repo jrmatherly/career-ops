@@ -138,6 +138,10 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
     throw new ScheduledJobValidationError("Invalid source groups.");
   }
   const sourceGroups = input.sourceGroups === undefined ? base?.sourceGroups ?? [] : cleanChips(input.sourceGroups);
+  // A name that cleans away would leave fewer groups than were asked for, and an empty list reads as "no groups".
+  if (input.sourceGroups !== undefined && (input.sourceGroups as string[]).some((group) => !cleanChips([group]).length)) {
+    throw new ScheduledJobValidationError("Invalid source groups.");
+  }
   const filters = parseExplorePatch(
     (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>,
     base?.filters || DEFAULT_FILTERS,

@@ -121,6 +121,7 @@ for (const [home, location] of [
   ['Dublin', 'Dublin, Co Dublin, D02 X285'],
   ['Dublin', 'Dublin, Co Dublin (Hybrid)'],
   ['Dublin', 'Dublin, Co. Dublin · London, UK'],
+  ['Dublin', 'Dublin, Co.Dublin · London, UK'],
   ['Washington', 'Washington, Co Down'],
   ['Dublin', 'Dublin, OH | Ireland'],
   ['Dublin', 'Dublin, GA | London, UK'],
