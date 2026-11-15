@@ -166,15 +166,19 @@ try {
   const probed = [];
   console.warn = (m) => warnings.push(String(m));
   let withLocked;
+  let probeRows;
   try {
     withLocked = await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: lockedFeed });
     await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: async () => ({ jobs: [mk(1)], has_more: false }) });
-    await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: (url) => { probed.push(url); return lockedFeed(url); }, maxPages: 1 });
+    probeRows = await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: (url) => { probed.push(url); return lockedFeed(url); }, maxPages: 1 });
   } finally {
     console.warn = warn;
   }
-  if (probed.length === 1) pass('4dayweek.fetch() reads only ctx.maxPages pages on a health probe');
-  else fail(`4dayweek.fetch() probe requested ${JSON.stringify(probed)}`);
+  if (probed.length === 1 && probeRows.length === 23 && !probeRows.some((j) => j.url.endsWith('/hidden-role'))) {
+    pass('4dayweek.fetch() reads only ctx.maxPages pages on a health probe and returns their unlocked rows');
+  } else {
+    fail(`4dayweek.fetch() probe requested ${JSON.stringify(probed)} and returned ${probeRows?.length} rows`);
+  }
   if (withLocked.length === 24 && !withLocked.some((j) => j.url.endsWith('/hidden-role'))) {
     pass('4dayweek.fetch() drops a locked row even when it carries a slug');
   } else {

@@ -16,9 +16,9 @@
 // the has_more flag. Expired postings (is_expired) are dropped.
 //
 // The feed also returns rows the site holds back for paying members
-// (`locked: true`, empty slug and company; mostly postings newer than the
-// feed's `meta.early_access_cutoff`). They cannot be read or linked, so they
-// are dropped, and one warning says how many.
+// (`locked: true`, empty slug and company; postings newer than the feed's
+// `meta.early_access_cutoff`). They cannot be read or linked, so they are
+// dropped, and one warning says how many.
 //
 // Wire in via a `job_boards:` entry with `provider: 4dayweek`.
 
