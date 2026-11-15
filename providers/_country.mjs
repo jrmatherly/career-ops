@@ -431,8 +431,10 @@ function homePlaces(loc, onsite) {
     for (const state of US_STATE_CODES) {
       const leads = state.leads.test(core);
       if (!leads && !state.matches(core)) continue;
-      // "GA-SPRINGFIELD, 1 MAIN ST": the street address part is dropped, since its "ST" is not a country.
-      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d[^,/|]*/, '') : place).replace(state.token, ' ') });
+      // "GA-SPRINGFIELD, 1 MAIN ST": in this form the state leads and a street address follows, so its other two-letter
+      // words ("ST", "NW") are not countries. A country written by name after it still counts.
+      const take = () => place.replace(state.token, ' ');
+      states.push({ at: place.search(state.token), take: leads ? () => take().replace(/(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu, ' ') : take });
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) {
       const at = place.search(joined);
