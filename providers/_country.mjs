@@ -357,6 +357,8 @@ const US_STATE_PATTERN = USPS_STATES.flat().sort((x, y) => y.length - x.length).
 const US_STATE_CODE_PATTERN = USPS_STATES.map(([, abbr]) => abbr).join('|');
 // After a space, not a comma, these codes are more often the English word: "Dublin or London".
 const US_STATE_AFTER_SPACE = USPS_STATES.flat().filter(text => !['in', 'or', 'me', 'hi', 'ok', 'oh'].includes(text)).sort((x, y) => y.length - x.length).map(escape).join('|');
+// A street address ends at a slash, bar, bracket or spaced dash; what follows may name the country.
+const ADDRESS_HEAD = /^.*?(?=\s-\s|[/|(]|$)/;
 const TWO_LETTER_WORD = /(?<![\p{L}\p{N}])\p{L}{2}(?![\p{L}\p{N}])/gu;
 
 /** A reader for one onsite location name: given a folded place, the place with
@@ -377,6 +379,6 @@ function compileHomeState(home) {
     if (after.test(place)) return place.replace(after, '$1');
     const parts = place.split(',');
     if (!before.test(place) || (parts.length > 1 && !/\d/.test(parts[1]))) return null;
-    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : /\d/.test(part) ? part.replace(TWO_LETTER_WORD, ' ') : part)).join(',');
+    return parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : /\d/.test(part) ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(',');
   };
 }
