@@ -156,6 +156,40 @@ try {
   if (badThrew) pass('4dayweek.fetch() throws on unexpected API response shape (no jobs array)');
   else fail('4dayweek.fetch() should throw when the jobs array is absent');
 
+  // Locked rows (held back for paying members) are dropped by their flag, and one warning counts them.
+  const lockedRow = { ...mk(90), title: 'Hidden role', slug: 'hidden-role', locked: true };
+  const lockedFeed = async (url) => (Number(new URL(url).searchParams.get('page')) === 1
+    ? { jobs: [...Array.from({ length: 23 }, (_, i) => mk(i)), lockedRow, { ...mk(50), is_expired: true }], has_more: true }
+    : { jobs: [mk(60), lockedRow], has_more: false });
+  const warn = console.warn;
+  const warnings = [];
+  const probed = [];
+  console.warn = (m) => warnings.push(String(m));
+  let withLocked;
+  let probeRows;
+  try {
+    withLocked = await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: lockedFeed });
+    await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: async () => ({ jobs: [mk(1)], has_more: false }) });
+    probeRows = await fourdayweek.fetch({ name: 'Board X' }, { fetchJson: (url) => { probed.push(url); return lockedFeed(url); }, maxPages: 1 });
+  } finally {
+    console.warn = warn;
+  }
+  if (probed.length === 1 && probeRows.length === 23 && !probeRows.some((j) => j.url.endsWith('/hidden-role'))) {
+    pass('4dayweek.fetch() reads only ctx.maxPages pages on a health probe and returns their unlocked rows');
+  } else {
+    fail(`4dayweek.fetch() probe requested ${JSON.stringify(probed)} and returned ${probeRows?.length} rows`);
+  }
+  if (withLocked.length === 24 && !withLocked.some((j) => j.url.endsWith('/hidden-role'))) {
+    pass('4dayweek.fetch() drops a locked row even when it carries a slug');
+  } else {
+    fail(`4dayweek.fetch() kept ${withLocked.length} rows: ${JSON.stringify(withLocked.map((j) => j.url.split('/').pop()))}`);
+  }
+  if (warnings.length === 1 && warnings[0] === '[4dayweek] Board X: 2 of the 27 rows read are locked for paying members (no company or link) and were skipped.') {
+    pass('4dayweek.fetch() warns once across pages, counting every row read; quiet with no locked row and on a health probe');
+  } else {
+    fail(`4dayweek.fetch() locked-row warnings = ${JSON.stringify(warnings)}`);
+  }
+
 } catch (e) {
   fail(`4dayweek provider tests crashed: ${e.message}`);
 }

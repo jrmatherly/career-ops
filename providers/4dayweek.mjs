@@ -15,6 +15,11 @@
 // Paginated 25/page via ?page=N; bounded by max_pages (default 3, cap 50) and
 // the has_more flag. Expired postings (is_expired) are dropped.
 //
+// The feed also returns rows the site holds back for paying members
+// (`locked: true`, empty slug and company; postings newer than the feed's
+// `meta.early_access_cutoff`). They cannot be read or linked, so they are
+// dropped, and one warning says how many.
+//
 // Wire in via a `job_boards:` entry with `provider: 4dayweek`.
 
 const FEED_BASE = 'https://4dayweek.io/api/jobs';
@@ -133,9 +138,13 @@ export default {
 
   async fetch(entry, ctx) {
     assertFourDayUrl(FEED_BASE);
-    const maxPages = resolveMaxPages(entry);
+    // verify-portals.mjs probes with ctx.maxPages set: read no more pages than that, and stay quiet.
+    const probing = Number.isInteger(ctx?.maxPages) && ctx.maxPages > 0;
+    const maxPages = probing ? Math.min(resolveMaxPages(entry), ctx.maxPages) : resolveMaxPages(entry);
     const fallbackCompany = entry?.name;
     const out = [];
+    let read = 0;
+    let locked = 0;
 
     for (let page = 1; page <= maxPages; page++) {
       const url = `${FEED_BASE}?page=${page}`;
@@ -146,12 +155,20 @@ export default {
           `4dayweek: unexpected API response on page ${page} — expected { jobs: [...] }, got keys: [${json ? Object.keys(json).join(', ') : 'null'}]`,
         );
       }
+      read += json.jobs.length;
       for (const j of json.jobs) {
+        if (j?.locked === true) {
+          locked += 1;
+          continue;
+        }
         const normalized = normalize4dwJob(j, fallbackCompany);
         if (normalized) out.push(normalized);
       }
       if (json.has_more === false) break; // last page per the API flag
       if (json.jobs.length < PER_PAGE) break; // short page → last page
+    }
+    if (locked && !probing) {
+      console.warn(`[4dayweek] ${entry?.name ?? '4 Day Week'}: ${locked} of the ${read} rows read are locked for paying members (no company or link) and were skipped.`);
     }
     return out;
   },
