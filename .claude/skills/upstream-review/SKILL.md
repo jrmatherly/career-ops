@@ -477,7 +477,7 @@ Decision log: `.upstream-review/reviews/2026-11-15-review.md` (375 commits, `033
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
-| `providers/4dayweek.mjs` drops a row with no slug without a count, so the rows 4dayweek.io keeps for paying members (`locked: true`) vanish silently | `providers/4dayweek.mjs`: the `locked` counter in `fetch()` its `read` counter and its one `console.warn`. Test in `tests/providers/4dayweek.test.mjs`. `docs/SUPPORTED_JOB_BOARDS.md`: the 4 Day Week row's locked-rows sentences, nine "Evaluated, not supported" rows dated 2026-11-15, and the rewritten Authentic Jobs row | KEEP | If upstream handles locked rows itself, take upstream's and drop ours. |
+| `providers/4dayweek.mjs` drops a row with no slug without a count, so the rows 4dayweek.io keeps for paying members (`locked: true`) vanish silently | `providers/4dayweek.mjs`: the `locked` counter in `fetch()` its `read` counter, its one `console.warn`, and the `probing` clamp of the page loop to `ctx.maxPages`. Test in `tests/providers/4dayweek.test.mjs`. `docs/SUPPORTED_JOB_BOARDS.md`: the 4 Day Week row's locked-rows sentences, nine "Evaluated, not supported" rows dated 2026-11-15, and the rewritten Authentic Jobs row | KEEP | If upstream handles locked rows itself, take upstream's and drop ours. |
 
 ## Decision log template
 

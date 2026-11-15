@@ -138,7 +138,9 @@ export default {
 
   async fetch(entry, ctx) {
     assertFourDayUrl(FEED_BASE);
-    const maxPages = resolveMaxPages(entry);
+    // verify-portals.mjs probes with ctx.maxPages set: read no more pages than that, and stay quiet.
+    const probing = Number.isInteger(ctx?.maxPages) && ctx.maxPages > 0;
+    const maxPages = probing ? Math.min(resolveMaxPages(entry), ctx.maxPages) : resolveMaxPages(entry);
     const fallbackCompany = entry?.name;
     const out = [];
     let read = 0;
@@ -165,8 +167,6 @@ export default {
       if (json.has_more === false) break; // last page per the API flag
       if (json.jobs.length < PER_PAGE) break; // short page → last page
     }
-    // verify-portals.mjs probes with ctx.maxPages set; a health probe stays quiet.
-    const probing = Number.isInteger(ctx?.maxPages) && ctx.maxPages > 0;
     if (locked && !probing) {
       console.warn(`[4dayweek] ${entry?.name ?? '4 Day Week'}: ${locked} of the ${read} rows read are locked for paying members (no company or link) and were skipped.`);
     }
