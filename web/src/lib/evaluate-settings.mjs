@@ -27,11 +27,13 @@ export function evaluateBody(form, stored) {
   if (!evaluateFieldsVisible(form.mode)) return { mode: form.mode };
   const onsiteLocations = form.holdOnsite ?? [];
   const remoteCountries = form.holdRemote ?? [];
-  if (onsiteLocations.length || remoteCountries.length) return { ...clampEvaluate(form), hold: { onsiteLocations, remoteCountries } };
-  // A stored hold the form cannot show (a store edited by hand) is kept, not cleared: the runner refuses it and says why.
+  // A stored hold the form cannot show in full (a store edited by hand) is kept until its fields are edited: the runner refuses it and says why.
   const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string");
   const unreadable = stored?.hold !== undefined && !(strings(stored.hold?.onsiteLocations) && strings(stored.hold?.remoteCountries));
-  return unreadable ? clampEvaluate(form) : { ...clampEvaluate(form), hold: null };
+  const shown = evaluateForm(stored);
+  const same = (left, right) => left.length === right.length && left.every((item, i) => item === right[i]);
+  if (unreadable && same(onsiteLocations, shown.holdOnsite) && same(remoteCountries, shown.holdRemote)) return clampEvaluate(form);
+  return { ...clampEvaluate(form), hold: onsiteLocations.length || remoteCountries.length ? { onsiteLocations, remoteCountries } : null };
 }
 
 /** The job card's mode badge, or null when evaluation is off. */

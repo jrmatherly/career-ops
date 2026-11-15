@@ -432,7 +432,7 @@ function homePlaces(loc, onsite) {
       const leads = state.leads.test(core);
       if (!leads && !state.matches(core)) continue;
       // "GA-SPRINGFIELD, 1 MAIN ST": the street address part is dropped, since its "ST" is not a country.
-      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d[^,]*/, '') : place).replace(state.token, ' ') });
+      states.push({ at: place.search(state.token), take: () => (leads ? place.replace(/,\s*\d[^,/|]*/, '') : place).replace(state.token, ' ') });
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) {
       const at = place.search(joined);

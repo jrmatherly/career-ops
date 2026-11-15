@@ -63,6 +63,9 @@ test("a stored hold whose lists are not lists shows no chips", () => {
 test("saving the form over a stored hold it cannot show keeps that hold, so the runner still refuses it", () => {
   const stored = { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } };
   assert.equal("hold" in evaluateBody(evaluateForm(stored), stored), false);
+  const partly = { ...stored, hold: { onsiteLocations: ["Springfield", 42], remoteCountries: ["United States"] } };
+  assert.equal("hold" in evaluateBody(evaluateForm(partly), partly), false, "an unchanged save keeps it");
+  assert.deepEqual(evaluateBody({ ...evaluateForm(partly), holdOnsite: ["Shelbyville"] }, partly).hold, { onsiteLocations: ["Shelbyville"], remoteCountries: ["United States"] }, "an edit replaces it");
   const mixed = { ...stored, hold: { onsiteLocations: [42], remoteCountries: [] } };
   assert.equal("hold" in evaluateBody(evaluateForm(mixed), mixed), false);
   assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdOnsite: ["Springfield"], holdRemote: ["United States"] }, stored).hold, HOLD);
