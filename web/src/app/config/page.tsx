@@ -7,6 +7,7 @@ import { careerOpsRoot } from "@/lib/career-ops";
 const SECTIONS = [
   ["engine", "AI engine"],
   ["cadence", "Follow-up cadence"],
+  ["templates", "CV and letter templates"],
   ["scanner", "Scanner and network"],
   ["automation", "Automation and evaluation"],
   ["profile", "Profile preferences"],

@@ -350,7 +350,8 @@ test('running one scheduled job by hand leaves the alert folder alone', () => {
 
 test('the scheduled inbox poll holds the same lock as the job run', () => {
   const src = readFileSync(join(ROOT, 'web', 'scripts', 'scheduled-jobs-runner.mjs'), 'utf8');
-  const lockAt = src.indexOf('return withResourceLock(');
+  // The fork's runner keeps the tick in a const so the rank and drain passes run after it.
+  const lockAt = src.search(/(?:return|const tick =) withResourceLock\(/);
   const pollAt = src.indexOf('await pollLinkedInInbox(');
   assert.ok(lockAt > 0 && pollAt > lockAt, 'poll runs inside the runner lock');
   const callback = src.slice(lockAt, src.indexOf('timeoutMs:', lockAt));

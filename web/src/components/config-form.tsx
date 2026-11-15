@@ -349,10 +349,6 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
 
       <CadenceSettings />
 
-      <TemplatesSection kind="cv" />
-
-      <TemplatesSection kind="cover" />
-
       <div className="mt-8 flex items-center gap-3">
         <button
           type="button"
@@ -369,6 +365,12 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
         ) : hosted ? null : (
           <span className="text-xs text-faint">Local-first · on our roadmap</span>
         )}
+      </div>
+
+      {/* Below Save config: the gallery saves each choice itself, so that button does not cover it. */}
+      <div id="settings-templates" className="scroll-mt-6">
+        <TemplatesSection kind="cv" />
+        <TemplatesSection kind="cover" />
       </div>
     </div>
   );

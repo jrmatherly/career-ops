@@ -134,7 +134,7 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
 
   return (
     <section aria-labelledby={copy.id} className="mt-8">
-      <h2 id={copy.id} className="text-base font-semibold">
+      <h2 id={copy.id} className="text-base font-semibold text-foreground">
         {copy.title}
       </h2>
       <p className="mt-1 text-sm text-muted">{copy.note}</p>
@@ -217,7 +217,7 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
                 </form>
               ) : (
                 <div className="mt-2 flex gap-3 text-xs">
-                  <button type="button" disabled={busy !== null} onClick={() => ask(t.name, "duplicate")} className="underline">
+                  <button type="button" disabled={busy !== null} onClick={() => ask(t.name, "duplicate")} className="min-h-6 underline">
                     Duplicate
                   </button>
                   {t.layer === "user" && (
@@ -225,13 +225,13 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
                       <button type="button" disabled={busy !== null || editLocks(editing, t.name).edit} title={editLocks(editing, t.name).edit ? "Close the open editor first" : undefined} onClick={(e) => {
                           returnFocus.current = e.currentTarget;
                           setEditing(t.name);
-                        }} className="underline">
+                        }} className="min-h-6 underline">
                         Edit
                       </button>
-                      <button type="button" disabled={busy !== null || editLocks(editing, t.name).rename} title={editLocks(editing, t.name).rename ? "Close the editor first" : undefined} onClick={() => ask(t.name, "rename")} className="underline">
+                      <button type="button" disabled={busy !== null || editLocks(editing, t.name).rename} title={editLocks(editing, t.name).rename ? "Close the editor first" : undefined} onClick={() => ask(t.name, "rename")} className="min-h-6 underline">
                         Rename
                       </button>
-                      <button type="button" disabled={busy !== null || t.isDefault || editLocks(editing, t.name).remove} title={t.isDefault ? "Make another template the default first" : editLocks(editing, t.name).remove ? "Close the editor first" : undefined} onClick={() => ask(t.name, "delete")} className="underline">
+                      <button type="button" disabled={busy !== null || t.isDefault || editLocks(editing, t.name).remove} title={t.isDefault ? "Make another template the default first" : editLocks(editing, t.name).remove ? "Close the editor first" : undefined} onClick={() => ask(t.name, "delete")} className="min-h-6 underline">
                         Delete
                       </button>
                     </>

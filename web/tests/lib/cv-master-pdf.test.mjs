@@ -93,7 +93,7 @@ test("a render that outlives the deadline is killed and answers 504", async () =
   let child;
   const spawnFn = () => {
     child = new EventEmitter();
-    child.stderr = new EventEmitter();
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding() {} });
     child.killed = false;
     child.kill = () => { child.killed = true; setImmediate(() => child.emit("close", null)); };
     return child;
@@ -124,7 +124,7 @@ test("a child that ignores SIGTERM gets SIGKILL and the call still answers 504",
   let child;
   const spawnFn = () => {
     child = new EventEmitter();
-    child.stderr = new EventEmitter();
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding() {} });
     child.kill = (signal) => {
       signals.push(signal);
       if (signal === "SIGKILL") setImmediate(() => child.emit("close", null));

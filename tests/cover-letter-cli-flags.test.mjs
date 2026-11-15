@@ -11,6 +11,7 @@
 //   - a typo such as --reprot 42 was accepted and did nothing.
 // The parser is now strict, validates --report and --max-pages, and passes the
 // page budget to the renderer. The default budget for a cover letter is 1 page.
+import './helpers.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

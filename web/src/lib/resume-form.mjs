@@ -160,7 +160,7 @@ export function toggleHidden(data, ref, itemId) {
 // Headings absorb.mjs (resolveSection) gives to a built-in section before any custom one, mirrored from
 // lib/resume/to-cv-md.mjs SECTION_ROWS and lib/cv-markdown.mjs EXPERIENCE_HEADING_RE; resume-form.test.mjs pins the list.
 export const BUILT_IN_HEADINGS = ["Education", "Projects", "Skills", "Certifications", "Awards", "Publications", "Languages", "Interests", "Volunteer", "References"];
-export const EXPERIENCE_HEADING_RE = /^(?:(?:work|professional)\s+)?experience$|^(?:employment|work)\s+history$|^(?:experiencia(?:\s+(?:laboral|profesional))?)$/i;
+export const EXPERIENCE_HEADING_RE = /^(?:(?:work|professional)\s+)?experience$|^(?:employment|work)\s+history$|^(?:experiencia(?:\s+(?:laboral|profesional))?)$|^(?:工作|专业)(?:经历|经验)$|^(?:工作|專業)(?:經歷|經驗)$/i;
 export const SUMMARY_HEADING_RE = /^(professional )?summary$/i;
 
 /**

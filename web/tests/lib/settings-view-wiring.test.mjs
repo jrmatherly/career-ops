@@ -143,6 +143,7 @@ test("the page is a section list beside the content, and every link has a target
   const page = src("app/config/page.tsx");
   assert.match(page, /id="settings-engine"/);
   assert.match(src("components/followups/cadence-settings.tsx"), /id="settings-cadence"/);
+  assert.match(form, /<div id="settings-templates"[^>]*>\s*<TemplatesSection kind="cv" \/>\s*<TemplatesSection kind="cover" \/>/);
   assert.match(view, /id=\{`settings-\$\{group\.id\}`\}/);
   // From the registry, so a new group cannot be left out of the section list.
   for (const { id, label } of GROUPS) assert.ok(page.includes(`["${id}", "${label}"]`), `${label} is listed`);

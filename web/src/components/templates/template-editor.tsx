@@ -107,7 +107,7 @@ export function TemplateEditor({ kind, name, title, onClose, onSaved }: Props) {
         >
           {busy ? "Saving…" : "Save"}
         </button>
-        <button type="button" disabled={busy} onClick={onClose} className="text-xs underline disabled:opacity-60">
+        <button type="button" disabled={busy} onClick={onClose} className="min-h-6 text-xs underline disabled:opacity-60">
           {dirty ? "Discard and close" : "Close"}
         </button>
         {dirty && <span className="text-xs text-muted">Unsaved changes</span>}

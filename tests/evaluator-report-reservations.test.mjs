@@ -108,7 +108,9 @@ for (const engine of ['openai', 'ollama']) {
         const num = scenario.expected - 1;
         // With no tracker present, the read resolver falls back to the legacy
         // path, so its status log is beside that path; the other ledgers are data/.
-        const ledgerPath = join(dataRoot, scenario.ledger === 'status-log.tsv' ? '' : 'data', scenario.ledger);
+        // Fork: a root with no tracker resolves to data/applications.md (path-resolver.mjs),
+        // so the status log is in data/ with the other ledgers.
+        const ledgerPath = join(dataRoot, 'data', scenario.ledger);
         const contents = scenario.ledger === 'contacts.tsv'
           ? ['1', 'Synthetic Contact', '-', '-', '-', '-', '-', String(num)].join('\t') + '\n'
           : scenario.ledger === 'follow-ups.md'
