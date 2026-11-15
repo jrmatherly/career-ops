@@ -29,7 +29,8 @@ export function evaluateBody(form, stored) {
   const remoteCountries = form.holdRemote ?? [];
   if (onsiteLocations.length || remoteCountries.length) return { ...clampEvaluate(form), hold: { onsiteLocations, remoteCountries } };
   // A stored hold the form cannot show (a store edited by hand) is kept, not cleared: the runner refuses it and says why.
-  const unreadable = stored?.hold !== undefined && !(Array.isArray(stored.hold?.onsiteLocations) && Array.isArray(stored.hold?.remoteCountries));
+  const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string");
+  const unreadable = stored?.hold !== undefined && !(strings(stored.hold?.onsiteLocations) && strings(stored.hold?.remoteCountries));
   return unreadable ? clampEvaluate(form) : { ...clampEvaluate(form), hold: null };
 }
 

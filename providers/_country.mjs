@@ -420,11 +420,12 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
  */
 function readUsStates(loc, onsite) {
   return loc.split(/([·|;/])/).map((place) => {
-    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read.
-    if (!has(place, onsite) || !placesWithoutCountryCode(place).length) return place;
+    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read. A trailing "(Hybrid)" does not hide the slot.
+    const core = place.replace(/\s*\([^)]*\)\s*$/, '');
+    if (!has(place, onsite) || !placesWithoutCountryCode(core).length) return place;
     let next = place;
     for (const state of US_STATE_CODES) {
-      if (state.matches(place) || state.leads.test(place)) next = next.replace(state.token, 'united states');
+      if (state.matches(core) || state.leads.test(core)) next = next.replace(state.token, 'united states');
     }
     for (const { name, joined } of US_STATE_NAMES_JOINED) next = next.replace(joined, match => match.replace(name, 'united states'));
     // Names, three-letter codes and a two-letter code in parentheses only: a bare two-letter read would take the "ST" of a street address for a country.

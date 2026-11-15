@@ -29,6 +29,8 @@ test('a country slot after the state name keeps the place foreign', () => {
   const dublin = buildWorkplacePolicy({ onsite_locations: ['Dublin'], remote_countries: ['United States'] });
   assert.deepEqual(verdict(dublin, 'Dublin, Georgia, IE'), { eligible: false, reason: 'onsite_country_restricted' });
   assert.equal(verdict(dublin, 'Dublin, Georgia (IE)').eligible, false);
+  assert.equal(verdict(dublin, 'Dublin, ON, CA (Hybrid)').eligible, false);
+  assert.equal(verdict(dublin, 'Dublin, OH (Hybrid)').eligible, true);
   assert.equal(verdict(dublin, 'Dublin, Georgia, US').eligible, true);
 });
 test('a three-letter country code after the state keeps the place foreign', () => {
