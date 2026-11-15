@@ -49,7 +49,7 @@ import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
-import { resolveAtsApi, JD_TEXT_API_ATS } from './liveness-api.mjs';
+import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
 import { decodeEntities } from './providers/_html-entities.mjs';
 import { HTML_TAG_RE } from './providers/_html-to-text.mjs';
@@ -1022,6 +1022,112 @@ async function fetchWorkableJd(resolved, postingUrl, textCap, timeoutMs) {
 }
 
 /**
+ * Eightfold position: v2 `/api/apply/v2/jobs/{pid}` first, then PCSX
+ * `/api/pcsx/position_details`, the order providers/eightfold.mjs tries its two
+ * API generations. Both stay on the host resolveAtsApi already pinned.
+ */
+async function fetchEightfoldJd(resolved, postingUrl, textCap, timeoutMs) {
+  const { host, pid, domain } = resolved.parts;
+  const pcsx = new URL(`https://${host}/api/pcsx/position_details`);
+  pcsx.searchParams.set('position_id', pid);
+  if (domain) pcsx.searchParams.set('domain', domain);
+  pcsx.searchParams.set('hl', 'en');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    for (const [apiUrl, pick] of [[resolved.apiUrl, (j) => j], [pcsx.href, (j) => j?.data]]) {
+      if (rejectPrivateOrInvalid(apiUrl)) return null;
+      // Both requests share one budget: a first one that spent it leaves none for the second.
+      controller.signal.throwIfAborted();
+      const res = await fetch(apiUrl, {
+        headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (!res.ok) { await discard(res); continue; }
+      let job;
+      try { job = pick(await res.json()); } catch { continue; }
+      if (!job || String(job.id) !== pid) continue;
+      const body = jdHtmlToText(job.job_description ?? job.jobDescription);
+      if (!body) continue;
+      const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+      const locations = [...new Set([str(job.location), ...(Array.isArray(job.locations) ? job.locations.map(str) : [])].filter(Boolean))];
+      return {
+        url: postingUrl,
+        title: compactText(str(job.name), 300),
+        text: compactText([locations.length ? `Location: ${locations.join(' | ')}` : '', body].filter(Boolean).join('\n\n'), textCap),
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The feed is about 2 MB and holds every Atlassian posting, so one download serves
+// every posting asked for in the next minute (a scan's experience filter, a drain tick).
+const ATLASSIAN_FEED_TTL_MS = 60_000;
+let atlassianFeed = null;
+
+/** Forget the cached Atlassian feed. For tests, which swap `fetch` between cases. */
+export function forgetAtlassianFeed() {
+  atlassianFeed = null;
+}
+
+/** The parsed listings feed, or null when it could not be read. Only a feed that is a list is kept. */
+function atlassianListings(apiUrl, timeoutMs) {
+  if (atlassianFeed && Date.now() - atlassianFeed.at < ATLASSIAN_FEED_TTL_MS) return atlassianFeed.promise;
+  const promise = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(apiUrl, {
+        headers: { accept: 'application/json', 'user-agent': DEFAULT_USER_AGENT },
+        redirect: 'error',
+        signal: controller.signal,
+      });
+      if (!res.ok) return await discard(res);
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+  const entry = { at: Date.now(), promise };
+  atlassianFeed = entry;
+  promise.then((feed) => {
+    if (!Array.isArray(feed) && atlassianFeed === entry) atlassianFeed = null;
+  });
+  return promise;
+}
+
+/** Atlassian posting: its item in the public listings feed, matched by iCIMS host and job id. */
+async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
+  if (rejectPrivateOrInvalid(resolved.apiUrl)) return null;
+  try {
+    const job = findAtlassianListing(await atlassianListings(resolved.apiUrl, timeoutMs), resolved.parts);
+    if (!job) return null;
+    const blocks = [['overview', 'Overview'], ['responsibilities', 'Responsibilities'], ['qualifications', 'Qualifications']]
+      .map(([key, label]) => [label, jdHtmlToText(job[key])])
+      .filter(([, body]) => body)
+      .map(([label, body]) => `${label}:\n${body}`);
+    if (!blocks.length) return null;
+    const locations = (Array.isArray(job.locations) ? job.locations : [])
+      .map((l) => String(l).replace(/\s+/g, ' ').trim()).filter(Boolean);
+    return {
+      url: postingUrl,
+      title: compactText(typeof job.title === 'string' ? job.title : '', 300),
+      text: compactText([locations.length ? `Location: ${locations.join(' | ')}` : '', ...blocks].filter(Boolean).join('\n\n'), textCap),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * ats id → fetcher. THE routing table `fetchJdViaKnownApi` dispatches through,
  * exported so the owned test can assert its key set IS `JD_TEXT_API_ATS`.
  *
@@ -1057,34 +1163,40 @@ export const JD_FETCHERS = {
   hirehive: (resolved, url, textCap, timeoutMs) =>
     fetchHireHiveJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
   hibob: fetchHibobJd,
+  eightfold: fetchEightfoldJd,
+  'atlassian-icims': fetchAtlassianJd,
 };
 
 /**
  * Try every known JD-text-capable ATS API for one posting URL before anyone
- * reaches for a browser. This is the single dispatch point both this script's
- * own CLI (jd mode) and `fetch-jd.mjs` (the bash-callable front door) call —
- * one copy of the routing table, so the interactive and headless paths cannot
- * drift on which ATS is API-fetchable.
+ * reaches for a browser. This is the single dispatch point for every API JD
+ * read, so there is one copy of the routing table. Callers differ only in
+ * `textOnly`: jd mode leaves the text-only boards to the page, `fetch-jd.mjs`
+ * reads them.
  *
  * @param {string} url
  * @param {number} [textCap]
  * @param {number} [timeoutMs]
+ * @param {{ textOnly?: boolean }} [options] textOnly: also read boards whose API says
+ *   nothing about liveness (Eightfold, Atlassian). For callers that judge liveness
+ *   elsewhere, or only need the text.
  * @returns {Promise<{url: string, title: string, text: string, ats: string}|null>}
- *   null = not a JD_TEXT_API_ATS host, or the fetch/parse was inconclusive —
- *   caller should fall through to a browser-backed read.
+ *   null = not a JD_TEXT_API_ATS host, a text-only board read without
+ *   `textOnly`, or the fetch/parse was inconclusive — caller should fall
+ *   through to a browser-backed read.
  */
-export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs = WORKDAY_TIMEOUT_MS) {
+export async function fetchJdViaKnownApi(url, textCap = JD_TEXT_CAP, timeoutMs = WORKDAY_TIMEOUT_MS, { textOnly = false } = {}) {
   const resolved = resolveAtsApi(url);
   if (!resolved || !JD_TEXT_API_ATS.has(resolved.ats)) return null;
+  // A text-only API also answers for a closed posting. A caller that reads the page to
+  // learn whether the posting is open must not get its text from here.
+  if (resolved.jdTextOnly && !textOnly) return null;
   const fetcher = JD_FETCHERS[resolved.ats];
   if (!fetcher) return null;
 
-  // `resolveAtsApi` carries a per-ATS timeout for the APIs that need one
-  // (Ashby: 20 s, liveness-api.mjs:113); without it a slow Ashby board that
-  // liveness waits for falls through here on the generic 15 s both callers
-  // pass. Same precedence liveness-api.mjs:357 applies to the same field —
-  // the resolved value wins, the argument is the fallback for every ATS that
-  // declares none.
+  // `resolveAtsApi` carries a per-ATS timeout for the APIs that need one (a slow
+  // Ashby board, the 2 MB Atlassian feed). It wins over the argument, as in
+  // checkLivenessViaApi, so a board liveness waits for is not cut short here.
   const budgetMs = resolved.timeoutMs || timeoutMs;
   const result = await fetcher(resolved, url, textCap, budgetMs);
   return result ? { ...result, ats: resolved.ats } : null;

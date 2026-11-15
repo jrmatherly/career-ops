@@ -56,7 +56,7 @@
 import { BROWSER_LIKE_USER_AGENT, fetchJsonWithRetry, sleep } from './_http.mjs';
 import { coerceId } from './_ids.mjs';
 
-const EIGHTFOLD_HOST_RE = /^[a-z0-9-]+\.eightfold\.ai$/i;
+export const EIGHTFOLD_HOST_RE = /^[a-z0-9-]+\.eightfold\.ai$/i;
 // A bare DNS name with at least two labels and an alphabetic TLD. That shape
 // leaves no room for a scheme, port, path, userinfo, `*` or trailing dot, and
 // the alphabetic TLD rules out an IPv4 literal (IPv6 needs brackets/colons).
