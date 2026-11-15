@@ -38,10 +38,13 @@ There is no index file — discovery is filesystem-convention-based
    `local-parser`, then each provider's `detect()` in load order — first
    non-null hit wins.
 
-Underscore-prefixed files are shared helpers, never loaded as providers.
-Examples: `_types.js` (contract typedefs), `_registry.mjs` (loader/router),
-`_http.mjs` (HTTP transport), `_ip-guard.mjs` (DNS/IP-layer SSRF guard),
-`_safe-url.mjs` (URL-component encoding), `_ids.mjs` (ATS id coercion),
-`_cached-lookup.mjs` (board ids kept between scans), `_html-entities.mjs`,
-`_html-to-text.mjs` (description HTML → plain text), `_config-utils.mjs`,
-`_trust-validator.mjs`. The guide says which ones a provider must use.
+Files whose names start with `_` are shared helpers, and `_registry.mjs`
+never loads them as providers. Three of them matter when you write a
+provider: `_types.js` (the contract typedefs), `_registry.mjs` (the loader
+and router described above) and `_http.mjs` (the HTTP transport, with
+retry). The rest cover HTML decoding, URL and network safety, caching, and
+parsing country, salary and id fields; each one states its purpose in its
+header comment. Before you write a parser of your own, run
+`ls providers/_*` to see what already exists.
+[ADDING_A_PROVIDER.md](ADDING_A_PROVIDER.md) covers the HTTP and retry
+helpers in detail.

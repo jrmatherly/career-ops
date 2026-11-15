@@ -1,11 +1,12 @@
-import { readApplications, readInbox, requestReportReader, doctorState, pdfPathStatusForReport, outputPdfNames } from "@/lib/career-ops";
-import { tailoredCvOnDisk } from "@/lib/tailored-cv-ready.mjs";
+import { readApplications, readInbox, requestReportReader, doctorState } from "@/lib/career-ops";
 import { pickAwaitingDecision } from "@/lib/home/awaiting.mjs";
 import { cardReason } from "@/lib/machine-summary.mjs";
 import type { CardReason } from "@/lib/machine-summary.mjs";
 import { todaySnapshot } from "@/lib/home/today-snapshot.mjs";
 import { homeLead, showFirstRunHome } from "@/lib/home/home-lead.mjs";
 import { scoreNum, parseReport } from "@/lib/format";
+import { reportNumberFor } from "@/lib/apply-checklist.mjs";
+import { readCvDiskForRows } from "@/lib/read-cv-disk";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { OnboardingProgress } from "@/components/home/onboarding-progress";
 import { FirstRunHome } from "@/components/home/first-run-home";
@@ -25,8 +26,8 @@ export default async function Home() {
   const legitimacy: Record<string, string> = {};
   const cvReady: Record<string, boolean> = {};
   const readReport = requestReportReader();
-  const pdfNames = outputPdfNames();
   const carded = new Set(pickAwaitingDecision(applications, scoreNum).map((app) => app.n));
+  const cvRows: { n: string; company: string; trackerMarked: boolean; reportNumber: number | null }[] = [];
   // Every awaiting row's legitimacy, since the apply-line tile counts past the cards shown.
   for (const app of pickAwaitingDecision(applications, scoreNum, Infinity)) {
     const content = readReport(app)?.content ?? "";
@@ -35,10 +36,11 @@ export default async function Home() {
     if (!carded.has(app.n)) continue;
     const reason = cardReason(content);
     if (reason) reasons[app.n] = reason;
-    // The report page's PDF button reads the same two sources.
-    const indexStatus = (await pdfPathStatusForReport(app.n)).status;
-    cvReady[app.n] = tailoredCvOnDisk({ indexStatus, filenames: pdfNames, company: app.company || parseReport(content).title || "" });
+    cvRows.push({ n: app.n, company: app.company || parseReport(content).title || "", trackerMarked: (app.pdf ?? "").includes("✅"), reportNumber: reportNumberFor(app.n, app, null) });
   }
+  // The report page's PDF button reads the same check.
+  const disks = await readCvDiskForRows(cvRows);
+  for (const row of cvRows) cvReady[row.n] = disks[row.n]?.exists ?? false;
   // Established / in-between: the dual-loop retention dashboard. Show the setup
   // banner whenever ANY prereq is missing (mirrors the core doctor.mjs), so a
   // portals-missing user is nudged rather than told "all caught up".

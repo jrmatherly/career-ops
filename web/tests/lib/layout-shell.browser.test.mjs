@@ -26,6 +26,7 @@ const RENDERS = {
   "/pipeline?tab=ALL": [["a tailored CV link", 'a[title="Open the tailored CV PDF"]']],
   "/followups": [["a follow-up company link", 'a[href^="/pipeline/"]']],
   "/portals": [["the Board type filter", 'select[aria-label="Board type"]']],
+  "/config": [["a template Duplicate button", "button", "Duplicate"]],
   "/": [
     ["the follow-ups See all link", 'a[href="/followups"]', "See all "],
     ["the fresh matches See all link", 'a[href="/explore?view=fresh"]', "See all "],
@@ -110,6 +111,13 @@ test("every page sits in one shell under one header, with readable text and reac
     for (const [i, [label]] of renders.entries()) {
       await t.test(`${route}: renders ${label}`, () => {
         assert.ok(m.rendered[i] > 0, `${label} did not render, so its size was not checked`);
+      });
+    }
+    if (route === "/config") {
+      const dead = await page.evaluate(() => [...document.querySelectorAll('nav[aria-label="Settings sections"] a')]
+        .map((a) => a.getAttribute("href")).filter((href) => !href.startsWith("#") || !document.getElementById(href.slice(1))));
+      await t.test("/config: every section link has a target on the page", () => {
+        assert.deepEqual(dead, []);
       });
     }
     if (route === "/explore") {

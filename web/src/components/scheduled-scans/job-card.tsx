@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Edit3, Globe, Loader2, MoreVertical, Pause, Play, Sparkles, Trash2, Zap } from "lucide-react";
 import type { ScheduledJob } from "@/lib/scheduled-jobs";
 import { evaluateModeLabel } from "@/lib/evaluate-settings.mjs";
+import { scanEngineLabel } from "@/lib/schedule-label.mjs";
 import { cn } from "@/lib/cn";
 import { formatWhen } from "@/lib/format-time.mjs";
 import { cadenceLabel } from "@/lib/scheduled-cadence.mjs";
@@ -132,7 +133,7 @@ export function JobCard({
             )}
           >
             {isFull ? <Globe className="size-3" /> : <Zap className="size-3" />}
-            {isFull ? "Full ATS Sweep" : "Zero-Token Portals"}
+            {scanEngineLabel(job.engine)}
           </span>
 
           <span

@@ -20,6 +20,7 @@ import { scoreNum } from "@/lib/format";
 import { APPLY_LINE, BELOW_APPLY_LINE } from "@/lib/report-sections.mjs";
 import { undoStatus } from "@/lib/pipeline-status.mjs";
 import { pickAwaitingDecision, groupAwaiting } from "@/lib/home/awaiting.mjs";
+import { selectDueFollowups } from "@/lib/core/followup-view.mjs";
 import { companyPresentation } from "@/lib/company-presentation.mjs";
 import { useHydrated } from "@/lib/use-hydrated";
 import { resolveHeroState, mayClaimAllClear, missingSourceLabel, displayCounts, tileValue } from "@/lib/home/hero-state.mjs";
@@ -36,7 +37,6 @@ export function TodayDashboard({
   legitimacy,
   cvReady,
   inbox,
-  inBetween,
 }: {
   applications: Application[];
   reasons: Record<string, CardReason>;
@@ -177,6 +177,10 @@ export function TodayDashboard({
   const shown = displayCounts({ followupsError, freshError, overdue, newThisWeek });
   const followupRest = homeFollowupRemainder(followups.length, overdue);
   const inboxUrls = useMemo(() => new Set(inbox.map((j) => j.url)), [inbox]);
+  const dueFollowups = useMemo(
+    () => selectDueFollowups(followups, Math.max(followups.length, 1)),
+    [followups],
+  );
 
   return (
     <PageFrame>
@@ -207,7 +211,7 @@ export function TodayDashboard({
           {heroState === "loading" ? "Your career queue is loading." : heroState === "unavailable" ? "Some updates are unavailable." : "You're all caught up."}
         </h2>
       )}
-      {inBetween && <QuickEvaluate />}
+      <QuickEvaluate />
 
       {dataError && !dataLoading && (
         <div role="alert" className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface/40 px-5 py-4 text-sm text-muted">
@@ -221,10 +225,10 @@ export function TodayDashboard({
         <FollowupsDueSectionSkeleton />
       ) : followupsError ? (
         null
-      ) : followups.length > 0 ? (
+      ) : dueFollowups.length > 0 ? (
         <Section icon={Bell} title="Follow-ups due" hint="Keep your applications alive — a nudge beats silence">
           <div className="grid gap-2.5">
-            {followups.map((f) => (
+            {dueFollowups.map((f) => (
               // Refetch (not a local decrement) so the parent's followups/upcoming
               // stay in sync with the server. Logging the LAST due item must flip this
               // section over to "Upcoming" instead of leaving it empty.

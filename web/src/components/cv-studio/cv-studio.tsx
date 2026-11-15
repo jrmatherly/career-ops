@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, FileText, Loader2, RotateCcw, Undo2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { BackLink } from "@/components/back-link";
+import { CvPdfFileActions } from "@/components/cv-pdf-file-actions";
 import { pipelineQuery } from "@/lib/pipeline-navigation.mjs";
 import { arrange, renderBlocks, type BlockTree } from "@/lib/cv-studio/html-blocks.mjs";
 import { applyRecordedEdit, emptyEdits, isStudioUndoKey, resolveStudio, studioReducer, type StudioAction, type StudioDoc, type StudioEdits } from "@/lib/cv-studio/studio.mjs";
@@ -13,7 +14,7 @@ import { SectionCard } from "./section-card";
 import { CvPreview } from "./cv-preview";
 import { CoverageMeter } from "./coverage-meter";
 
-type Loaded = { ok: true; reportNum: string; company: string; file: string; tree: BlockTree; doc: StudioDoc; edits: StudioEdits; stale: boolean; hasBase: boolean };
+type Loaded = { ok: true; reportNum: string; company: string; file: string; tree: BlockTree; doc: StudioDoc; edits: StudioEdits; stale: boolean; hasBase: boolean; pdfExport?: { ok: false; error: string } | null };
 type LoadState = { kind: "loading" } | { kind: "error"; reason: string } | { kind: "ready"; data: Loaded };
 type SaveState =
   | { kind: "idle" }
@@ -94,7 +95,9 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
     editsRef.current = prev;
     dispatchEdit({ type: "replace", edits: prev });
   }, []);
-  const [save, setSave] = useState<SaveState>({ kind: "idle" });
+  const rejectedOnLoad = data.pdfExport?.ok === false;
+  const [pdfRejected, setPdfRejected] = useState(rejectedOnLoad);
+  const [save, setSave] = useState<SaveState>(rejectedOnLoad ? { kind: "failed", error: data.pdfExport?.error ?? "Saving failed." } : { kind: "idle" });
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const resolved = useMemo(() => resolveStudio(doc, edits), [doc, edits]);
   const html = useMemo(() => renderBlocks(tree, resolved.view, { added: resolved.added }), [tree, resolved]);
@@ -189,7 +192,7 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
   }, [edits, putEdits]);
 
   const editsJson = JSON.stringify(edits);
-  const editStatus = editSaveStatus(savedJsonRef.current, editsJson, savingJsonRef.current, postingJsonRef.current, autosaveUncertainRef.current);
+  const editStatus = editSaveStatus(savedJsonRef.current, editsJson, savingJsonRef.current, postingJsonRef.current, autosaveUncertainRef.current, pdfRejected);
 
   const saveForApply = useCallback(async () => {
     setSave({ kind: "saving" });
@@ -218,10 +221,13 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
         return;
       }
       if (!r.ok || !body.pdf) {
+        setPdfRejected(true);
         setSave({ kind: "failed", error: SAVE_ERRORS[body.error ?? ""] ?? body.error ?? "Saving failed." });
       } else if (latestEdits.current !== sent) {
+        setPdfRejected(false);
         setSave({ kind: "outdated", pdf: body.pdf });
       } else {
+        setPdfRejected(false);
         setSave({ kind: "saved", pdf: body.pdf, indexed: body.indexed === true, warnings: body.warnings ?? [] });
       }
     } catch {
@@ -247,6 +253,7 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
   }, [undo]);
 
   const changed = doc.sections.flatMap((s) => s.items.flatMap((i) => i.bullets)).filter((b) => b.change !== "same").length;
+  const pdfHref = `/api/cv-pdf?n=${encodeURIComponent(data.reportNum)}`;
 
   return (
     <>
@@ -285,9 +292,10 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
           {save.indexed ? (
             <>
               Saved. Apply now uploads this version.{" "}
-              <a href={`/api/cv-pdf?n=${encodeURIComponent(data.reportNum)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium underline">
+              <a href={pdfHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium underline">
                 <FileText className="size-3.5" /> Open {save.pdf}
-              </a>
+              </a>{" "}
+              <CvPdfFileActions viewHref={pdfHref} className="inline-flex items-center gap-1 font-medium underline" />
             </>
           ) : (
             <>Saved {save.pdf}, but data/pdf-index.tsv was not updated, so Apply still uploads the earlier PDF.</>

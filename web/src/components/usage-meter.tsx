@@ -5,7 +5,17 @@ import { Gauge } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { FootSection } from "@/components/foot-section";
 
-type Usage = { window5h: { tokens: number }; window7d: { tokens: number } };
+type PlanRow = { label: string; percent: number; resets: string | null };
+type Usage = { window5h: { tokens: number }; window7d: { tokens: number }; plan?: { rows: PlanRow[] } | null };
+
+// "Current session" -> "Session", "Current week (all models)" -> "Week",
+// "Current week (Fable)" -> "Week · Fable".
+function planLabel(label: string): string {
+  const m = label.replace(/^Current\s+/i, "").match(/^(\w+)\s*(?:\((.*)\))?$/);
+  if (!m) return label;
+  const head = m[1][0].toUpperCase() + m[1].slice(1);
+  return m[2] && !/^all models$/i.test(m[2]) ? `${head} · ${m[2]}` : head;
+}
 
 // Soft total-activity budgets, including Claude cache reads. Persisted
 // `career-ops:usage-budget` values remain authoritative, so users who calibrated
@@ -83,38 +93,48 @@ export function UsageMeter() {
     ) : null;
   }
 
-  const rows = [
-    { label: "5h", tokens: data.window5h?.tokens ?? 0, budget: budget.w5, title: "Tokens used in the last 5 hours, and the share of the plan's limit" },
-    { label: "7d", tokens: data.window7d?.tokens ?? 0, budget: budget.w7, title: "Tokens used in the last 7 days, and the share of the plan's limit" },
-  ].map((r) => {
-    const pct = Math.round((r.tokens / r.budget) * 100);
-    return { ...r, pct: Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0 };
-  });
+  // Real plan limits when the Claude CLI answered; otherwise the token estimate.
+  const planRows = data.plan?.rows ?? [];
+  const tokens5h = data.window5h?.tokens ?? 0;
+  const tokens7d = data.window7d?.tokens ?? 0;
+  // A zero estimate still paints a 2% bar. Hide it until a plan or any tokens exist.
+  if (planRows.length === 0 && tokens5h === 0 && tokens7d === 0) return null;
+  const clampPct = (n: number) => (Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 0);
+  const rows = planRows.length
+    ? planRows.map((r) => ({
+        label: planLabel(r.label),
+        pct: clampPct(r.percent),
+        text: `${clampPct(r.percent)}%`,
+        detail: r.resets ? `Resets ${r.resets}` : null,
+        title: `${r.percent}% of your plan limit used${r.resets ? `, resets ${r.resets}` : ""}`,
+      }))
+    : [
+        { label: "5h", tokens: tokens5h, budget: budget.w5, title: "Tokens used in the last 5 hours, and an estimated share of the plan's limit" },
+        { label: "7d", tokens: tokens7d, budget: budget.w7, title: "Tokens used in the last 7 days, and an estimated share of the plan's limit" },
+      ].map((r) => {
+        const pct = clampPct((r.tokens / r.budget) * 100);
+        return { label: r.label, pct, text: `${fmt(r.tokens)} · ${pct}%`, detail: `${r.tokens.toLocaleString()} tokens`, title: r.title };
+      });
 
   return (
     <div className="border-t border-border pt-2">
       <FootSection label="Usage" icon={<Gauge className="size-3" />} summary={failed ? "stale" : rows.map((r) => `${r.label} ${r.pct}%`).join(" ")} alert={rows.some((r) => r.pct >= NEAR_LIMIT) ? "near the plan's limit" : undefined}>
       <div className="space-y-2 px-1">
-        {rows.map((r) => {
-          const pct = r.pct;
-          return (
-            <div key={r.label} title={r.title}>
-              <div className="flex items-center justify-between text-xs text-faint">
-                <span>{r.label}</span>
-                <span className="tabular-nums">
-                  {fmt(r.tokens)} · {pct}%
-                </span>
-              </div>
-              <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-hover">
-                <div
-                  className={cn("h-full rounded-full transition-all", tone(pct))}
-                  style={{ width: `${Math.max(pct, 2)}%` }}
-                />
-              </div>
-              <div className="mt-0.5 text-xs tabular-nums text-faint">{r.tokens.toLocaleString()} tokens</div>
+        {rows.map((r) => (
+          <div key={r.label} title={r.title}>
+            <div className="flex items-center justify-between text-xs text-faint">
+              <span>{r.label}</span>
+              <span className="tabular-nums">{r.text}</span>
             </div>
-          );
-        })}
+            <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-surface-hover">
+              <div
+                className={cn("h-full rounded-full transition-all", tone(r.pct))}
+                style={{ width: `${Math.max(r.pct, 2)}%` }}
+              />
+            </div>
+            {r.detail && <div className="mt-0.5 text-xs tabular-nums text-faint">{r.detail}</div>}
+          </div>
+        ))}
       </div>
       </FootSection>
     </div>

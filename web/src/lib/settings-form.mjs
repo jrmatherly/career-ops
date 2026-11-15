@@ -10,6 +10,8 @@
 
 /** Fired on window after a save from outside the settings sections, so they reload before their next save. */
 export const SETTINGS_SAVED_EVENT = "career-ops:settings-saved";
+/** Fired on window after the settings sections save a profile setting, so the template gallery re-reads its default. */
+export const PROFILE_SAVED_EVENT = "career-ops:profile-saved";
 
 export const SOURCE_LABELS = { saved: "Saved here", environment: "From environment", dotenv: "From .env", default: "Default", unset: "Not set" };
 

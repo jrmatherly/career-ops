@@ -283,9 +283,8 @@ test("evaluate-text refuses a data root it cannot resolve", async (t) => {
   const root = fixtureRoot(t);
   process.env.CAREER_OPS_ROOT = path.join(root, "missing");
   globalThis.__onSpawn = () => assert.fail("no CLI may start");
-  const logged = t.mock.method(console, "error", () => {});
-  assert.match(await refusal(await run({ jdText: "Role." })), /could not resolve the data root .*missing \(ENOENT\)/);
-  assert.ok(logged.mock.calls.some((call) => String(call.arguments[0]).includes("ENOENT")), "the error code is logged");
+  // Upstream's missing-folder check answers before the realpath check the deny rules need.
+  assert.match(await refusal(await run({ jdText: "Role." })), /data folder not found at .*missing/);
 });
 
 test("evaluate-text needs a CV to score against", POSIX_ROOT, async (t) => {

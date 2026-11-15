@@ -9,11 +9,14 @@ export async function GET(req: Request) {
   const root = careerOpsRoot();
   const manifestPath = await resolvePdfIndexPath();
   // Titles are a nicety: an unreadable tracker must not take the PDFs down with it.
+  // A single-document fetch needs no titles, so it skips the tracker read.
   let applications: ReturnType<typeof readApplications> = [];
-  try {
-    applications = readApplications();
-  } catch (e) {
-    console.error("documents: tracker unreadable, titling by filename", e);
+  if (!new URL(req.url).searchParams.get("id")) {
+    try {
+      applications = readApplications();
+    } catch (e) {
+      console.error("documents: tracker unreadable, titling by filename", e);
+    }
   }
   return handleDocumentsRequest(req, root, manifestPath, isRegularContainedFile, applications);
 }

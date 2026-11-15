@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/cn";
 import { useDeployment } from "@/components/deployment-context";
 import { CadenceSettings } from "@/components/followups/cadence-settings";
+import { TemplatesSection } from "@/components/templates/templates-section";
 import { persistCliId, readSavedCliId } from "@/lib/saved-cli";
 import { keepIfInstalled, pickDefaultInstalled } from "@/lib/cli-pick.mjs";
 import { CONFIG_KEY as STORAGE_KEY, writeConfig } from "@/lib/config-events.mjs";
@@ -364,6 +365,12 @@ export function ConfigForm({ dataRoot }: { dataRoot: string }) {
         ) : hosted ? null : (
           <span className="text-xs text-faint">Local-first · on our roadmap</span>
         )}
+      </div>
+
+      {/* Below Save config: the gallery saves each choice itself, so that button does not cover it. */}
+      <div id="settings-templates" className="scroll-mt-6">
+        <TemplatesSection kind="cv" />
+        <TemplatesSection kind="cover" />
       </div>
     </div>
   );

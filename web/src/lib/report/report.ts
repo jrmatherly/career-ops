@@ -1,4 +1,5 @@
 import { recentLogs } from "./logbuf";
+import { scrub } from "./scrub.mjs";
 
 /** This fork's repository: bug reports and the banner's similar-issue search
  *  open here, never on upstream (career-ops-hq). */
@@ -6,16 +7,6 @@ export const REPO = "jrmatherly/career-ops";
 
 /** Labels on every issue the reporter files; the banner's similar-issue search filters on the same set. */
 export const ISSUE_LABELS = ["area:web"];
-
-/** Strip PII / secrets that could ride in error text, paths or logs BEFORE anything
- *  leaves the machine. Defence-in-depth — the user also reviews the full payload
- *  (preview-then-confirm) before the issue opens. */
-export function scrub(s: string): string {
-  return (s || "")
-    .replace(/\/Users\/[^/\s"']+/g, "~")
-    .replace(/\/home\/[^/\s"']+/g, "~")
-    .replace(/(sk|key|token|secret|bearer|api[-_]?key)([-_=:\s"']+)[A-Za-z0-9._-]{8,}/gi, "$1$2[redacted]");
-}
 
 /** Structural fingerprint from /api/report/shape — shapes/counts, never contents. */
 export type Shape = {

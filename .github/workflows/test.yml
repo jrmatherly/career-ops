@@ -35,7 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The test merge and its parents: the first parent is the PR's base.
+          # A PR's test merge with its parents, the first being the PR's base. In
+          # the merge queue, the entry's squash commit with its parent, the base.
           fetch-depth: 2
           persist-credentials: false
       - id: classify

@@ -203,10 +203,7 @@ export function MobileNav({ followupsEnabled }: { followupsEnabled: boolean }) {
           <UsageMeter />
           <nav aria-label="Pinned" className="-mx-3">{pinned.map(navLink)}</nav>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className={`${instrumentSerif.className} text-sm text-faint`}>{host ? `Hosted · ${host}` : ""}</span>
-              <span className="font-mono text-xs text-faint">THEME</span>
-            </div>
+            {host && <span className={`${instrumentSerif.className} block text-sm text-faint`}>Hosted · {host}</span>}
             <ThemeToggle showLabel className="bg-surface-hover/40" />
           </div>
         </div>

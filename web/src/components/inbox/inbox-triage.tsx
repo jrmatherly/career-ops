@@ -27,6 +27,19 @@ const BATCH = 20;
 type UndoNotice = { label: string; fn: () => Promise<void>; busy?: boolean; error?: string };
 
 // The inbox as a TRIAGE surface: Abundance → Triage → Shortlist → Opt-in Score.
+type Ordered = { job: InboxJob; age: number | null };
+
+// Two unranked rows on the same side of the gate order by fit (core/inbox-rank.mjs)
+// before freshness. Every other pair is compareInboxJobs's.
+function compareWithFit(a: Ordered, b: Ordered): number {
+  if (a.job.rank == null && b.job.rank == null && !a.job.gated === !b.job.gated) {
+    const fitA = a.job.fit?.score ?? -Infinity;
+    const fitB = b.job.fit?.score ?? -Infinity;
+    if (fitA !== fitB) return fitB - fitA;
+  }
+  return compareInboxJobs(a, b);
+}
+
 // Default is a small capped batch (never the full wall); free facets + Save/Skip narrow
 // it; only "Score shortlist" spends tokens. 🔴 The shell is agnostic to what makes a
 // role relevant — order goes through a single documented plug point.
@@ -176,9 +189,9 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
     [enriched, hidden, added, within, sources, seniorities, locQ, kw],
   );
 
-  // 🔴 SINGLE ORDER PLUG POINT — compareInboxJobs (ranked rows first, then freshness).
-  // Facets/triage/shortlist/score never touch relevance. This is the whole firewall in one line.
-  const ordered = useMemo(() => [...filtered].sort(compareInboxJobs), [filtered]);
+  // 🔴 SINGLE ORDER PLUG POINT — compareInboxJobs (gated last, ranked rows first, then freshness),
+  // with the zero-token fit ordering the unranked rows. Facets/triage/shortlist/score never touch relevance.
+  const ordered = useMemo(() => [...filtered].sort(compareWithFit), [filtered]);
 
   const anyFacet = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
   const capped = !showAll && !anyFacet;
@@ -472,6 +485,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
               job={e.job}
               source={e.source}
               age={e.age}
+              reason={e.job.rank == null ? e.job.fit?.reason ?? "" : ""}
               scored={scoreByUrl.get(e.job.url)}
               selected={selected.has(e.job.url)}
               shortlisted={isShortlisted(e.job.url)}

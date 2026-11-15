@@ -7,7 +7,7 @@ When the user runs `/career-ops update`, execute this interactive update flow.
 Run `node update-system.mjs check --force` and parse the JSON output. `--force` because the user asked: a release they said no to earlier is shown too. This fork cuts its own releases (`career-ops-vX.Y.Z`, the 2.x line), so the default channel is right; `--channel main` would compare against an unreleased `main` instead.
 
 - If `up-to-date`: Tell the user "career-ops is up to date (v{version})." and stop.
-- If `offline`: Tell the user "Cannot reach GitHub to check for updates. Try again later." and stop.
+- If `offline`: Tell the user "Cannot reach GitHub to check for updates. Try again later." and stop. If the JSON carries a `detail` field, show it verbatim after that sentence: it is a fixed-English diagnostic naming what failed (for example `ENOENT` when curl is not installed, or a proxy or TLS error), and that is what the user needs to fix it.
 - If `no-remote-version`: Tell the user "Couldn't determine the latest career-ops release right now. Try again later." and stop.
 - If `managed-by-plugin`: career-ops runs as a Claude Code plugin, and `apply` and `rollback` refuse. Tell the user to update the plugin from the career-ops entry under `/plugin` → **Installed** (**Update now**), or, for a plugin added in Claude desktop, with **Check for updates** under **Customize → Plugins**, and stop.
 - If `worktree-without-main`: this is a linked git worktree and no checkout has `main` checked out. Tell the user to check out `main` in their main checkout and run the update there, and stop.

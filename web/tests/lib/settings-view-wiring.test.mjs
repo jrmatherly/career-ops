@@ -143,8 +143,29 @@ test("the page is a section list beside the content, and every link has a target
   const page = src("app/config/page.tsx");
   assert.match(page, /id="settings-engine"/);
   assert.match(src("components/followups/cadence-settings.tsx"), /id="settings-cadence"/);
+  assert.match(form, /<div id="settings-templates"[^>]*>\s*<TemplatesSection kind="cv" \/>\s*<TemplatesSection kind="cover" \/>/);
   assert.match(view, /id=\{`settings-\$\{group\.id\}`\}/);
   // From the registry, so a new group cannot be left out of the section list.
   for (const { id, label } of GROUPS) assert.ok(page.includes(`["${id}", "${label}"]`), `${label} is listed`);
   assert.match(view, /<h2 [^>]*className="mb-2 text-base font-semibold text-foreground"/);
+});
+
+test("a template change reloads the Settings view, so its next profile save is not stale", () => {
+  const gallery = src("components/templates/templates-section.tsx");
+  assert.match(gallery, /window\.dispatchEvent\(new Event\(SETTINGS_SAVED_EVENT\)\)/);
+  assert.equal(gallery.match(/\bprofileChanged\(\);/g)?.length, 2, "after a new default, and after a duplicate, rename or delete");
+  assert.match(view, /window\.addEventListener\(SETTINGS_SAVED_EVENT, reload\)/);
+});
+
+test("a profile save in the Settings view refreshes the gallery's default mark", () => {
+  const gallery = src("components/templates/templates-section.tsx");
+  assert.match(view, /startsWith\("profile:"\)[^\n]*window\.dispatchEvent\(new Event\(PROFILE_SAVED_EVENT\)\)/);
+  assert.match(gallery, /window\.addEventListener\(PROFILE_SAVED_EVENT, reload\)/);
+  assert.match(gallery, /window\.removeEventListener\(PROFILE_SAVED_EVENT, reload\)/);
+});
+
+test("a refresh after a save elsewhere keeps the form, and drops only an edit whose value changed under it", () => {
+  assert.match(view, /if \(keepEdits && loaded\.current\) \{\s*setNotice\(/, "a failed refresh does not replace the form with the load error");
+  assert.match(view, /const dropped = Object\.keys\(typed\.current\)\.filter\(\(id\) => changed\.has\(id\)\);/);
+  assert.match(view, /changed elsewhere on this page/);
 });

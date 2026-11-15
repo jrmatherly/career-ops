@@ -4,7 +4,12 @@
 
 **Do NOT open a public issue for security vulnerabilities.**
 
-Instead, use [GitHub's private vulnerability reporting](https://github.com/jrmatherly/career-ops/security/advisories/new) on this repository, or email **support@matherly.net**, with:
+Report it privately through either channel:
+
+- **GitHub:** open the **Security** tab and click **Report a vulnerability**, or go to https://github.com/jrmatherly/career-ops/security/advisories/new. The report stays between you and the maintainers, and you can follow its status on GitHub.
+- **Email:** **support@matherly.net**
+
+Include:
 
 1. Description of the vulnerability
 2. Steps to reproduce
@@ -24,6 +29,7 @@ Security issues in the following are in scope:
 - **Web dashboard** (`web/`) — anything reachable while it is running, including cross-origin requests from a page the user visits, requests from other hosts on the same network, and command injection through its API
 - **Templates** (`templates/`) — XSS in generated HTML/PDF
 - **Configuration** — secrets exposure, unsafe defaults
+- **Agent instructions** (`AGENTS.md`, `modes/`, `batch/`) — prompt injection through untrusted input (a job posting, company page, recruiter email or application form) that makes the agent write files outside a mode's normal output, reveal secrets, or submit or send anything the user has not explicitly approved, even a draft they have already reviewed
 
 ## Out of Scope
 

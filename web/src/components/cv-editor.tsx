@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState }
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Loader2 } from "lucide-react";
+import { noMarkdownImages } from "@/lib/markdown-options.mjs";
 import { cn } from "@/lib/cn";
 import {
   cvSaveUsesKeepalive,
@@ -194,7 +195,7 @@ const shiftedHeadings: Components = {
 
 /** cv.md rendered as markdown, one heading level below the page title. */
 export function CvMarkdown({ content }: { content: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={shiftedHeadings}>{content}</ReactMarkdown>;
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={shiftedHeadings} {...noMarkdownImages}>{content}</ReactMarkdown>;
 }
 
 /** The Edit tab: the save bar, then the markdown editor beside its live preview. */
