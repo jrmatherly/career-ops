@@ -149,3 +149,11 @@ test("the page is a section list beside the content, and every link has a target
   for (const { id, label } of GROUPS) assert.ok(page.includes(`["${id}", "${label}"]`), `${label} is listed`);
   assert.match(view, /<h2 [^>]*className="mb-2 text-base font-semibold text-foreground"/);
 });
+
+test("a template change reloads the Settings view, so its next profile save is not stale", () => {
+  const gallery = src("components/templates/templates-section.tsx");
+  assert.match(gallery, /const profileChanged = \(\) => window\.dispatchEvent\(new Event\(SETTINGS_SAVED_EVENT\)\);/);
+  assert.match(gallery, /applied: \(\) => \{\s*setTemplates\([^\n]*\n\s*profileChanged\(\);\s*\},/, "after a new default");
+  assert.match(gallery, /setPending\(null\);\s*setDraft\(""\);\s*profileChanged\(\);/, "after a duplicate, rename or delete");
+  assert.match(view, /window\.addEventListener\(SETTINGS_SAVED_EVENT, reload\)/);
+});

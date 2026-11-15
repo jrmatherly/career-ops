@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { TemplateEditor } from "@/components/templates/template-editor";
+import { SETTINGS_SAVED_EVENT } from "@/lib/settings-form.mjs";
 import { editLocks, editingAfterReload, latestOnly, loadFailureView, pendingAfterReload, settleChoice } from "@/lib/templates-state.mjs";
 
 // The CV templates the core resolves, each shown filled with a fictional resume
@@ -24,6 +25,10 @@ const COPY = {
   cv: { id: "cv-templates-heading", title: "CV templates", note: "Previews use a made-up resume, not yours. The default is used for new CVs." },
   cover: { id: "cover-templates-heading", title: "Cover letter templates", note: "Previews use a made-up letter, not yours. The default is used for new cover letters." },
 } as const;
+
+// A template change rewrites config/profile.yml, so the Settings view has to
+// reload its revision or its next profile save is refused as stale.
+const profileChanged = () => window.dispatchEvent(new Event(SETTINGS_SAVED_EVENT));
 
 export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
   const copy = COPY[kind];
@@ -88,7 +93,10 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
         return { ok: res.ok, error: typeof j.error === "string" ? j.error : undefined };
       },
       {
-        applied: () => setTemplates((prev) => prev && prev.map((t) => ({ ...t, isDefault: t.name === name }))),
+        applied: () => {
+          setTemplates((prev) => prev && prev.map((t) => ({ ...t, isDefault: t.name === name })));
+          profileChanged();
+        },
         // The list shown now is already right, so a failed reload must not hide it.
         reload: () => load(true),
         failed: setError,
@@ -118,6 +126,7 @@ export function TemplatesSection({ kind = "cv" }: { kind?: "cv" | "cover" }) {
       else {
         setPending(null);
         setDraft("");
+        profileChanged();
       }
       if (res.ok || res.status === 409) load();
     } catch {
