@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.5.0](https://github.com/jrmatherly/career-ops/compare/web-v1.4.0...web-v1.5.0) (2026-11-15)
+
+
+### Features
+
+* **web:** a scheduled scan can read only named source groups ([b73b385](https://github.com/jrmatherly/career-ops/commit/b73b385c8b2e69ac1d9abde97ad5f964b3ae563b))
+* **web:** a scheduled scan can store a location hold ([9fa015f](https://github.com/jrmatherly/career-ops/commit/9fa015fe807f9a091a5c438d61b1f3a583faca71))
+* **web:** auto-evaluation holds postings outside the job's locations ([ad38e37](https://github.com/jrmatherly/career-ops/commit/ad38e37c485203de3373f5d65a4d47ef7cb3254c))
+* **web:** pick the rows a location hold keeps back ([cf2acb8](https://github.com/jrmatherly/career-ops/commit/cf2acb8b6439052da3e735963fe711c0b7ac58a3))
+* **web:** scheduled scan source groups and a location hold on auto-evaluation ([f5b1db5](https://github.com/jrmatherly/career-ops/commit/f5b1db5d3650a34aa2bb2980438f966292d5f7bf))
+* **web:** show held postings in the Inbox and the hold in the job form ([0c1c489](https://github.com/jrmatherly/career-ops/commit/0c1c4894270191180db44d31a2ae728ecf3139c1))
+
+
+### Bug Fixes
+
+* **scan:** a state counts only directly beside the home place name ([5406f58](https://github.com/jrmatherly/career-ops/commit/5406f58eec5345b92073d6844bd1f1299ad7eb64))
+* **scan:** a trailing qualifier does not hide a foreign country slot ([c399eb1](https://github.com/jrmatherly/career-ops/commit/c399eb1cc2f8dfa4cd4045263bd8e5fda76ff538))
+* **scan:** keep a state's evidence with the home place it sits beside ([655769a](https://github.com/jrmatherly/career-ops/commit/655769aa073f04d56c15d9974b418e9530ae7841))
+* **scan:** only the first state token and the street segment leave a home place ([4867bc3](https://github.com/jrmatherly/career-ops/commit/4867bc3750d29465150506c95db9523940e6378f))
+* **web:** a run stays due while its hold is broken, and each home place is judged alone ([a3a2a5b](https://github.com/jrmatherly/career-ops/commit/a3a2a5beeb8efce24d3352ad7550c4e526d37fe9))
+* **web:** an unchanged save keeps a stored hold the form cannot show in full ([f9eab9d](https://github.com/jrmatherly/career-ops/commit/f9eab9dd8c9601fa3d81e3c88e1a930acc0cb190))
+* **web:** close the PR review's findings on the hold, groups and the gate ([3633aa1](https://github.com/jrmatherly/career-ops/commit/3633aa1ba9965750bf387999aedad6327de8f50f))
+* **web:** keep a hold the form cannot show, and index scan history once ([9609953](https://github.com/jrmatherly/career-ops/commit/9609953728fc640729e66c370529708943ff1f61))
+* **web:** refuse a source group name that cleans away, and a county written Co.Dublin ([7d669a1](https://github.com/jrmatherly/career-ops/commit/7d669a1666a1aaf7b944471b764c50d37ac245e0))
+* **web:** source groups and the hold fail closed on the review's cases ([8ab05b7](https://github.com/jrmatherly/career-ops/commit/8ab05b7ee4a8894dbb798374ab4c5e696fd402da))
+* **web:** the drain applies a job's location hold too ([f598eec](https://github.com/jrmatherly/career-ops/commit/f598eeca86938c3b528018bbd7525c0ed52cb8ed))
+
 ## [1.4.0](https://github.com/jrmatherly/career-ops/compare/web-v1.3.0...web-v1.4.0) (2026-11-14)
 
 
