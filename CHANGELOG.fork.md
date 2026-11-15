@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.5.0...career-ops-v2.5.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* **scan:** a 4 Day Week health probe reads one page, and the paywall is recorded as an open rule 1 question ([37fff2c](https://github.com/jrmatherly/career-ops/commit/37fff2c41af9b66711270483fe88b0179e6fbd99))
+* **scan:** the 4 Day Week provider counts locked rows; record nine reviewed job sources ([c211c35](https://github.com/jrmatherly/career-ops/commit/c211c35bc6fc150cbf87755d24858312c69cf685))
+* **scan:** the 4 Day Week provider says how many rows are locked for paying members ([dbc94b8](https://github.com/jrmatherly/career-ops/commit/dbc94b8a4d51f5e8357b0f9f63f7bf4012d35766))
+
 ## [2.5.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.4.0...career-ops-v2.5.0) (2026-11-15)
 
 
