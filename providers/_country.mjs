@@ -420,8 +420,8 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
  */
 function readUsStates(loc, onsite) {
   return loc.split(/([·|;/])/).map((place) => {
-    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read. A trailing "(Hybrid)" does not hide the slot.
-    const core = place.replace(/\s*\([^)]*\)\s*$/, '');
+    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read. A trailing "(Hybrid)" or "- Hybrid" does not hide the slot.
+    const core = place.replace(/\s*(?:\([^)]*\)|\s-\s+[\p{L} ]+)\s*$/u, '');
     if (!has(place, onsite) || !placesWithoutCountryCode(core).length) return place;
     let next = place;
     for (const state of US_STATE_CODES) {
