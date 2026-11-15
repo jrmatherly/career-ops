@@ -307,8 +307,8 @@ and leave both empty to evaluate every location.
   **Held: location** badge, and the ledger records it as `skipped` with the
   reason `held-location`. Evaluate it from the Inbox when you want it.
 - **A held row is not weighed again.** Changing the hold later does not
-  release rows it already held, and a row queued before the hold was set is
-  still evaluated.
+  release rows it already held. A row queued before the hold was set is
+  checked again when its turn to be evaluated comes, and held then.
 - **A hold that cannot be read queues nothing.** The form refuses a country it
   does not know. If the stored hold is unusable anyway (a file edited by hand),
   the run's message starts with "Location hold:" and says nothing was queued.

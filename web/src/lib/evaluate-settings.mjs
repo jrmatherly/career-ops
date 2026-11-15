@@ -77,11 +77,14 @@ export function addedLink(entry) {
   return typeof at === "string" && /^\d{4}-\d{2}-\d{2}/.test(at) ? `/pipeline?added=${at.slice(0, 10)}` : null;
 }
 
+// A store edited by hand can hold a number or a string here; the form shows no chips for it.
+const chipList = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === "string") : []);
+
 /** The modal's form state for a job's stored settings; no settings reads as Off with the defaults shown. */
 export function evaluateForm(stored) {
   return {
     mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5),
-    holdOnsite: [...(stored?.hold?.onsiteLocations ?? [])], holdRemote: [...(stored?.hold?.remoteCountries ?? [])],
+    holdOnsite: chipList(stored?.hold?.onsiteLocations), holdRemote: chipList(stored?.hold?.remoteCountries),
   };
 }
 

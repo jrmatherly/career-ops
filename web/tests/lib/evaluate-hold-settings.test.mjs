@@ -56,6 +56,10 @@ test("the form shows a stored hold and empty lists for none", () => {
   assert.deepEqual([evaluateForm(base).holdOnsite, evaluateForm(base).holdRemote], [["Springfield"], ["United States"]]);
   assert.deepEqual([evaluateForm().holdOnsite, evaluateForm().holdRemote], [[], []]);
 });
+test("a stored hold whose lists are not lists shows no chips", () => {
+  const form = evaluateForm({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: 42, remoteCountries: "United States" } });
+  assert.deepEqual([form.holdOnsite, form.holdRemote], [[], []]);
+});
 test("the card badge names the hold", () => {
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: HOLD }), "Auto, rank 3.5 and above, 5 per run, other locations held");
   assert.equal(evaluateModeLabel({ mode: "auto", rankThreshold: 3.5, maxPerRun: 5 }), "Auto, rank 3.5 and above, 5 per run");

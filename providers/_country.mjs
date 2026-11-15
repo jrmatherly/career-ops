@@ -420,7 +420,8 @@ const US_STATE_NAMES_JOINED = [...US_STATE_NAMES_ALSO_COUNTRIES].map(name => ({
  */
 function readUsStates(loc, onsite) {
   return loc.split(/([·|;/])/).map((place) => {
-    if (!has(place, onsite)) return place;
+    // "Dublin, Georgia, IE": a foreign country slot settles the place before any state is read.
+    if (!has(place, onsite) || !placesWithoutCountryCode(place).length) return place;
     let next = place;
     for (const state of US_STATE_CODES) {
       if (state.matches(place) || state.leads.test(place)) next = next.replace(state.token, 'united states');

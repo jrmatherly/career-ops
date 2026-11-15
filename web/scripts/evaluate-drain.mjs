@@ -12,17 +12,20 @@ import http from "node:http";
 import path from "node:path";
 import { readScheduledStore } from "../src/lib/scheduled-jobs-store.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
-import { pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
+import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
-import { appendRow, drainPlan, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
+import { HELD_LOCATION, appendRow, drainPlan, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
 import { JD_TEXT_API_ATS, resolveAtsApi } from "../../liveness-api.mjs";
 import { fetchJdViaKnownApi } from "../../browser-extract.mjs";
 import { resolveTrackerPath } from "../../path-resolver.mjs";
 import { parseTrackerRow, resolveColumns } from "../../tracker-parse.mjs";
 import { reportUrlToken } from "../../tracker-utils.mjs";
 import { tsvCell } from "../../lib/application-meta.mjs";
+import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
+import { buildWorkplacePolicy } from "../../providers/_country.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
 // A wall-clock deadline on one run. For an evaluation: the route's 740 s kill,
@@ -73,6 +76,22 @@ function skipReason(root, key, persisted) {
   if (trackerKeys(root).has(key)) return "already-evaluated";
   if (persisted.has(key)) return "report-exists";
   return null;
+}
+
+/**
+ * The job's location hold as a test for one URL, null when it has none. The
+ * rank pass holds rows as it queues them; this covers a row queued before the
+ * hold was set. `problem` is set when the stored hold cannot be built.
+ */
+function locationHold(root, job) {
+  if (job.evaluate.hold === undefined) return null;
+  try {
+    const gate = buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {}));
+    const scanHistoryRows = scanHistoryDataLines(readText(path.join(root, "data", "scan-history.tsv"))).filter((line) => line.trim()).map(parseScanHistoryLine);
+    return { holds: (url) => heldForLocation({ rows: [{ url }], scanHistoryRows, gate }).size > 0 };
+  } catch (error) {
+    return { problem: `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was evaluated.` };
+  }
 }
 
 /** One request to the dashboard. Resolves {status, text} or {transport: error}; never rejects. */
@@ -276,6 +295,7 @@ export async function runDrain({
   try {
     jobs: for (const job of jobs) {
       let started = 0;
+      let hold;
       for (let entry; (entry = planFor(job, tried, started)[0]); current = undefined) {
         current = entry;
         tried.add(entry.key);
@@ -297,6 +317,15 @@ export async function runDrain({
         const skip = skipReason(root, entry.key, persisted);
         if (skip) {
           await append("skipped", skip);
+          continue;
+        }
+        hold ??= locationHold(root, job) ?? {};
+        if (hold.problem) {
+          touchedRuns.set(entry.runId, { drainMessage: hold.problem });
+          continue jobs;
+        }
+        if (hold.holds?.(url)) {
+          await append("skipped", HELD_LOCATION);
           continue;
         }
         if (!JD_TEXT_API_ATS.has(resolveAtsApi(url)?.ats)) {

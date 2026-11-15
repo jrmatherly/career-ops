@@ -755,3 +755,25 @@ test("CV runs count toward neither the job's per-pass limit nor the daily cap", 
   assert.deepEqual(urls.map((u) => state(u).state), ["evaluated", "evaluated"]);
   assert.equal(cvPosts(posts).length, 2);
 });
+
+const HOLD = { onsiteLocations: ["Springfield"], remoteCountries: ["United States"] };
+const historyOf = (root, rows) => fs.writeFileSync(path.join(root, "data", "scan-history.tsv"),
+  ["url\tfirst_seen\tportal\ttitle\tcompany\tstatus\tlocation", ...rows.map(([u, location]) => `${u}\t2026-11-08\tboards\tEngineer\tFictional Co\tadded\t${location}`), ""].join("\n"));
+
+test("a row queued before the job got a location hold is held at the drain, not evaluated", async (t) => {
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2), url(3)], evaluate: { ...AUTO, hold: HOLD } });
+  historyOf(root, [[url(1), "Remote, United States"], [url(2), "Metropolis, NY"]]);
+  const result = await drain();
+  assert.deepEqual(posts.map((post) => post.body.input), [url(1)], "only the row the hold admits is sent");
+  assert.deepEqual([url(1), url(2), url(3)].map((u) => [state(u).state, state(u).reason]), [["evaluated", "report 1"], ["skipped", "held-location"], ["skipped", "held-location"]]);
+  assert.equal(result.skipped, 2);
+});
+
+test("a hold that cannot be built evaluates nothing and leaves the rows queued", async (t) => {
+  const { root, drain, state, posts, storePath } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: { ...HOLD, remoteCountries: ["Atlantis"] } } });
+  historyOf(root, [[url(1), "Remote, United States"]]);
+  await drain();
+  assert.equal(posts.length, 0);
+  assert.equal(state(url(1)).state, "queued");
+  assert.match(readScheduledStore(storePath).runs[0].drainMessage, /^Location hold: .*\. Nothing was evaluated\.$/);
+});
