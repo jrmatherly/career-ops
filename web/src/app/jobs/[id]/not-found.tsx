@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { PageFrame } from "@/components/page-frame";
 
 export default function JobNotFound() {
   const { id } = useParams<{ id: string }>();
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <PageFrame width="reading">
       <Link
         href="/jobs"
         className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand-text"
@@ -20,6 +21,6 @@ export default function JobNotFound() {
           Nothing in this browser matches that address. It may have finished and been cleared, or the link is wrong.
         </p>
       </div>
-    </div>
+    </PageFrame>
   );
 }

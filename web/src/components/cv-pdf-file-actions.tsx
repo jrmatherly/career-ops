@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useDeployment } from "@/components/deployment-context";
 import { pdfDownloadHref, pdfRevealHref } from "@/lib/cv-pdf-query.mjs";
 
 export function CvPdfFileActions({ viewHref, className }: { viewHref: string; className: string }) {
   const [error, setError] = useState("");
+  const { hosted } = useDeployment();
 
   async function reveal() {
     setError("");
@@ -24,9 +26,11 @@ export function CvPdfFileActions({ viewHref, className }: { viewHref: string; cl
       <a href={pdfDownloadHref(viewHref)} className={className}>
         Download PDF
       </a>
-      <button type="button" className={className} title="Reveal the file" onClick={reveal}>
-        Show in Finder
-      </button>
+      {hosted ? null : (
+        <button type="button" className={className} title="Reveal the file" onClick={reveal}>
+          Show in Finder
+        </button>
+      )}
       {error ? (
         <span role="alert" className="text-xs text-red-700 dark:text-red-400">
           {error}
