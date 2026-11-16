@@ -34,6 +34,11 @@ listings keep upstream's 1.x numbers, because they describe upstream's
 packages; upstream's releases ship inside the next fork release after an
 upstream review.
 
+Updating with `node update-system.mjs apply` is not supported on this fork.
+Shipped scripts import fork-local modules that `apply` does not deliver, so an
+install updated that way fails with `ERR_MODULE_NOT_FOUND`. Update through the
+Claude plugin, the container image or `git pull`.
+
 ## How it syncs
 
 Upstream is merged, not re-based, through the `/upstream-review` skill: it

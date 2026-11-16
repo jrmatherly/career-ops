@@ -128,15 +128,17 @@ Nothing important is stored inside the container. `./cops down` is safe.
 
 ```bash
 ./cops update:check   # is a newer release out?
-./cops update         # apply it
+./cops update         # apply it (not supported on this fork, see below)
 ./cops rollback       # undo the last update
 ```
 
-**Not on this fork's own checkout.** `./cops update` runs `update-system.mjs apply`,
-which replaces system files from upstream's release tarball and would freeze or
-overwrite the fork's deviations. In the checkout that develops this fork, sync
-through the `/upstream-review` skill instead (`.claude/skills/upstream-review/SKILL.md`).
-`./cops update` is fine inside a container that only runs the tool.
+**`./cops update` is not supported on this fork.** It runs `update-system.mjs apply`,
+which fetches the fork's release tag by git and replaces the system files with
+it. Shipped scripts import fork-local modules that `apply` does not deliver, so
+an install updated that way fails with `ERR_MODULE_NOT_FOUND`. Update with
+`git pull` and `./cops rebuild`, or pull a newer pre-built image. In the
+checkout that develops this fork, bring upstream in through the
+`/upstream-review` skill (`.claude/skills/upstream-review/SKILL.md`).
 
 `./cops` runs each command as the owner of the project directory as the
 container sees it. With Docker Engine's default (rootful) install on Linux that
