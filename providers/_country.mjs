@@ -133,6 +133,8 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 // discipline, not a work arrangement. The policy must not convert an office
 // job outside onsite_locations into an eligible country-wide remote role.
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
+// Home-working words in a location. Read only under a policy that allows the United States.
+const HOME_WORKING = /\b(?:virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?))\b|(?:^|[·;] ?)home ?[-,]/;
 const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*remote\b/;
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
@@ -189,6 +191,7 @@ export function buildWorkplacePolicy(policy) {
   const homeCodes = new Set(home.flatMap(v => [...countries(countryValue(v), true)]));
   if (!homeCodes.size) throw new Error('workplace_policy.remote_countries must name a country or ISO country code');
   const homeStates = onsite.map(compileHomeState);
+  const usHome = homeCodes.has('US');
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
   // must not become eligibility evidence. Structured fields still accept ISO.
@@ -234,10 +237,12 @@ export function buildWorkplacePolicy(policy) {
   const localCountries = onsiteCountries.length ? onsiteCountries : home;
   const localCodes = new Set(localCountries.flatMap(v => [...countries(countryValue(v), true)]));
   if (!localCodes.size) throw new Error('workplace_policy.onsite_countries must name a country or ISO country code');
+  const usLocal = localCodes.has('US');
   const homeAliases = [...home.map(countryValue), ...COUNTRY_NAMES.filter(c => homeCodes.has(c.code)).flatMap(c => PROSE_WORD_CODES.has(c.code.toLowerCase()) ? [c.name] : [c.name, c.code.toLowerCase()]), ...COUNTRY_ALIASES.filter(c => homeCodes.has(c.code)).map(c => c.name)];
   const foreignOnly = [...COUNTRY_NAMES, ...COUNTRY_ALIASES].filter(c => !homeCodes.has(c.code)).map(country => new RegExp(`(?<![\\p{L}\\p{N}])${escape(country.name)}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?\\s*[- ]?only\\b`, 'u'));
   return (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
+    const raw = typeof location === 'string' ? location : '';
     const loc = fold(location), heading = fold(title), description = plain(offer.description);
     const meta = fold(requirementText(offer));
     const workplace = fold(offer.workplaceType || offer.workplace_type || offer.workArrangement);
@@ -274,20 +279,25 @@ export function buildWorkplacePolicy(policy) {
     }
     const structuredOffice = OFFICE.test(loc) || OFFICE.test(workplace) || OFFICE.test(heading);
     const remote = !structuredOffice && !NOT_REMOTE.test(loc) && !NOT_REMOTE.test(heading)
-      && (REMOTE.test(loc) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
-    if (!remote) {
+      && (REMOTE.test(loc) || (usHome && HOME_WORKING.test(loc)) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
+    // Under a US policy a posting marked remote that names a home place is judged as that place first ("Atlanta or Remote").
+    if (!remote || (usLocal && has(loc, onsite))) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
       const abroad = (text) => { const found = countries(text, true); return found.size > 0 && ![...found].some(c => localCodes.has(c)); };
       // A home place with its US state written beside it is judged alone, so "Atlanta, GA · London, UK" passes through
       // Atlanta and its "GA" is not Gabon. Without one, the whole location decides.
-      const stated = localCodes.has('US') ? loc.split(/[·;]/).flatMap(place => homeStates.map(read => read(place)).filter(text => text !== null)) : [];
-      if (!stated.some(text => !abroad(text)) && abroad(loc)) return fail('onsite_country_restricted');
-      return { eligible: true, reason: 'onsite_location_allowed' };
+      const stated = usLocal ? loc.split(/[·;]/).flatMap(place => homeStates.map(read => read(place)).filter(text => text !== null)).map(withoutAddressWords) : [];
+      if (stated.some(text => !abroad(text)) || !abroad(usLocal ? withoutAddressWords(withoutStateCodes(raw)) : loc)) return { eligible: true, reason: 'onsite_location_allowed' };
+      if (!remote) return fail('onsite_country_restricted');
     }
     // Explicit structured countries narrow a covering region. Europe + UK-only
     // never implies Spain. Multiple genuine eligible countries including Spain
     // are allowed. No timezone token is an eligibility signal.
-    const geoLoc = geographyText(loc);
+    // Under a US policy a place that names a US state and no foreign country stands for the United States.
+    const geoLoc = geographyText(usHome ? raw.split(/[·;]/).map(place => {
+      const rest = withoutUsStates(place);
+      return rest !== null && [...countries(rest, true)].every(c => homeCodes.has(c)) ? `${rest} united states` : fold(place);
+    }).join(' · ') : loc);
     const locationCountries = countries(geoLoc, true);
     if (locationCountries.size && ![...locationCountries].some(c => homeCodes.has(c))) return fail('remote_country_restricted');
     const remoteDescription = description.split(/[.!?;\n]+/).some(clause => /\b(?:work remotely|work remote|remote work|remote role|work from home|work from)\b/.test(clause) && supportsHomeGeography(clause));
@@ -382,4 +392,40 @@ function compileHomeState(home) {
     if (!before.test(place) || (parts.length > 1 && !/\d/.test(parts[1]))) return null;
     return brackets(parts.map((part, i) => (i === 0 ? part.replace(before, '$1') : i === 1 ? part.replace(ADDRESS_HEAD, head => head.replace(TWO_LETTER_WORD, ' ')) : part)).join(','));
   };
+}
+
+// CA, CO, DE, IL and IN are also Canada, Colombia, Germany, Israel and India, and boards write "Remote, CA" for both.
+const AMBIGUOUS_STATE_CODES = ['ca', 'co', 'de', 'il', 'in'];
+// HI, ME, OH, OK and OR are also words in capitals ("Remote (OK to work anywhere)"), so a word after one makes it a word.
+const US_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:HI|ME|OH|OK|OR)(?!\\s+\\p{Ll})|${USPS_STATES.map(([, abbr]) => abbr).filter(abbr => ![...AMBIGUOUS_STATE_CODES, 'hi', 'me', 'oh', 'ok', 'or'].includes(abbr)).join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
+// Georgia is left out: alone it is the country.
+const US_STATE_NAME = new RegExp(`(?<![\\p{L}\\p{N}])(?:${USPS_STATES.map(([name]) => name).filter(name => name !== 'georgia').join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+const GEORGIA_CODE = /(?<![\p{L}\p{N}])GA(?!\p{L})/u;
+// A street number, then the words up to the next comma, slash, bar, bracket or spaced dash.
+const ADDRESS_RUN = /(?<![\p{L}\p{N}])\d[\p{L}\p{N}]*\s.*?(?=\s-\s|[,/|()[\]·;]|$)/gu;
+
+/** A raw location with its capital US state codes taken out, folded. A place written all in capitals keeps
+ * them, because nothing there tells "OR" the state from "or" the word.
+ * @param {string} location
+ */
+function withoutStateCodes(location) {
+  return location.split(/[·;]/).map(place => fold(/\p{Ll}/u.test(place) ? place.replace(US_STATE_CODE, ' ') : place)).join(' · ');
+}
+
+/** A raw place with its US states taken out, folded, or null when it names none. Georgia counts where its
+ * code GA stands in the same place ("GEORGIA - VIRTUAL - GA01").
+ * @param {string} place
+ */
+function withoutUsStates(place) {
+  const named = GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place;
+  const rest = withoutStateCodes(named.replace(US_STATE_NAME, ' '));
+  return rest === fold(place) ? null : rest;
+}
+
+/** A folded place without the two-letter words of its street addresses: the "St" of "999 18th St" and the
+ * "SE" of "200 Main Parkway SE" are not countries. A number with one word after it is left alone ("30339 IE").
+ * @param {string} text
+ */
+function withoutAddressWords(text) {
+  return text.replace(/\[/g, '(').replace(/\]/g, ')').replace(ADDRESS_RUN, run => run.trim().split(/\s+/).length > 2 ? run.replace(TWO_LETTER_WORD, ' ') : run);
 }

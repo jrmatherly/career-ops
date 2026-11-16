@@ -62,11 +62,32 @@ as its default; a supplied nonempty country list must name a recognized country.
   not make it foreign, and any country it still names decides (`Dublin, GA -
   IE` stays Ireland). A state anywhere else is not read: `Vancouver, BC, CA`
   and `CA-BC-Richmond` stay Canada. Without a state beside the name, the
-  whole location decides, as before. This applies to the onsite check only.
-  A state never confirms a remote role: `Remote - CO` and
-  `Remote, California` are not eligible, because `Berlin, DE` and `Perth, WA`
-  read the same as a US place. A policy that does not allow the United States
-  reads all of these as before.
+  whole location decides, as before. There, a state code in capitals
+  (`Detroit, 1515 Main Avenue, MS`) and the two-letter words of a street
+  address (`999 18th St`, `200 Main Parkway SE Suite 900`) are not read as
+  countries. A posting marked remote that names an allowed onsite location
+  (`Atlanta or Remote`, or `Atlanta` under a title ending in `(Remote)`) is
+  judged as that location first.
+- When `remote_countries` includes the United States, a US state confirms a
+  remote role. A full state name counts (`Remote - Texas`, `New Jersey -
+  Remote`), and so does a state code in capitals (`Remote, TN`, `Remote; Orem,
+  UT`), in a place that is not written all in capitals. Five codes never
+  count, because boards write them for the country too: `CA`, `CO`, `DE`,
+  `IL` and `IN` (`Remote, CA` is Canada as often as California). `Georgia`
+  alone is the country; it is the state where its code stands in the same
+  place (`GEORGIA - VIRTUAL - GA01`). A foreign country in the same place
+  wins (`Remote - Chennai, TN, India`). The cost: a foreign place whose
+  region shares a state's letters is admitted when no country is written
+  (`Remote - Perth, WA`), and so is a bare code of a country that shares
+  them (`Remote, AR` for Argentina).
+- Under the same policy these location words mark a remote role as `Remote`
+  does: `Virtual`, `Telework`, `Work at Home`, `Working at Home`, `Home
+  based`, `Home Office`, `Home Worker`, `Home Teleworkers`, and a place that
+  opens with `Home` (`Home-United States`). The role still has to show the
+  United States or a state.
+- A policy that does not allow the United States reads none of this: a state
+  never confirms a remote role there (`Remote - CO`, `Perth, WA` and `Berlin,
+  DE` read the same as a US place), and `Home based` is not a remote marker.
 - Timezone abbreviations in hours/overlap wording do not count as countries.
   A region qualified by "where we have a hiring presence" needs separate
   evidence that the allowed remote country is eligible.
