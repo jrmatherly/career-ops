@@ -36,6 +36,7 @@ import {
   resolvePdfIndexPath,
   resolveTrackerPath,
   resolveWorkspaceRoot,
+  writeFileAtomic,
 } from './tracker-utils.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { localToday } from './lib/local-today.mjs';
@@ -618,21 +619,33 @@ try {
 }
 
 // Publish the committed journal only after set-status confirms the transition.
+let journalLock;
+try {
+  journalLock = await acquireDirLock(join(outcomeDir, '.submitted-cv.lock'), {
+    timeoutMs: 60_000, retryMs: 75, staleMs: 10 * 60_000, maxWaitMs: 60_000,
+  });
+} catch (err) {
+  failExit(`Tracker updated, but outcome journal lock unavailable in ${outcomeDir} (${err.message})`, 'journal-locked', 1);
+}
+let journalError = null;
 try {
   if (existsSync(outcomeLogPath)) {
     const existingLog = readFileSync(outcomeLogPath, 'utf-8');
     if (!existingLog.includes(newEntry.trim())) {
-      writeFileSync(outcomeLogPath, existingLog.endsWith('\n') ? existingLog + '\n' + newEntry : existingLog + '\n\n' + newEntry);
+      writeFileAtomic(outcomeLogPath, existingLog.endsWith('\n') ? existingLog + '\n' + newEntry : existingLog + '\n\n' + newEntry);
     }
   } else {
     const initialLog = `# Application Outcome Log — ${matchedRow.company} — ${matchedRow.role} (#${matchedRow.num})
 
 ${newEntry}`;
-    writeFileSync(outcomeLogPath, initialLog);
+    writeFileAtomic(outcomeLogPath, initialLog);
   }
 } catch (err) {
-  failExit(`Tracker updated, but outcome journal could not be saved: ${err.message}`, 'journal-write-failed', 1);
+  journalError = err;
+} finally {
+  releaseOrWarn(journalLock);
 }
+if (journalError) failExit(`Tracker updated, but outcome journal could not be saved: ${journalError.message}`, 'journal-write-failed', 1);
 
 // 6. Clean up output/ — only ever removes a file whose archived copy in
 // data/outcomes/ has already been verified byte-for-byte (sha256) against the
