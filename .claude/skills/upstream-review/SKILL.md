@@ -485,6 +485,13 @@ Decision log: `.upstream-review/reviews/2026-11-15-review.md` (375 commits, `033
 | --- | --- | --- | --- |
 | a provider's waits between pages and before a retry are set in its own file (often `INTER_PAGE_DELAY_MS`, `RETRY_POLICY`; some providers take none), with no per-entry override | `lib/entry-pacing.mjs` (`applyEntryPacing`) reads `request_delay_ms` on a `portals.yml` entry and gates that entry's `fetchJson`, `fetchText` and `fetchResponse`, so each request starts that long after the one before, to within a millisecond; `scan.mjs` imports it and calls it right after `applyEntryTimeout(ctx, company)`, and `verify-portals.mjs` (`withEntryLimits`, and the first check's fetchers in `verifyOne`) and `audit-portals.mjs` wrap their per-entry ctx with it, shortened to `PROBE_MAX_REQUEST_DELAY_MS` because the web health check is killed at 110 s; `templates/portals.example.yml` gains the `request_delay_ms` comment block after `timeout_ms`. In the web app, `setCompanyFieldText` in `web/src/lib/portals-config.mjs` (the former body of `setCompanyEnabledText`, now over any scalar key), with `setCompanyRequestDelayText` and `requestDelayMs` or `requestDelayIgnored` on a watched company; `MAX_REQUEST_DELAY_MS`, `isRequestDelayMs` and `requestDelayFromSeconds` in `web/src/lib/portals-view-model.mjs`; the `request_delay_ms` branch and `editCompany` in `web/src/app/api/portals/route.ts`, and the timer button and form per row in `web/src/components/portals-view.tsx` | KEEP | Fork feature, asked for by the owner on 2026-11-15; no file under `providers/` changes. Our hunks in `scan.mjs` and `audit-portals.mjs` are the import and the one call, and in `verify-portals.mjs` also `withEntryLimits` and the first check's fetchers in `verifyOne`: an upstream hunk elsewhere is ADOPT. Pinned by `tests/scan-entry-pacing.test.mjs`, `tests/verify-portals-entry-pacing.test.mjs` and `web/tests/lib/portals-request-delay.test.mjs`. An upstream per-entry pacing key is a comparison review: ours paces every request a provider sends through the ctx fetchers, retries included. The standalone `scan-*.mjs` scanners do not read the key. |
 
+### Project audit fixes (2026-11-16)
+
+Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `docs/superpowers/research/2026-11-16-project-audit/README.md`.
+
+| Upstream | Ours | Status | Notes |
+| --- | --- | --- | --- |
+
 ## Decision log template
 
 ```markdown
