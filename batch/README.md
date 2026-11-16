@@ -122,7 +122,7 @@ Workers write one TSV per offer to `batch/tracker-additions/`. The merge script 
 
 - Deduplication by posting URL first, then report number, then company + role fuzzy match
 - Fields resolved by name from the TSV header; a legacy headerless TSV (status before score, the reverse of applications.md) is converted by column order
-- In-place updates on re-evaluation whether the score goes up, down or stays the same (a downgrade notes the superseded report number)
+- In-place updates on re-evaluation whether the score goes up, down or stays the same (a re-evaluation that replaces the report notes the superseded report number)
 - Moving processed TSVs to `tracker-additions/merged/`
 
 Run `npm run merge` manually if you need to merge outside of a batch run.

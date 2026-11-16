@@ -12,7 +12,7 @@
  *
  * Dedup: posting URL first, then report number, then company normalized + role fuzzy match
  * A duplicate is updated in place whether the score goes up, down or stays the same;
- * a downgrade records the superseded report number in notes (#2411)
+ * a re-evaluation that replaces the report records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
@@ -630,11 +630,11 @@ export async function mergeTracker(options = {}) {
    * @param {number} oldScore - Score currently on the row.
    * @param {number} newScore - Score from the addition.
    * @param {string} [extraMarker] - Appended to the re-eval marker, before any
-   *   incoming notes. Used by the downgrade path to record the superseded report
-   *   (#2411). It rides on the marker rather than on `addition.notes` so that the
-   *   repeat detection below keeps comparing the user's own text against the
+   *   incoming notes. Used by a re-evaluation that replaces the Report cell to
+   *   record the superseded report (#2411). It rides on the marker rather than
+   *   on `addition.notes` so that the repeat detection below keeps comparing the user's own text against the
    *   user's own text — a generated fragment in that comparison would make every
-   *   downgrade look like a new note and defeat it.
+   *   re-evaluation look like a new note and defeat it.
    * @returns {string} Combined Notes cell.
    */
   function mergeNotes(existingNotes, addition, oldScore, newScore, extraMarker = '') {
@@ -2308,14 +2308,14 @@ export async function mergeTracker(options = {}) {
         // the notes and report link are still fresher than what the row holds.
         //
         // Because the fuzzy matcher can mis-pair genuinely different roles (see
-        // role-matcher.mjs — "Senior" is a stopword and short tokens are dropped), a
-        // downgrade records the superseded report number so a bad match stays
-        // recoverable from the tracker alone. mergeNotes() keeps the existing cell
-        // verbatim and first, so a second downgrade preserves the earlier marker
-        // rather than overwriting it.
+        // role-matcher.mjs — "Senior" is a stopword and short tokens are dropped), any
+        // re-evaluation that replaces the Report cell records the superseded report
+        // number, so the old report and a bad match stay reachable from the tracker.
+        // mergeNotes() keeps the existing cell verbatim and first, so a second
+        // downgrade preserves the earlier marker rather than overwriting it.
         const downgrade = newScore < oldScore;
         const oldReportNum = extractReportNum(duplicate.report, duplicate.notes);
-        const supersededNote = downgrade && oldReportNum && oldReportNum !== reportNum
+        const supersededNote = oldReportNum && oldReportNum !== reportNum
           ? `Superseded report [${oldReportNum}] (was ${oldScore}/5)`
           : '';
 
