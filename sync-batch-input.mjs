@@ -45,7 +45,7 @@ import { createHash } from 'crypto';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
 import { getCareerOpsRoot } from './path-resolver.mjs';
-import { sectionKind } from './lib/pipeline-sections.mjs';
+import { pendingRange } from './lib/pipeline-sections.mjs';
 import { acquirePipelineLock } from './pipeline-lock.mjs';
 import { releaseOrWarn } from './lib/dir-lock.mjs';
 
@@ -71,7 +71,6 @@ export function batchInputLockTarget(inputPath) {
   return join(realpathSync(tmpdir()), 'career-ops-batch-input-locks', identity);
 }
 
-const SECTION_RE = /^##\s+/;
 const PENDING_ITEM_RE = /^- \[ \]\s+/;
 
 /**
@@ -237,19 +236,10 @@ export function buildNotes(labels) {
  */
 export function parsePending(text) {
   const lines = text.split(/\r?\n/);
-  let pendStart = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (sectionKind(lines[i]) === 'pending') { pendStart = i; break; }
-  }
-  if (pendStart < 0) return [];
-
-  let pendEnd = lines.length;
-  for (let i = pendStart + 1; i < lines.length; i++) {
-    if (SECTION_RE.test(lines[i])) { pendEnd = i; break; }
-  }
+  const { start, end } = pendingRange(lines);
 
   const out = [];
-  for (let i = pendStart + 1; i < pendEnd; i++) {
+  for (let i = start; i < end; i++) {
     if (!PENDING_ITEM_RE.test(lines[i])) continue;
     const body = lines[i].replace(PENDING_ITEM_RE, '');
     const raw = lineUrl(body);

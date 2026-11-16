@@ -42,6 +42,7 @@ import { withPipelineLock } from './pipeline-lock.mjs';
 import { replaceUserFile } from './tracker-utils.mjs';
 import { scorePosting } from './lib/inbox-rank.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
+import { pendingRange } from './lib/pipeline-sections.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { normalizeUrl } from './url-key.mjs';
@@ -182,7 +183,9 @@ export function heuristicSegment(entry, targets) {
 export function parsePendingEntries(text) {
   const out = [];
   const lines = String(text ?? '').split('\n');
+  const { start, end } = pendingRange(lines);
   lines.forEach((raw, index) => {
+    if (index < start || index >= end) return;
     if (!raw.startsWith('- [ ] ')) return;
     if (raw.includes(RANK_LABEL)) return;
     const cells = raw.slice(6).split('|').map(c => c.trim());
