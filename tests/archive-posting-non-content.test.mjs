@@ -41,7 +41,7 @@ function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Ba
     async goto(url) { page._landedUrl = url; return { status: () => httpStatus }; },
     url() { return page._landedUrl; },
     frames() { return []; },
-    on() {},
+    on() {}, context: () => ({ on() {} }),
     async waitForTimeout() {},
     async title() { return title; },
     async $eval(selector) {

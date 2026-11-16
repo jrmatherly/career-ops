@@ -1537,7 +1537,8 @@ async function main() {
     // Refuses the first URL of every routed request (navigation, popup,
     // subresource) that names or resolves to a private host. It never sees a
     // redirect hop, so the landed URL is judged below before any CONTENT is
-    // read, and every URL a frame committed to is judged after the read (SSRF).
+    // read, and what the page received (the address behind every response,
+    // frame URLs, WebSockets) is judged after the read (SSRF).
     await installEgressGuard(context);
     const page = await context.newPage();
     const rejectVisited = recordLandedUrls(page);

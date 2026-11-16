@@ -335,8 +335,9 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
 
     // The route guard never sees a redirect hop, so where the page and its
     // frames landed is judged here, after the page settles and before anything
-    // is read from it. Once the PDF is rendered, every address any frame
-    // committed to since the page opened is judged.
+    // is read from it. Once the PDF is rendered, everything the page received
+    // since it opened is judged: the address behind every response, every URL
+    // a frame committed to, every WebSocket.
     const postGuard = await rejectLandedPage(page);
     if (postGuard) {
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
@@ -386,14 +387,12 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     const company = resolvedCompany.replace(/^job\s+application\s+for\s+/i, '').trim();
     const role = resolvedRole.replace(/^job\s+application\s+for\s+/i, '').trim();
 
-    console.log(`   Company: ${company}`);
-    console.log(`   Role:    ${role}`);
     if (httpStatus === 404) {
       throw new Error('refusing to archive: HTTP 404');
     }
     const interstitial = httpStatus >= 400 ? cloudflareInterstitial(pageTitle) : null;
     if (interstitial) {
-      throw new Error(`refusing to archive: HTTP ${httpStatus} Cloudflare ${interstitial} ("${pageTitle.trim()}"), not a posting`);
+      throw new Error(`refusing to archive: HTTP ${httpStatus} Cloudflare ${interstitial}, not a posting`);
     }
     if (httpStatus && httpStatus >= 400) {
       console.log(`HTTP ${httpStatus} — page may be closed, archiving anyway`);
@@ -409,6 +408,9 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     if (afterRender) {
       throw new Error(`refusing to archive restricted destination after redirect: ${afterRender.reason}`);
     }
+    // Printed only now: before the verdict these could be an internal page's title.
+    console.log(`   Company: ${company}`);
+    console.log(`   Role:    ${role}`);
 
     mkdirSync(JDS_DIR, { recursive: true });
 

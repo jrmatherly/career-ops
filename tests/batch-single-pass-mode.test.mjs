@@ -239,7 +239,7 @@ try {
   const mockBrowser = {
     newPage: async () => ({
       url: () => 'https://example.com/test-job',
-      context: () => ({ route: async () => {} }), on() {},
+      context: () => ({ route: async () => {}, on() {} }), on() {},
       goto: async () => {},
       waitForTimeout: async () => {},
       evaluate: async () => rawJd,

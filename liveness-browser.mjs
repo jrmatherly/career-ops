@@ -309,10 +309,12 @@ export async function validateUrlSecurity(urlString) {
  * hostname resolving into private space.
  *
  * Playwright calls a route handler for the first URL of a request only, never
- * for the hops a 3xx sends it to. So this guard does not see a redirect target:
- * every caller that reads page content must also call `recordLandedUrls` on a
- * new page, `rejectLandedUrl` before its first read, and the recorder's check
- * after its last. WebSocket handshakes are not routed.
+ * for the hops a 3xx sends it to, and never for a WebSocket handshake. So this
+ * guard does not see a redirect target, of a navigation or of an image, script,
+ * stylesheet or fetch, and what such a hop answers does reach the page. Every
+ * caller that reads page content must also call `recordLandedUrls` on a new
+ * page, `rejectLandedUrl` before its first read, and the recorder's check after
+ * its last.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
  */
@@ -339,15 +341,15 @@ export async function installEgressGuard(context) {
 /**
  * Judge the URL a page is on, by literal host and then by DNS. Call it after
  * the navigation settles and before anything is read from the page, so a page
- * already known bad is not read. What the page and its frames do after that is
- * judged by `recordLandedUrls`.
+ * already known bad is not read. What the page receives after that is judged
+ * by `recordLandedUrls`.
  *
- * Still open: the request to a redirect hop is SENT, blind, before any check
- * sees it. A redirected subresource (image, script, style) commits no frame
- * navigation and is never seen. DNS rebinding between this lookup and
- * Chromium's own, WebSocket handshakes and a lookup with no timeout are not
- * covered. Closing these needs a filtering proxy in front of Chromium that
- * resolves and connects by address.
+ * Still open after both: the request to a redirect hop is SENT before any check
+ * sees it, a blind GET to an internal address whose answer is discarded. A
+ * WebSocket is judged by its name, not by the address dialled. A lookup has no
+ * timeout. Anything Playwright reports no `response` or `websocket` event for
+ * is not seen. The structural fix is a filtering proxy in front of Chromium
+ * that resolves and connects by address.
  *
  * @param {string} url - `page.url()` after the navigation.
  * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
@@ -383,25 +385,65 @@ export async function rejectLandedPage(page) {
   return null;
 }
 
+const blockedByAddress = ({ ipAddress }) => isBlockedAddress(normalizeHost(ipAddress));
+let dialledAddressBlocked = blockedByAddress;
+
 /**
- * Record every URL any frame of a page commits to, from now until the page
- * closes, and the same for every popup it opens. Call it on a new page, before
- * its first navigation. Where a frame is at one moment proves nothing: a page
- * can point its iframe at a private name while it is read and point it back
- * before the next look.
+ * Swap the rule that says which dialled address is blocked, returning a restore
+ * function. A real-Chromium test reaches every name on loopback, which the real
+ * rule refuses, so it has to say which of its own listeners stands for a
+ * private host. Nothing is cached per rule, so a swap has nothing to clear.
  *
- * @param {{ url: () => string, on: (event: string, listener: Function) => unknown }} page - Page to record.
+ * @param {((addr: { ipAddress: string, port: number }) => boolean)|null} judge -
+ *   Rule to install, or null to restore the real one.
+ * @returns {() => void} Restores the rule in place before this call.
+ */
+export function setDialledAddressJudge(judge) {
+  const previous = dialledAddressBlocked;
+  dialledAddressBlocked = judge ?? blockedByAddress;
+  return () => {
+    dialledAddressBlocked = previous;
+  };
+}
+
+/**
+ * Record what a page received, from now until its context closes: the address
+ * Chromium dialled for every response in the page's context (redirect hops,
+ * subresources, fetches, workers and popups included), every URL a frame of
+ * the page or of a popup committed to, and every WebSocket they opened. Call it
+ * on a new page, before its first navigation. Where a frame is at one moment
+ * proves nothing: a page can point its iframe at a private name while it is
+ * read and point it back before the next look.
+ *
+ * A response is judged by the address it came from, which is Chromium's own
+ * connection, so a name that answers this module's lookup one way and
+ * Chromium's another is still caught. A response Playwright gives no address
+ * for is judged by its URL, as frames and sockets are. A request
+ * the route guard aborted or a dead host never answered has no response and
+ * refuses nothing.
+ *
+ * @param {{ url: () => string, on: (event: string, listener: Function) => unknown, context: () => { on: (event: string, listener: Function) => unknown } }} page - Page to record.
  * @returns {() => Promise<null|{code: string, reason: string}>} Call after the
- *   last read of the page. It judges the page's URL now and every URL recorded,
- *   and returns null only when what was read may be kept.
+ *   last read of the page. It judges every address and URL recorded and the
+ *   page's URL now, each once, and returns null only when what was read may be
+ *   kept.
  */
 export function recordLandedUrls(page) {
   const committed = new Set();
+  const dialled = new Map();
+  const addressLookups = [];
   const record = (url) => {
     if (!HOSTLESS_FRAME_URL.test(url)) committed.add(url);
   };
+  page.context().on('response', (response) => {
+    addressLookups.push(response.serverAddr().then(
+      (addr) => (addr ? dialled.set(`${addr.ipAddress} ${addr.port}`, addr) : record(response.url())),
+      () => record(response.url()),
+    ));
+  });
   const watch = (watched) => {
     watched.on('framenavigated', (frame) => record(frame.url()));
+    watched.on('websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
     watched.on('popup', (popup) => {
       record(popup.url());
       watch(popup);
@@ -409,6 +451,12 @@ export function recordLandedUrls(page) {
   };
   watch(page);
   return async () => {
+    await Promise.all(addressLookups);
+    for (const addr of dialled.values()) {
+      if (dialledAddressBlocked(addr)) {
+        return { code: 'blocked_host', reason: `Access denied: a response came from private target IP ${addr.ipAddress}` };
+      }
+    }
     for (const url of new Set([page.url(), ...committed])) {
       const verdict = await rejectLandedUrl(url);
       if (verdict) return verdict;

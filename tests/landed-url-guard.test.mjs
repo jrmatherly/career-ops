@@ -1,8 +1,10 @@
 // tests/landed-url-guard.test.mjs. A redirect never reaches the route guard, so
-// the landed URL is judged by DNS before any script reads the page, and every
-// URL a frame committed to is judged after its last read.
+// the landed URL is judged by DNS before any script reads the page, and what
+// the page received (the address behind every response, every URL a frame
+// committed to, every WebSocket) is judged after its last read.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -10,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ROOT } from './helpers.mjs';
 import { toolRequired } from './required-tools.mjs';
-import { installEgressGuard, recordLandedUrls, rejectLandedPage, rejectLandedUrl, setHostResolver } from '../liveness-browser.mjs';
+import { installEgressGuard, recordLandedUrls, rejectLandedPage, rejectLandedUrl, setDialledAddressJudge, setHostResolver } from '../liveness-browser.mjs';
 
 const dataRoot = mkdtempSync(join(tmpdir(), 'career-ops-landed-'));
 process.env.CAREER_OPS_ROOT = dataRoot;
@@ -66,7 +68,12 @@ test('rejectLandedPage judges every frame that a host answered, and only those',
 });
 
 const HOSTLESS = ['', 'about:blank', 'about:srcdoc', 'data:text/html,hi', 'blob:https://jobs.example.test/0b1c', 'chrome-error://chromewebdata/'];
-const fakePage = (url) => Object.assign(new EventEmitter(), { url: () => url });
+const fakePage = (url) => {
+  const context = new EventEmitter();
+  return Object.assign(new EventEmitter(), { url: () => url, context: () => context });
+};
+const respond = (page, url, serverAddr) => page.context().emit('response', { url: () => url, serverAddr });
+const from = (ipAddress, port = 443) => async () => ({ ipAddress, port });
 const commit = (page, url) => page.emit('framenavigated', { url: () => url });
 
 test('recordLandedUrls resolves each host a frame committed to once, and skips frames no host answered', async (t) => {
@@ -111,6 +118,71 @@ test('recordLandedUrls records a popup, and judges the page itself strictly', as
   assert.equal((await recordLandedUrls(blank)())?.code, 'unsupported_protocol', 'the allowance is for recorded frames, not the page');
 });
 
+test('recordLandedUrls judges a response by the address it came from, whatever its URL says', async (t) => {
+  t.after(setHostResolver(async (host) => { throw new Error(`no lookup expected for ${host}`); }));
+  for (const address of ['10.0.0.5', '127.0.0.1', '169.254.169.254', '::1', '[fd00::1]', '::ffff:10.0.0.5']) {
+    const page = fakePage('about:blank');
+    const rejectVisited = recordLandedUrls(page);
+    respond(page, 'https://jobs.example.test/logo.png', from(address));
+    assert.deepEqual(await rejectVisited(), { code: 'blocked_host', reason: `Access denied: a response came from private target IP ${address}` });
+  }
+});
+
+test('recordLandedUrls passes a response from a public address without resolving its name', async (t) => {
+  const lookups = [];
+  t.after(setHostResolver(async (host) => { lookups.push(host); return stubResolver(host); }));
+  const page = fakePage('https://jobs.example.test/1');
+  const rejectVisited = recordLandedUrls(page);
+  respond(page, 'https://private.example.test/admin', from('93.184.216.34'));
+  respond(page, 'https://nowhere.example.test/x.js', from('[2606:2800:220:1::1]'));
+  assert.equal(await rejectVisited(), null);
+  assert.deepEqual(lookups, ['jobs.example.test'], 'only the page URL was resolved');
+});
+
+test('recordLandedUrls judges a response with no address by its URL', async (t) => {
+  t.after(setHostResolver(stubResolver));
+  const noAddress = async () => null;
+  const lookupFailed = async () => { throw new Error('Target page, context or browser has been closed'); };
+  for (const serverAddr of [noAddress, lookupFailed]) {
+    const page = fakePage('https://jobs.example.test/1');
+    const rejectVisited = recordLandedUrls(page);
+    for (const url of ['https://jobs.example.test/cached.js', 'data:text/plain,hi', 'blob:https://jobs.example.test/0b1c']) respond(page, url, serverAddr);
+    assert.equal(await rejectVisited(), null);
+    respond(page, 'https://private.example.test/cached.js', serverAddr);
+    assert.match((await rejectVisited())?.reason, /private target IP 10\.0\.0\.5/);
+  }
+});
+
+test('recordLandedUrls judges a WebSocket by its URL, on the page and on a popup', async (t) => {
+  t.after(setHostResolver(stubResolver));
+  const open = (page, url) => page.emit('websocket', { url: () => url });
+  for (const [url, refused] of [['wss://jobs.example.test/live', false], ['ws://private.example.test:8080/ws', true], ['wss://private.example.test/ws', true], ['ws://127.0.0.1:9229/', true]]) {
+    const page = fakePage('https://jobs.example.test/1');
+    const rejectVisited = recordLandedUrls(page);
+    open(page, url);
+    assert.equal(Boolean(await rejectVisited()), refused, url);
+
+    const opener = fakePage('https://jobs.example.test/1');
+    const rejectOpener = recordLandedUrls(opener);
+    const popup = fakePage('about:blank');
+    opener.emit('popup', popup);
+    open(popup, url);
+    assert.equal(Boolean(await rejectOpener()), refused, `popup ${url}`);
+  }
+});
+
+test('recordLandedUrls judges each distinct dialled address once', async (t) => {
+  t.after(setHostResolver(stubResolver));
+  const judged = [];
+  t.after(setDialledAddressJudge(({ ipAddress, port }) => { judged.push(`${ipAddress}:${port}`); return false; }));
+  const page = fakePage('https://jobs.example.test/1');
+  const rejectVisited = recordLandedUrls(page);
+  for (const path of ['a.png', 'b.png', 'c.js']) respond(page, `https://jobs.example.test/${path}`, from('93.184.216.34'));
+  respond(page, 'https://cdn.example.test/d.js', from('93.184.216.35'));
+  assert.equal(await rejectVisited(), null);
+  assert.deepEqual(judged, ['93.184.216.34:443', '93.184.216.35:443']);
+});
+
 // Each script, inside the function that drives the page: the context-bound
 // guard, the recorder, the navigation, the landed check, every read, then the
 // check of everything recorded.
@@ -149,9 +221,13 @@ for (const [file, { guard, check, first, last }] of Object.entries(SITES)) {
 
 // Chromium resolves names itself, so the two test names are mapped to the local
 // server with --host-resolver-rules while the guard's resolver calls one public
-// and the other private. No request leaves the machine.
+// and the other private. No request leaves the machine. Every address Chromium
+// dials is therefore loopback, so the server has a second listener and the
+// address rule is told that this one is the private host.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
+const INTERNAL = 'ZX81';
 const POSTING = `<h1>Engineer</h1><p>${'Platform engineer role with responsibilities and requirements. '.repeat(30)}</p>`;
-async function chromiumAndServer(t) {
+async function chromiumAndServer(t, { realAddressRule = false } = {}) {
   let browser;
   try {
     const { chromium } = await import('playwright');
@@ -163,10 +239,25 @@ async function chromiumAndServer(t) {
   }
   let releaseSignal;
   const signal = new Promise((resolve) => { releaseSignal = resolve; });
-  const html = (res, body) => res.writeHead(200, { 'content-type': 'text/html' }).end(`<title>Engineer | Acme</title><body>${body}</body>`);
-  const server = createServer((req, res) => {
+  const html = (res, body, title = 'Engineer | Acme') => res.writeHead(200, { 'content-type': 'text/html' }).end(`<title>${title}</title><body>${body}</body>`);
+  const send = (res, type, body) => res.writeHead(200, { 'content-type': type, 'access-control-allow-origin': '*' }).end(body);
+  const privateOrigin = () => `private.example.test:${privateServer.address().port}`;
+  const answer = (req, res) => {
     const toPrivate = () => res.writeHead(302, { location: `http://private.example.test:${server.address().port}/landed` }).end();
     if (req.url === '/start' || req.url === '/redir') toPrivate();
+    else if (req.url.startsWith('/to-private/')) res.writeHead(302, { location: `http://${privateOrigin()}/${req.url.slice('/to-private/'.length)}` }).end();
+    else if (req.url === '/img.png') send(res, 'image/png', PNG);
+    else if (req.url === '/style.css') send(res, 'text/css', `body::after { content: "${INTERNAL} css"; }`);
+    else if (req.url === '/script.js') send(res, 'text/javascript', `document.body.append("${INTERNAL} js");`);
+    else if (req.url === '/cors') send(res, 'text/plain', `${INTERNAL} cors`);
+    else if (req.url === '/payroll') html(res, `<h1>${INTERNAL}-H1 salary table</h1>${POSTING}`, `Payroll export ${INTERNAL}-TITLE | IntraCorp Admin`);
+    else if (req.url === '/with-img') html(res, `<img src="/to-private/img.png">${POSTING}`);
+    else if (req.url === '/with-stylesheet') html(res, `<link rel="stylesheet" href="/to-private/style.css">${POSTING}`);
+    else if (req.url === '/with-script') html(res, `${POSTING}<script src="/to-private/script.js"></script>`);
+    else if (req.url === '/with-fetch') html(res, `${POSTING}<script>fetch('/to-private/cors').then((r) => r.text()).then((text) => document.body.append(text))</script>`);
+    else if (req.url === '/with-websocket') html(res, `${POSTING}<script>new WebSocket('ws://${privateOrigin()}/ws').onmessage = (e) => document.body.append(e.data)</script>`);
+    else if (req.url === '/public-assets') html(res, `<img src="/img.png"><img src="http://${privateOrigin()}/img.png">${POSTING}<script src="/script.js"></script><script>fetch('/cors')</script>`);
+    else if (req.url === '/self-redirect-to-payroll') html(res, `${POSTING}<script>fetch('/signal').then(() => { location = '/to-private/payroll'; })</script>`);
     else if (req.url === '/signal') signal.then(() => res.end('go'));
     else if (req.url === '/self-redirect') html(res, `${POSTING}<script>fetch('/signal').then(() => { location = '/redir'; })</script>`);
     else if (req.url === '/framed') html(res, `<iframe src="/redir"></iframe>${POSTING}`);
@@ -176,17 +267,29 @@ async function chromiumAndServer(t) {
     else if (req.url === '/embed') html(res, '<p>widget</p>');
     else if (req.url === '/posting') html(res, `<iframe></iframe><iframe srcdoc="<p>widget</p>"></iframe><iframe src="/embed"></iframe>${POSTING}`);
     else html(res, '<h1>Internal</h1><p>internal secret</p>');
+  };
+  const server = createServer(answer);
+  const privateServer = createServer(answer);
+  privateServer.on('upgrade', (req, socket) => {
+    const accept = createHash('sha1').update(`${req.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
+    const payload = Buffer.from(`${INTERNAL} ws`);
+    socket.on('error', () => {});
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    socket.write(Buffer.concat([Buffer.from([0x81, payload.length]), payload]));
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  for (const listener of [server, privateServer]) await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  const privatePort = privateServer.address().port;
   t.after(async () => {
     releaseSignal();
     await browser.close().catch(() => {});
     server.close();
+    privateServer.close();
   });
   t.after(setHostResolver(stubResolver));
+  if (!realAddressRule) t.after(setDialledAddressJudge(({ port }) => port === privatePort));
   const warned = t.mock.method(console, 'warn', () => {});
-  t.mock.method(console, 'log', () => {});
-  return { browser, warned, releaseSignal, publicUrl: (path) => `http://jobs.example.test:${server.address().port}${path}` };
+  const logged = t.mock.method(console, 'log', () => {});
+  return { browser, warned, logged, releaseSignal, privatePort, publicUrl: (path) => `http://jobs.example.test:${server.address().port}${path}` };
 }
 
 test('real Chromium: a 302 to a private-resolving name is not routed, and its landed URL is refused', { timeout: 60_000 }, async (t) => {
@@ -295,4 +398,75 @@ test('real Chromium: archiveUrl still archives a posting with a public iframe an
   const before = archived().length;
   await archiveUrl(env.browser, env.publicUrl('/posting'));
   assert.equal(archived().length, before + 1);
+});
+
+// The page's first read waits until the private listener has answered, as a
+// response or as a WebSocket frame, so the refusal never depends on the 2 s
+// hydration wait being long enough.
+const readsAfterPrivateAnswer = (env) => ({ newContext: async () => {
+  const context = await env.browser.newContext();
+  const newPage = context.newPage.bind(context);
+  context.newPage = async () => {
+    const page = await newPage();
+    const answered = new Promise((resolve) => {
+      context.on('response', (response) => { if (new URL(response.url()).port === String(env.privatePort)) resolve(); });
+      page.on('websocket', (socket) => socket.on('framereceived', resolve));
+    });
+    const title = page.title.bind(page);
+    page.title = async () => {
+      await answered;
+      return title();
+    };
+    return page;
+  };
+  return context;
+} });
+
+const REFUSED_BY_ADDRESS = /refusing to archive restricted destination after redirect: .*a response came from private target IP 127\.0\.0\.1/;
+for (const [what, path, refused] of [
+  ['an image', '/with-img', REFUSED_BY_ADDRESS],
+  ['a stylesheet', '/with-stylesheet', REFUSED_BY_ADDRESS],
+  ['a script', '/with-script', REFUSED_BY_ADDRESS],
+  ['a fetch', '/with-fetch', REFUSED_BY_ADDRESS],
+  ['a WebSocket', '/with-websocket', REFUSED],
+]) {
+  test(`real Chromium: archiveUrl refuses a page that received ${what} from a private host`, { timeout: 60_000 }, async (t) => {
+    const env = await chromiumAndServer(t);
+    if (!env) return;
+    const before = archived();
+    await assert.rejects(archiveUrl(readsAfterPrivateAnswer(env), env.publicUrl(path)), refused);
+    assert.deepEqual(archived(), before);
+  });
+}
+
+test('real Chromium: archiveUrl archives a posting with public subresources and one the route guard aborted', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const before = archived().length;
+  await archiveUrl(env.browser, env.publicUrl('/public-assets'));
+  assert.equal(archived().length, before + 1);
+  assert.equal(env.warned.mock.callCount(), 1, 'the image on the private name was aborted by the route guard');
+});
+
+test('real Chromium: nothing from an internal page is printed or quoted when the run is refused', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const browser = hooked(env, async (page) => {
+    env.releaseSignal();
+    await page.waitForURL('**/payroll');
+  }, () => {});
+  const before = archived();
+  const refusal = await archiveUrl(browser, env.publicUrl('/self-redirect-to-payroll')).then(() => null, (err) => err);
+  assert.match(refusal?.message ?? '', /refusing to archive restricted destination after redirect/);
+  const output = [refusal.message, ...env.logged.mock.calls.map((call) => call.arguments.join(' '))].join('\n');
+  assert.doesNotMatch(output, new RegExp(INTERNAL), 'the internal title and heading stay out of stdout and the error');
+  assert.deepEqual(archived(), before);
+});
+
+test('real Chromium: a name the lookup calls public is refused when Chromium dialled a private address for it', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t, { realAddressRule: true });
+  if (!env) return;
+  const before = archived();
+  await assert.rejects(archiveUrl(env.browser, env.publicUrl('/posting')), REFUSED_BY_ADDRESS);
+  assert.deepEqual(archived(), before);
 });

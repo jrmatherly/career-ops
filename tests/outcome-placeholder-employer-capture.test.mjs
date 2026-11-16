@@ -45,7 +45,7 @@ const page = {
   async goto(url) { page._url = url; return { status: () => 200 }; },
   url() { return page._url; },
   frames() { return []; },
-  on() {},
+  on() {}, context: () => ({ on() {} }),
   async waitForTimeout() {},
   async title() { return 'Platform Engineer | Recruiting Partner'; },
   async $eval() { return 'Platform Engineer'; },

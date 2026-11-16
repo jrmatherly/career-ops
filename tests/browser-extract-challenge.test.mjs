@@ -30,7 +30,7 @@ setHostResolver(async () => ['93.184.216.34']);
 const page = JSON.parse(process.env.FAKE_PAGE);
 const tab = {
   goto: async () => ({ status: () => page.status }),
-  on() {},
+  on() {}, context: () => ({ on() {} }),
   waitForTimeout: async () => {},
   url: () => page.url,
   evaluate: async () => page.raw,

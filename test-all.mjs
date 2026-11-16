@@ -2212,7 +2212,7 @@ try {
           },
           url: () => landedUrl,
           frames: () => [],
-          on() {},
+          on() {}, context: () => ({ on() {} }),
           async waitForTimeout() {},
           async title() { throw new Error(STOP); },
           async $eval() { return ''; },
