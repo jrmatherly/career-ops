@@ -96,6 +96,16 @@ function v4ToInt(address) {
   return value >>> 0;
 }
 
+function v6Groups(addr) {
+  const [head, tail] = addr.includes('::') ? addr.split('::') : [addr, null];
+  const left = head ? head.split(':') : [];
+  const right = tail ? tail.split(':') : [];
+  const fill = tail === null ? 0 : 8 - left.length - right.length;
+  if (fill < 0) return null;
+  const groups = [...left, ...Array(fill).fill('0'), ...right].map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? Number.parseInt(g, 16) : NaN));
+  return groups.length === 8 && groups.every(Number.isInteger) ? groups : null;
+}
+
 /**
  * Does this address belong to a range a provider must never connect to?
  *
@@ -136,6 +146,15 @@ export function isBlockedAddress(address) {
     const high = Number.parseInt(hexEmbedded[1], 16);
     const low = Number.parseInt(hexEmbedded[2], 16);
     return isBlockedAddress(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
+  }
+
+  const g = v6Groups(addr);
+  if (g) {
+    const v4 = () => `${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`;
+    if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return isBlockedAddress(v4()); // NAT64 64:ff9b::/96
+    if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0) return isBlockedAddress(v4()); // IPv4-translated ::ffff:0:0:0/96
+    if (g[0] === 0x2002) return true;                     // 6to4 2002::/16
+    if (g[0] === 0x2001 && g[1] === 0) return true;       // Teredo 2001::/32
   }
 
   if (addr === '::' || addr === '::1') return true;      // unspecified, loopback
