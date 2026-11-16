@@ -1,23 +1,21 @@
 const PREVIEW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
+// Whitespace, comments and one doctype: the only things that can precede the meta
+// without making an element. The comment pattern ends where the parser does
+// (<!-->, <!--->, --!>), so an early close cannot hide markup from it.
+const LEADING_DOCTYPE = /^(?:[\t\n\f\r ]|<!--(?!-?>)(?:(?!--!?>)[\s\S])*--!?>)*<!doctype[^>]*>/i;
 
 /**
  * The page with a CSP of its own. The preview is shown as an iframe srcdoc, and a
  * srcdoc document takes its parent's policy, not the headers of the response it
- * was fetched from, so the policy has to travel inside the page.
+ * was fetched from, so the policy has to travel inside the page. It goes ahead of
+ * all of the page's markup, after a leading doctype only, so the parser puts it in
+ * the head it creates and nothing in the page can enclose it or come before it.
  * @param {string} html
  */
 export function withPreviewCsp(html) {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
-  // Skip comments, which a template may fill with markup, and match <head> as a
-  // whole tag name so <header> is not taken for it.
-  const tokens = /<!--[\s\S]*?-->|<head(?=[\s>])[^>]*>/gi;
-  let match;
-  while ((match = tokens.exec(html))) {
-    if (match[0].startsWith("<!--")) continue;
-    const end = match.index + match[0].length;
-    return html.slice(0, end) + meta + html.slice(end);
-  }
-  return meta + html;
+  const at = LEADING_DOCTYPE.exec(html)?.[0].length ?? 0;
+  return html.slice(0, at) + meta + html.slice(at);
 }
 
 const FIT = `.job-header, .edu-header, .contact-row, .cert-table, .award-table { min-width: 0; max-width: 100%; }

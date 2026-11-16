@@ -146,7 +146,7 @@ test("a flow-style cv mapping with no comments is still written", () => {
 test("the preview page carries its own CSP so it holds when loaded as srcdoc", () => {
   const out = withPreviewCsp("<!DOCTYPE html><html><head><title>x</title></head><body>b</body></html>");
 
-  assert.match(out, /<head><meta http-equiv="Content-Security-Policy" content="[^"]*img-src data:[^"]*">/);
+  assert.match(out, /^<!DOCTYPE html><meta http-equiv="Content-Security-Policy" content="[^"]*img-src data:[^"]*">/);
   assert.ok(out.includes("<title>x</title>"));
 });
 
@@ -164,10 +164,10 @@ test("a # inside a value is not mistaken for a comment", () => {
   assert.match(text, /template: modern/);
 });
 
-test("the CSP goes after the real head, not a <head> inside a comment", () => {
+test("a <head> inside a comment does not move the CSP", () => {
   const out = withPreviewCsp("<!-- <head> --><html><head><title>x</title></head></html>");
 
-  assert.ok(out.startsWith("<!-- <head> --><html><head><meta http-equiv="));
+  assert.ok(out.startsWith("<meta http-equiv="));
 });
 
 test("a <header> element is not mistaken for the head", () => {
