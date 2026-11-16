@@ -1534,22 +1534,29 @@ async function main() {
   try {
     browser = await chromium.launch(browserLaunchOptions({ headless: true }));
     const context = await browser.newContext(LIVENESS_CONTEXT_OPTIONS);
-    // Refuses the first URL of every request (navigation, popup, subresource)
-    // that names or resolves to a private host. It never sees a redirect hop,
-    // so the landed URL is judged below before any CONTENT is read (SSRF).
+    // Refuses the first URL of every routed request (navigation, popup,
+    // subresource) that names or resolves to a private host. It never sees a
+    // redirect hop, so the landed URL is judged below before any CONTENT is
+    // read, and again after the read (SSRF).
     await installEgressGuard(context);
     const page = await context.newPage();
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     await page.waitForTimeout(HYDRATION_WAIT_MS); // let SPAs hydrate
 
     const finalUrl = page.url();
-    const finalGuard = await rejectLandedUrl(finalUrl);
+    const finalGuard = await rejectLandedUrl(page.url());
     if (finalGuard) {
       console.error(JSON.stringify({ error: `blocked final URL: ${finalGuard.reason}`, code: finalGuard.code }));
       process.exitCode = 1;
       return;
     }
     const raw = await readDom(page);
+    const afterRead = await rejectLandedUrl(page.url());
+    if (afterRead) {
+      console.error(JSON.stringify({ error: `blocked final URL: ${afterRead.reason}`, code: afterRead.code }));
+      process.exitCode = 1;
+      return;
+    }
 
     if (mode === 'listing') {
       process.stdout.write(JSON.stringify(normalizeListing(raw.anchors, finalUrl, max)));

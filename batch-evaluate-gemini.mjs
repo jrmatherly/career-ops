@@ -386,6 +386,10 @@ async function scrapeUrl(browser, url) {
       document.querySelectorAll('script, style, noscript, iframe, svg, img').forEach(s => s.remove());
       return document.body.innerText;
     });
+    const afterRead = await rejectLandedUrl(page.url());
+    if (afterRead) {
+      throw new Error(`Invalid or blocked URL after redirect: ${afterRead.reason}`);
+    }
     return text.trim();
   } finally {
     await page.close();

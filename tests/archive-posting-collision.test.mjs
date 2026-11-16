@@ -15,7 +15,7 @@ function browser() {
   return { async newContext() {
     let url;
     return { async route() {}, async close() {}, async newPage() {
-      return { async goto(value) { url = value; return { status: () => 200 }; }, url() { return url; },
+      return { async goto(value) { url = value; return { status: () => 200 }; }, url() { return url; }, frames() { return []; },
         async waitForTimeout() {}, async title() { return 'Engineer | Fictional'; }, async $eval() { return 'Engineer'; },
         async evaluate() { return 'Fictional engineering role with responsibilities and requirements. '.repeat(40); },
         async pdf() { return Buffer.from('%PDF-fixture ' + url); } };

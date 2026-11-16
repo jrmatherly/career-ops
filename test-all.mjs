@@ -2211,6 +2211,7 @@ try {
             return { status: () => 200 };
           },
           url: () => landedUrl,
+          frames: () => [],
           async waitForTimeout() {},
           async title() { throw new Error(STOP); },
           async $eval() { return ''; },

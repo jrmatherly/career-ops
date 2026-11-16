@@ -871,7 +871,10 @@ if (isMain) {
           await page.goto(secureUrl, { waitUntil: 'networkidle', timeout: 30000 });
           const landed = await rejectLandedUrl(page.url());
           if (landed) throw new Error(`blocked URL after redirect: ${landed.reason}`);
-          targetText = await page.innerText('body');
+          const bodyText = await page.innerText('body');
+          const afterRead = await rejectLandedUrl(page.url());
+          if (afterRead) throw new Error(`blocked URL after redirect: ${afterRead.reason}`);
+          targetText = bodyText;
         } catch (err) {
           console.warn('Playwright extraction failed or blocked, trying fallback WebFetch...', err.message);
           try {

@@ -14,7 +14,7 @@
 // through a real headless browser, and a unit test that launched Chromium
 // against a live URL would be flaky, slow, and network-dependent for no
 // benefit. The fake page satisfies exactly the Playwright surface
-// archiveUrl() calls (goto/url/title/$eval/waitForTimeout/evaluate/pdf) so the
+// archiveUrl() calls (goto/url/frames/title/$eval/waitForTimeout/evaluate/pdf) so the
 // REAL function logic runs end to end; only the browser layer underneath it
 // is faked. CAREER_OPS_ROOT is set to a temp dir BEFORE import, so JDS_DIR
 // resolves there instead of the real project's jds/.
@@ -40,6 +40,7 @@ function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Ba
     _landedUrl: null,
     async goto(url) { page._landedUrl = url; return { status: () => httpStatus }; },
     url() { return page._landedUrl; },
+    frames() { return []; },
     async waitForTimeout() {},
     async title() { return title; },
     async $eval(selector) {

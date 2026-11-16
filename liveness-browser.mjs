@@ -310,7 +310,8 @@ export async function validateUrlSecurity(urlString) {
  *
  * Playwright calls a route handler for the first URL of a request only, never
  * for the hops a 3xx sends it to. So this guard does not see a redirect target:
- * every caller that reads page content must also call `rejectLandedUrl` first.
+ * every caller that reads page content must also call `rejectLandedUrl` before
+ * its first read and again after its last. WebSocket handshakes are not routed.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
  */
@@ -335,12 +336,17 @@ export async function installEgressGuard(context) {
 }
 
 /**
- * Judge the URL a navigation landed on, by literal host and then by DNS. Call it
- * after the navigation settles and before anything is read from the page.
+ * Judge the URL a page is on, by literal host and then by DNS. Call it after
+ * the navigation settles and before anything is read from the page, and again
+ * after the last read, discarding what was read on a refusal: a page can send
+ * itself through a public 302 to a private name between the first check and
+ * the read.
  *
- * Remaining limit: the request to a redirect hop is still SENT, blind, before
- * this runs, and a redirected subresource is not checked at all. Closing those
- * needs a filtering proxy or Chromium's `--host-resolver-rules`.
+ * Still open: the request to a redirect hop is SENT, blind, before any check
+ * sees it. Redirected subresources (images, scripts, styles) are not checked.
+ * DNS rebinding, WebSocket handshakes and a lookup with no timeout are not
+ * covered. Closing these needs a filtering proxy in front of Chromium that
+ * resolves and connects by address.
  *
  * @param {string} url - `page.url()` after the navigation.
  * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
@@ -354,6 +360,26 @@ export async function rejectLandedUrl(url) {
   } catch (err) {
     return { code: 'blocked_host', reason: err.message };
   }
+}
+
+// Empty is a frame with nothing committed yet. The rest hold what the parent
+// wrote or Chromium's own error page, never a host's answer.
+const HOSTLESS_FRAME_URL = /^$|^(?:about:blank|about:srcdoc|data:|blob:|chrome-error:)/;
+
+/**
+ * `rejectLandedUrl` for a page that is read with its frames, as a PDF render
+ * is: judges the page's URL and the URL of every frame in it.
+ *
+ * @param {{ url: () => string, frames: () => { url: () => string }[] }} page - Page to judge.
+ * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
+ */
+export async function rejectLandedPage(page) {
+  const frameUrls = page.frames().map((frame) => frame.url()).filter((url) => !HOSTLESS_FRAME_URL.test(url));
+  for (const url of new Set([page.url(), ...frameUrls])) {
+    const verdict = await rejectLandedUrl(url);
+    if (verdict) return verdict;
+  }
+  return null;
 }
 
 // Rediscovery can navigate a newly created page before its first liveness
