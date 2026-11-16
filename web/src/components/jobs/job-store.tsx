@@ -76,6 +76,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
     return () => { owner.dispose(); feedback.current = null; };
   }, []);
   const seq = useRef(0);
+  const aborts = useRef(new Map<string, AbortController>());
 
   // Restore first. setReady in this effect, and save only on a later render
   // where ready is already true. Saving from a ref flipped in this same
@@ -146,6 +147,8 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
       // Declared before resolveCliId() so its stale-CLI notice lands in the log
       // sent to /api/runs/save, not only in the live job.
       const steps: JobStep[] = [];
+      const controller = new AbortController();
+      aborts.current.set(id, controller);
       (async () => {
         // resolveCliId() validates the saved id against what is installed; a
         // bare readSavedCliId() here would short-circuit that check and launch
@@ -161,6 +164,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           steps.push(step);
           patch(id, (j) => ({ ...j, steps: [...j.steps, step] }));
         });
+        if (controller.signal.aborted) return;
         if (!cliId) {
           feedback.current?.push({ ...job, status: "error" });
           patch(id, (j) => ({
@@ -178,6 +182,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         let doneReportN: number | null = null;
         let finished = false;
         const finish = (status: "done" | "error" | "gated", lastLabel?: string, gate?: JobGate) => {
+          if (controller.signal.aborted) return;
           if (finished) return;
           finished = true;
           feedback.current?.push({ ...job, status });
@@ -213,6 +218,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ kind: opts.kind, input: opts.input, cliId, brief: opts.brief, evaluationSections: opts.evaluationSections }),
+            signal: controller.signal,
           });
           if (!res.ok || !res.body) {
             const e = await res.json().catch(() => ({}));
@@ -253,14 +259,17 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         } catch {
           finish("error", "Connection error");
         }
-      })();
+      })().finally(() => aborts.current.delete(id));
 
       return id;
     },
     [patch],
   );
 
-  const removeJob = useCallback((id: string) => setJobs((js) => js.filter((j) => j.id !== id)), []);
+  const removeJob = useCallback((id: string) => {
+    aborts.current.get(id)?.abort();
+    setJobs((js) => js.filter((j) => j.id !== id));
+  }, []);
   const clearFinished = useCallback(() => setJobs((js) => js.filter((j) => j.status === "running")), []);
 
   // A new object only when the list or an action changes, not on every render

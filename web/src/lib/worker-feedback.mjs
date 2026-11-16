@@ -17,6 +17,11 @@ export function workerDetailsLabel(job) {
   return `Open worker: ${workerIdentity(job)} — ${jobStateLabel(job)}`;
 }
 
+/** @param {Pick<Worker, 'title' | 'subtitle' | 'status'>} job */
+export function workerDismissLabel(job) {
+  return `${job.status === "running" ? "Stop and dismiss" : "Dismiss"} worker: ${workerIdentity(job)}`;
+}
+
 /** @param {Worker[]} jobs @param {number} total */
 export function workerBatchSummary(jobs, total = jobs.length) {
   const counts = [

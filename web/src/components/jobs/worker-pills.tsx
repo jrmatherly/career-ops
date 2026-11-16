@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { X, History } from "lucide-react";
 import { useJobs } from "@/components/jobs/job-store";
 import { WorkerCard, pillTone, TONE } from "@/components/jobs/worker-card";
-import { workerDetailsLabel, workerIdentity } from "@/lib/worker-feedback.mjs";
+import { workerDetailsLabel, workerDismissLabel } from "@/lib/worker-feedback.mjs";
 import { cn } from "@/lib/cn";
 
 // Back-compat re-exports (app/jobs/page.tsx imports pillTone from here).
@@ -52,7 +52,7 @@ export function WorkerPills() {
               <button
                 onClick={() => removeJob(j.id)}
                 className="absolute right-2 top-2 rounded text-faint opacity-100 [@media(hover:hover)]:opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label={`Dismiss worker: ${workerIdentity(j)}`}
+                aria-label={workerDismissLabel(j)}
               >
                 <X className="size-3" />
               </button>
