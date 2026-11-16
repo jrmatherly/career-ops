@@ -93,9 +93,14 @@ export function sameOrigin(frameUrl, pageUrl) {
 // instead of the posting. Presenting a normal desktop Chrome UA clears the wall
 // headlessly (the scan parser scripts/parsers/pracuj-jobs.mjs relies on the same
 // trick), so the common case never needs the slower headed-browser fallback.
+//
+// A service worker's own requests and sockets reach neither the route guard nor
+// the recorder, and no posting needs one to be read once, so registration is
+// blocked.
 export const LIVENESS_CONTEXT_OPTIONS = {
   userAgent: BROWSER_LIKE_USER_AGENT,
   locale: 'en-US',
+  serviceWorkers: 'block',
 };
 
 // Open a page in a context that already presents a realistic UA. Both callers use
@@ -316,9 +321,18 @@ export async function validateUrlSecurity(urlString) {
  * page, `rejectLandedUrl` before its first read, and the recorder's check after
  * its last.
  *
- * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
+ * Playwright attaches to no shared worker and to no service worker's sockets:
+ * what they request is not routed and raises no event, so neither this guard
+ * nor the recorder sees it. Both are denied instead. The guard removes the
+ * `SharedWorker` constructor from every document before the page's scripts
+ * run, and the caller creates the context with `serviceWorkers: 'block'`.
+ *
+ * @param {{ route: (pattern: string, handler: Function) => Promise<void>, addInitScript: (script: Function) => Promise<unknown> }} context - Context to guard.
  */
 export async function installEgressGuard(context) {
+  await context.addInitScript(() => {
+    delete globalThis.SharedWorker;
+  });
   await context.route('**/*', async (route) => {
     const requestUrl = route.request().url();
 
@@ -344,12 +358,22 @@ export async function installEgressGuard(context) {
  * already known bad is not read. What the page receives after that is judged
  * by `recordLandedUrls`.
  *
- * Still open after both: the request to a redirect hop is SENT before any check
- * sees it, a blind GET to an internal address whose answer is discarded. A
- * WebSocket is judged by its name, not by the address dialled. A lookup has no
- * timeout. Anything Playwright reports no `response` or `websocket` event for
- * is not seen. The structural fix is a filtering proxy in front of Chromium
- * that resolves and connects by address.
+ * Still open after both:
+ * - The request to a redirect hop is SENT before any check sees it, a blind GET
+ *   to an internal address whose answer is discarded.
+ * - A WebSocket is judged by its name, not by the address dialled, so a name
+ *   that answers this module's lookup one way and Chromium's another (DNS
+ *   rebinding) is not caught for a socket.
+ * - A lookup has no timeout.
+ * - `upskill.mjs` answers a refusal by fetching the original URL from Node,
+ *   with its own lookup and `redirect: 'error'`.
+ * - WebTransport, WebRTC and prerendering were never attempted.
+ * - Anything else Playwright reports no `response` or WebSocket frame for is
+ *   not seen. Shared and service workers are such paths and are denied (see
+ *   `installEgressGuard`); the denial was measured against a page that takes
+ *   the constructor from a new iframe or a popup, and nothing wider.
+ * The structural fix is a filtering proxy in front of Chromium that resolves
+ * and connects by address.
  *
  * @param {string} url - `page.url()` after the navigation.
  * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
@@ -409,18 +433,24 @@ export function setDialledAddressJudge(judge) {
 /**
  * Record what a page received, from now until its context closes: the address
  * Chromium dialled for every response in the page's context (redirect hops,
- * subresources, fetches, workers and popups included), every URL a frame of
- * the page or of a popup committed to, and every WebSocket they opened. Call it
- * on a new page, before its first navigation. Where a frame is at one moment
- * proves nothing: a page can point its iframe at a private name while it is
- * read and point it back before the next look.
+ * subresources, fetches, dedicated workers and popups included), every URL a
+ * frame of the page or of a popup committed to, and every WebSocket of theirs
+ * that received a frame. Call it on a new page, before its first navigation.
+ * Where a frame is at one moment proves nothing: a page can point its iframe at
+ * a private name while it is read and point it back before the next look.
  *
  * A response is judged by the address it came from, which is Chromium's own
  * connection, so a name that answers this module's lookup one way and
  * Chromium's another is still caught. A response Playwright gives no address
- * for is judged by its URL, as frames and sockets are. A request
- * the route guard aborted or a dead host never answered has no response and
- * refuses nothing.
+ * for is judged by its URL, as frames and sockets are. A request the route
+ * guard aborted, a host that never answered and a socket that never received a
+ * frame delivered nothing and refuse nothing: Playwright announces a socket
+ * when the page creates it, connected or not, and a posting with a socket to a
+ * filtered tracker must still be read.
+ *
+ * Not seen: a shared worker, and a socket a service worker opens. Playwright
+ * raises no event for either, so they are denied instead of recorded (see
+ * `installEgressGuard`).
  *
  * @param {{ url: () => string, on: (event: string, listener: Function) => unknown, context: () => { on: (event: string, listener: Function) => unknown } }} page - Page to record.
  * @returns {() => Promise<null|{code: string, reason: string}>} Call after the
@@ -443,7 +473,9 @@ export function recordLandedUrls(page) {
   });
   const watch = (watched) => {
     watched.on('framenavigated', (frame) => record(frame.url()));
-    watched.on('websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
+    watched.on('websocket', (socket) => {
+      socket.once('framereceived', () => record(socket.url().replace(/^ws/, 'http')));
+    });
     watched.on('popup', (popup) => {
       record(popup.url());
       watch(popup);
@@ -463,6 +495,28 @@ export function recordLandedUrls(page) {
     }
     return null;
   };
+}
+
+/**
+ * Await one read of a recorded page. When the read throws, the recorder gives
+ * its verdict before anything can be said about the failure, and the error
+ * raised here never repeats the one caught: a script in the page chooses the
+ * message and the name of what it throws, so both are page content.
+ *
+ * @template T
+ * @param {() => Promise<null|{code: string, reason: string}>} rejectVisited - The recorder's check for the page.
+ * @param {Promise<T>} pending - The read.
+ * @returns {Promise<T>} What the read returned.
+ * @throws {Error & { refused: null|{code: string, reason: string} }} `refused`
+ *   is the recorder's verdict: non-null when the page must be refused.
+ */
+export async function readLanded(rejectVisited, pending) {
+  try {
+    return await pending;
+  } catch {
+    const refused = await rejectVisited();
+    throw Object.assign(new Error(refused ? refused.reason : 'a read of the page failed'), { refused });
+  }
 }
 
 // Rediscovery can navigate a newly created page before its first liveness

@@ -70,6 +70,7 @@ function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Ba
     // logic (rejectPrivateOrInvalid / validateUrlSecurity) is exercised on the
     // real navigation URL passed to archiveUrl(), not through this handler.
     async route() {},
+    async addInitScript() {},
   };
   const browser = { async newContext() { return context; } };
   return { browser, pdfCalled: () => pdfCalled };
@@ -132,11 +133,12 @@ test('a real extraction FAILURE (page.evaluate rejects) fails CLOSED — refuses
   // content is UNKNOWN, not confirmed empty. Coercing that to '' (as an
   // earlier version of this code did) let a page that genuinely couldn't be
   // inspected reach page.pdf() anyway — the exact capture-time gap this
-  // whole check exists to close. The error must propagate.
+  // whole check exists to close. The failure must propagate, as fixed text:
+  // a script in the page chooses the message of what it throws.
   const { browser, pdfCalled } = makeFakeBrowser({ bodyText: 'unused — evaluate() rejects before returning it', evaluateRejects: true });
   await assert.rejects(
     () => archiveUrl(browser, 'https://boards.greenhouse.io/acme/jobs/4', {}),
-    /page\.evaluate\(\) failed/,
+    /^Error: a read of the page failed$/,
   );
   assert.equal(pdfCalled(), false, 'an extraction failure must not reach page.pdf()');
 });

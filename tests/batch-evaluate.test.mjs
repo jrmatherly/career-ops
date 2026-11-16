@@ -32,7 +32,7 @@ async function testProcessOffer() {
     const mockBrowser = {
       newPage: async () => ({
         url: () => 'https://example.com/job',
-        context: () => ({ route: async () => {}, on() {} }), on() {},
+        context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {},
         goto: async () => {},
         waitForTimeout: async () => {},
         evaluate: async () => 'Valid JD Text of sufficient length (more than 100 characters). '.repeat(5),
@@ -113,7 +113,7 @@ async function testDeadPostingOutcome() {
     PATHS.trackerAdditions = join(work, 'tracker-additions');
     const mockBrowser = {
       newPage: async () => ({
-        url: () => 'https://example.com/job', context: () => ({ route: async () => {}, on() {} }), on() {}, goto: async () => {},
+        url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {}, goto: async () => {},
         waitForTimeout: async () => {},
         evaluate: async () => 'Expired job posting content. '.repeat(8),
         close: async () => {}
@@ -138,7 +138,7 @@ async function testDeadPostingOutcome() {
       newPage: async () => {
         let reads = 0;
         return {
-          url: () => 'https://example.com/job', context: () => ({ route: async () => {}, on() {} }), on() {},
+          url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {},
           goto: async () => ({ status: () => 410 }),
           waitForTimeout: async () => {},
           evaluate: async () => ++reads === 1 ? 'Job not found' : [],
@@ -171,7 +171,7 @@ async function testDeadPostingOutcome() {
       for (const verdict of ['active', 'uncertain', 'expired']) {
         let evaluated = false;
         const browser = { newPage: async () => ({
-          url: () => 'https://example.com/job', context: () => ({ route: async () => {}, on() {} }), on() {},
+          url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {},
           goto: async () => { if (scrapeFails) throw new Error('navigation failed'); },
           waitForTimeout: async () => {}, evaluate: async () => 'Job not found', close: async () => {}
         }) };
@@ -188,7 +188,7 @@ async function testDeadPostingOutcome() {
     const loadingBrowser = { newPage: async () => {
       let reads = 0;
       return {
-        url: () => 'https://example.com/job', context: () => ({ route: async () => {}, on() {} }), on() {},
+        url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {},
         goto: async () => ({ status: () => 200 }), waitForTimeout: async () => {},
         evaluate: async () => ++reads === 1 ? 'Loading...' : [], close: async () => {}
       };

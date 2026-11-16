@@ -1,18 +1,22 @@
 // tests/landed-url-guard.test.mjs. A redirect never reaches the route guard, so
 // the landed URL is judged by DNS before any script reads the page, and what
 // the page received (the address behind every response, every URL a frame
-// committed to, every WebSocket) is judged after its last read.
+// committed to, every WebSocket that received a frame) is judged after its last
+// read. Shared and service workers, which Playwright reports nothing for, are
+// denied, and a read that throws is judged before its error is reported.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ROOT } from './helpers.mjs';
 import { toolRequired } from './required-tools.mjs';
-import { installEgressGuard, recordLandedUrls, rejectLandedPage, rejectLandedUrl, setDialledAddressJudge, setHostResolver } from '../liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, installEgressGuard, readLanded, recordLandedUrls, rejectLandedPage, rejectLandedUrl, setDialledAddressJudge, setHostResolver } from '../liveness-browser.mjs';
 
 const dataRoot = mkdtempSync(join(tmpdir(), 'career-ops-landed-'));
 process.env.CAREER_OPS_ROOT = dataRoot;
@@ -25,6 +29,7 @@ const ANSWERS = {
   'metadata.example.test': ['169.254.169.254'],
   'mixed.example.test': ['93.184.216.34', '10.0.0.5'],
   'jobs.example.test': ['93.184.216.34'],
+  'tracker.example.test': ['0.0.0.0'],
 };
 const stubResolver = async (host) => {
   if (host === 'down.example.test') throw new Error('SERVFAIL');
@@ -153,9 +158,16 @@ test('recordLandedUrls judges a response with no address by its URL', async (t) 
   }
 });
 
-test('recordLandedUrls judges a WebSocket by its URL, on the page and on a popup', async (t) => {
+const openSocket = (page, url) => {
+  const socket = Object.assign(new EventEmitter(), { url: () => url });
+  page.emit('websocket', socket);
+  return socket;
+};
+const receiveFrame = (socket) => socket.emit('framereceived', { payload: 'hello' });
+
+test('recordLandedUrls judges a WebSocket that received a frame by its URL, on the page and on a popup', async (t) => {
   t.after(setHostResolver(stubResolver));
-  const open = (page, url) => page.emit('websocket', { url: () => url });
+  const open = (page, url) => receiveFrame(openSocket(page, url));
   for (const [url, refused] of [['wss://jobs.example.test/live', false], ['ws://private.example.test:8080/ws', true], ['wss://private.example.test/ws', true], ['ws://127.0.0.1:9229/', true]]) {
     const page = fakePage('https://jobs.example.test/1');
     const rejectVisited = recordLandedUrls(page);
@@ -169,6 +181,40 @@ test('recordLandedUrls judges a WebSocket by its URL, on the page and on a popup
     open(popup, url);
     assert.equal(Boolean(await rejectOpener()), refused, `popup ${url}`);
   }
+});
+
+test('recordLandedUrls ignores a WebSocket until its first frame arrives', async (t) => {
+  t.after(setHostResolver(stubResolver));
+  for (const url of ['ws://tracker.example.test:1/t', 'ws://nowhere.example.test/t', 'ws://private.example.test:8080/ws', 'ws://127.0.0.1:9229/']) {
+    const page = fakePage('https://jobs.example.test/1');
+    const rejectVisited = recordLandedUrls(page);
+    const socket = openSocket(page, url);
+    socket.emit('framesent', { payload: 'hello' });
+    socket.emit('socketerror', 'net::ERR_CONNECTION_REFUSED');
+    assert.equal(await rejectVisited(), null, `${url} never answered`);
+    receiveFrame(socket);
+    receiveFrame(socket);
+    assert.ok(await rejectVisited(), `${url} answered after an earlier verdict`);
+  }
+});
+
+test('readLanded returns what the read returned and asks for no verdict', async () => {
+  assert.equal(await readLanded(async () => { throw new Error('verdict must not be asked'); }, Promise.resolve('body text')), 'body text');
+});
+
+test('readLanded asks the recorder before it reports a failed read, and never repeats what was thrown', async () => {
+  const thrown = Object.assign(new Error(`THROWN ${INTERNAL} message`), { name: `${INTERNAL} name` });
+  const verdict = { code: 'blocked_host', reason: 'Access denied: a response came from private target IP 10.0.0.5' };
+  for (const refused of [verdict, null]) {
+    const failure = await readLanded(async () => refused, Promise.reject(thrown)).then(() => null, (err) => err);
+    assert.equal(failure.refused, refused);
+    assert.equal(failure.message, refused ? verdict.reason : 'a read of the page failed');
+    assert.doesNotMatch(`${failure.name} ${failure.message} ${failure.stack} ${String(failure.cause)}`, new RegExp(INTERNAL));
+  }
+});
+
+test('LIVENESS_CONTEXT_OPTIONS blocks service workers', () => {
+  assert.equal(LIVENESS_CONTEXT_OPTIONS.serviceWorkers, 'block');
 });
 
 test('recordLandedUrls judges each distinct dialled address once', async (t) => {
@@ -188,21 +234,24 @@ test('recordLandedUrls judges each distinct dialled address once', async (t) => 
 // check of everything recorded.
 const URL_CHECK = 'rejectLandedUrl(page.url())';
 const RECORD = 'const rejectVisited = recordLandedUrls(page);';
+const NO_SERVICE_WORKERS = "{ serviceWorkers: 'block' }";
+const CONTEXT_CREATED = /browser\.new(?:Context|Page)\(([^)]*)\)/g;
 const SITES = {
-  'browser-extract.mjs': { guard: 'await installEgressGuard(context);', check: URL_CHECK, first: 'readDom(page)', last: 'readDom(page)' },
-  'batch-evaluate-gemini.mjs': { guard: 'await installEgressGuard(page.context());', check: URL_CHECK, first: 'page.evaluate(', last: 'page.evaluate(' },
-  'archive-posting.mjs': { guard: 'await installEgressGuard(context);', check: 'rejectLandedPage(page)', first: 'page.title(', last: 'page.pdf(' },
-  'upskill.mjs': { guard: 'await installEgressGuard(page.context());', check: URL_CHECK, first: 'page.innerText(', last: 'page.innerText(' },
+  'browser-extract.mjs': { created: 'LIVENESS_CONTEXT_OPTIONS', guard: 'await installEgressGuard(context);', check: URL_CHECK, first: 'readDom(page)', last: 'readDom(page)' },
+  'batch-evaluate-gemini.mjs': { created: NO_SERVICE_WORKERS, guard: 'await installEgressGuard(page.context());', check: URL_CHECK, first: 'page.evaluate(', last: 'page.evaluate(' },
+  'archive-posting.mjs': { created: NO_SERVICE_WORKERS, guard: 'await installEgressGuard(context);', check: 'rejectLandedPage(page)', first: 'page.title(', last: 'page.pdf(' },
+  'upskill.mjs': { created: NO_SERVICE_WORKERS, guard: 'await installEgressGuard(page.context());', check: URL_CHECK, first: 'page.innerText(', last: 'page.innerText(' },
 };
 const PAGE_READ = /\bpage\.(?:evaluate|title|innerText|innerHTML|content|textContent|\$\$?(?:eval)?|locator|getBy\w+|frames|waitForSelector|pdf|screenshot)\(|\breadDom\(page\)/g;
 const ACTED_ON_CHECK = /const (\w+) = await (reject(?:Landed\w+|Visited)\([^;]*\));\s*if \(\1\)/g;
 
-for (const [file, { guard, check, first, last }] of Object.entries(SITES)) {
-  test(`${file} guards the context, records every frame navigation and checks before its first read and after its last`, () => {
+for (const [file, { created, guard, check, first, last }] of Object.entries(SITES)) {
+  test(`${file} blocks service workers, guards the context, records every frame navigation and checks before its first read and after its last`, () => {
     const source = readFileSync(join(ROOT, file), 'utf8');
     assert.doesNotMatch(source, /installEgressGuard\(page\)/, 'the guard must be on the context, not the page');
     const guardAt = source.indexOf(guard);
     assert.notEqual(guardAt, -1, `expected ${guard}`);
+    assert.equal([...source.slice(0, guardAt).matchAll(CONTEXT_CREATED)].at(-1)?.[1], created, 'the guarded context is created with service workers blocked');
     const body = source.slice(guardAt).split(/\n}\n/)[0];
     const gotoAt = body.indexOf('page.goto(');
     const recordAt = body.indexOf(RECORD);
@@ -239,6 +288,11 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
   }
   let releaseSignal;
   const signal = new Promise((resolve) => { releaseSignal = resolve; });
+  const privateHits = [];
+  const sharedWorkerActions = {
+    fetch: () => `fetch('http://${privateOrigin()}/cors').then((r) => r.text())`,
+    socket: () => `new Promise((resolve, reject) => { const socket = new WebSocket('ws://${privateOrigin()}/ws'); socket.onmessage = (e) => resolve(e.data); socket.onerror = reject; })`,
+  };
   const html = (res, body, title = 'Engineer | Acme') => res.writeHead(200, { 'content-type': 'text/html' }).end(`<title>${title}</title><body>${body}</body>`);
   const send = (res, type, body) => res.writeHead(200, { 'content-type': type, 'access-control-allow-origin': '*' }).end(body);
   const privateOrigin = () => `private.example.test:${privateServer.address().port}`;
@@ -256,6 +310,15 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
     else if (req.url === '/with-script') html(res, `${POSTING}<script src="/to-private/script.js"></script>`);
     else if (req.url === '/with-fetch') html(res, `${POSTING}<script>fetch('/to-private/cors').then((r) => r.text()).then((text) => document.body.append(text))</script>`);
     else if (req.url === '/with-websocket') html(res, `${POSTING}<script>new WebSocket('ws://${privateOrigin()}/ws').onmessage = (e) => document.body.append(e.data)</script>`);
+    else if (req.url === '/armed') send(res, 'text/plain', 'ok');
+    else if (req.url === '/armed-posting') html(res, `${POSTING}<script>fetch('/armed')</script>`);
+    else if (req.url.startsWith('/shared.js?')) send(res, 'text/javascript', `onconnect = (e) => { ${sharedWorkerActions[req.url.split('?')[1]]()}.then((text) => e.ports[0].postMessage(text), () => e.ports[0].postMessage('failed')); };`);
+    else if (req.url.startsWith('/with-shared-worker?')) {
+      const [action, from] = req.url.split('?')[1].split('&');
+      const constructor = from === 'iframe' ? "document.body.appendChild(document.createElement('iframe')).contentWindow.SharedWorker" : 'globalThis.SharedWorker';
+      html(res, `${POSTING}<script>const Shared = ${constructor}; const done = () => fetch('/armed'); if (!Shared) done(); else new Shared('/shared.js?${action}').port.onmessage = (e) => { document.body.append(e.data); done(); };</script>`);
+    } else if (req.url === '/with-dead-socket') html(res, `${POSTING}<script>new WebSocket('ws://tracker.example.test:${deadPort}/t')</script>`);
+    else if (req.url === '/throws') html(res, `${POSTING}<script>fetch('/to-private/cors').then((r) => r.text()).then((text) => { const boom = () => { throw new Error('THROWN ' + text); }; for (const key of ['body', 'title', 'documentElement']) Object.defineProperty(document, key, { get: boom }); document.querySelectorAll = boom; document.querySelector = boom; Element.prototype.querySelectorAll = boom; return fetch('/armed'); })</script>`);
     else if (req.url === '/public-assets') html(res, `<img src="/img.png"><img src="http://${privateOrigin()}/img.png">${POSTING}<script src="/script.js"></script><script>fetch('/cors')</script>`);
     else if (req.url === '/self-redirect-to-payroll') html(res, `${POSTING}<script>fetch('/signal').then(() => { location = '/to-private/payroll'; })</script>`);
     else if (req.url === '/signal') signal.then(() => res.end('go'));
@@ -270,15 +333,20 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
   };
   const server = createServer(answer);
   const privateServer = createServer(answer);
+  privateServer.on('request', (req) => privateHits.push(req.url));
   privateServer.on('upgrade', (req, socket) => {
+    privateHits.push(req.url);
     const accept = createHash('sha1').update(`${req.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
     const payload = Buffer.from(`${INTERNAL} ws`);
     socket.on('error', () => {});
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
     socket.write(Buffer.concat([Buffer.from([0x81, payload.length]), payload]));
   });
-  for (const listener of [server, privateServer]) await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  const closed = createServer();
+  for (const listener of [server, privateServer, closed]) await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const privatePort = privateServer.address().port;
+  const deadPort = closed.address().port;
+  await new Promise((resolve) => closed.close(resolve));
   t.after(async () => {
     releaseSignal();
     await browser.close().catch(() => {});
@@ -289,7 +357,7 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
   if (!realAddressRule) t.after(setDialledAddressJudge(({ port }) => port === privatePort));
   const warned = t.mock.method(console, 'warn', () => {});
   const logged = t.mock.method(console, 'log', () => {});
-  return { browser, warned, logged, releaseSignal, privatePort, publicUrl: (path) => `http://jobs.example.test:${server.address().port}${path}` };
+  return { browser, warned, logged, releaseSignal, privatePort, privateHits, publicUrl: (path) => `http://jobs.example.test:${server.address().port}${path}` };
 }
 
 test('real Chromium: a 302 to a private-resolving name is not routed, and its landed URL is refused', { timeout: 60_000 }, async (t) => {
@@ -469,4 +537,135 @@ test('real Chromium: a name the lookup calls public is refused when Chromium dia
   const before = archived();
   await assert.rejects(archiveUrl(env.browser, env.publicUrl('/posting')), REFUSED_BY_ADDRESS);
   assert.deepEqual(archived(), before);
+});
+
+// The page's first read waits for `ready`, a signal from the page or its
+// socket, so no case depends on the 2 s hydration wait being long enough.
+const readsWhen = (env, ready) => ({ newContext: async (options) => {
+  const context = await env.browser.newContext(options);
+  const newPage = context.newPage.bind(context);
+  context.newPage = async () => {
+    const page = await newPage();
+    const waited = ready(context, page);
+    const title = page.title.bind(page);
+    page.title = async () => {
+      await waited;
+      return title();
+    };
+    return page;
+  };
+  return context;
+} });
+const pageArmed = (context) => new Promise((resolve) => {
+  context.on('response', (response) => { if (new URL(response.url()).pathname === '/armed') resolve(); });
+});
+const socketGaveUp = (context, page) => new Promise((resolve) => {
+  page.on('websocket', (socket) => { socket.on('socketerror', resolve); socket.on('close', resolve); });
+});
+
+test('real Chromium: archiveUrl archives a posting whose WebSocket to a filtered tracker never connected', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const before = archived().length;
+  await archiveUrl(readsWhen(env, socketGaveUp), env.publicUrl('/with-dead-socket'));
+  assert.equal(archived().length, before + 1);
+});
+
+for (const [what, query] of [
+  ['a fetch', 'fetch'],
+  ['a WebSocket', 'socket'],
+  ['a fetch, with the constructor taken from a new iframe', 'fetch&iframe'],
+]) {
+  test(`real Chromium: a page has no SharedWorker to reach a private host with ${what}, and is archived without it`, { timeout: 60_000 }, async (t) => {
+    const env = await chromiumAndServer(t);
+    if (!env) return;
+    const before = archived().length;
+    await archiveUrl(readsWhen(env, pageArmed), env.publicUrl(`/with-shared-worker?${query}`));
+    assert.deepEqual(env.privateHits, [], 'nothing reached the private host, so none of its text is in any output');
+    assert.equal(archived().length, before + 1, 'the page found no constructor, carried on and was kept');
+  });
+}
+
+test('real Chromium: archiveUrl refuses, and repeats nothing, when a read throws text the page took from a private host', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const errors = t.mock.method(console, 'error', () => {});
+  const before = archived();
+  const refusal = await archiveUrl(readsWhen(env, pageArmed), env.publicUrl('/throws')).then(() => null, (err) => err);
+  assert.match(refusal?.message ?? '', REFUSED_BY_ADDRESS);
+  const printed = [env.logged, env.warned, errors].flatMap((mock) => mock.mock.calls.map((call) => call.arguments.join(' ')));
+  assert.doesNotMatch([refusal.message, refusal.stack, ...printed].join('\n'), new RegExp(INTERNAL));
+  assert.deepEqual(archived(), before);
+});
+
+// browser-extract.mjs reports a failed read from its main, so the CLI runs as a
+// child with `playwright` swapped (a module hook) for the real one plus this
+// file's seams: the resolver, the address rule, the name mapping, and a first
+// read that waits for the page's signal.
+function extractCli(t, env, path) {
+  const dir = mkdtempSync(join(tmpdir(), 'career-ops-landed-cli-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const href = (...parts) => pathToFileURL(join(...parts)).href;
+  writeFileSync(join(dir, 'playwright.mjs'), `
+import { chromium as real } from ${JSON.stringify(href(ROOT, 'node_modules', 'playwright', 'index.mjs'))};
+import { setDialledAddressJudge, setHostResolver } from ${JSON.stringify(href(ROOT, 'liveness-browser.mjs'))};
+const { answers, privatePort } = JSON.parse(process.env.LANDED_TEST);
+setHostResolver(async (host) => answers[host] ?? []);
+setDialledAddressJudge(({ port }) => port === privatePort);
+export const chromium = { launch: async (options) => {
+  const browser = await real.launch({ ...options, args: ['--host-resolver-rules=MAP *.example.test 127.0.0.1'] });
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (contextOptions) => {
+    const context = await newContext(contextOptions);
+    const armed = new Promise((resolve) => {
+      context.on('response', (response) => { if (new URL(response.url()).pathname === '/armed') resolve(); });
+    });
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+      const page = await newPage();
+      const evaluate = page.evaluate.bind(page);
+      page.evaluate = async (...args) => {
+        await armed;
+        return evaluate(...args);
+      };
+      return page;
+    };
+    return context;
+  };
+  return browser;
+} };
+`);
+  writeFileSync(join(dir, 'hooks.mjs'), `
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier === 'playwright') return { url: ${JSON.stringify(href(dir, 'playwright.mjs'))}, shortCircuit: true };
+  return nextResolve(specifier, context);
+}
+`);
+  writeFileSync(join(dir, 'register.mjs'), `import { register } from 'node:module';\nregister(${JSON.stringify(href(dir, 'hooks.mjs'))});\n`);
+  return new Promise((resolve) => {
+    execFile(process.execPath, ['--import', href(dir, 'register.mjs'), join(ROOT, 'browser-extract.mjs'), env.publicUrl(path)], {
+      cwd: dir, timeout: 50_000,
+      env: { ...process.env, LANDED_TEST: JSON.stringify({ answers: ANSWERS, privatePort: env.privatePort }) },
+    }, (err, stdout, stderr) => resolve({ code: err ? err.code : 0, stdout, stderr }));
+  });
+}
+
+test('real Chromium: browser-extract.mjs reports the refusal, and nothing else, when its read throws text the page took from a private host', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const { code, stdout, stderr } = await extractCli(t, env, '/throws');
+  const reported = JSON.parse(stderr.split('\n').find((line) => line.startsWith('{')) ?? 'null');
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(reported?.code, 'blocked_host', stderr);
+  assert.match(reported.error, /^blocked final URL: .*a response came from private target IP 127\.0\.0\.1$/);
+  assert.doesNotMatch(stderr, new RegExp(INTERNAL));
+});
+
+test('real Chromium: browser-extract.mjs still extracts a posting through the same child', { timeout: 60_000 }, async (t) => {
+  const env = await chromiumAndServer(t);
+  if (!env) return;
+  const { code, stdout, stderr } = await extractCli(t, env, '/armed-posting');
+  assert.equal(code, 0, stderr);
+  assert.match(JSON.parse(stdout).text, /Platform engineer role/);
 });

@@ -2232,6 +2232,7 @@ try {
   function makeMockBrowser({ landedUrl = 'https://example.com/job/1' } = {}) {
     const state = { routeCallback: null, contextCreated: false, closed: false };
     const context = {
+      async addInitScript() {},
       async route(pattern, callback) {
         state.pattern = pattern;
         state.routeCallback = callback;

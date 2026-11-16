@@ -54,7 +54,7 @@ const page = {
 };
 export const chromium = {
   launch: async () => ({
-    newContext: async () => ({ newPage: async () => page, route: async () => {}, close: async () => {} }),
+    newContext: async () => ({ newPage: async () => page, route: async () => {}, addInitScript: async () => {}, close: async () => {} }),
     close: async () => {},
   }),
 };

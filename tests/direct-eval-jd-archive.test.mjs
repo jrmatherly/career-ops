@@ -131,7 +131,7 @@ const { processOffer, PATHS } = await import(${JSON.stringify(pathToFileURL(join
 PATHS.reports = ${JSON.stringify(join(dir, 'reports'))};
 PATHS.trackerAdditions = ${JSON.stringify(join(dir, 'tracker-additions'))};
 const browser = { newPage: async () => ({
-  url: () => 'https://example.com/job', context: () => ({ route: async () => {}, on() {} }), on() {}, goto: async () => {},
+  url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {}, goto: async () => {},
   waitForTimeout: async () => {}, evaluate: async () => ${JSON.stringify(JD)}, close: async () => {},
 }) };
 const evaluate = async () => ${JSON.stringify(`${BLOCKS}\n\n${SUMMARY}`)};

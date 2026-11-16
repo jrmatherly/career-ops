@@ -17,7 +17,7 @@ const fixture = `
   const url = ${JSON.stringify(url)};
   const line = '- [ ] ' + url + ' | Example Corp | Platform Engineer';
   const page = {
-    url: () => url, context: () => ({ route: async () => {}, on() {} }), on() {}, goto: async () => {},
+    url: () => url, context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {}, goto: async () => {},
     waitForTimeout: async () => {}, close: async () => {},
     evaluate: async () => 'Build reliable platforms and test production systems. '.repeat(4),
   };

@@ -37,7 +37,7 @@ const tab = {
 };
 export const chromium = {
   launch: async () => ({
-    newContext: async () => ({ route: async () => {}, newPage: async () => tab }),
+    newContext: async () => ({ route: async () => {}, addInitScript: async () => {}, newPage: async () => tab }),
     close: async () => {},
   }),
 };

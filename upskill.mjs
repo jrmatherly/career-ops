@@ -864,7 +864,7 @@ if (isMain) {
           const secureUrl = inputSource;
           const { chromium } = await import('playwright');
           browser = await chromium.launch(browserLaunchOptions({ headless: true }));
-          const page = await browser.newPage();
+          const page = await browser.newPage({ serviceWorkers: 'block' });
 
           await installEgressGuard(page.context());
           const rejectVisited = recordLandedUrls(page);

@@ -370,7 +370,7 @@ async function scrapeUrl(browser, url) {
     throw new Error(`Invalid or blocked URL: ${rejected.reason}`);
   }
   
-  const page = await browser.newPage();
+  const page = await browser.newPage({ serviceWorkers: 'block' });
   try {
     await installEgressGuard(page.context());
     const rejectVisited = recordLandedUrls(page);

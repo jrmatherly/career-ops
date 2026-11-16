@@ -9,7 +9,7 @@ const lb = await import(pathToFileURL(join(ROOT, 'liveness-browser.mjs')).href);
 
 async function verdictFor(url) {
   let handler;
-  await lb.installEgressGuard({ route: async (pattern, h) => { assert.equal(pattern, '**/*'); handler = h; } });
+  await lb.installEgressGuard({ addInitScript: async () => {}, route: async (pattern, h) => { assert.equal(pattern, '**/*'); handler = h; } });
   let verdict = null;
   await handler({ request: () => ({ url: () => url }), abort: async (code) => { verdict = `abort:${code}`; }, continue: async () => { verdict = 'continue'; } });
   return verdict;

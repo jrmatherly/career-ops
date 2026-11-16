@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
-import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
@@ -1552,7 +1552,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    const raw = await readDom(page);
+    const raw = await readLanded(rejectVisited, readDom(page));
     const afterRead = await rejectVisited();
     if (afterRead) {
       console.error(JSON.stringify({ error: `blocked final URL: ${afterRead.reason}`, code: afterRead.code }));
@@ -1572,7 +1572,11 @@ async function main() {
       }
     }
   } catch (err) {
-    console.error(JSON.stringify({ error: `navigation error: ${String(err.message).split('\n')[0]}`, code: 'navigation_error' }));
+    if (err.refused) {
+      console.error(JSON.stringify({ error: `blocked final URL: ${err.refused.reason}`, code: err.refused.code }));
+    } else {
+      console.error(JSON.stringify({ error: `navigation error: ${String(err.message).split('\n')[0]}`, code: 'navigation_error' }));
+    }
     process.exitCode = 1;
   } finally {
     if (browser) await browser.close().catch(() => {});

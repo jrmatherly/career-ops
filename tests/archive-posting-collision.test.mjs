@@ -14,7 +14,7 @@ const { archiveUrl } = await import('../archive-posting.mjs?archive-posting-coll
 function browser() {
   return { async newContext() {
     let url;
-    return { async route() {}, async close() {}, async newPage() {
+    return { async route() {}, async addInitScript() {}, async close() {}, async newPage() {
       return { async goto(value) { url = value; return { status: () => 200 }; }, url() { return url; }, frames() { return []; }, on() {}, context: () => ({ on() {} }),
         async waitForTimeout() {}, async title() { return 'Engineer | Fictional'; }, async $eval() { return 'Engineer'; },
         async evaluate() { return 'Fictional engineering role with responsibilities and requirements. '.repeat(40); },

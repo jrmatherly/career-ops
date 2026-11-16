@@ -30,7 +30,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { captureSlug, reportPrefix } from './jd-capture.mjs';
-import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedPage, recordLandedUrls } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedPage, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 export { installEgressGuard } from './liveness-browser.mjs';
 import { cloudflareInterstitial } from './liveness-core.mjs';
 import { validateFlags } from './lib/cli-flags.mjs';
@@ -321,7 +321,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     throw new Error(`refusing to archive restricted destination: ${preGuard.reason}`);
   }
 
-  const context = await browser.newContext();
+  const context = await browser.newContext({ serviceWorkers: 'block' });
   await installEgressGuard(context);
   const page = await context.newPage();
   const rejectVisited = recordLandedUrls(page);
@@ -343,7 +343,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
     }
 
-    const pageTitle = await page.title();
+    const pageTitle = await readLanded(rejectVisited, page.title());
     const h1Text = await page.$eval('h1', el => el.innerText.trim()).catch(() => '');
     const urlCompany = extractCompanyFromUrl(url);
 
@@ -366,7 +366,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     // ever having been checked — a capture-time gap in the exact protection
     // this block exists to add. Fail closed: propagate the error, refusing
     // to archive rather than archiving blind.
-    const bodyText = await page.evaluate(() => document.body?.innerText ?? '');
+    const bodyText = await readLanded(rejectVisited, page.evaluate(() => document.body?.innerText ?? ''));
     if (!bodyText.trim()) {
       throw new Error('refusing to archive: page has no visible text');
     }
@@ -398,12 +398,12 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
       console.log(`HTTP ${httpStatus} — page may be closed, archiving anyway`);
     }
 
-    const pdfBuffer = await page.pdf({
+    const pdfBuffer = await readLanded(rejectVisited, page.pdf({
       format: 'a4',
       printBackground: true,
       margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
       preferCSSPageSize: false,
-    });
+    }));
     const afterRender = await rejectVisited();
     if (afterRender) {
       throw new Error(`refusing to archive restricted destination after redirect: ${afterRender.reason}`);
@@ -447,6 +447,11 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
 
     return { filename, reference, url, size: pdfBuffer.length };
 
+  } catch (err) {
+    if (err.refused) {
+      throw new Error(`refusing to archive restricted destination after redirect: ${err.refused.reason}`);
+    }
+    throw err;
   } finally {
     await context.close();
   }
