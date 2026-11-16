@@ -32,7 +32,7 @@ import { normalizeReportLink as normalizeLink } from './tracker-links.mjs';
 import { getCareerOpsRoot, resolveBatchStatePaths } from './path-resolver.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 import { parsePdfIndex, livePdfIndex, normNum } from './find.mjs';
-import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
+import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, parseTrackerRow, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
 // The ATS vendor table shared with analyze-patterns.mjs and the scanners, so
 // the URL cell's label and the per-vendor analysis name a board identically.
 import { atsVendorOf } from './ats-vendor.mjs';
@@ -1681,7 +1681,9 @@ export async function mergeTracker(options = {}) {
       // below; this is the dedup half (#2265).
       if (!line.startsWith('|')) continue;
       const app = parseAppLine(line);
-      if (app) {
+      if (app && !parseTrackerRow(line, COLMAP)) {
+        console.warn(`⚠️  Row #${app.num} is short of the header, so no addition will update it. Add the missing cell to that row in applications.md, then re-run.`);
+      } else if (app) {
         existingApps.push(app);
         if (app.num > maxNum) maxNum = app.num;
       }
