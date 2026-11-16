@@ -92,6 +92,7 @@ export function EditJobModal({
           </div>
           <button
             type="button"
+            aria-label="Close"
             onClick={onClose}
             className="rounded-lg p-1.5 text-faint transition-colors hover:bg-surface-hover hover:text-foreground"
           >
@@ -104,8 +105,9 @@ export function EditJobModal({
 
           {/* ─── Name + Engine + Cadence ─── */}
           <div>
-            <label className="mb-1 block text-[13px] font-medium text-foreground">Scan Name</label>
+            <label htmlFor="edit-scan-name" className="mb-1 block text-[13px] font-medium text-foreground">Scan Name</label>
             <input
+              id="edit-scan-name"
               ref={nameRef}
               type="text"
               value={name}
@@ -118,8 +120,9 @@ export function EditJobModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-[13px] font-medium text-foreground">Where to check</label>
+              <label htmlFor="edit-scan-engine" className="mb-1 block text-[13px] font-medium text-foreground">Where to check</label>
               <select
+                id="edit-scan-engine"
                 value={engine}
                 onChange={(e) => setEngine(e.target.value as ScanEngine)}
                 className="w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
@@ -130,9 +133,10 @@ export function EditJobModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-[13px] font-medium text-foreground">Repeat Cadence</label>
+              <label htmlFor="edit-scan-every" className="mb-1 block text-[13px] font-medium text-foreground">Repeat Cadence</label>
               <div className="flex gap-2">
                 <input
+                  id="edit-scan-every"
                   type="number"
                   min={cadenceMinimum(unit)}
                   value={every}
@@ -140,6 +144,7 @@ export function EditJobModal({
                   className="w-20 rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
                 />
                 <select
+                  aria-label="Repeat unit"
                   value={unit}
                   onChange={(e) => {
                     const nextUnit = e.target.value as "minutes" | "hours" | "days";

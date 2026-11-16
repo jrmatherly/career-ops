@@ -108,5 +108,16 @@ test("visible labels are part of accessible names, and shell content sits in lan
     await dialog.getByLabel("Scan depth").waitFor();
   });
 
+  const CONTROLS = [["button", "Close"], ["textbox", "Scan Name"], ["combobox", "Where to check"], ["spinbutton", "Repeat Cadence"], ["combobox", "Repeat unit"]];
+  await t.test("/scheduled-scans: the scan dialogs name every control", async () => {
+    const dialog = page.getByRole("dialog");
+    for (const [role, name] of CONTROLS) assert.equal(await dialog.getByRole(role, { name, exact: true }).count(), 1, `create dialog: ${role} "${name}"`);
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Run log" }).click();
+    await page.getByRole("heading", { name: "Execution Run History" }).waitFor();
+    assert.equal(await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).count(), 1, "run log drawer: Close");
+    await page.keyboard.press("Escape");
+  });
+
   assert.deepEqual(unexpected, []);
 });

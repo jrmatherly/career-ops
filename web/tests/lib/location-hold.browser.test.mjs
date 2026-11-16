@@ -34,6 +34,9 @@ test("a held posting keeps its rank in the Inbox, and the job form shows the hol
   await dialog.getByRole("button", { name: "Remove United States" }).waitFor();
   await dialog.getByText("Source groups", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Remove weekly" }).waitFor();
+  for (const [role, name] of [["button", "Close"], ["textbox", "Scan Name"], ["combobox", "Where to check"], ["spinbutton", "Repeat Cadence"], ["combobox", "Repeat unit"]]) {
+    assert.equal(await dialog.getByRole(role, { name, exact: true }).count(), 1, `edit dialog: ${role} "${name}"`);
+  }
 
   // A country the gate does not know is refused by the route and named in the form.
   await dialog.getByRole("button", { name: "Remove United States" }).click();

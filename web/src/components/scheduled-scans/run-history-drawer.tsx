@@ -31,6 +31,7 @@ export function RunHistoryDrawer({
           <button
             ref={closeRef}
             type="button"
+            aria-label="Close"
             onClick={onClose}
             className="rounded-lg p-1.5 text-faint hover:bg-surface-hover hover:text-foreground"
           >
