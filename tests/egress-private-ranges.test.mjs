@@ -31,3 +31,43 @@ test('a name whose only answer is 0.0.0.0 is still a DNS sinkhole', async (t) =>
   t.after(setHostResolver(async () => ['0.0.0.0']));
   await assert.rejects(validateUrlSecurity('https://tracker.example.test/'), (err) => err.livenessCode === 'dns_sinkhole');
 });
+
+test('IPv6 ranges are judged on the parsed address, however it is spelled', () => {
+  for (const a of [
+    '0:0:0:0:0:0:0:1', '0::1', '::0001', '0::', '0:0:0:0:0:ffff:7f00:1', '0:0:0:0:0:0:7f00:1',
+    'fc00::8.8.8.8', 'fe80::8.8.8.8', 'ff02::8.8.8.8', 'fd00:ec2::8.8.8.8', '2002::8.8.8.8', '2001::8.8.8.8',
+    'FC00:0:0:0:0:0:0:1', 'fe80:0000::1', 'fe80::1%eth0',
+  ]) {
+    assert.equal(isBlockedAddress(a), true, a);
+  }
+});
+
+test('the NAT64 local-use prefix 64:ff9b:1::/48 is blocked whole', () => {
+  for (const a of ['64:ff9b:1::7f00:1', '64:ff9b:1::a9fe:a9fe', '64:ff9b:1::808:808', '64:ff9b:1:ffff:ffff:ffff:808:808']) {
+    assert.equal(isBlockedAddress(a), true, a);
+  }
+  assert.equal(rejectPrivateOrInvalid('http://[64:ff9b:1::7f00:1]/')?.code, 'blocked_host');
+  assert.equal(isBlockedAddress('64:ff9b:2::808:808'), false, 'the next /48 is not the local-use prefix');
+});
+
+test('a string that is not an address is blocked', () => {
+  for (const a of ['::g', ':::', '1:2:3:4:5:6:7:8:9', '12345::1', '[::1]', '127.0.0.1:80', '1::2::3']) {
+    assert.equal(isBlockedAddress(a), true, a);
+  }
+});
+
+test('public IPv6 addresses pass in every spelling', () => {
+  for (const a of [
+    '2606:4700:4700::1111', '2606:4700:4700:0000:0000:0000:0000:1111', '2606:4700:4700:0:0:0:0:1111', '2606:4700:4700::1111'.toUpperCase(),
+    '2001:4860:4860::8888', '2001:4860:4860:0000:0000:0000:0000:8888', '2001:4860:4860:0:0:0:0:8888', '2001:4860:4860::8888'.toUpperCase(),
+    '64:ff9b::808:808', '64:ff9b::8.8.8.8',
+  ]) {
+    assert.equal(isBlockedAddress(a), false, a);
+  }
+});
+
+test('a hostname that only looks like a private address passes the literal check', () => {
+  for (const u of ['http://10.example.com/', 'http://127.0.0.1.nip.io/']) {
+    assert.equal(rejectPrivateOrInvalid(u), null, u);
+  }
+});

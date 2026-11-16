@@ -96,14 +96,22 @@ function v4ToInt(address) {
   return value >>> 0;
 }
 
+/** The eight 16-bit groups of an IPv6 address, or null when it is not one. */
 function v6Groups(addr) {
-  const [head, tail] = addr.includes('::') ? addr.split('::') : [addr, null];
-  const left = head ? head.split(':') : [];
-  const right = tail ? tail.split(':') : [];
-  const fill = tail === null ? 0 : 8 - left.length - right.length;
-  if (fill < 0) return null;
-  const groups = [...left, ...Array(fill).fill('0'), ...right].map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? Number.parseInt(g, 16) : NaN));
-  return groups.length === 8 && groups.every(Number.isInteger) ? groups : null;
+  let hex = addr;
+  if (addr.includes('.')) {
+    const cut = addr.lastIndexOf(':') + 1;
+    const v4 = v4ToInt(addr.slice(cut));
+    if (v4 === null) return null;
+    hex = `${addr.slice(0, cut)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
+  }
+  const halves = hex.split('::');
+  if (halves.length > 2) return null;
+  const [left, right] = halves.map((half) => (half ? half.split(':') : []));
+  const fill = right ? 8 - left.length - right.length : 0;
+  if (right ? fill < 1 : left.length !== 8) return null;
+  const groups = [...left, ...Array(fill).fill('0'), ...(right ?? [])];
+  return groups.every((g) => /^[0-9a-f]{1,4}$/.test(g)) ? groups.map((g) => Number.parseInt(g, 16)) : null;
 }
 
 /**
@@ -131,36 +139,24 @@ export function isBlockedAddress(address) {
     });
   }
 
-  if (!addr.includes(':')) return true; // neither v4 nor v6 — refuse to guess
-
-  // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d).
-  const tail = addr.slice(addr.lastIndexOf(':') + 1);
-  if (tail.includes('.')) {
-    const embedded = v4ToInt(tail);
-    return embedded === null ? true : isBlockedAddress(tail);
-  }
-  // The same two forms written in hex, which is how the URL parser prints them:
-  // `new URL('http://[::ffff:127.0.0.1]/').hostname` is `[::ffff:7f00:1]`.
-  const hexEmbedded = /^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(addr);
-  if (hexEmbedded) {
-    const high = Number.parseInt(hexEmbedded[1], 16);
-    const low = Number.parseInt(hexEmbedded[2], 16);
-    return isBlockedAddress(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
-  }
-
   const g = v6Groups(addr);
-  if (g) {
-    const v4 = () => `${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`;
-    if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return isBlockedAddress(v4()); // NAT64 64:ff9b::/96
-    if (g.slice(0, 4).every((x) => x === 0) && g[4] === 0xffff && g[5] === 0) return isBlockedAddress(v4()); // IPv4-translated ::ffff:0:0:0/96
-    if (g[0] === 0x2002) return true;                     // 6to4 2002::/16
-    if (g[0] === 0x2001 && g[1] === 0) return true;       // Teredo 2001::/32
-  }
+  if (!g) return true; // neither v4 nor v6 — refuse to guess
 
-  if (addr === '::' || addr === '::1') return true;      // unspecified, loopback
-  if (/^f[cd]/.test(addr)) return true;                   // fc00::/7 unique local
-  if (/^fe[89ab]/.test(addr)) return true;                // fe80::/10 link-local
-  if (/^ff/.test(addr)) return true;                      // ff00::/8 multicast
+  const zero = (from, to) => g.slice(from, to).every((x) => x === 0);
+  const embeddedV4 = () => isBlockedAddress(`${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`);
+  // ::/96 holds unspecified (::) and loopback (::1), which read as 0.0.0.0 and 0.0.0.1.
+  if (zero(0, 5) && (g[5] === 0 || g[5] === 0xffff)) return embeddedV4(); // IPv4-compatible ::/96, IPv4-mapped ::ffff:0:0/96
+  if (zero(0, 4) && g[4] === 0xffff && g[5] === 0) return embeddedV4();   // IPv4-translated ::ffff:0:0:0/96
+  if (g[0] === 0x64 && g[1] === 0xff9b) {
+    if (zero(2, 6)) return embeddedV4();                  // NAT64 64:ff9b::/96
+    // Where the IPv4 sits in the local-use prefix depends on the operator's prefix length (RFC 6052 section 2.2).
+    if (g[2] === 1) return true;                          // NAT64 local-use 64:ff9b:1::/48
+  }
+  if (g[0] === 0x2002) return true;                       // 6to4 2002::/16
+  if (g[0] === 0x2001 && g[1] === 0) return true;         // Teredo 2001::/32
+  if ((g[0] & 0xfe00) === 0xfc00) return true;            // fc00::/7 unique local
+  if ((g[0] & 0xffc0) === 0xfe80) return true;            // fe80::/10 link-local
+  if (g[0] >> 8 === 0xff) return true;                    // ff00::/8 multicast
   return false;
 }
 
