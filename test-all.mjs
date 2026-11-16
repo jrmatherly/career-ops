@@ -17446,11 +17446,11 @@ try {
         if (existsSync(join(ROOT, 'web', 'tests', 'lib'))) {
           fail('web/tests/lib contains no *.test.mjs — the #2185 unit suites are not being gated');
         }
-      } else if (run(NODE, ['--experimental-strip-types', '--test', ...webUnits], { timeout: 180000 }) !== null) {
+      } else if (run(NODE, ['--experimental-strip-types', '--test', ...webUnits], { timeout: Math.max(180_000, webUnits.length * 1_000) }) !== null) {
         pass('web pdf write-scope unit suites pass (#2185)');
       } else {
         // The signal distinguishes a timeout/kill from an assertion failure —
-        // run()'s default 30s is short for six suites in one child process.
+        // run()'s default 30s is far too short for every web/tests/lib suite in one child, so the budget grows by a second per file.
         const killed = lastRunFailure()?.signal;
         // Surface the child's own output, for the same reason the per-file
         // node:test path does (see runDiscovered): a bare "failed" is not
