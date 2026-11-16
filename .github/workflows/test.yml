@@ -136,6 +136,14 @@ jobs:
         if: env.SKIP_LEG != 'true'
         run: go test ./...
         working-directory: dashboard
+      - name: "🐹 Go vet"
+        if: env.SKIP_LEG != 'true' && runner.os == 'Linux'
+        run: go vet ./...
+        working-directory: dashboard
+      - name: "🐹 Go lint"
+        if: env.SKIP_LEG != 'true' && runner.os == 'Linux'
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...
+        working-directory: dashboard
 
   test-result:
     name: "✅ Test legs passed"

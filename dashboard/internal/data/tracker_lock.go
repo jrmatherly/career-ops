@@ -295,30 +295,3 @@ func (lock *trackerLock) release() error {
 	lock.released = true
 	return nil
 }
-
-func writeFileAtomic(filePath string, content []byte) error {
-	dir := filepath.Dir(filePath)
-	temp, err := os.CreateTemp(dir, "."+filepath.Base(filePath)+".*.tmp")
-	if err != nil {
-		return err
-	}
-	tempPath := temp.Name()
-	defer os.Remove(tempPath)
-
-	mode := os.FileMode(0o644)
-	if info, statErr := os.Stat(filePath); statErr == nil {
-		mode = info.Mode().Perm()
-	}
-	if err := temp.Chmod(mode); err != nil {
-		temp.Close()
-		return err
-	}
-	if _, err := temp.Write(content); err != nil {
-		temp.Close()
-		return err
-	}
-	if err := temp.Close(); err != nil {
-		return err
-	}
-	return replaceFileAtomic(tempPath, filePath)
-}

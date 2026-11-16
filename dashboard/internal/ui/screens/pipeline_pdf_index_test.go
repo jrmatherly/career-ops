@@ -16,7 +16,7 @@ func TestPDFKeysUseSelectedIndexAndTrackerWorkspace(t *testing.T) {
 			t.Setenv("CAREER_OPS_PDF_INDEX", "")
 			root := t.TempDir()
 			workspace := root
-			index := filepath.Join(root, "data", "pdf-index.tsv")
+			var index string
 			if layout == "index-override" {
 				index = filepath.Join(t.TempDir(), "custom.tsv")
 				t.Setenv("CAREER_OPS_PDF_INDEX", index)
