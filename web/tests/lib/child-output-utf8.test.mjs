@@ -9,6 +9,7 @@ import { EventEmitter } from "node:events";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
 import { markTrackerReady } from "../../src/lib/pdf-render.mjs";
+import { listTree } from "../../../lib/walk-tree.mjs";
 
 function fakeStream() { // same contract as pdf-render.test.mjs: Buffers until setEncoding is called
   const s = new EventEmitter(); let decoder = null;
@@ -29,7 +30,7 @@ const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../src")
 // The one exemption: cv/ingest forwards Buffers to lib/cv/ingest-output.mjs, which decodes with a StringDecoder.
 const EXEMPT = new Set(["app/api/cv/ingest/route.ts"]);
 test("every data handler that reads its chunk is on a stream set to utf8", () => {
-  const files = fs.readdirSync(SRC, { recursive: true }).filter((f) => /\.(mjs|ts|tsx)$/.test(f));
+  const files = listTree(SRC, { match: /\.(mjs|ts|tsx)$/ }).map((f) => path.relative(SRC, f));
   const offenders = [];
   for (const rel of files) {
     if (EXEMPT.has(rel.split(path.sep).join("/"))) continue;

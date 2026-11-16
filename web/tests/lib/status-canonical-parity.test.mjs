@@ -10,6 +10,8 @@ import { resolveCodeRoot } from "../../src/lib/core/code-root.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CORE_ROOT = resolveCodeRoot(path.join(HERE, "..", ".."));
+// canonicalizeStatus reads states.yml from resolveCodeRoot(process.cwd()), which assumes cwd is web/; the suite runs from the repo root.
+process.env.CAREER_OPS_CODE_ROOT = CORE_ROOT;
 const CORE = path.join(CORE_ROOT, "tracker-utils.mjs");
 const core = fs.existsSync(CORE) ? await import(pathToFileURL(CORE).href) : null;
 const { canonicalizeStatus } = await import("../../src/lib/core/states.ts");

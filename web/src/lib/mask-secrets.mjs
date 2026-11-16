@@ -23,7 +23,7 @@ const LABEL_WORDS = ["api[_-]?key", "key", "token", "secret", "password", "passw
 const LABEL = `(?<![A-Za-z0-9])(?:${LABEL_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${LABEL_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
 const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?:${ci("bearer")}|${ci("basic")})[ \\t]+)?([A-Za-z0-9._~+/=-]{16,})`, "g");
 
-// "/Users/me/.cache/…" is a path; "/9j4AAQ…" with no second slash is base64.
+// "/home/me/.cache/…" is a path; "/9j4AAQ…" with no second slash is base64.
 const isPath = (s) => /^\/[^/]+\//.test(s);
 
 const hasDigit = (s) => /\d/.test(s);

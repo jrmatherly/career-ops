@@ -76,8 +76,8 @@ test("credential, password, cookie and api key label variants are masked", () =>
 
 test("a path or a word ending in a label is not taken for a key", () => {
   for (const s of [
-    "Press any key\n/Users/me/cv-2026-11-16.pdf",
-    "cache key: /Users/me/.cache/claude/v2/abc123def456ghi",
+    "Press any key\n/home/me/cv-2026-11-16.pdf",
+    "cache key: /home/me/.cache/claude/v2/abc123def456ghi",
     "the monkey 2024abcdefghijklmnop",
   ]) assert.equal(maskSecrets(s), s);
 });
@@ -111,5 +111,5 @@ test("a lowercase word holding a label is not taken for a key", () => {
 
 test("a labelled value starting with a slash is masked unless it is a path", () => {
   assert.equal(maskSecrets("token=/9j4AAQSkZJRgABAQ0000FAKE"), "token=[masked]");
-  assert.equal(maskSecrets("cache key: /Users/me/.cache/claude/v2/abc123def456ghi"), "cache key: /Users/me/.cache/claude/v2/abc123def456ghi");
+  assert.equal(maskSecrets("cache key: /home/me/.cache/claude/v2/abc123def456ghi"), "cache key: /home/me/.cache/claude/v2/abc123def456ghi");
 });
