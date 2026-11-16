@@ -162,7 +162,7 @@ async function enrichFromAts(url: string, fields: ApplyField[]): Promise<void> {
   }
 }
 
-type Session = { id: string; url: string; title: string; fields: ApplyField[]; context: BrowserContext; page: Page; frame: Frame; createdAt: number; formShot?: string };
+type Session = { id: string; url: string; title: string; fields: ApplyField[]; context: BrowserContext; page: Page; frame: Frame; createdAt: number; expiry: ReturnType<typeof setTimeout>; formShot?: string };
 
 declare global {
   // eslint-disable-next-line no-var
@@ -207,9 +207,19 @@ function scheduleIdleClose() {
   }, 5 * 60_000);
 }
 
+const SESSION_MAX_AGE_MS = 15 * 60_000;
+
 function prune() {
   const now = Date.now();
-  for (const [id, s] of SESSIONS) if (now - s.createdAt > 15 * 60_000) void closeSession(id);
+  for (const [id, s] of SESSIONS) if (now - s.createdAt > SESSION_MAX_AGE_MS) void closeSession(id);
+}
+
+/** Record a session with its own expiry, so one nothing closes (a crashed or discarded tab, a
+ *  handed-off form whose tab is gone) is reaped without waiting for the next openSession. */
+function recordSession(s: Omit<Session, "createdAt" | "expiry">): void {
+  const expiry = setTimeout(() => void closeSession(s.id), SESSION_MAX_AGE_MS);
+  expiry.unref();
+  SESSIONS.set(s.id, { ...s, createdAt: Date.now(), expiry });
 }
 
 /** Bounded scroll pass to trigger lazy/virtualized forms that only render their
@@ -236,171 +246,182 @@ export async function openSession(url: string, cliId?: string, forceAgent?: bool
   if (globalThis.__coIdleTimer) clearTimeout(globalThis.__coIdleTimer); // someone's active
   const browser = await headedBrowser();
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  await installApplyEgressGuard(context);
-  context.setDefaultTimeout(8000); // no single action hangs the whole open/fill
-  const page = await context.newPage();
-  const abort = async (msg: string): Promise<never> => {
-    await context.close().catch(() => {});
-    if (SESSIONS.size === 0) scheduleIdleClose();
-    throw new Error(msg);
-  };
-  // Capture the real form as we read it → a "behind the scenes" progress strip
-  // that proves we genuinely opened + parsed THEIR form (not magic). The last
-  // shot doubles as a subtle blurred backdrop behind the clean proxy.
-  const shots: string[] = [];
-  const snap = async () => {
-    try {
-      const b = await page.screenshot({ type: "jpeg", quality: 42 });
-      shots.push(`data:image/jpeg;base64,${b.toString("base64")}`);
-    } catch {
-      /* ignore */
-    }
-  };
-  // 1) Navigate (resilient) → cheapest hard-block check on the Response status.
-  let resp: Response | null;
+  let released = false;
   try {
-    resp = await gotoResilient(page, url);
-  } catch (e) {
-    await context.close().catch(() => {});
-    if (SESSIONS.size === 0) scheduleIdleClose();
-    throw e;
-  }
-  // A career page can redirect onto a blocked portal. Close before scroll,
-  // screenshots, or the Apply click that opens a second window.
-  const landedAts = await unsupportedInAppAts(page.url());
-  if (landedAts) {
-    await context.close().catch(() => {});
-    if (SESSIONS.size === 0) scheduleIdleClose();
-    return { unsupported: landedAts, message: unsupportedAtsMessage(landedAts.label, true) };
-  }
-  await snap(); // first paint
-  const sBlock = statusBlock(resp?.status(), resp ? resp.headers() : {});
-  if (sBlock) return abort(sBlock.message);
-
-  // 2) Clear any cookie/consent overlay that hides the form (never a hard block).
-  const consentIssues = await dismissConsent(page);
-
-  // 3) Wait for real form controls to render (SPA hydrate) in ANY frame (embedded
-  //    forms), then settle. More reliable than a fixed sleep.
-  const formSel = 'form input, form textarea, input[type=file], [role=combobox], [class*="application-form" i], #application_form';
-  await Promise.race(page.frames().map((f) => f.waitForSelector(formSel, { timeout: 12_000 }).catch(() => null))).catch(() => {});
-  await page.waitForTimeout(1200);
-  await dropNewTabs(page); // make any "Apply" link/popup navigate in OUR tab
-  const settledAts = await unsupportedInAppAts(page.url());
-  if (settledAts) {
-    await context.close().catch(() => {});
-    if (SESSIONS.size === 0) scheduleIdleClose();
-    return { unsupported: settledAts, message: unsupportedAtsMessage(settledAts.label, true) };
-  }
-  await snap(); // settled
-
-  // 4) Extract from the richest frame; if nothing yet, try (a) a scroll pass to
-  //    trigger lazy/virtualized fields, then (b) clicking an "Apply" button (SPA;
-  //    never a submit) — re-settling and re-extracting after each.
-  let { frame, form } = await pickFormFrame(page);
-  // A password box is a login wall. Stop before scroll, Apply clicks, or the
-  // agent, so nothing is typed into the password field.
-  if (formHasPassword(form)) return abort(LOGIN_WALL_MESSAGE);
-  // "no usable form yet" = 0 fields OR only non-application fields (e.g. a search
-  // box on a job-description page) — both should trigger the recovery, not just 0.
-  if (!looksLikeApplicationForm(form)) {
-    await nudgeScroll(page);
-    await page.waitForTimeout(400);
-    ({ frame, form } = await pickFormFrame(page));
-    if (formHasPassword(form)) return abort(LOGIN_WALL_MESSAGE);
-  }
-  if (!noApplyBtn && !looksLikeApplicationForm(form)) {
-    const trigger = await tryApplyTrigger(page);
-    // The Apply control points at Workday, iCIMS, or UKG. Close this window
-    // instead of following it or handing the page to the drive agent.
-    if (trigger && typeof trigger === "object" && "blocked" in trigger) {
-      const hit = await unsupportedInAppAts(trigger.blocked);
+    await installApplyEgressGuard(context);
+    context.setDefaultTimeout(8000); // no single action hangs the whole open/fill
+    const page = await context.newPage();
+    const abort = async (msg: string): Promise<never> => {
+      released = true;
       await context.close().catch(() => {});
       if (SESSIONS.size === 0) scheduleIdleClose();
-      if (hit) return { unsupported: hit, message: unsupportedAtsMessage(hit.label, true) };
-    } else if (trigger && typeof trigger === "object" && "followed" in trigger) {
-      await Promise.race(page.frames().map((f) => f.waitForSelector(formSel, { timeout: 6_000 }).catch(() => null))).catch(() => {});
-      await page.waitForTimeout(800);
-      await dropNewTabs(page);
-      await waitForBlankPopup(page, trigger.followed);
-      const lateUrl = await blockedAfterAction(page, trigger.followed, false);
-      const lateAts = lateUrl ? await unsupportedInAppAts(lateUrl) : null;
-      if (lateAts) {
-        await context.close().catch(() => {});
-        if (SESSIONS.size === 0) scheduleIdleClose();
-        return { unsupported: lateAts, message: unsupportedAtsMessage(lateAts.label, true) };
+      throw new Error(msg);
+    };
+    // Capture the real form as we read it → a "behind the scenes" progress strip
+    // that proves we genuinely opened + parsed THEIR form (not magic). The last
+    // shot doubles as a subtle blurred backdrop behind the clean proxy.
+    const shots: string[] = [];
+    const snap = async () => {
+      try {
+        const b = await page.screenshot({ type: "jpeg", quality: 42 });
+        shots.push(`data:image/jpeg;base64,${b.toString("base64")}`);
+      } catch {
+        /* ignore */
       }
+    };
+    // 1) Navigate (resilient) → cheapest hard-block check on the Response status.
+    let resp: Response | null;
+    try {
+      resp = await gotoResilient(page, url);
+    } catch (e) {
+      released = true;
+      await context.close().catch(() => {});
+      if (SESSIONS.size === 0) scheduleIdleClose();
+      throw e;
+    }
+    // A career page can redirect onto a blocked portal. Close before scroll,
+    // screenshots, or the Apply click that opens a second window.
+    const landedAts = await unsupportedInAppAts(page.url());
+    if (landedAts) {
+      await context.close().catch(() => {});
+      if (SESSIONS.size === 0) scheduleIdleClose();
+      return { unsupported: landedAts, message: unsupportedAtsMessage(landedAts.label, true) };
+    }
+    await snap(); // first paint
+    const sBlock = statusBlock(resp?.status(), resp ? resp.headers() : {});
+    if (sBlock) return abort(sBlock.message);
+
+    // 2) Clear any cookie/consent overlay that hides the form (never a hard block).
+    const consentIssues = await dismissConsent(page);
+
+    // 3) Wait for real form controls to render (SPA hydrate) in ANY frame (embedded
+    //    forms), then settle. More reliable than a fixed sleep.
+    const formSel = 'form input, form textarea, input[type=file], [role=combobox], [class*="application-form" i], #application_form';
+    await Promise.race(page.frames().map((f) => f.waitForSelector(formSel, { timeout: 12_000 }).catch(() => null))).catch(() => {});
+    await page.waitForTimeout(1200);
+    await dropNewTabs(page); // make any "Apply" link/popup navigate in OUR tab
+    const settledAts = await unsupportedInAppAts(page.url());
+    if (settledAts) {
+      await context.close().catch(() => {});
+      if (SESSIONS.size === 0) scheduleIdleClose();
+      return { unsupported: settledAts, message: unsupportedAtsMessage(settledAts.label, true) };
+    }
+    await snap(); // settled
+
+    // 4) Extract from the richest frame; if nothing yet, try (a) a scroll pass to
+    //    trigger lazy/virtualized fields, then (b) clicking an "Apply" button (SPA;
+    //    never a submit) — re-settling and re-extracting after each.
+    let { frame, form } = await pickFormFrame(page);
+    // A password box is a login wall. Stop before scroll, Apply clicks, or the
+    // agent, so nothing is typed into the password field.
+    if (formHasPassword(form)) return abort(LOGIN_WALL_MESSAGE);
+    // "no usable form yet" = 0 fields OR only non-application fields (e.g. a search
+    // box on a job-description page) — both should trigger the recovery, not just 0.
+    if (!looksLikeApplicationForm(form)) {
+      await nudgeScroll(page);
+      await page.waitForTimeout(400);
       ({ frame, form } = await pickFormFrame(page));
       if (formHasPassword(form)) return abort(LOGIN_WALL_MESSAGE);
-      await snap();
     }
-  }
-  await enrichFromAts(url, form.fields); // clean labels + real options for known ATS (Greenhouse)
-  await snap();
-
-  let aiInterpreted = false;
-  // Whether the user's CLI was actually LAUNCHED over the form, as reported by
-  // the interpreter. Kept apart from aiInterpreted: a launched agent can come
-  // back empty, and the fencing notice below is about the launch, not about the
-  // result. A missing CLI, an empty form or a fencing refusal (the throw the
-  // catch below absorbs) never launched anything, so no notice is owed.
-  let agentSpawned = false;
-  // Opt-in: ALWAYS interpret with AI (max robustness, ignores the deterministic
-  // result) — for users who'd rather pay tokens than risk a heuristic miss.
-  if (forceAgent && cliId) {
-    const aiFrame = await richestControlFrame(page);
-    const ai = await interpretFormWithAgent(aiFrame, cliId, form.title || (await page.title().catch(() => ""))).catch(() => ({ fields: [] as ApplyField[], spawned: false }));
-    agentSpawned = ai.spawned;
-    const aiFields = ai.fields;
-    if (aiFields.length) {
-      frame = aiFrame;
-      form = { ...form, fields: aiFields };
-      aiInterpreted = true;
-      await snap();
+    if (!noApplyBtn && !looksLikeApplicationForm(form)) {
+      const trigger = await tryApplyTrigger(page);
+      // The Apply control points at Workday, iCIMS, or UKG. Close this window
+      // instead of following it or handing the page to the drive agent.
+      if (trigger && typeof trigger === "object" && "blocked" in trigger) {
+        const hit = await unsupportedInAppAts(trigger.blocked);
+        await context.close().catch(() => {});
+        if (SESSIONS.size === 0) scheduleIdleClose();
+        if (hit) return { unsupported: hit, message: unsupportedAtsMessage(hit.label, true) };
+      } else if (trigger && typeof trigger === "object" && "followed" in trigger) {
+        await Promise.race(page.frames().map((f) => f.waitForSelector(formSel, { timeout: 6_000 }).catch(() => null))).catch(() => {});
+        await page.waitForTimeout(800);
+        await dropNewTabs(page);
+        await waitForBlankPopup(page, trigger.followed);
+        const lateUrl = await blockedAfterAction(page, trigger.followed, false);
+        const lateAts = lateUrl ? await unsupportedInAppAts(lateUrl) : null;
+        if (lateAts) {
+          await context.close().catch(() => {});
+          if (SESSIONS.size === 0) scheduleIdleClose();
+          return { unsupported: lateAts, message: unsupportedAtsMessage(lateAts.label, true) };
+        }
+        ({ frame, form } = await pickFormFrame(page));
+        if (formHasPassword(form)) return abort(LOGIN_WALL_MESSAGE);
+        await snap();
+      }
     }
-  }
+    await enrichFromAts(url, form.fields); // clean labels + real options for known ATS (Greenhouse)
+    await snap();
 
-  // 5) Deterministic extraction found no usable APPLICATION form. Classify WHY
-  //    first — then run the AGENTIC FALLBACK only for the genuinely AMBIGUOUS
-  //    "no-form" case (controls are present but our heuristics produced nothing).
-  //    A challenge/login/listing/expired/Workday page has no form to interpret,
-  //    so we abort directly with the right message (no wasted AI run).
-  if (!aiInterpreted && !looksLikeApplicationForm(form)) {
-    const why = await classifyEmpty(page, url);
-    // Driveable (controls present, not a hard block) + we have an agent → KEEP the
-    // session open and hand off to the STREAMED drive route, so the user watches
-    // the agent reach the form live (/api/apply/drive). Otherwise abort.
-    if (cliId && why.code === "no-form") {
-      const id = `apply-${crypto.randomUUID()}`;
-      const title = form.title || (await page.title().catch(() => "")) || "Application";
-      SESSIONS.set(id, { id, url, title, fields: [], context, page, frame, createdAt: Date.now(), formShot: shots[shots.length - 1] });
-      return { id, title, fields: [], shots, issues: [], needsDrive: true };
+    let aiInterpreted = false;
+    // Whether the user's CLI was actually LAUNCHED over the form, as reported by
+    // the interpreter. Kept apart from aiInterpreted: a launched agent can come
+    // back empty, and the fencing notice below is about the launch, not about the
+    // result. A missing CLI, an empty form or a fencing refusal (the throw the
+    // catch below absorbs) never launched anything, so no notice is owed.
+    let agentSpawned = false;
+    // Opt-in: ALWAYS interpret with AI (max robustness, ignores the deterministic
+    // result) — for users who'd rather pay tokens than risk a heuristic miss.
+    if (forceAgent && cliId) {
+      const aiFrame = await richestControlFrame(page);
+      const ai = await interpretFormWithAgent(aiFrame, cliId, form.title || (await page.title().catch(() => ""))).catch(() => ({ fields: [] as ApplyField[], spawned: false }));
+      agentSpawned = ai.spawned;
+      const aiFields = ai.fields;
+      if (aiFields.length) {
+        frame = aiFrame;
+        form = { ...form, fields: aiFields };
+        aiInterpreted = true;
+        await snap();
+      }
     }
-    return abort(why.message);
+
+    // 5) Deterministic extraction found no usable APPLICATION form. Classify WHY
+    //    first — then run the AGENTIC FALLBACK only for the genuinely AMBIGUOUS
+    //    "no-form" case (controls are present but our heuristics produced nothing).
+    //    A challenge/login/listing/expired/Workday page has no form to interpret,
+    //    so we abort directly with the right message (no wasted AI run).
+    if (!aiInterpreted && !looksLikeApplicationForm(form)) {
+      const why = await classifyEmpty(page, url);
+      // Driveable (controls present, not a hard block) + we have an agent → KEEP the
+      // session open and hand off to the STREAMED drive route, so the user watches
+      // the agent reach the form live (/api/apply/drive). Otherwise abort.
+      if (cliId && why.code === "no-form") {
+        const id = `apply-${crypto.randomUUID()}`;
+        const title = form.title || (await page.title().catch(() => "")) || "Application";
+        recordSession({ id, url, title, fields: [], context, page, frame, formShot: shots[shots.length - 1] });
+        return { id, title, fields: [], shots, issues: [], needsDrive: true };
+      }
+      return abort(why.message);
+    }
+
+    // 6) Soft issues the user should know about — surfaced, never silent.
+    const [cap, multi] = await Promise.all([captchaWarning(page), multiStepInfo(page)]);
+    const unlabeled = form.fields.filter((f) => !(f.label || "").trim()).length;
+    const issues: ApplyIssue[] = [...consentIssues];
+    if (cap) issues.push(cap);
+    if (multi) issues.push(multi);
+    if (aiInterpreted) issues.push({ level: "info", code: "ai-interpreted", message: "This form had an uncommon layout, so AI read its fields live — give them an extra check before submitting." });
+    // agentInterpretForm just ran the user's chosen CLI over this form. If that
+    // runtime has no verified fencing mechanism it read the page with its default
+    // access, and the user should know — agent-interpret.ts has no stream of its
+    // own, so the notice belongs here, where its callers already surface soft
+    // issues (#2507). warn, not info: this is "proceeded, but look". Keyed on the
+    // LAUNCH the interpreter reports, not on aiInterpreted: an empty
+    // interpretation still ran the agent, and an interpreter that never launched
+    // it (no CLI, no controls, refused argv) owes no warning.
+    const interpretFencing = agentSpawned && cliId ? fencingReport({ cliId, cliName: resolveCli(cliId)?.spec.name ?? cliId, capabilities: CAPS.localReadOnly }) : null;
+    if (interpretFencing?.notice) issues.push({ level: "warn", code: "cli-unfenced", message: interpretFencing.notice });
+    if (unlabeled > 0) issues.push({ level: "warn", code: "unlabeled-fields", message: `${unlabeled} field${unlabeled > 1 ? "s" : ""} couldn't be labelled cleanly — double-check ${unlabeled > 1 ? "them" : "it"} before submitting.` });
+
+    const id = `apply-${crypto.randomUUID()}`;
+    recordSession({ id, url, title: form.title, fields: form.fields, context, page, frame, formShot: shots[shots.length - 1] });
+    return { id, title: form.title, fields: form.fields, shots, issues };
+  } catch (e) {
+    if (!released) {
+      await context.close().catch(() => {});
+      if (SESSIONS.size === 0) scheduleIdleClose();
+    }
+    throw e;
   }
-
-  // 6) Soft issues the user should know about — surfaced, never silent.
-  const [cap, multi] = await Promise.all([captchaWarning(page), multiStepInfo(page)]);
-  const unlabeled = form.fields.filter((f) => !(f.label || "").trim()).length;
-  const issues: ApplyIssue[] = [...consentIssues];
-  if (cap) issues.push(cap);
-  if (multi) issues.push(multi);
-  if (aiInterpreted) issues.push({ level: "info", code: "ai-interpreted", message: "This form had an uncommon layout, so AI read its fields live — give them an extra check before submitting." });
-  // agentInterpretForm just ran the user's chosen CLI over this form. If that
-  // runtime has no verified fencing mechanism it read the page with its default
-  // access, and the user should know — agent-interpret.ts has no stream of its
-  // own, so the notice belongs here, where its callers already surface soft
-  // issues (#2507). warn, not info: this is "proceeded, but look". Keyed on the
-  // LAUNCH the interpreter reports, not on aiInterpreted: an empty
-  // interpretation still ran the agent, and an interpreter that never launched
-  // it (no CLI, no controls, refused argv) owes no warning.
-  const interpretFencing = agentSpawned && cliId ? fencingReport({ cliId, cliName: resolveCli(cliId)?.spec.name ?? cliId, capabilities: CAPS.localReadOnly }) : null;
-  if (interpretFencing?.notice) issues.push({ level: "warn", code: "cli-unfenced", message: interpretFencing.notice });
-  if (unlabeled > 0) issues.push({ level: "warn", code: "unlabeled-fields", message: `${unlabeled} field${unlabeled > 1 ? "s" : ""} couldn't be labelled cleanly — double-check ${unlabeled > 1 ? "them" : "it"} before submitting.` });
-
-  const id = `apply-${crypto.randomUUID()}`;
-  SESSIONS.set(id, { id, url, title: form.title, fields: form.fields, context, page, frame, createdAt: Date.now(), formShot: shots[shots.length - 1] });
-  return { id, title: form.title, fields: form.fields, shots, issues };
 }
 
 export function getSession(id: string): Session | undefined {
@@ -485,6 +506,7 @@ export async function finalizeDrivenSession(id: string, cliId?: string): Promise
 export async function closeSession(id: string): Promise<void> {
   const s = SESSIONS.get(id);
   SESSIONS.delete(id);
+  clearTimeout(s?.expiry);
   await s?.context.close().catch(() => {});
   if (SESSIONS.size === 0) scheduleIdleClose();
 }

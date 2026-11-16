@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ApplyField } from "@/lib/apply/extract";
 import type { ApplyIssue, DriveStep } from "@/lib/apply/issue";
-import { resolveLateSession } from "@/lib/apply/exit.mjs";
+import { releasesOnPageHide, resolveLateSession } from "@/lib/apply/exit.mjs";
 import { withoutReadbackIssues } from "@/lib/apply/prefilled-banner.mjs";
 import { readFillResult, screenForFill } from "@/lib/apply/fill-stream.mjs";
 import { issuesAfterAgent, issuesAfterFill } from "@/lib/apply/handoff-gate.mjs";
@@ -93,6 +93,8 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
   fieldsRef.current = fields;
   const answersRef = useRef<Record<string, string>>({});
   answersRef.current = answers;
+  const statusRef = useRef<Status>("idle");
+  statusRef.current = status;
   // Bumped every time a session is abandoned or replaced. Leaving the page is
   // reachable while a request or stream is still in flight, and none of them can
   // be recalled, so each one carries the generation it started in and drops its
@@ -453,6 +455,17 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     setCvAttached(false);
     setError("");
   }, []);
+
+  // Leaving the app (or entering the back-forward cache) releases the form's browser context. reset also
+  // clears sessionId and returns the page to idle, so a restored page never holds a closed session.
+  // The status is read when the event fires: a listener closing over it could miss the handoff.
+  useEffect(() => {
+    const release = () => {
+      if (releasesOnPageHide(statusRef.current)) reset();
+    };
+    window.addEventListener("pagehide", release);
+    return () => window.removeEventListener("pagehide", release);
+  }, [reset]);
 
   const value = useMemo(
     () => ({ status, url, title, company, n, from, fields, answers, meta, steps, shots, prefillLog, issues, driveSteps, error, blockedAts, cvAttached, open, prefill, setAnswer, fill, agentFill, reset }),
