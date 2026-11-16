@@ -254,7 +254,9 @@ function saveBlacklist(set) {
   try {
     fs.mkdirSync(BLACKLIST_DIR, { recursive: true });
     fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([...set], null, 2), 'utf-8');
-  } catch { }
+  } catch (err) {
+    console.warn(`⚠️  Could not save the model blacklist to ${BLACKLIST_FILE}: ${err.message}. Models blacklisted in this run may be tried again next run.`);
+  }
 }
 
 // Models that failed permanently (403, timeout, persistent 429) — never retry
