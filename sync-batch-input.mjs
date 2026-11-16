@@ -230,7 +230,8 @@ export function buildNotes(labels) {
 }
 
 /**
- * Parse pending entries out of raw pipeline.md text (mirrors reconcile-pipeline.mjs).
+ * Parse pending entries out of raw pipeline.md text, from the lines pendingRange()
+ * gives (the same lines rank-pipeline.mjs reads).
  * @param {string} text - Raw pipeline.md contents.
  * @returns {Array<{url:string, company:string, notes:string}>}
  */
