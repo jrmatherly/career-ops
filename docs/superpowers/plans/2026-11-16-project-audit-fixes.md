@@ -4,7 +4,7 @@
 
 **Goal:** Fix the defects and close the gaps that the 2026-11-16 project audit confirmed, in the order that protects tracker data first.
 
-**Architecture:** There is no new design. Each task is one small change with its own test, and almost every fix reuses a helper the repo already has (`parseTrackerRow`, `writeFileAtomic`, `isBlockedAddress`, `installEgressGuard`, `withPreviewCsp`, `setEncoding`). The tasks keep their audit ids (`CORE-1`, `WEB-2`) so that each one traces to a finding and a repro script. Phases group the tasks by area. The tasks that edit GitHub workflows come last, so that they can move to a second pull request without touching the rest.
+**Architecture:** There is no new design. Each task is one small change with its own test, and almost every fix reuses a helper the repo already has (`parseTrackerRow`, `writeFileAtomic`, `isBlockedAddress`, `installEgressGuard`, `withPreviewCsp`, `setEncoding`). The tasks keep their audit ids (`CORE-1`, `WEB-2`) so that each one traces to a finding and a repro script. Phases group the tasks by area. The tasks that edit GitHub workflows come late, after the fixes that carry no CI risk.
 
 **Tech Stack:** Node 24 ESM scripts with `node:test`, Next.js 16.4 and React 19 in `web/`, Go 1.26 in `dashboard/`, GitHub Actions, Docker.
 
@@ -47,14 +47,28 @@ Each default below is what the plan does unless the owner says otherwise. Change
 | D1 | CORE-3. Should a re-evaluation keep a pointer to the report it replaces? | Yes, on every report change. | Keep today's behaviour and drop CORE-3. |
 | D2 | DOCS-1. Does the fork support installs that update with `apply`? | Yes. Move 16 entries into SYSTEM_PATHS and add an import-closure test. | No. Say so in `FORK.md` and drop DOCS-1. |
 | D3 | DOCS-5. Should `discover-ats.mjs` probe the 14 other vendors? | Yes, as the last code task. The owner probes each vendor once before its commit. | Drop DOCS-5. The release is then a patch. |
-| D4 | CI-1. When should the Tests workflow run? | On pull requests and on pushes to `main`. One run per push to a pull-request branch, none on tags. A branch with no pull request gets no run until one is opened. | On every branch push and not on pull requests. CI-1 gives this as a complete second design, with its cost. |
+| D4 | CI-1. When should the Tests workflow run? | On pull requests and on pushes to `main`. One run per push to a pull-request branch, none on tags. A branch with no pull request gets no run until one is opened, which was about 1 push in 20 in the measured week. | On every branch push and not on pull requests. CI-1 gives this as a complete second design, with its cost. |
 | D5 | CI-7. Should `main` require the test checks, and should a ruleset protect the release tags? | Yes to both, with an admin bypass. All of CI-7 is the owner's, after the merge. | Leave the settings as they are. |
 | D6 | TEST-2. The Windows check name changes from `test (windows-latest)` to two shard names. | Accept the new names. CI-7 lists them. | Keep one Windows leg and drop TEST-2. |
 | D7 | WEB-8. Was leaving failed runs out of the saved log deliberate? | No, so save them. | Yes. Drop WEB-8. |
-| D8 | Delivery. | One branch and one pull request, per the standing rule for a program. The workflow phase is last so that it can be split off. | Two pull requests, landed one at a time. The first holds phases 1 to 5 and 7. The second holds phase 6, the workflow edits. A reviewer recommended this split, because only GitHub can evaluate a workflow edit and a mistake there would otherwise hold 30 fixes behind a 25-minute CI retry. |
+| D8 | Delivery. | One branch and one pull request, per the standing rule for a program. The measurements below support it. | Phase 1 as its own pull request first, then the rest, landed one at a time. Choose it if execution runs past a day, because phase 1 protects the tracker and all seven of its tasks were run green together. A split of product fixes from workflow edits was considered and is not recommended: a pull request already tests its own workflow edits. |
 | D9 | TEST-4. Delete `tests/set-status-lock-scope.test.mjs`, an upstream test that only reads source text? | Yes. `tests/tracker-writer-lock.test.mjs` fails when the lock order is broken, which was checked by breaking it. | Keep the file. |
 | D10 | SEC-6b. Run the code change whatever the canary shows? | Yes, as defence in depth. The canary result is recorded either way. | Run SEC-6b only if SEC-6a reports the path open. |
 | D11 | WEB-3. A page that goes into the back-forward cache releases its apply session and resets to the start. | Yes. The user reopens the application from the pipeline. | Keep the session id and accept that a restored page can hold a dead session. |
+
+### Evidence for D4 and D8
+
+Measured on 2026-11-16 from this repository's history and checked against the current GitHub and CodeRabbit documentation.
+
+- **A pull request tests its own workflow edits.** For a `pull_request` event, GitHub runs the workflow file from the pull request's merge commit. An edit to `test.yml` is exercised on the first push of the branch that carries it. Two things cannot be tested before a merge under any delivery choice: the run on a push to `main`, and the absence of runs on tags.
+- **One CI round takes about 18 minutes.** On pull request 98, the 28 checks took 17 min 41 s from the first start to the last end, and every job started within 3 s of being created. The 25 minutes that `.claude/rules/dev-workflow.md` gives is out of date.
+- **Pull requests of this size have landed before.** Pull request 78 changed 91 files and merged 1.3 hours after it opened, with three CI rounds. Pull request 43 changed 87 files. This plan names about 135 paths. Across the last 86 owner pull requests, those with 40 files or more had a median of 3 CI rounds, and the smaller ones had 2.
+- **CodeRabbit reviews it.** This account's limit is 300 files. Pull request 93 was skipped with the message "1299 files, which is 999 over the limit of 300".
+- **Each task stays revertable.** The repository merges with merge commits, so the task commits survive the merge.
+- **D4's default removes 126 of 300 Tests runs.** In the six days from 2026-11-10 the workflow ran 300 times: 104 on `pull_request`, 70 on pushes to `main`, 78 on pushes to other branches, 30 on pushes to the release branch and 18 on tags. The default keeps the first two groups. Of the 78 branch pushes, 4 were for a commit that never had a pull-request run. `workflow_dispatch` covers that case.
+- **CI-1 saves runs, not time.** The repository is public, so standard runners cost nothing, and no queueing showed on pull request 98. TEST-2 is the task that shortens a round: the Windows legs took 12 and 17 minutes there, against 8 for macOS and 6 for Ubuntu.
+
+Not measured: how long 41 tasks take to execute, and whether reviewers catch as much across 135 paths as across 40.
 
 ## Owner steps, in one place
 
@@ -4465,7 +4479,7 @@ Expected: exit 0. Exit 2 means findings. Fix the confirmed ones and rerun it, or
 
 Stop here and report. The report names the tasks done, the tasks dropped with the reason, the owner steps still open, the Step 1 output, and the three screenshots. The owner says when to push.
 
-Under D8's default, push the branch once and open one pull request. Under the other choice, the first pull request holds every commit except those of phase 6, and phase 6 is pushed and opened only after the first one merges.
+Under D8's default, push the branch once and open one pull request. Under the other choice, the first pull request holds PREP-1 and the phase 1 commits, and the rest is pushed and opened only after the first one merges.
 
 The pull request body opens with the goal of this plan. It states that no personal data was added and that `node test-all.mjs` passed. It lists the tasks that change what a user sees: CORE-1, CORE-3, WEB-1, WEB-3, WEB-8 and SEC-6b.
 
