@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0](https://github.com/jrmatherly/career-ops/compare/web-v1.6.0...web-v1.7.0) (2026-11-16)
+
+
+### Features
+
+* **scan:** a portals.yml entry can slow its own requests with request_delay_ms, set from the Portals page ([52c6ae3](https://github.com/jrmatherly/career-ops/commit/52c6ae33bd2bc6fdc13278efc1d62296416e2e4c))
+* **scan:** a portals.yml entry can slow its own requests with request_delay_ms, set from the Portals page ([67ddd9f](https://github.com/jrmatherly/career-ops/commit/67ddd9f678300676944c83d4c897e789ac33f0f6))
+
+
+### Bug Fixes
+
+* **scan:** the portal checks pace every request and cap the wait, and the Portals page flags an ignored delay ([2fc3742](https://github.com/jrmatherly/career-ops/commit/2fc3742749d3c3af9a9f724a2e74ee9ea3e29561))
+
 ## [1.6.0](https://github.com/jrmatherly/career-ops/compare/web-v1.5.0...web-v1.6.0) (2026-11-15)
 
 
