@@ -157,12 +157,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: "🐳 Pull the canonical CV rendering environment (build it if GHCR has none yet)"
-        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
-        # fresh fork or an unpublished Dockerfile change green.
+      - name: "🐳 Pull the canonical CV rendering environment (build it when tests/cv-visual/Dockerfile changed since that image)"
+        # Published by docker-image.yml from tests/cv-visual. The image records the
+        # commit it was built from; when this checkout's Dockerfile differs from that
+        # commit's, or GHCR has no image yet, build here so the change is what runs.
         run: |
-          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
-            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          img=ghcr.io/${{ github.repository }}-cv-visual:latest
+          if docker pull --platform linux/amd64 "$img" \
+            && rev=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$img") \
+            && [ -n "$rev" ] \
+            && git fetch --quiet --no-tags --depth=1 origin "$rev" \
+            && git diff --quiet "$rev" HEAD -- tests/cv-visual/Dockerfile; then
+            docker tag "$img" career-ops-cv-visual
           else
             docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
           fi
@@ -209,12 +215,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: "🐳 Pull the canonical CV rendering environment (build it if GHCR has none yet)"
-        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
-        # fresh fork or an unpublished Dockerfile change green.
+      - name: "🐳 Pull the canonical CV rendering environment (build it when tests/cv-visual/Dockerfile changed since that image)"
+        # Published by docker-image.yml from tests/cv-visual. The image records the
+        # commit it was built from; when this checkout's Dockerfile differs from that
+        # commit's, or GHCR has no image yet, build here so the change is what runs.
         run: |
-          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
-            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          img=ghcr.io/${{ github.repository }}-cv-visual:latest
+          if docker pull --platform linux/amd64 "$img" \
+            && rev=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$img") \
+            && [ -n "$rev" ] \
+            && git fetch --quiet --no-tags --depth=1 origin "$rev" \
+            && git diff --quiet "$rev" HEAD -- tests/cv-visual/Dockerfile; then
+            docker tag "$img" career-ops-cv-visual
           else
             docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
           fi
