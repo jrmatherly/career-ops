@@ -10746,7 +10746,7 @@ try {
   // on the shared contract means the check tracks the contract, not the spelling.
   // Presence of the string "tracker-additions" is deliberately NOT the test: a
   // comment satisfies that.
-  const writeSinkRe = /write(?:File|FileSync)\([\s\S]{0,200}?\$\{[A-Za-z0-9_]*(?:HEADER|Header)\}\\n\$\{([^}]+)\}/;
+  const writeSinkRe = /write(?:File|FileSync|FileAtomic)\([\s\S]{0,200}?\$\{[A-Za-z0-9_]*(?:HEADER|Header)\}\\n\$\{([^}]+)\}/;
   // ...and the payload has to BE the row. Accepting any identifier let a mutation
   // that replaced `${trackerFields.join('\t')}` with `${placeholder}` pass, which
   // is the failure-wearing-a-pass this check exists to stop. Either the join is
