@@ -1,0 +1,11 @@
+// Copy to web/tests/lib/ and run from web/: node --experimental-strip-types <name>. Compares web canonicalizeStatus with the core resolveCanonicalState.
+await import("../helpers/web-ts-alias-loader.mjs");
+const web = await import("../../src/lib/core/states.ts");
+const core = await import("../../../tracker-utils.mjs");
+const states = core.loadCanonicalStates(new URL("../../../templates/states.yml", import.meta.url).pathname);
+const inputs = new Set();
+for (const s of states) for (const v of [s.label, s.id, ...s.aliases]) { inputs.add(v); inputs.add(v.toUpperCase()); inputs.add(v.toLocaleUpperCase("tr")); inputs.add(`**${v}**`); inputs.add(`  ${v}  `); }
+let n = 0, bad = [];
+for (const i of inputs) { n++; const a = web.canonicalizeStatus(i), b = core.resolveCanonicalState(i, states); if (a !== b) bad.push([i, a, b]); }
+console.log("states", states.length, "inputs", n, "disagree", bad.length); console.log(bad.slice(0, 15));
+console.log("aliases with uppercase:", states.flatMap(s => s.aliases).filter(a => a !== a.toLowerCase()));

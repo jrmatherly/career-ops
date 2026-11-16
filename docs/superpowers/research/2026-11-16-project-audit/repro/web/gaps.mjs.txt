@@ -1,0 +1,18 @@
+// Run from the repo root: node gaps.mjs. Lists web/src/lib modules and API routes no test imports or names.
+import fs from 'node:fs'; import path from 'node:path';
+const web=path.resolve('web');
+const files=[];const walk=(d,acc,re)=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p,acc,re);else if(re.test(p))acc.push(p);}};
+const tests=[];walk(path.join(web,'tests'),tests,/\.(mjs|ts)$/);
+const testText=tests.map(f=>fs.readFileSync(f,'utf8')).join('\n');
+const libs=[];walk(path.join(web,'src/lib'),libs,/\.(mjs|ts)$/);
+const loc=f=>fs.readFileSync(f,'utf8').split('\n').length;
+const untested=[];
+for(const f of libs){const rel=path.relative(path.join(web,'src'),f).replace(/\.(mjs|ts)$/,'');
+ const base=path.basename(f).replace(/\.(mjs|ts)$/,"");const re=new RegExp("[/\"']"+base.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"(\\.(mjs|ts|js))?[\"'`]");const _x=(rel.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(\\.(mjs|ts|js))?["\']');
+ if(!re.test(testText)) untested.push([loc(f),path.relative(web,f)]);}
+untested.sort((a,b)=>b[0]-a[0]);console.log('libs',libs.length,'untested',untested.length);console.log(untested.slice(0,40).map(x=>x.join(' ')).join('\n'));
+const routes=[];walk(path.join(web,'src/app/api'),routes,/route\.ts$/);
+const ur=[];for(const f of routes){const rel=path.relative(path.join(web,'src'),f).replace(/\.ts$/,'');const api='/'+path.relative(path.join(web,'src/app'),path.dirname(f));
+ const imp=testText.includes(rel);const str=testText.includes(api+'"')||testText.includes(api+"'")||testText.includes(api+'`')||testText.includes(api+'?');
+ if(!imp) ur.push([loc(f),path.relative(web,f),str?'(path string only)':'']);}
+ur.sort((a,b)=>b[0]-a[0]);console.log('routes',routes.length,'not imported by a test',ur.length);console.log(ur.map(x=>x.join(' ')).join('\n'));

@@ -1,0 +1,17 @@
+// Run from the repo root: node upskill-guard-copy.mjs
+// Loads upskill.mjs's private validateUrlSecurity (not exported) by slicing its
+// source and importing the slice, then probes it. Measured on 2edd1b33 with the
+// function at upskill.mjs:781-809: 0.0.0.0, [::ffff:7f00:1], [fd12:3456::1] and
+// 100.64.0.1 ALLOWED. Lookups for the literals go through dns.resolve/lookup.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const src = readFileSync(join(process.cwd(), 'upskill.mjs'), 'utf8');
+const start = src.indexOf('async function validateUrlSecurity(');
+const end = src.indexOf('\n}\n', start) + 3;
+const body = `const dnsCache = new Map();\nexport ${src.slice(start, end)}`;
+const { validateUrlSecurity } = await import(`data:text/javascript,${encodeURIComponent(body)}`);
+for (const u of ['http://0.0.0.0:3000/', 'http://[::ffff:7f00:1]/', 'http://[fd12:3456::1]/',
+  'http://100.64.0.1/', 'http://localtest.me/', 'http://127.0.0.1/']) {
+  try { await validateUrlSecurity(u); console.log(u, 'ALLOWED'); } catch { console.log(u, 'blocked'); }
+}

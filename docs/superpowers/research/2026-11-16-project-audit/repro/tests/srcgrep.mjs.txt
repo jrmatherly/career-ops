@@ -1,0 +1,20 @@
+// Run from the repo root: node <this file without .txt>
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); if (n === 'node_modules') return []; return statSync(p).isDirectory() ? walk(p) : p.endsWith('.test.mjs') ? [p] : []; });
+const files = [...walk('tests'), ...walk('web/tests')];
+const rows = [];
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  // reads a code source file as text
+  const reads = [...s.matchAll(/read(File|Text\w*|Source|Repo\w*)?(Sync)?\(\s*(?:join\([^)]*?,\s*)?['"`]([^'"`]*\.(?:mjs|js|ts|tsx|go|sh))['"`]/g)].map((m) => m[3]);
+  if (!reads.length) continue;
+  const textAsserts = (s.match(/assert\.(match|doesNotMatch)\(|\.includes\(['"`]|\.test\(src|\.test\(source|\.match\(\/|Match\(src|src\.includes|source\.includes/g) || []).length;
+  // imports from repo code (behavior calls)
+  const imports = (s.match(/^import .* from ['"]\.\.\/(?!tests\/|.*helpers)[^'"]+['"]|await import\(/gm) || []).length;
+  rows.push({ f, reads: [...new Set(reads)], textAsserts, imports });
+}
+console.log('files reading source text:', rows.length);
+console.log('of which import no code under test:', rows.filter(r => r.imports === 0).length);
+rows.sort((a, b) => (a.imports - b.imports) || (b.textAsserts - a.textAsserts));
+for (const r of rows.filter(r => r.imports === 0).slice(0, 60)) console.log(r.textAsserts, r.f, r.reads.slice(0,3).join(','));

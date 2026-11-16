@@ -1,0 +1,26 @@
+// Run from the repo root: node <this file, renamed to .mjs> [scratch dir]. Writes only under the scratch dir (default: a new temp dir).
+import { mkdtempSync as __mk } from 'node:fs'; import { tmpdir as __tmp } from 'node:os'; import { join as __j } from 'node:path';
+const REPO = process.cwd();
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
+import { join } from 'path';
+const S=process.argv[2] ?? __mk(__j(__tmp(), 'core-audit-')); const W=join(S,'ws-full'); rmSync(W,{recursive:true,force:true});
+mkdirSync(join(W,'data'),{recursive:true}); mkdirSync(join(W,'reports'),{recursive:true}); mkdirSync(join(W,'batch/tracker-additions'),{recursive:true});
+const apps=join(W,'data/applications.md');
+// Row 1 is missing its PDF cell (hand edit): 9 cells under a 10-column header.
+writeFileSync(apps,`# Applications Tracker
+
+| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |
+|---|------|---------|------|-------|--------|-----|--------|-------|-----|
+| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |
+`);
+writeFileSync(join(W,'reports/001-acme-2026-01-01.md'),'# r\n');
+writeFileSync(join(W,'reports/002-acme-2026-02-01.md'),'# r\n');
+writeFileSync(join(W,'batch/tracker-additions/002-acme.tsv'),
+ 'num\tdate\tcompany\trole\tstatus\tscore\tpdf\treport\tnotes\turl\n2\t2026-02-01\tAcme\tData Engineer\tEvaluated\t4.5/5\t❌\t[2](reports/002-acme-2026-02-01.md)\tre-eval\thttps://jobs.acme.com/1\n');
+writeFileSync(join(W,'batch/state.tsv'),'id\turl\tstatus\tstarted_at\tcompleted_at\treport_num\tscore\terror\tretries\n');
+const tp=await import(REPO+'/tracker-parse.mjs');
+const lines=readFileSync(apps,'utf8').split('\n');
+console.log('parseTrackerRow on row 1:', tp.parseTrackerRow(lines[4], tp.resolveColumns(lines)));
+const { mergeTracker } = await import(REPO+'/merge-tracker.mjs');
+const code = await mergeTracker({ appsFile: apps, dataRoot: W, additionsDir: join(W,'batch/tracker-additions'), batchStateFile: join(W,'batch/state.tsv'), pdfIndexFile: join(W,'data/pdf-index.tsv') });
+console.log('exit', code); console.log(readFileSync(apps,'utf8'));

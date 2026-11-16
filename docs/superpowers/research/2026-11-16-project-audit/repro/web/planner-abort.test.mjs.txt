@@ -1,0 +1,14 @@
+// Copy to web/tests/lib/ and run from web/: node --experimental-strip-types --test tests/lib/<name>. Times out at 2edd1b33: runPlanner has no signal.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import os from "node:os";
+await import("../helpers/web-ts-alias-loader.mjs");
+const { runPlanner } = await import("../../src/lib/apply/planner.ts");
+test("runPlanner stops the planner when its signal aborts", { timeout: 5_000 }, async () => {
+  const abort = new AbortController();
+  const spec = { id: "gemini", name: "Gemini", args: () => ["-e", "setTimeout(() => {}, 10_000)"] };
+  const run = runPlanner({ cliId: "gemini", spec, binPath: process.execPath, prompt: "x", fieldCount: 1, cwd: os.tmpdir(), t0: Date.now(), log: () => {}, signal: abort.signal });
+  setTimeout(() => abort.abort(), 100);
+  const result = await run;
+  assert.equal(result.signal, "SIGTERM");
+});

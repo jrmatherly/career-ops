@@ -1,0 +1,11 @@
+// Run from the repo root: node cv-preview-remote-resources.mjs
+// previewHtml (web/src/lib/cv-studio/preview-html.mjs) is what CvPreview puts in
+// its iframe srcDoc. Measured on 2edd1b33: "true false", so a remote <img> passes
+// through and no CSP is added.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const { previewHtml } = await import(pathToFileURL(join(process.cwd(), 'web/src/lib/cv-studio/preview-html.mjs')).href);
+const out = previewHtml('<html><head></head><body><p>Hi</p><img src="https://attacker.example/beacon?u=1">'
+  + '<div style="background:url(https://attacker.example/css)"></div></body></html>');
+console.log(/attacker\.example\/beacon/.test(out), /Content-Security-Policy/i.test(out));

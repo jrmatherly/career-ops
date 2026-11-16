@@ -1,0 +1,16 @@
+// Run from the repo root: node <this file without .txt>
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); if (n === 'node_modules') return []; return statSync(p).isDirectory() ? walk(p) : p.endsWith('.test.mjs') ? [p] : []; });
+const files = [...walk('tests'), ...walk('web/tests')];
+let zero = [], kinds = { nodeTest: 0, passfail: 0, other: 0 };
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  const nt = /from ['"]node:test['"]/.test(s);
+  const pf = /\b(pass|fail)\(/.test(s);
+  kinds[nt ? 'nodeTest' : pf ? 'passfail' : 'other']++;
+  const n = (s.match(/\bassert(\.\w+)?\(|\bexpect\(|\bfail\(|\bthrow new|\bt\.assert|\bcheck\(|\bok\(|\bequal\(|\bdeepEqual\(|\bmatch\(/g) || []).length;
+  if (n === 0) zero.push(f);
+}
+console.log(files.length, kinds);
+console.log('zero-assert files:', zero.length); console.log(zero.join('\n'));

@@ -1,0 +1,22 @@
+// Place under tests/providers/ and run: node --test tests/providers/<name>.test.mjs
+// Observed at 2edd1b33: actual { json: 4, text: 4, sleep: 6 }
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import workable from '../../providers/workable.mjs';
+import { withAbortScope } from '../../providers/_connection-scope.mjs';
+
+test('an aborted board is not retried and does not sleep', async () => {
+  const calls = { json: 0, text: 0, sleep: 0 };
+  const unavailable = () => Object.assign(new Error('HTTP 503'), { status: 503 });
+  const ctx = {
+    transport: 'http',
+    sleep: async () => { calls.sleep++; },
+    fetchJson: async () => { calls.json++; throw unavailable(); },
+    fetchText: async () => { calls.text++; throw unavailable(); },
+  };
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(withAbortScope(controller.signal, () =>
+    workable.fetch({ name: 'Acme', careers_url: 'https://apply.workable.com/acme-widgets' }, ctx)), /HTTP 503/);
+  assert.deepEqual(calls, { json: 1, text: 1, sleep: 0 });
+});

@@ -1,0 +1,17 @@
+// Run from the repo root: node child-output-convention.mjs. Lists child-process data handlers whose stream is never set to utf8 (29 at 2edd1b33).
+import fs from "node:fs"; import path from "node:path";
+const SRC = path.resolve("web/src");
+const EXEMPT = new Set(["app/api/cv/ingest/route.ts"]);
+const files = fs.readdirSync(SRC, { recursive: true }).filter((f) => /\.(mjs|ts|tsx)$/.test(f));
+const offenders = [];
+for (const rel of files) {
+  if (EXEMPT.has(rel.split(path.sep).join("/"))) continue;
+  const text = fs.readFileSync(path.join(SRC, rel), "utf8");
+  const handlers = new Map();
+  for (const m of text.matchAll(/([\w.]+?)\??\.on\(\s*["']data["']\s*,(?!\s*\(\s*\)\s*=>)/g)) handlers.set(m[1], (handlers.get(m[1]) ?? 0) + 1);
+  for (const [stream, count] of handlers) {
+    const set = text.split(`${stream}.setEncoding(`).length - 1 + text.split(`${stream}?.setEncoding(`).length - 1;
+    if (set < count) offenders.push(`${rel}: ${stream} (${count} handler(s), ${set} setEncoding)`);
+  }
+}
+console.log(offenders.length); console.log(offenders.join("\n"));

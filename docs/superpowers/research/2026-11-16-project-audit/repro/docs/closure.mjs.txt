@@ -1,0 +1,24 @@
+// Import closure of the updater's SYSTEM_PATHS: which non-shipped files do shipped files import?
+import fs from 'node:fs'; import path from 'node:path'; import { execSync } from 'node:child_process';
+const src = fs.readFileSync('lib/update-manifest.mjs', 'utf8');
+const sys = [...src.match(/export const SYSTEM_PATHS\s*=\s*\[([\s\S]*?)\n\];/)[1].matchAll(/^\s*'([^']+)'/gm)].map((x) => x[1]);
+const local = fs.readFileSync('config/local-paths.txt', 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+const EXEMPT = ['web/', 'employers/'];
+const match = (p, e) => (e.endsWith('/') ? p.startsWith(e) : p === e);
+const files = execSync('git ls-files "*.mjs" "*.js"', { encoding: 'utf8' }).trim().split('\n');
+const shipped = new Set(files.filter((f) => sys.some((e) => match(f, e))));
+const moved = new Map();
+let grew = true;
+while (grew) {
+  grew = false;
+  for (const f of [...shipped]) {
+    for (const m of fs.readFileSync(f, 'utf8').matchAll(/(?:from\s+|import\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g)) {
+      const t = path.normalize(path.join(path.dirname(f), m[1]));
+      if (!fs.existsSync(t) || shipped.has(t) || EXEMPT.some((e) => t.startsWith(e))) continue;
+      const entry = local.find((e) => match(t, e)) ?? '(not in local-paths)';
+      (moved.get(entry) ?? moved.set(entry, []).get(entry)).push(`${f} -> ${t}`);
+      shipped.add(t); grew = true;
+    }
+  }
+}
+for (const [e, list] of moved) console.log(`${e}\n  ${[...new Set(list)].join('\n  ')}`);

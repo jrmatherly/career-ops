@@ -1,0 +1,21 @@
+// Draft of the DOCS-1 test logic, run from the repo root. Extra args simulate SYSTEM_PATHS additions.
+import { readFileSync } from 'node:fs';
+import { join, posix, relative, sep } from 'node:path';
+const ROOT = process.cwd();
+const { SYSTEM_PATHS } = await import(join(ROOT, 'lib/update-manifest.mjs'));
+const { relativeImportSpecifiers } = await import(join(ROOT, 'update-system.mjs'));
+const { trackedFiles } = await import(join(ROOT, 'lib/mjs-files.mjs'));
+const shipped = [...SYSTEM_PATHS, ...process.argv.slice(2)];
+const EXEMPT = ['web/', 'employers/'];
+const covers = (file) => shipped.some((e) => (e.endsWith('/') ? file.startsWith(e) : file === e));
+const tracked = new Set(trackedFiles(ROOT).map((f) => relative(ROOT, f).split(sep).join('/')));
+const missing = [];
+for (const file of [...tracked].filter((f) => /\.m?js$/.test(f) && covers(f))) {
+  const src = readFileSync(join(ROOT, file), 'utf8');
+  const imports = relativeImportSpecifiers(src).map((s) => posix.normalize(posix.join(posix.dirname(file), s)));
+  const spawned = [...src.matchAll(/['"]([\w.-]+\.mjs)['"]/g)].map((m) => m[1]);
+  for (const t of [...imports, ...spawned]) {
+    if (tracked.has(t) && !covers(t) && !EXEMPT.some((e) => t.startsWith(e))) missing.push(`${file} loads ${t}, which SYSTEM_PATHS does not ship`);
+  }
+}
+console.log([...new Set(missing)].length, [...new Set(missing)].slice(0, 60).join('\n'));

@@ -1,0 +1,16 @@
+// Run from the repo root: node evaluate-read-denies.mjs
+// The argv claudeCliArgs (web/src/lib/claude-invocation.mjs) builds for an
+// attended URL evaluate (no roots, what /api/run passes when the run is not
+// fenced) and for an unattended one (roots passed). Measured on 2edd1b33:
+// both allow Read and WebFetch; only the unattended argv carries the Read denies.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const m = await import(pathToFileURL(join(process.cwd(), 'web/src/lib/claude-invocation.mjs')).href);
+const attended = m.claudeCliArgs({ kind: 'evaluate', prompt: 'x' });
+const unattended = m.claudeCliArgs({ kind: 'evaluate', prompt: 'x', dataRoot: '/data', codeRoot: '/app' });
+for (const [label, a] of [['attended', attended], ['unattended', unattended]]) {
+  const denied = m.argValue(a, '--disallowedTools');
+  console.log(label, 'allowed=', m.argValue(a, '--allowedTools'));
+  console.log(label, 'denies //proc:', denied.includes('Read(//proc/**)'), 'denies data-root .env:', denied.includes('Read(//data/.env)'));
+}

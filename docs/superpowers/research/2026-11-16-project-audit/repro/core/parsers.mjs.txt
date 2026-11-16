@@ -1,0 +1,27 @@
+// Run from the repo root: node <this file, renamed to .mjs> [scratch dir]. Writes only under the scratch dir (default: a new temp dir).
+import { mkdtempSync as __mk } from 'node:fs'; import { tmpdir as __tmp } from 'node:os'; import { join as __j } from 'node:path';
+const REPO = process.cwd();
+const R=REPO;
+const tp = await import(R+'/tracker-parse.mjs');
+const web = await import(R+'/web/src/lib/tracker-table.mjs');
+const header='| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |\n|---|---|---|---|---|---|---|---|---|---|';
+const rows={
+ full:'| 1 | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [1](reports/001.md) | n | https://x.co/1 |',
+ noTrailingPipe:'| 2 | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [2](r.md) | n | https://x.co/2',
+ emptyUrlNoPipe:'| 3 | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [3](r.md) | n |',
+ indented:'  | 4 | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [4](r.md) | n | https://x.co/4 |',
+ pipeInNotes:'| 5 | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [5](r.md) | a | b | https://x.co/5 |',
+ boldNum:'| **6** | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [6](r.md) | n | https://x.co/6 |',
+ tabRow:'|7\t2026-01-01\tAcme\tEng\t4.0/5\tApplied\t❌\t[7](r.md)\tn\thttps://x.co/7|',
+ numSuffix:'| 8a | 2026-01-01 | Acme | Eng | 4.0/5 | Applied | ❌ | [8](r.md) | n | https://x.co/8 |',
+};
+const md=header+'\n'+Object.values(rows).join('\n');
+const lines=md.split('\n');
+const col=tp.resolveColumns(lines);
+const webRows=web.parseApplications(md, R, R);
+const webNums=new Set(webRows.map(r=>String(r.n)));
+for (const [k,l] of Object.entries(rows)){
+  const r=tp.parseTrackerRow(l,col);
+  const w=webRows.find(x=>l.includes(`| ${x.n} `)||l.startsWith(`|${x.n}\t`)||l.includes(`|${x.n}\t`));
+  console.log(k.padEnd(16),'core:',r?`#${r.num} url=${r.url} notes=${r.notes}`:'DROPPED','| web:',w?`#${w.n} url=${w.url} notes=${w.notes}`:'DROPPED');
+}

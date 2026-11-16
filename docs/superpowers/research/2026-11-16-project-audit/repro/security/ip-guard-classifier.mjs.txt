@@ -1,0 +1,12 @@
+// Audit repro (read-only). Run from the repo root: node ip-guard-classifier.mjs
+// Calls isBlockedAddress in providers/_ip-guard.mjs on address literals only; it
+// opens no connection. Measured on 2edd1b33: 100.64.0.1 and 198.18.0.1 true; the
+// NAT64, 6to4, Teredo and ::ffff:0:0/96 forms false.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const g = await import(pathToFileURL(join(process.cwd(), 'providers/_ip-guard.mjs')).href);
+for (const a of ['100.64.0.1', '64:ff9b::7f00:1', '64:ff9b::a9fe:a9fe', '2002:7f00:1::',
+  '2001:0:4136:e378:8000:63bf:3fff:fdd2', '198.18.0.1', '::ffff:0:7f00:1']) {
+  console.log(a.padEnd(40), g.isBlockedAddress(a));
+}

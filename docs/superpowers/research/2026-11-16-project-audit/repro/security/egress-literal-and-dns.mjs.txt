@@ -1,0 +1,20 @@
+// Audit repro (read-only). Run from the repo root: node egress-literal-and-dns.mjs
+// Asks the two egress-guard checks in liveness-browser.mjs what they decide for
+// each URL. It never fetches a URL. The DNS check does name lookups for the
+// hostnames in the list.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const lb = await import(pathToFileURL(join(process.cwd(), 'liveness-browser.mjs')).href);
+const urls = [
+  'http://127.0.0.1/', 'http://0x7f.1/', 'http://2130706433/', 'http://[::ffff:7f00:1]/',
+  'http://0.0.0.0/', 'http://[::]/', 'http://[fd00::1]/', 'http://100.64.0.1/', 'http://100.100.100.100/',
+  'http://[64:ff9b::7f00:1]/', 'http://198.18.0.1/', 'http://[2002:7f00:1::]/', 'http://224.0.0.1/',
+  'http://255.255.255.255/', 'http://career-ops-web:3000/', 'http://localtest.me/',
+];
+for (const u of urls) {
+  const literal = lb.rejectPrivateOrInvalid(u) ? 'BLOCKED' : 'allowed';
+  let dns;
+  try { await lb.validateUrlSecurity(u); dns = 'allowed'; } catch { dns = 'blocked'; }
+  console.log(u.padEnd(34), 'literal:', literal.padEnd(8), '| dns:', dns);
+}

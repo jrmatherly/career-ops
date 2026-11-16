@@ -1,0 +1,10 @@
+// Run from the repo root: node company-slug-traversal.mjs
+// companySlug (web/src/lib/company-slug.mjs) on traversal-shaped names.
+// Measured on 2edd1b33: no output keeps a dot-dot or a separator.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const { companySlug } = await import(pathToFileURL(join(process.cwd(), 'web/src/lib/company-slug.mjs')).href);
+for (const c of ['../../etc/passwd', '..', 'a/../../b', '%2e%2e', 'C:\\x', '..\u2215..']) {
+  console.log(JSON.stringify(c), '->', JSON.stringify(companySlug(c)));
+}

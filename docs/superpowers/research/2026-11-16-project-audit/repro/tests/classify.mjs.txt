@@ -1,0 +1,20 @@
+// Run from the repo root: node <this file without .txt>
+import { readFileSync } from 'fs';
+const lines = readFileSync(process.argv[2],'utf8').trim().split('\n');
+const b = {};
+const rules = [
+ ['platform', /win32|platform|getuid|darwin|linux|canDropPermissions|symlink|directory link|root/i],
+ ['tool', /browser|chromium|playwright|latex|tectonic|toolRequired|pdftotext|poppler|git\b|bash|go\b|NO_GO|lsof/i],
+ ['deps/web-present', /depsReason|NO_WEB|web\/ not present|node_modules|HAS_WEB|webDeps|not installed|tsx|typescript/i],
+ ['todo', /\.todo\(|todo *:/],
+ ['only', /\.only\(/],
+];
+for (const l of lines) {
+  let k = 'other';
+  for (const [n, re] of rules) if (re.test(l)) { k = n; break; }
+  (b[k] ??= []).push(l);
+}
+for (const [k, v] of Object.entries(b)) console.log(k, v.length);
+for (const l of (b.other||[])) console.log('OTHER', l.slice(0,260));
+for (const l of (b.todo||[])) console.log('TODO', l.slice(0,260));
+for (const l of (b.only||[])) console.log('ONLY', l.slice(0,260));

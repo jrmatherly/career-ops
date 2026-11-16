@@ -1,0 +1,17 @@
+// Run from the repo root: node origin-guard-decisions.mjs
+// checkRequest in web/src/lib/origin-guard.mjs with the hosts the pod allows.
+// Measured on 2edd1b33: the two header-less in-cluster shapes pass; a cross-site
+// iframe, a cross-site form POST and a rebound Host are 403.
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+
+const g = await import(pathToFileURL(join(process.cwd(), 'web/src/lib/origin-guard.mjs')).href);
+const base = { allowedHosts: g.parseAllowedHosts('cops.example.com career-ops-web'), allowedOrigins: new Set() };
+const cases = {
+  podPeerNoHeaders: { host: 'localhost', method: 'POST', pathname: '/api/run' },
+  podPeerServiceName: { host: 'career-ops-web:3000', method: 'POST', pathname: '/api/scheduler' },
+  crossSiteIframe: { host: 'localhost:3000', secFetchSite: 'cross-site', secFetchMode: 'navigate', secFetchDest: 'iframe', method: 'GET', pathname: '/pipeline' },
+  crossSiteFormPost: { host: 'localhost:3000', secFetchSite: 'cross-site', secFetchMode: 'navigate', secFetchDest: 'document', method: 'POST', pathname: '/api/run' },
+  rebind: { host: 'evil.example:3000', secFetchSite: 'same-origin', method: 'GET', pathname: '/pipeline' },
+};
+for (const [k, c] of Object.entries(cases)) console.log(k, JSON.stringify(g.checkRequest({ ...base, ...c })));

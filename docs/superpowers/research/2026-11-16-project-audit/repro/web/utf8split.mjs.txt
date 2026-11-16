@@ -1,0 +1,6 @@
+// Run: node utf8split.mjs. Shows per-chunk Buffer#toString corrupting a multibyte character.
+import { spawn } from 'node:child_process';
+// Child writes "café — 日本" with a pause in the middle of the 'é' bytes, so the parent gets two chunks.
+const child = spawn(process.execPath, ['-e', `const b=Buffer.from("café — 日本");process.stdout.write(b.subarray(0,4));setTimeout(()=>process.stdout.write(b.subarray(4)),50)`]);
+let buf=''; child.stdout.on('data', d => { buf += d.toString(); });
+child.on('close', () => console.log(JSON.stringify(buf), buf === 'café — 日本' ? 'INTACT' : 'CORRUPTED'));

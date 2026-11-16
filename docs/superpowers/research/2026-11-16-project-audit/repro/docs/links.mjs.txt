@@ -1,0 +1,22 @@
+import fs from 'node:fs'; import path from 'node:path'; import { execSync } from 'node:child_process';
+const files = execSync('git ls-files "*.md"', {encoding:'utf8'}).trim().split('\n').filter(f => !f.startsWith('docs/superpowers/research/'));
+const tracked = new Set(execSync('git ls-files', {encoding:'utf8'}).trim().split('\n'));
+let total = 0, broken = [];
+for (const f of files) {
+  let txt = fs.readFileSync(f, 'utf8').replace(/```[\s\S]*?```/g, m => m.replace(/[^\n]/g, ' '));
+  txt.split('\n').forEach((l, i) => {
+    for (const m of l.matchAll(/\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
+      let t = m[1];
+      if (/^[a-z][a-z0-9+.-]*:/i.test(t) || t.startsWith('#') || t.startsWith('//')) continue;
+      t = decodeURIComponent(t.split('#')[0].split('?')[0]); if (!t) continue;
+      total++;
+      const abs = t.startsWith('/') ? t.slice(1) : path.normalize(path.join(path.dirname(f), t));
+      if (!fs.existsSync(abs)) broken.push({f, line:i+1, t, why:'missing'});
+      else if (!fs.statSync(abs).isDirectory() && !tracked.has(abs)) broken.push({f, line:i+1, t, why:'untracked'});
+    }
+  });
+}
+console.log('files', files.length, 'links', total, 'broken', broken.length);
+const byFile = {}; for (const b of broken) (byFile[b.f] ||= []).push(b);
+console.log(Object.entries(byFile).sort((a,b)=>b[1].length-a[1].length).map(([f,a])=>`${a.length}\t${f}`).join('\n'));
+fs.writeFileSync(process.argv[2], broken.map(b=>`${b.f}:${b.line}\t${b.why}\t${b.t}`).join('\n'));

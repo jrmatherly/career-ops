@@ -1,0 +1,17 @@
+// Run from the repo root: node probe.mjs. Shows findUnarchivedApplications skipping an Assessment row.
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+const { findUnarchivedApplications } = await import(pathToFileURL(join(process.cwd(), 'check-jd-archive.mjs')).href);
+const d = mkdtempSync(join(tmpdir(), 'jd-probe-'));
+mkdirSync(join(d, 'reports')); mkdirSync(join(d, 'jds'));
+writeFileSync(join(d, 'applications.md'), [
+  '# Applications Tracker', '',
+  '| # | Date | Company | Role | Score | Status | PDF | Report | Notes |',
+  '|---|------|---------|------|-------|--------|-----|--------|-------|',
+  '| 1 | 2026-11-01 | Acme | Engineer | 4.0/5 | Applied | ❌ | | |',
+  '| 2 | 2026-11-01 | Beta | Engineer | 4.0/5 | Assessment | ❌ | | |',
+  '| 3 | 2026-11-01 | Gamma | Engineer | 4.0/5 | Interview | ❌ | | |', ''].join('\n'));
+console.log(findUnarchivedApplications(join(d, 'applications.md'), join(d, 'reports'), join(d, 'jds')).map((f) => `${f.row} ${f.status}`));
+// Observed at 2edd1b33: [ '1 Applied', '3 Interview' ]

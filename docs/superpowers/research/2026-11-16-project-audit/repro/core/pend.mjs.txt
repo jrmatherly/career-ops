@@ -1,0 +1,22 @@
+// Run from the repo root: node <this file, renamed to .mjs> [scratch dir]. Writes only under the scratch dir (default: a new temp dir).
+import { mkdtempSync as __mk } from 'node:fs'; import { tmpdir as __tmp } from 'node:os'; import { join as __j } from 'node:path';
+const REPO = process.cwd();
+const R=REPO;
+const a=(await import(R+'/sync-batch-input.mjs')).parsePending;
+const b=(await import(R+'/rank-pipeline.mjs')).parsePendingEntries;
+const cases={
+ std:'## Pending\n\n- [ ] https://x.co/1 | Acme | Eng\n',
+ es:'## Pendientes\n\n- [ ] https://x.co/2 | Acme | Eng\n',
+ star:'## Pending\n\n* [ ] https://x.co/3 | Acme | Eng\n',
+ noSpaceBox:'## Pending\n\n- [] https://x.co/4 | Acme | Eng\n',
+ urlOnly:'## Pending\n\n- [ ] https://x.co/5\n',
+ local:'## Pending\n\n- [ ] local:jds/acme.md | Acme | Eng\n',
+ h3:'### Pending\n\n- [ ] https://x.co/7 | Acme | Eng\n',
+ noHeading:'- [ ] https://x.co/8 | Acme | Eng\n',
+ checked:'## Pending\n\n- [x] https://x.co/9 | Acme | Eng\n',
+ indented:'## Pending\n\n  - [ ] https://x.co/10 | Acme | Eng\n',
+ upperX:'## Pending\n\n- [X] https://x.co/11 | Acme | Eng\n',
+ dash:'## Pending\n\n- [ ] https://x.co/12 — Acme — Eng\n',
+};
+const n=(r)=>Array.isArray(r)?r.length:(r?.entries?.length ?? r?.pending?.length ?? JSON.stringify(r).slice(0,60));
+for (const [k,t] of Object.entries(cases)) { let x,y; try{x=n(a(t))}catch(e){x='ERR '+e.message} try{y=n(b(t))}catch(e){y='ERR '+e.message} console.log(k.padEnd(11),'sync-batch-input:',x,' rank-pipeline:',y, x!==y?'  <-- DIFFER':''); }

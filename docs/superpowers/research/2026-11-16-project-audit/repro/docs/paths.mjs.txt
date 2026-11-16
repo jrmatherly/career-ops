@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+const files = process.argv.slice(2);
+for (const f of files) {
+  const lines = fs.readFileSync(f, 'utf8').split('\n');
+  lines.forEach((l, i) => {
+    for (const m of l.matchAll(/`([^`\s]+)`/g)) {
+      let p = m[1].replace(/[:,.)]+$/, '').replace(/^node /,'');
+      if (!/^[\w.\-\/{}*]+$/.test(p)) continue;
+      if (!/\.(mjs|js|md|json|ya?ml|txt|tsv|go|ts|tsx|sh)$/.test(p) && !p.endsWith('/')) continue;
+      if (/[{}*<]/.test(p)) continue;
+      if (p.startsWith('~') || p.startsWith('/')) continue;
+      const cands = [p, 'web/'+p, 'dashboard/'+p];
+      if (!cands.some(c => fs.existsSync(c))) console.log(`${f}:${i+1}: ${p}`);
+    }
+  });
+}

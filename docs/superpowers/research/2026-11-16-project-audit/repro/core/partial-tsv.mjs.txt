@@ -1,0 +1,21 @@
+// Run from the repo root: node <this file, renamed to .mjs> [scratch dir]. Writes only under the scratch dir (default: a new temp dir).
+import { mkdtempSync as __mk } from 'node:fs'; import { tmpdir as __tmp } from 'node:os'; import { join as __j } from 'node:path';
+const REPO = process.cwd();
+import { mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'fs';
+import { join } from 'path';
+const S=process.argv[2] ?? __mk(__j(__tmp(), 'core-audit-'));
+const full='num\tdate\tcompany\trole\tstatus\tscore\tpdf\treport\tnotes\turl\n7\t2026-02-01\tAcme\tData Engineer\tEvaluated\t4.5/5\t❌\t[7](reports/007-acme-2026-02-01.md)\tGemini evaluation\thttps://jobs.acme.com/123456\n';
+const { mergeTracker } = await import(REPO+'/merge-tracker.mjs');
+for (const cut of [full.length-10, full.indexOf('Gemini')+3, full.indexOf('\t[7]')+5]) {
+  const W=join(S,'ws-partial'); rmSync(W,{recursive:true,force:true});
+  for (const d of ['data','reports','batch/tracker-additions']) mkdirSync(join(W,d),{recursive:true});
+  const apps=join(W,'data/applications.md');
+  writeFileSync(apps,'# Applications Tracker\n\n| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |\n|---|---|---|---|---|---|---|---|---|---|\n');
+  writeFileSync(join(W,'reports/007-acme-2026-02-01.md'),'# r\n');
+  writeFileSync(join(W,'batch/tracker-additions/007-acme.tsv'), full.slice(0,cut));
+  writeFileSync(join(W,'batch/state.tsv'),'id\turl\tstatus\tstarted_at\tcompleted_at\treport_num\tscore\terror\tretries\n');
+  const logs=[]; const lg={log:(...a)=>logs.push(a.join(' ')),warn:(...a)=>logs.push('W '+a.join(' ')),error:(...a)=>logs.push('E '+a.join(' '))};
+  const code=await mergeTracker({ appsFile: apps, dataRoot: W, additionsDir: join(W,'batch/tracker-additions'), batchStateFile: join(W,'batch/state.tsv'), pdfIndexFile: join(W,'data/pdf-index.tsv'), logger: lg });
+  console.log('--- cut at', JSON.stringify(full.slice(cut-12,cut)), 'exit', code, 'archived:', readdirSync(join(W,'batch/tracker-additions/merged')).join(','));
+  console.log(readFileSync(apps,'utf8').trim().split('\n').at(-1));
+}

@@ -1,0 +1,23 @@
+// Run from the repo root: node <this file without .txt>
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); if (n === 'node_modules') return []; return statSync(p).isDirectory() ? walk(p) : p.endsWith('.test.mjs') ? [p] : []; });
+const files = [...walk('tests'), ...walk('web/tests')];
+const other = [];
+const hits = { passInCatch: [], unconditionalPassOnly: [] };
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  if (!/from ['"]node:test['"]/.test(s) && !/\b(pass|fail)\(/.test(s)) other.push(f);
+  // catch block whose body contains pass( and no fail(
+  for (const m of s.matchAll(/catch\s*(\([^)]*\))?\s*\{([^{}]{0,300})\}/g)) {
+    if (/\bpass\(/.test(m[2]) && !/fail\(|throw|assert/.test(m[2]) && !/\b(err|e|error)\b.*(code|message|name)/.test(m[2])) {
+      const line = s.slice(0, m.index).split('\n').length;
+      hits.passInCatch.push(`${f}:${line}: ${m[0].replace(/\s+/g,' ').slice(0,160)}`);
+    }
+  }
+  // pass/fail suites with pass() but no fail(
+  if (!/from ['"]node:test['"]/.test(s) && /\bpass\(/.test(s) && !/\bfail\(/.test(s) && !/assert/.test(s)) hits.unconditionalPassOnly.push(f);
+}
+console.log('other', other);
+console.log('passInCatch', hits.passInCatch.length); console.log(hits.passInCatch.join('\n'));
+console.log('passOnly', hits.unconditionalPassOnly);

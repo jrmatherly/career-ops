@@ -1,0 +1,20 @@
+// Run from the repo root: node a11y.cjs web/src. Uses the Babel parser that Next bundles (web/node_modules/next).
+const B=require('path').resolve('web/node_modules/next/dist/compiled/babel')+'/';
+const {parse}=require(B+'parser.js');
+const fs=require('fs'),path=require('path');
+const root=process.argv[2]; const res={click:[],iconBtn:[],dialog:[]};
+const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name); if(e.isDirectory()) walk(p); else if(p.endsWith('.tsx')) scan(p);}};
+const INTER=new Set(['button','a','input','select','textarea','label','summary','option','form','details','dialog']);
+const name=n=>n.type==='JSXIdentifier'?n.name:n.type==='JSXMemberExpression'?name(n.object)+'.'+n.property.name:'?';
+function attrs(op){const m={};for(const a of op.attributes){if(a.type==='JSXAttribute')m[a.name.name]=a.value?(a.value.type==='StringLiteral'?a.value.value:'{expr}'):true; else m['...spread']=true;}return m;}
+function hasText(el,src){return el.children.some(c=>(c.type==='JSXText'&&c.value.trim())||(c.type==='JSXExpressionContainer'&&c.expression.type!=='JSXEmptyExpression')||(c.type==='JSXElement'&&(/^[a-z]/.test(name(c.openingElement.name))&&hasText(c,src)||/sr-only/.test(src.slice(c.start,c.end)))));}
+function scan(f){const src=fs.readFileSync(f,'utf8');let ast;try{ast=parse(src,{sourceType:'module',plugins:['jsx','typescript']});}catch(e){console.error('parse',f,e.message);return;}
+ const rel=path.relative(root,f);
+ const visit=n=>{if(!n||typeof n.type!=='string')return;
+  if(n.type==='JSXElement'){const op=n.openingElement;const tag=name(op.name);const a=attrs(op);const line=op.loc.start.line;
+   if(/^[a-z]/.test(tag)&&!INTER.has(tag)&&a.onClick&&!a.role&&!a['aria-hidden']) res.click.push(`${rel}:${line} <${tag}>`);
+   if(tag==='button'&&!a['...spread']&&!a['aria-label']&&!a['aria-labelledby']&&!hasText(n,src)) res.iconBtn.push(`${rel}:${line}${a.title?' (title only)':''}`);
+   if(a.role==='dialog'||a.role==='alertdialog'||a['aria-modal']) res.dialog.push(`${rel}:${line}`);}
+  for(const k in n){if(k==='loc')continue;const v=n[k];if(Array.isArray(v))v.forEach(visit);else if(v&&typeof v.type==='string')visit(v);}};
+ visit(ast.program);}
+walk(root); for(const k in res){console.log('##',k,res[k].length);console.log(res[k].join('\n'));}

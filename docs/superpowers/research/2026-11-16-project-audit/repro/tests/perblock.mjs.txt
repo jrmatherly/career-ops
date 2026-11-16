@@ -1,0 +1,22 @@
+// Run from the repo root: node <this file without .txt>
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); if (n === 'node_modules') return []; return statSync(p).isDirectory() ? walk(p) : p.endsWith('.test.mjs') ? [p] : []; });
+const files = [...walk('tests'), ...walk('web/tests')];
+const ASSERT = /\bassert(\.\w+)?\(|\bexpect\(|\bthrow\b|\bt\.assert|\bt\.skip|\bt\.todo|\bfail\(|\bequal\(|\bdeepEqual\(|\bok\(|\bmatch\(|\brejects\(|\bthrows\(|\bdoesNotMatch\(|\bnotEqual\(|\bstrictEqual\(/;
+let hits = [];
+for (const f of files) {
+  const s = readFileSync(f, 'utf8');
+  if (!/from ['"]node:test['"]/.test(s)) continue;
+  const idx = [...s.matchAll(/^\s*(test|it)\(\s*(['"`])(.*?)\2/gm)];
+  for (let i = 0; i < idx.length; i++) {
+    const start = idx[i].index, end = i + 1 < idx.length ? idx[i + 1].index : s.length;
+    const body = s.slice(start, end);
+    if (!ASSERT.test(body)) {
+      // calls to local helper functions may assert; record helper name
+      const calls = [...body.matchAll(/\b(await\s+)?([a-zA-Z_]\w*)\(/g)].map((m) => m[2]).filter((n) => !['test','it','async','join','String','Number','JSON'].includes(n));
+      hits.push(`${f}:${s.slice(0,start).split('\n').length} "${idx[i][3].slice(0,70)}" calls: ${[...new Set(calls)].slice(0,6).join(',')}`);
+    }
+  }
+}
+console.log(hits.length); console.log(hits.join('\n'));

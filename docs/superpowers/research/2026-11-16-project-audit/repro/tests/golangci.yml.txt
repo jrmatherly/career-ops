@@ -1,0 +1,7 @@
+version: "2"
+linters:
+  default: none
+  enable: [govet, ineffassign, staticcheck, unused]
+  settings:
+    staticcheck:
+      checks: ["all", "-ST*", "-QF*", "-S1011"]

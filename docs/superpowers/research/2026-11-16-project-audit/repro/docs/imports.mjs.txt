@@ -1,0 +1,18 @@
+import fs from 'node:fs'; import path from 'node:path'; import { execSync } from 'node:child_process';
+const root = process.cwd();
+const src = fs.readFileSync('lib/update-manifest.mjs','utf8');
+const m = src.match(/export const SYSTEM_PATHS\s*=\s*(?:Object\.freeze\()?\[([\s\S]*?)\]/);
+const sys = [...m[1].matchAll(/'([^']+)'/g)].map(x=>x[1]);
+const cov = p => sys.some(s => s.endsWith('/') ? p.startsWith(s) : p === s);
+const tracked = execSync('git ls-files "*.mjs"',{encoding:'utf8'}).trim().split('\n').filter(cov);
+const out = new Map();
+for (const f of tracked) {
+  const t = fs.readFileSync(f,'utf8');
+  for (const im of t.matchAll(/(?:from\s+|import\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g)) {
+    const target = path.normalize(path.join(path.dirname(f), im[1]));
+    if (!fs.existsSync(target)) continue;
+    if (!cov(target)) (out.get(target) || out.set(target, []).get(target)).push(f);
+  }
+}
+console.log('SYSTEM_PATHS entries', sys.length, 'system .mjs', tracked.length);
+for (const [t, fs_] of out) console.log(t, '<=', [...new Set(fs_)].slice(0,6).join(' '));

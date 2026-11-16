@@ -1,0 +1,24 @@
+// Read-only scan: for each merged PR, list the candidate required checks that were not green on its head commit.
+// Usage: node merged-pr-checks.mjs <owner/repo> [limit]
+import { execFileSync } from 'node:child_process';
+
+const [repo = 'jrmatherly/career-ops', limit = '100'] = process.argv.slice(2);
+const gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 1 << 26 }));
+const REQUIRED = /^(test \(|🔒 Guard user-layer files|🔗 depends-on)/;
+
+const prs = gh('pr', 'list', '-R', repo, '--state', 'merged', '-L', limit, '--json', 'number,headRefOid,mergedAt');
+let blocked = 0;
+for (const pr of prs) {
+  const runs = gh('api', `repos/${repo}/commits/${pr.headRefOid}/check-runs?per_page=100`).check_runs;
+  const required = runs.filter((r) => REQUIRED.test(r.name));
+  // Latest run per name decides, as a required check does.
+  const latest = new Map();
+  for (const r of required) if (!latest.has(r.name) || r.started_at > latest.get(r.name).started_at) latest.set(r.name, r);
+  const bad = [...latest.values()].filter((r) => !['success', 'skipped'].includes(r.conclusion)).map((r) => `${r.name}=${r.conclusion}`);
+  const missing = required.length === 0 ? ['no candidate checks on head'] : [];
+  if (bad.length || missing.length) {
+    blocked++;
+    console.log(`#${pr.number} merged ${pr.mergedAt} ${[...bad, ...missing].join(', ')}`);
+  }
+}
+console.log(`${prs.length} merged PRs scanned, ${blocked} would have been held by the candidate required checks`);

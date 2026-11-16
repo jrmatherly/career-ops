@@ -1,0 +1,15 @@
+// Run from the repo root: node inputs.cjs web/src. Uses the Babel parser that Next bundles (web/node_modules/next).
+const {parse}=require(require('path').resolve('web/node_modules/next/dist/compiled/babel/parser.js'));
+const fs=require('fs'),path=require('path');const root=process.argv[2];const out=[];
+const walk=d=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name); if(e.isDirectory()) walk(p); else if(p.endsWith('.tsx')) scan(p);}};
+const name=n=>n.type==='JSXIdentifier'?n.name:'?';
+function scan(f){const src=fs.readFileSync(f,'utf8');const ast=parse(src,{sourceType:'module',plugins:['jsx','typescript']});const rel=path.relative(root,f);
+ const htmlFors=new Set([...src.matchAll(/htmlFor=["{]+([^"}]+)/g)].map(m=>m[1]));
+ const visit=(n,inLabel)=>{if(!n||typeof n.type!=='string')return;
+  if(n.type==='JSXElement'){const op=n.openingElement;const tag=name(op.name);
+   const a={};for(const x of op.attributes){if(x.type==='JSXAttribute')a[x.name.name]=x.value?src.slice(x.value.start,x.value.end).replace(/^["{]+|["}]+$/g,''):true;else a.spread=1;}
+   if(['input','select','textarea'].includes(tag)&&!inLabel&&!a.spread&&a.type!=='hidden'&&a.type!=='file'&&!a['aria-label']&&!a['aria-labelledby']&&!(a.id&&htmlFors.has(a.id))) out.push(`${rel}:${op.loc.start.line} <${tag}${a.type?' type='+a.type:''}${a.placeholder?' placeholder':''}>`);
+   if(tag==='label')inLabel=true;}
+  for(const k in n){if(k==='loc')continue;const v=n[k];if(Array.isArray(v))v.forEach(c=>visit(c,inLabel));else if(v&&typeof v.type==='string')visit(v,inLabel);}};
+ visit(ast.program,false);}
+walk(root);console.log(out.join('\n'));console.log('count',out.length);
