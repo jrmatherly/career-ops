@@ -47,6 +47,7 @@ import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
 import { applyEntryResponseCap } from './lib/entry-response-cap.mjs';
 import { applyEntryTimeout } from './lib/entry-timeout.mjs';
+import { applyEntryPacing, PROBE_MAX_REQUEST_DELAY_MS } from './lib/entry-pacing.mjs';
 
 import { fetchJson as defaultFetchJson, fetchText as defaultFetchFullText, fetchTextHead as defaultFetchText, makeHttpCtx } from './providers/_http.mjs';
 import { ASHBY_MAX_BYTES, ASHBY_TIMEOUT_MS, buildEmbedUrl as ashbyEmbedUrl, parseEmbedAppData as parseAshbyEmbed } from './providers/ashby.mjs';
@@ -945,17 +946,18 @@ export async function verifyCompanies(
 }
 
 /**
- * Apply an entry's `timeout_ms` and `max_response_mb` to a ctx, as scan.mjs
+ * Apply an entry's `timeout_ms`, `max_response_mb` and `request_delay_ms` to a ctx, as scan.mjs
  * and audit-portals.mjs do, so the check reads a board with the same limits
- * the scan does. The ctx's fetchers are replaced in place; pass a copy when
- * it is shared.
+ * the scan does. The delay alone is shortened to PROBE_MAX_REQUEST_DELAY_MS:
+ * the check runs under a time limit. The ctx's fetchers are replaced in place;
+ * pass a copy when it is shared.
  *
  * @param {object} ctx
  * @param {object} entry
  * @returns {any}
  */
 function withEntryLimits(ctx, entry) {
-  return applyEntryTimeout(applyEntryResponseCap(ctx, entry), entry);
+  return applyEntryPacing(applyEntryTimeout(applyEntryResponseCap(ctx, entry), entry), entry, { maxDelayMs: PROBE_MAX_REQUEST_DELAY_MS });
 }
 
 /**
@@ -990,11 +992,15 @@ async function verifyOne(company, { fetchJson, fetchText, providers, httpCtx }) 
   // reads the embed page instead.
   const embedOnly = match?.ats === 'ashby' && /** @type {any} */ (company).ashby?.embed === true;
   if (match && !embedOnly) {
-    // The entry's own board is read with its timeout_ms and max_response_mb,
-    // as scan.mjs reads it. Alternates below are other boards and keep the
-    // defaults.
-    const entryFetchJson = withEntryLimits({ fetchJson }, company).fetchJson;
-    const probe = await probeSlug(match.ats, match.slug, { fetchJson: entryFetchJson, eu: match.eu });
+    // The entry's own board is read with its timeout_ms, max_response_mb and
+    // request_delay_ms. Alternates below are other boards and keep the defaults.
+    // The limits sit under the redirect follower, so each hop is paced too.
+    const ownFetch = fetchJson === probeFetchJson;
+    const limited = withEntryLimits({ fetchJson: ownFetch ? defaultFetchJson : fetchJson }, company).fetchJson;
+    const entryFetchJson = ownFetch ? followRedirects(limited) : limited;
+    // The oversized-board fallback is one more request to the same board: paced, with its own size cap.
+    const fetchEmbed = applyEntryPacing({ fetchText: defaultFetchFullText }, company, { maxDelayMs: PROBE_MAX_REQUEST_DELAY_MS }).fetchText;
+    const probe = await probeSlug(match.ats, match.slug, { fetchJson: entryFetchJson, fetchEmbed, eu: match.eu });
     if (probe.status === 'live' || probe.status === 'empty') return { name, ...probe };
     // Wrong slug or ATS migration — cross-probe only for slug/unknown failures.
     if (probe.errorKind === 'slug_gone' || probe.errorKind === 'unknown') {

@@ -4,7 +4,7 @@ import * as yaml from "js-yaml";
 import { careerOpsRoot, portalsConfigPath } from "@/lib/career-ops";
 import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { atomicWriteWithBackup } from "@/lib/core/safe-write";
-import { companiesNamed, isMapping, loadPortalsDocument, mergePortalFilters, patchPortalFiltersText, PortalsConfigError, setCompanyEnabledText } from "@/lib/portals-config.mjs";
+import { companiesNamed, isMapping, isRequestDelayMs, loadPortalsDocument, mergePortalFilters, patchPortalFiltersText, MAX_REQUEST_DELAY_MS, PortalsConfigError, setCompanyEnabledText, setCompanyRequestDelayText } from "@/lib/portals-config.mjs";
 import { readJsonObject } from "@/lib/json-body";
 import { revisionOf } from "@/lib/settings-state.mjs";
 
@@ -23,11 +23,25 @@ export const dynamic = "force-dynamic";
 // POST also takes { company, enabled, revision }, the Portals page's switch for
 // one tracked company. That write is not confirm-gated, so it carries the
 // revision of the file the page showed and is refused when the file has changed.
+// { company, request_delay_ms, revision } is the same page's least time between
+// one company's requests: whole milliseconds, or null to remove the line.
 
 export async function POST(req: Request) {
-  const body = await readJsonObject<{ roles?: string[]; location?: string[]; company?: unknown; enabled?: unknown; revision?: unknown }>(req);
+  const body = await readJsonObject<{ roles?: string[]; location?: string[]; company?: unknown; enabled?: unknown; request_delay_ms?: unknown; revision?: unknown }>(req);
   if (!body) return Response.json({ error: "bad json" }, { status: 400 });
-  if ("company" in body) return setCompanyEnabled(body.company, body.enabled, body.revision);
+  if ("company" in body && "request_delay_ms" in body) {
+    if ("enabled" in body) return Response.json({ error: "send enabled and request_delay_ms in separate requests" }, { status: 400 });
+    const ms = body.request_delay_ms;
+    if (ms !== null && !isRequestDelayMs(ms)) {
+      return Response.json({ error: `request_delay_ms must be null or a whole number from 1 to ${MAX_REQUEST_DELAY_MS}` }, { status: 400 });
+    }
+    return editCompany(body.company, body.revision, "paced", (source, company) => setCompanyRequestDelayText(source, company, ms));
+  }
+  if ("company" in body) {
+    const { enabled } = body;
+    if (typeof enabled !== "boolean") return Response.json({ error: "expected { company: string, enabled: boolean, revision: string }" }, { status: 400 });
+    return editCompany(body.company, body.revision, "switched", (source, company) => setCompanyEnabledText(source, company, enabled));
+  }
   const roles = (Array.isArray(body.roles) ? body.roles : []).map((r) => String(r).trim()).filter(Boolean).slice(0, 24);
   if (roles.length === 0) return Response.json({ error: "no roles" }, { status: 400 });
 
@@ -61,9 +75,9 @@ export async function POST(req: Request) {
 
 // Synchronous from the read to the write, so no other request to this server can
 // land between the revision check and the write. A writer outside it still can.
-function setCompanyEnabled(company: unknown, enabled: unknown, revision: unknown) {
-  if (typeof company !== "string" || typeof enabled !== "boolean" || typeof revision !== "string") {
-    return Response.json({ error: "expected { company: string, enabled: boolean, revision: string }" }, { status: 400 });
+function editCompany(company: unknown, revision: unknown, verb: string, edit: (source: string, company: string) => string | null) {
+  if (typeof company !== "string" || typeof revision !== "string") {
+    return Response.json({ error: "expected { company: string, revision: string }" }, { status: 400 });
   }
   const file = portalsConfigPath(careerOpsRoot());
   let source: string;
@@ -83,9 +97,9 @@ function setCompanyEnabled(company: unknown, enabled: unknown, revision: unknown
   if (!isMapping(doc) || companiesNamed(doc as Record<string, unknown>, company).length === 0) {
     return Response.json({ error: `no company named "${company}" in portals.yml` }, { status: 404 });
   }
-  const text = setCompanyEnabledText(source, company, enabled);
+  const text = edit(source, company);
   if (text === null) {
-    return Response.json({ error: `"${company}" cannot be switched here (listed more than once, or written in a form the page does not edit). Edit portals.yml directly.` }, { status: 409 });
+    return Response.json({ error: `"${company}" cannot be ${verb} here (listed more than once, or written in a form the page does not edit). Edit portals.yml directly.` }, { status: 409 });
   }
   try {
     atomicWriteWithBackup(file, text);

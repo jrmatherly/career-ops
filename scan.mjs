@@ -119,6 +119,7 @@ import { resolveTrackerPath } from './path-resolver.mjs';
 import { browserLaunchOptions, snapshotBrowserProcessEnv } from './lib/browser-launch.mjs';
 import { applyEntryResponseCap } from './lib/entry-response-cap.mjs';
 import { applyEntryTimeout } from './lib/entry-timeout.mjs';
+import { applyEntryPacing } from './lib/entry-pacing.mjs';
 export { applyEntryResponseCap };
 import { boardTruncation, describeTruncation, partialBoardsNote, partialRepeatHints } from './lib/board-truncation.mjs';
 
@@ -5131,6 +5132,7 @@ async function main() {
     };
     applyEntryResponseCap(ctx, company);
     applyEntryTimeout(ctx, company);
+    applyEntryPacing(ctx, company);
     let sourceName = provider.id === 'local-parser' ? 'local-parser' : `${provider.id}-api`;
     const recordError = (err, { retryable = false } = {}) => {
       failedTargets++;

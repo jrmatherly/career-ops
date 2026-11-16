@@ -35,3 +35,5 @@ lib/evaluate-queue.mjs
 evaluate-queue.mjs
 # Recruiter advice follow-ups: which common behavioural prompts the story bank covers.
 story-coverage.mjs
+# Per-entry request pacing: request_delay_ms on a portals.yml entry.
+lib/entry-pacing.mjs
