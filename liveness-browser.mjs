@@ -299,6 +299,37 @@ export async function validateUrlSecurity(urlString) {
   }
 }
 
+/**
+ * Register the egress guard on a Playwright context.
+ *
+ * Registered on the *context* rather than the page: a route bound to a single
+ * page doesn't cover requests the flow makes outside it, and the context is
+ * what owns the whole navigation. Both layers of the shared guard run here —
+ * the literal-host check first (cheap, no network), then the DNS re-check that
+ * catches a public hostname resolving into private space.
+ *
+ * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
+ */
+export async function installEgressGuard(context) {
+  await context.route('**/*', async (route) => {
+    const requestUrl = route.request().url();
+
+    const verdict = rejectPrivateOrInvalid(requestUrl);
+    if (verdict) {
+      console.warn(`   Blocked request to restricted destination: ${requestUrl} (${verdict.reason})`);
+      return route.abort('blockedbyclient');
+    }
+
+    try {
+      await validateUrlSecurity(requestUrl);
+      return route.continue();
+    } catch (err) {
+      console.warn(`   Blocked request to restricted destination (DNS): ${requestUrl} - ${err.message}`);
+      return route.abort('blockedbyclient');
+    }
+  });
+}
+
 // Rediscovery can navigate a newly created page before its first liveness
 // check. Install the same URL/DNS guards before that search as well.
 let suppressedSubresourceBlocks = 0;

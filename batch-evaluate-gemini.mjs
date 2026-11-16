@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard } from './liveness-browser.mjs';
 import { isClosureEvidence } from './liveness-core.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
@@ -372,14 +372,7 @@ async function scrapeUrl(browser, url) {
   
   const page = await browser.newPage();
   try {
-    await page.route('**/*', (route) => {
-      const targetUrl = route.request().url();
-      const interceptedRejected = rejectPrivateOrInvalid(targetUrl);
-      if (interceptedRejected) {
-        return route.abort('accessdenied');
-      }
-      return route.continue();
-    });
+    await installEgressGuard(page);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     

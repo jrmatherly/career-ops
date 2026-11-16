@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
-import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid } from './liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
@@ -1538,10 +1538,7 @@ async function main() {
     // private/loopback/link-local or non-http(s) host. Guarding only the initial
     // URL isn't enough once we return page CONTENT: a server-side redirect could
     // otherwise steer the browser at internal infrastructure (SSRF).
-    await context.route('**/*', (route) => {
-      if (rejectPrivateOrInvalid(route.request().url())) return route.abort('blockedbyclient');
-      return route.continue();
-    });
+    await installEgressGuard(context);
     const page = await context.newPage();
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     await page.waitForTimeout(HYDRATION_WAIT_MS); // let SPAs hydrate
