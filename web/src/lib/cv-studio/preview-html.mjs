@@ -1,3 +1,25 @@
+const PREVIEW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";
+
+/**
+ * The page with a CSP of its own. The preview is shown as an iframe srcdoc, and a
+ * srcdoc document takes its parent's policy, not the headers of the response it
+ * was fetched from, so the policy has to travel inside the page.
+ * @param {string} html
+ */
+export function withPreviewCsp(html) {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
+  // Skip comments, which a template may fill with markup, and match <head> as a
+  // whole tag name so <header> is not taken for it.
+  const tokens = /<!--[\s\S]*?-->|<head(?=[\s>])[^>]*>/gi;
+  let match;
+  while ((match = tokens.exec(html))) {
+    if (match[0].startsWith("<!--")) continue;
+    const end = match.index + match[0].length;
+    return html.slice(0, end) + meta + html.slice(end);
+  }
+  return meta + html;
+}
+
 const FIT = `.job-header, .edu-header, .contact-row, .cert-table, .award-table { min-width: 0; max-width: 100%; }
 .job-header, .edu-header { flex-wrap: wrap; }
 .job-company, .edu-title, .project-title, .skill-category { min-width: 0; overflow-wrap: anywhere; }
@@ -56,5 +78,5 @@ function injectFit(html) {
 }
 
 export function previewHtml(html) {
-  return injectFit(mapText(String(html ?? "")));
+  return withPreviewCsp(injectFit(mapText(String(html ?? ""))));
 }
