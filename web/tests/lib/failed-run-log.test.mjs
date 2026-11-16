@@ -84,6 +84,33 @@ test("output cut at the 8000-character bound loses its first line, so a key cut 
   assert.match(md, /## Output\nsecond line\n/);
 });
 
+test("a single-line output past the bound keeps every word but the cut first one", async (t) => {
+  const output = Array.from({ length: 2000 }, (_, i) => `word${i}`).join(" ");
+  assert.ok(output.length > 8000 && !output.includes("\n"));
+  const { res, file } = await saveRun(t, { id: "fictional-one-line", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  const saved = fs.readFileSync(file, "utf8").split("## Output\n")[1].trimEnd();
+  assert.ok(saved.startsWith("word") && output.endsWith(saved), "a whole-word suffix of the output is saved");
+  assert.ok(saved.length > 8000 - 12, `saved ${saved.length} characters`);
+});
+
+test("a key cut by the bound in a single-line output is not saved", async (t) => {
+  const fakeKey = "sk-or-v1-FAKE0000fake1111FAKE2222";
+  const rest = " ordinary words follow".padEnd(8000 - 10, " filler");
+  const output = "lead " + fakeKey + rest;
+  const { res, file } = await saveRun(t, { id: "fictional-one-line-key", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(fakeKey.slice(-10)), "the key stub left by the cut is dropped");
+  assert.match(md, /## Output\nordinary words follow/);
+});
+
+test("an unbroken run at the bound is saved as a one-line marker", async (t) => {
+  const { res, file } = await saveRun(t, { id: "fictional-unbroken", status: "done", steps: [], output: "FAKEfake".repeat(1200) });
+  assert.equal(res.status, 200);
+  assert.match(fs.readFileSync(file, "utf8"), /## Output\n\[output omitted: one unbroken 8000-character run\]\n$/);
+});
+
 test("every free-text field is capped before masking, so a 256 KB body never reaches the masker whole", async (t) => {
   const huge = "key=".repeat(64 * 1024);
   const body = { id: "fictional-huge", title: huge, page: huge, input: huge, status: "error", error: huge, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: huge })), output: huge };

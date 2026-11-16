@@ -50,13 +50,16 @@ export async function POST(req: Request) {
   const gateMessage = gate ? text(gate.message, 1200) : "";
   const summary = text(b.result?.summary, 1200);
   const error = b.status === "error" ? text(b.error, 2000).slice(0, 1200) : "";
-  // The client keeps the last 8000 characters. At that bound the first line may start
-  // mid-key with no prefix or label left to mask, so it is dropped.
+  // The client keeps the last 8000 characters. At that bound the first line, or in a
+  // single-line output the first token, may start mid-key with no prefix or label left
+  // to mask, so it is dropped. An unbroken run that long is unreadable and may be a key.
   const rawOutput = String(b.output ?? "");
   let output = rawOutput.slice(-OUTPUT_MAX);
   if (rawOutput.length >= OUTPUT_MAX) {
     const nl = output.indexOf("\n");
-    output = nl === -1 ? "" : output.slice(nl + 1);
+    if (nl !== -1) output = output.slice(nl + 1);
+    else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
+    else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
   }
   output = maskSecrets(output);
 
