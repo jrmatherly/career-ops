@@ -88,3 +88,28 @@ test("an 8000-character run of repeated prefixes or labels returns", () => {
     assert.equal(maskSecrets(s), s);
   }
 });
+
+test("a label that ends a camelCase identifier is masked", () => {
+  for (const [s, out] of [
+    ["accessToken=FAKE0000fake1111FAKE", "accessToken=[masked]"],
+    ["apiKey: FAKE0000fake1111FAKE", "apiKey: [masked]"],
+    ["clientSecret=FAKE0000fake1111FAKE", "clientSecret=[masked]"],
+    ["refreshToken: FAKE0000fake1111FAKE", "refreshToken: [masked]"],
+    ["sessionCookie=FAKE0000fake1111FAKE", "sessionCookie=[masked]"],
+    ['{"accessToken":"FAKE0000fake1111FAKE"}', '{"accessToken":"[masked]"}'],
+  ]) assert.equal(maskSecrets(s), out);
+});
+
+test("a lowercase word holding a label is not taken for a key", () => {
+  for (const s of [
+    "the monkey 2024abcdefghijklmnop",
+    "the tokenizer 2024abcdefghijklmnop",
+    "the keyboard 2024abcdefghijklmnop",
+    "the secretary 2024abcdefghijklmnop",
+  ]) assert.equal(maskSecrets(s), s);
+});
+
+test("a labelled value starting with a slash is masked unless it is a path", () => {
+  assert.equal(maskSecrets("token=/9j4AAQSkZJRgABAQ0000FAKE"), "token=[masked]");
+  assert.equal(maskSecrets("cache key: /Users/me/.cache/claude/v2/abc123def456ghi"), "cache key: /Users/me/.cache/claude/v2/abc123def456ghi");
+});

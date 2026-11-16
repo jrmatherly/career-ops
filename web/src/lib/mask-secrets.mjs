@@ -14,10 +14,17 @@ const JWT = /^eyJ[\w-]*\.[\w-]+\.[\w-]+/;
 
 const URL_PASSWORD = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)[^\s/@]+@/gi;
 
-// A label is a whole word or the tail of an identifier (OPENROUTER_API_KEY, api_key),
-// never the end of a word ("monkey"). The separator stays on one line, and a value
-// starting with "/" is a path.
-const LABELLED = /(?<![A-Za-z0-9])(api[_-]?key|key|token|secret|password|passwd|pwd|credentials?|cookie|bearer|authorization)(["']?[ \t]*[:=][ \t]*["']?|[ \t]+)((?:bearer|basic)[ \t]+)?(?!\/)([A-Za-z0-9._~+/=-]{16,})/gi;
+// A label is a whole word, the tail of an identifier (OPENROUTER_API_KEY, api_key) or
+// a capitalised camelCase tail (accessToken), never the end of a lowercase word
+// ("monkey"). Case is spelled out per letter because an i flag would make the
+// camelCase boundary's [a-z] and [A-Z] match either case. The separator stays on one line.
+const ci = (w) => w.replace(/[a-z]/g, (c) => `[${c}${c.toUpperCase()}]`);
+const LABEL_WORDS = ["api[_-]?key", "key", "token", "secret", "password", "passwd", "pwd", "credentials?", "cookie", "bearer", "authorization"];
+const LABEL = `(?<![A-Za-z0-9])(?:${LABEL_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${LABEL_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
+const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?:${ci("bearer")}|${ci("basic")})[ \\t]+)?([A-Za-z0-9._~+/=-]{16,})`, "g");
+
+// "/Users/me/.cache/…" is a path; "/9j4AAQ…" with no second slash is base64.
+const isPath = (s) => /^\/[^/]+\//.test(s);
 
 const hasDigit = (s) => /\d/.test(s);
 
@@ -31,5 +38,5 @@ export function maskSecrets(s) {
     })
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
-    .replace(LABELLED, (m, label, sep, scheme = "", value) => (hasDigit(value) ? label + sep + scheme + MARK : m));
+    .replace(LABELLED, (m, label, sep, scheme = "", value) => (hasDigit(value) && !isPath(value) ? label + sep + scheme + MARK : m));
 }
