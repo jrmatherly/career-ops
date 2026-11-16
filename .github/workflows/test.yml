@@ -3,8 +3,12 @@ name: "🧪 Tests"
 on:
   pull_request:
     branches: [main]
-  # Fork: work lands on branches and on main without a PR, so run on every push too.
+  # Fork: work also lands on main without a PR, so run on every push to main.
+  # A pushed branch runs through its pull request, which tests the merge result
+  # and classifies the whole PR. `branches:` alone means tag pushes (the release
+  # tags) run nothing. A branch with no PR runs only by workflow_dispatch.
   push:
+    branches: [main]
   workflow_dispatch:
 
 # Nothing in this workflow writes, and no other secret is referenced here, so
@@ -132,7 +136,7 @@ jobs:
   cv-visual:
     name: "🖼️ CV visual regression"
     # Not a required check: a red run blocks nothing here (the fork has no
-    # merge queue). It still runs on every push and PR, where a red result is
+    # merge queue). It still runs on every PR and every push to main, where a red result is
     # seen (#5723).
     needs: changes
     # Skipped for a docs-only PR too: nothing this job checks depends on what a
