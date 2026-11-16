@@ -112,14 +112,16 @@ export function runPlanner(opts: {
     const hb = setInterval(() => {
       log(`…running ${Math.round((Date.now() - t0) / 1000)}s · ${buf.length} chars received`);
     }, 4000);
-    child.stdout.on("data", (d: Buffer) => {
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => {
       if (!firstByteAt) {
         firstByteAt = Date.now();
         log(`first output byte at ${Math.round((firstByteAt - t0) / 1000)}s`);
       }
       buf += d.toString();
     });
-    child.stderr.on("data", (d: Buffer) => {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d: string) => {
       const e = d.toString().trim();
       if (e) log(`stderr: ${e.slice(0, 160).replace(/\s+/g, " ")}`);
     });

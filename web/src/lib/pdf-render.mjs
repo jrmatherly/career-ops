@@ -259,7 +259,9 @@ export function markTrackerReady({ spawnFn, execPath, coreRoot, reportNum, dataR
     });
     let stdout = "";
     let stderr = "";
+    child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d) => { stdout += d.toString(); });
+    child.stderr.setEncoding("utf8");
     child.stderr.on("data", (d) => { stderr += d.toString(); });
     child.on("close", (code) => {
       let data = null;

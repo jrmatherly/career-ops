@@ -33,8 +33,10 @@ export function runRewrite(cliId: string, prompt: string): Promise<RewriteRun> {
     }
     let out = "";
     let err = "";
-    child.stdout.on("data", (d: Buffer) => (out += d.toString()));
-    child.stderr.on("data", (d: Buffer) => (err += d.toString()));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => (out += d.toString()));
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d: string) => (err += d.toString()));
     const killer = setTimeout(() => {
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 5_000).unref();

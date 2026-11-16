@@ -88,9 +88,11 @@ function readCliHelp(binPath, args) {
     const child = spawn(binPath, args, { env: { ...process.env, NO_COLOR: "1" }, windowsHide: true });
     child.stdin?.end();
 
+    child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       stdout = appendBounded(stdout, chunk);
     });
+    child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       stderr = appendBounded(stderr, chunk);
     });

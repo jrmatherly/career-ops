@@ -155,6 +155,7 @@ test("PDF render pins the child to the external data folder", async () => {
     const child = new EventEmitter();
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
+    child.stdout.setEncoding = () => {};
     child.stderr.setEncoding = () => {};
     queueMicrotask(() => {
       if (String(args[0]).endsWith("generate-pdf.mjs")) fs.writeFileSync(args[2], "%PDF-1.4\n");

@@ -27,6 +27,7 @@ function fakeChild({ stdout = "", stderr = "", exitCode = 0, spawnError = null, 
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
+  child.stdout.setEncoding = () => {}; child.stderr.setEncoding = () => {};
   let stdinBuf = "";
   child.stdin = {
     write(chunk) {

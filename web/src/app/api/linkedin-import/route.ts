@@ -40,10 +40,12 @@ function runImport(text: string): Promise<ImportPayload> {
     });
     let out = "";
     let err = "";
-    child.stdout.on("data", (chunk: Buffer) => {
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
       out += chunk.toString();
     });
-    child.stderr.on("data", (chunk: Buffer) => {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
       err += chunk.toString();
     });
     const killer = setTimeout(() => child.kill("SIGTERM"), 30_000);

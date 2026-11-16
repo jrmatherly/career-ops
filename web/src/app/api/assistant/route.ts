@@ -189,7 +189,8 @@ export async function POST(req: Request) {
 `);
       if (substitution) safeEnqueue(`⚠️ ${substitution}\n\n`);
 
-      child.stdout.on("data", (d: Buffer) => {
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (d: string) => {
         if (closed) return;
         if (!isClaude) {
           emit(d.toString());
@@ -213,7 +214,8 @@ export async function POST(req: Request) {
           }
         }
       });
-      child.stderr.on("data", (d: Buffer) => {
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (d: string) => {
         const s = d.toString();
         if (/error|not found|denied|fatal/i.test(s)) {
           safeEnqueue(`\n[${spec.name}] ${s.trim()}\n`);

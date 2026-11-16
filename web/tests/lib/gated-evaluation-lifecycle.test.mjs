@@ -37,6 +37,7 @@ async function replay(text, { cleanExit = true, sawError = false, noOutputMessag
     calls.push(basename(args[0]));
     const child = new EventEmitter();
     child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+    child.stdout.setEncoding = () => {}; child.stderr.setEncoding = () => {};
     child.stdin = { write() {}, end() {} };
     queueMicrotask(() => {
       if (calls.at(-1) === "reserve-report-num.mjs" && args.length === 1) child.stdout.emit("data", "001\n");

@@ -114,7 +114,8 @@ function plannerTurn(binPath: string, prompt: string, resumeId: string | null): 
       { cliId: "claude", capabilities: CAPS.localReadOnly },
     );
     let buf = "";
-    child.stdout.on("data", (d: Buffer) => (buf += d.toString()));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => (buf += d.toString()));
     child.stderr.on("data", () => {});
     const killer = setTimeout(() => {
       try {
