@@ -15,6 +15,13 @@ const stateRemote = [
   'New Jersey - Remote', 'Remote - New Mexico', 'Remote; Orem, UT', 'Remote - Philadelphia, PA', 'Bedford, NH/Remote',
   'Lehi, Utah, Open to Remote', 'Berkeley Heights, New Jersey · Remote, Arizona', 'Remote-MO · Remote-FL · Remote-CA',
   'New York - New York · Virginia - Washington DC Metro - Remote · Georgia - Springfield Metro - Remote',
+  'Remote, District of Columbia', 'DISTRICT OF COLUMBIA - VIRTUAL - DC01', 'Remote, DC',
+  // A bar or a spaced slash separates places as a middle dot does, so the Canada-or-California "CA" of one place does not refuse the next.
+  'Remote-Friendly (Travel-Required) | San Francisco, CA | Seattle, WA', 'Remote / Livingston, NJ / Sunnyvale, CA / Bellevue, WA', 'Remote | AUSTIN, TX',
+  // CA, CO, DE, IL and IN are states in a place that names another state.
+  'Remote; Colorado Springs, CO', 'Remote - Kansas City, MO or Denver, CO',
+  // Between states "and" is the word, not Andorra's three-letter code.
+  'Remote (California, Washington, and Oregon Only)',
 ];
 for (const location of stateRemote) {
   test(`${location} is remote in the United States`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
@@ -23,6 +30,11 @@ for (const location of stateRemote) {
 test('a state confirms a posting whose title carries the remote marker', () => {
   assert.deepEqual(us('TEXAS - SITE - TX01', 'Platform Lead (Remote)'), REMOTE_OK);
 });
+// The country reader stops at "us:" and at "u.s.a" without its last dot.
+for (const location of ['Remote - US: Select locations', 'Remote - US: All locations', 'US:Remote', 'Remote - Frequent Travel Required · U.S.A']) {
+  test(`${location} names the United States`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
+  test(`${location} is not eligible under a policy without the United States`, () => assert.equal(es(location, 'Platform Lead').eligible, false));
+}
 test('Georgia is the state where its own code stands in the same place', () => {
   assert.deepEqual(us('GEORGIA - VIRTUAL - GA01', 'Platform Lead'), REMOTE_OK);
   assert.equal(es('GEORGIA - VIRTUAL - GA01', 'Platform Lead (Remote)').eligible, false);
@@ -76,9 +88,14 @@ test('a number with one word after it is not a street address', () => {
   assert.deepEqual(dublin('1 Main St Dublin, OH, IE', 'Platform Lead'), { eligible: false, reason: 'onsite_country_restricted' });
 });
 
-// A state code beside a city is read the same way, so a foreign city whose region shares a state's letters is admitted too.
-for (const location of ['Remote - Austin, TX', 'Remote - Perth, WA', 'Remote - Milano, MI']) {
-  test(`${location} is read as a US state`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
+test('Remote - Austin, TX is read as a US state', () => assert.deepEqual(us('Remote - Austin, TX', 'Platform Lead'), REMOTE_OK));
+// Accepted limit, not wanted behaviour: these are foreign and are admitted. The gate knows no cities, so a foreign
+// region or country code that shares a state's letters reads as the state when no country is written
+// (Western Australia, Milano, Tunisia, Morocco, Indonesia, Gabon, Tamil Nadu, Albania, Bogota's Distrito Capital).
+// A wrong drop is never reconsidered and a wrong admit is only evaluated, so the gate admits. A fix that refuses
+// any of these without dropping a US posting is an improvement: move it to stillRefused.
+for (const location of ['Remote - Perth, WA', 'Remote - Milano, MI', 'Remote - Tunis, TN', 'Remote - Rabat, MA', 'Remote - Jakarta, ID', 'Remote - Libreville, GA', 'Remote - Lagos, LA', 'Remote - Chennai, TN', 'Remote, AL', 'Remote - Bogota, DC', 'Remote | Perth, WA | Sydney, Australia']) {
+  test(`accepted limit: ${location} is foreign and is admitted as a US state`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
 }
 test('a capital state code anywhere in an office posting is not a country', () => {
   const dublin = buildWorkplacePolicy({ onsite_locations: ['Dublin'], remote_countries: ['United States'] });
@@ -92,6 +109,8 @@ const stillRefused = [
   'Work At Home-Georgia', 'Remote - Tbilisi, Georgia', 'Remote - Vancouver, BC, CA', 'Remote - Chennai, TN, India', 'Remote - Montana, Bulgaria',
   'Remote, tn', 'Remote (OK to work anywhere)', 'London or Remote', 'LONDON OR REMOTE', 'Remote - Newcastle, NE1 4ST', 'Canada - Remote (ON, AB, BC, or NS Only)',
   'Remote, BR', 'Remote PH', 'Poland · Georgia · Bulgaria · Remote', 'Remote', 'Nationwide Remote',
+  'Remote-Friendly (Travel Required) | San Francisco, CA', 'Remote | Toronto, CA | Vancouver, BC', 'Chicago, IL; Remote', 'Remote / Bogota, CO',
+  'Remote - CA: Toronto', 'Remote - Perth, WA, Australia | Remote', 'Remote - Berlin, DE | Remote - Paris, FR', 'Remote - U.S.A.F. Academy', 'Remote - Texas and Mexico', 'Remote, AND',
 ];
 for (const location of stillRefused) {
   test(`${location} is still not confirmed as remote in the United States`, () => assert.equal(us(location, 'Platform Lead').eligible, false));
@@ -108,4 +127,11 @@ for (const location of ['Perth, WA', 'Berlin, DE', 'Tbilisi, Georgia', 'Vancouve
 test('a foreign country in the same place outranks the state beside it', () => {
   assert.deepEqual(us('Remote - Florianopolis, SC, Brazil', 'Platform Lead'), { eligible: false, reason: 'remote_country_restricted' });
   assert.deepEqual(us('Atlanta, Canada · Remote', 'Platform Lead'), { eligible: false, reason: 'remote_country_restricted' });
+});
+test('the onsite countries turn on the home-place rules, the remote countries the state-named remote role', () => {
+  const mixed = buildWorkplacePolicy({ onsite_locations: ['Atlanta'], onsite_countries: ['United States'], remote_countries: ['Spain'] });
+  assert.deepEqual(mixed('Atlanta or Remote', 'Platform Lead'), ONSITE_OK);
+  assert.deepEqual(mixed('200 Example Parkway SE Suite 900 Atlanta, GA 30339', 'Platform Lead'), ONSITE_OK);
+  assert.equal(mixed('Remote, TN', 'Platform Lead').eligible, false);
+  assert.deepEqual(mixed('Work at Home - Texas', 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
 });

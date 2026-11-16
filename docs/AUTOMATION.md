@@ -309,8 +309,12 @@ and leave both empty to evaluate every location.
   title from the row's scan history. A posting that says only "Remote", one
   with no location, and one in another city are all held. When **Remote
   from** includes the United States, a remote posting that names a US state
-  is admitted (`Remote, TN`, `Remote - Texas`), except by a code that is also
-  a country's (`Remote - CO`): that one needs the country.
+  is admitted (`Remote, TN`, `Remote - Texas`). Five state codes that boards
+  also write for a country are the exception (`CA`, `CO`, `DE`, `IL` and
+  `IN`): `Remote - CO` needs the country or another state beside it. So does
+  `Remote, Georgia`, which is read as the country unless `GA` is written
+  with it. Other codes that a country shares (`TN`, `AR`, `PA`, `GA`) are
+  read as the state.
 - **A held row is not dropped.** It stays in the Inbox with its rank and a
   **Held: location** badge, and the ledger records it as `skipped` with the
   reason `held-location`. Evaluate it from the Inbox when you want it.
