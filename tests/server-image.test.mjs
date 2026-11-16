@@ -71,6 +71,6 @@ check(steps.find((step) => /build and push/i.test(step.name ?? ''))?.with?.push 
   'docker-image.yml pushes only outside pull requests');
 check(triggers.push && !('paths' in triggers.push) && !('paths-ignore' in triggers.push),
   'docker-image.yml builds every push with no path filter');
-const PR_PATHS = ['Dockerfile', 'deploy/**', '.dockerignore', '.hadolint.yaml', 'package.json', 'web/package.json', 'web/package-lock.json', 'tests/cv-visual/Dockerfile', '.github/workflows/docker-image.yml'];
+const PR_PATHS = ['Dockerfile', 'deploy/**', 'publish/**', '.dockerignore', '.hadolint.yaml', 'package.json', 'web/package.json', 'web/package-lock.json', 'tests/cv-visual/Dockerfile', '.github/workflows/docker-image.yml'];
 check(JSON.stringify([...(triggers.pull_request?.paths ?? [])].sort()) === JSON.stringify([...PR_PATHS].sort()),
   'docker-image.yml builds pull requests that touch any image input');

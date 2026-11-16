@@ -14,8 +14,6 @@ name: "🐳 Docker images"
 # whole checkout, so any commit changes it. The other three rebuild from the
 # layer cache when their inputs did not change.
 # On a pull request that touches image inputs the images build without pushing.
-# publish/ is not in that list yet, so a pull request that changes only the
-# publish service does not build its image; the push to main does.
 #
 # Tags: `latest` on main, `sha-<short>` on every build, and on a fork release tag
 # (`career-ops-vX.Y.Z`, cut by release.yml) both the tag itself and the bare `X.Y.Z`.
@@ -30,6 +28,7 @@ on:
     paths:
       - Dockerfile
       - 'deploy/**'
+      - 'publish/**'
       - .dockerignore
       - .hadolint.yaml
       - package.json
