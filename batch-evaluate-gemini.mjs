@@ -22,7 +22,7 @@ import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS } fr
 import { isClosureEvidence } from './liveness-core.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
-import { replaceUserFile } from './tracker-utils.mjs';
+import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
@@ -547,7 +547,7 @@ ${withJdArchiveSection(evaluationText.replace(/---SCORE_SUMMARY---[\s\S]*?---END
     ];
     // Header row first: merge-tracker resolves the fields by name, so this row
     // cannot be ingested into the wrong columns (#3517).
-    writeFileSync(trackerPath, `${TSV_ADDITION_HEADER}\n${trackerFields.join('\t')}\n`, 'utf-8');
+    writeFileAtomic(trackerPath, `${TSV_ADDITION_HEADER}\n${trackerFields.join('\t')}\n`);
 
     console.log(`✅ Success: ${company} - ${role} | Score: ${score}/5 | Saved as ${filename}`);
     

@@ -492,6 +492,7 @@ Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `doc
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
 | `mergeTracker`'s `existingApps` loop pushes every row `parseAppLine` returns | `merge-tracker.mjs`: the loop also requires `parseTrackerRow(line, COLMAP)`, so a row short of the header is left out of duplicate matching with a `Row #N is short of the header` warning and no addition rewrites it shifted | landed 2026-11-16 | ADAPT. Our hunks are the `parseTrackerRow` import and the gate in the `existingApps` loop; `parseAppLine` and `--backfill-urls` stay upstream's, and an upstream hunk elsewhere in the file is ADOPT. Pinned by `tests/merge-tracker-short-row.test.mjs`. |
+| `gemini-eval.mjs`, `ollama-eval.mjs`, `openai-eval.mjs` and `batch-evaluate-gemini.mjs` write the tracker addition with `writeFileSync`; the `writeFile` helper in `openrouter-runner.mjs` uses `fs.writeFileSync` | `gemini-eval.mjs`, `ollama-eval.mjs`, `openai-eval.mjs`, `batch-evaluate-gemini.mjs` and `openrouter-runner.mjs` write through `writeFileAtomic` from `tracker-utils.mjs` (temp file plus rename), so a merge never reads a half-written addition | landed 2026-11-16 | ADAPT. Our hunks are the one write call per file and the added `tracker-utils.mjs` import; an upstream hunk elsewhere in these files is ADOPT. Pinned by `tests/tracker-addition-atomic-write.test.mjs`. |
 
 ## Decision log template
 

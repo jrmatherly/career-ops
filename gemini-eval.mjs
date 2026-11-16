@@ -84,6 +84,7 @@ import { getCareerOpsRoot, getProfilePath, resolveTrackerPath } from './path-res
 import { localToday } from './lib/local-today.mjs';
 import { withJdArchiveSection } from './lib/jd-archive-section.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
+import { writeFileAtomic } from './tracker-utils.mjs';
 import { assertGoogleRequestAllowed } from './lib/llm-outbound.mjs';
 import { installPiiInterceptor } from './lib/pii-interceptor.mjs';
 
@@ -653,7 +654,7 @@ ${withJdArchiveSection(evaluationText.replace(/---SCORE_SUMMARY---[\s\S]*?---END
       if (postingUrl) trackerFields.push(tsvSafe(postingUrl));
       // Header row first: merge-tracker resolves the fields by name, so this
       // row cannot be ingested into the wrong columns (#3517).
-      writeFileSync(trackerPath, `${trackerHeader}\n${trackerFields.join('\t')}\n`, 'utf-8');
+      writeFileAtomic(trackerPath, `${trackerHeader}\n${trackerFields.join('\t')}\n`);
       console.log(`\n✅  Report saved: reports/${filename}`);
       console.log(`📊  Tracker addition saved: batch/tracker-additions/${num}-${companySlug}.tsv`);
       reportSaved = true;

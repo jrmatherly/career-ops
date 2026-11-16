@@ -42,6 +42,7 @@ import { withPipelineLock } from './pipeline-lock.mjs';
 import { createAdmissionGate, formatSkipCounts } from './lib/admission-gate.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
+import { writeFileAtomic } from './tracker-utils.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { withJdArchiveSection } from './lib/jd-archive-section.mjs';
 import { locateApplyReport } from './apply-scope.mjs';
@@ -365,7 +366,7 @@ function readSystemFile(relPath) {
 function writeFile(relPath, content) {
   const full = path.join(DATA_ROOT, relPath);
   fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, content, 'utf-8');
+  writeFileAtomic(full, content);
 }
 
 function fileExists(relPath) {
