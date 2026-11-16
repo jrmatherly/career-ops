@@ -41,7 +41,9 @@ These come from `.claude/rules/dev-workflow.md` and the owner's standing instruc
 
 ## Owner decisions
 
-Each default below is what the plan does unless the owner says otherwise. Change a default before its task starts.
+**Decided 2026-11-16.** The owner's outcomes and the amendments they make to tasks are in [`decisions.md`](../research/2026-11-16-project-audit/decisions.md). Where that file differs from the table below or from a task's text, it wins: DOCS-1 is replaced by a docs edit (D2), DOCS-5 is dropped (D3), TEST-4 keeps `tests/set-status-lock-scope.test.mjs` (D9), and CORE-3, WEB-3, WEB-8, SEC-6b, TEST-2 and CI-7 are amended. The release is career-ops 2.6.1.
+
+The table records the defaults as first written.
 
 | # | Decision | Default in this plan | The other choice |
 | --- | --- | --- | --- |
