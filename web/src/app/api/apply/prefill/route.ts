@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     /* ignore */
   }
 
+  const abort = new AbortController();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (obj: unknown) => {
@@ -110,7 +111,9 @@ export async function POST(req: Request) {
         cwd: careerOpsRoot(),
         t0,
         log,
+        signal: abort.signal,
       });
+      if (abort.signal.aborted) return;
 
       // Fencing refused to start the planner (#2507): runPlanner already logged
       // the reason; report it as THE error, before the empty-output branch below
@@ -137,6 +140,7 @@ export async function POST(req: Request) {
       emit({ t: "done", answers: obj, truncated, count });
       controller.close();
     },
+    cancel() { abort.abort(); },
   });
 
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });

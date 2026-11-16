@@ -96,7 +96,7 @@ async function snapshot(frame: Frame): Promise<{ text: string; actionable: Set<s
 const PLANNER_DENIED = [scopeFrom("").disallowed, "Read", "Glob", "Grep"].join(",");
 
 /** One planner turn (Claude-first: --resume keeps the loop's context cheaply). */
-function plannerTurn(binPath: string, prompt: string, resumeId: string | null): Promise<{ out: string; sessionId: string | null }> {
+function plannerTurn(binPath: string, prompt: string, resumeId: string | null, signal?: AbortSignal): Promise<{ out: string; sessionId: string | null }> {
   const base = resumeId ? ["-p", "--resume", resumeId, prompt] : ["-p", prompt];
   const args = [...base, "--output-format", "json", "--strict-mcp-config", "--disallowedTools", PLANNER_DENIED];
   return new Promise((resolve) => {
@@ -110,7 +110,7 @@ function plannerTurn(binPath: string, prompt: string, resumeId: string | null): 
     const child = spawnHeadlessCli(
       binPath,
       args,
-      { cwd: careerOpsRoot(), env: process.env },
+      { cwd: careerOpsRoot(), env: process.env, signal },
       { cliId: "claude", capabilities: CAPS.localReadOnly },
     );
     let buf = "";
@@ -167,6 +167,7 @@ export async function driveSession(
   emit: (s: DriveStep) => void,
   budget = 10,
   answers?: { label: string; value: string }[],
+  signal?: AbortSignal,
 ): Promise<DriveResult> {
   const resolved = resolveCli(cliId);
   const steps: DriveStep[] = [];
@@ -191,6 +192,7 @@ ${answersBlock || "(no answers provided — just reach/observe)"}`;
 
   const stopVerb = goal === "reach" ? '{"action":"reached_form"}            STOP — the fillable application form is now visible' : '{"action":"done"}                    STOP — every answer is filled (you NEVER submit; the human does)';
   for (let turn = 1; turn <= budget; turn++) {
+    if (signal?.aborted) return { reached: false, turns: turn - 1, reason: "stopped", steps };
     if (goal === "reach" && (await isFormReady().catch(() => false))) return { reached: true, turns: turn - 1, reason: "form-reached", steps };
     await dropNewTabs(page); // any "Apply" link/popup navigates in OUR tab, not a new one
     const frame = page.mainFrame();
@@ -217,7 +219,7 @@ ${snap.text}
 
 Reply ONE action JSON.`;
 
-    const { out, sessionId } = await plannerTurn(resolved.binPath, prompt, resumeId);
+    const { out, sessionId } = await plannerTurn(resolved.binPath, prompt, resumeId, signal);
     if (sessionId) resumeId = sessionId;
     const act = parseAction(out);
     if (!act) {

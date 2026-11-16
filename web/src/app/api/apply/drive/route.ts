@@ -25,6 +25,7 @@ export async function POST(req: Request) {
   if (!s) return Response.json({ error: "apply session not found (it may have expired)" }, { status: 404 });
 
   const encoder = new TextEncoder();
+  const abort = new AbortController();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (o: unknown) => {
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
           }
         };
         const budget = goal === "full" ? 16 : 7;
-        const result = await driveSession(page, cliId, goal, isFormReady, (step) => emit({ t: "step", ...step }), budget, answers);
+        const result = await driveSession(page, cliId, goal, isFormReady, (step) => emit({ t: "step", ...step }), budget, answers, abort.signal);
 
         if (goal === "full") {
           // Open the window only when required screening answers have values and a claimed résumé file landed.
@@ -139,9 +140,10 @@ export async function POST(req: Request) {
       } catch (e) {
         emit({ t: "error", message: e instanceof Error ? e.message.slice(0, 160) : "drive failed" });
       } finally {
-        controller.close();
+        try { controller.close(); } catch { /* cancelled */ }
       }
     },
+    cancel() { abort.abort(); },
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
 }
