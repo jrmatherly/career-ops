@@ -2211,8 +2211,8 @@ try {
             return { status: () => 200 };
           },
           url: () => landedUrl,
-          async waitForTimeout() { throw new Error(STOP); },
-          async title() { return ''; },
+          async waitForTimeout() {},
+          async title() { throw new Error(STOP); },
           async $eval() { return ''; },
         };
       },

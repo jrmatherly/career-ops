@@ -9,6 +9,8 @@ const root = mkdtempSync(join(tmpdir(), 'career-ops-capture-collision-'));
 const previousRoot = process.env.CAREER_OPS_ROOT;
 process.env.CAREER_OPS_ROOT = root;
 const { archiveUrl } = await import('../archive-posting.mjs?archive-posting-collision');
+// archiveUrl resolves the landed URL; these fixtures stay off the network.
+(await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
 function browser() {
   return { async newContext() {
     let url;

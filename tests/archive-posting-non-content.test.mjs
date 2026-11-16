@@ -31,6 +31,8 @@ const tmp = mkdtempSync(join(tmpdir(), 'career-ops-archive-nc-'));
 process.env.CAREER_OPS_ROOT = tmp;
 
 const { archiveUrl } = await import('../archive-posting.mjs');
+// archiveUrl resolves the landed URL; these fixtures stay off the network.
+(await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
 
 function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Backend Engineer', httpStatus = 200, evaluateRejects = false }) {
   let pdfCalled = false;

@@ -24,6 +24,9 @@ console.log('\nbrowser-extract.mjs — a Cloudflare challenge page is not a JD')
 const dir = mkdtempSync(join(tmpdir(), 'browser-extract-challenge-'));
 const fake = join(dir, 'fake-playwright.mjs');
 writeFileSync(fake, `
+import { setHostResolver } from ${JSON.stringify(pathToFileURL(join(ROOT, 'liveness-browser.mjs')).href)};
+// browser-extract resolves the landed URL; keep that lookup off the network.
+setHostResolver(async () => ['93.184.216.34']);
 const page = JSON.parse(process.env.FAKE_PAGE);
 const tab = {
   goto: async () => ({ status: () => page.status }),

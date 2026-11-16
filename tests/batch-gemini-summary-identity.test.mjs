@@ -7,15 +7,17 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const batch = new URL('../batch-evaluate-gemini.mjs', import.meta.url).href;
+const liveness = new URL('../liveness-browser.mjs', import.meta.url).href;
 const merge = fileURLToPath(new URL('../merge-tracker.mjs', import.meta.url));
 const url = 'https://jobs.example.com/positions/42';
 const originalRow = `| 1 | 2026-11-01 | Example Corp | Platform Engineer | 3.0/5 | Applied | ❌ | — | User note | ${url} |`;
 const fixture = `
   const { processOffer, finishPipelineBatch, PATHS } = await import(${JSON.stringify(batch)});
+  (await import(${JSON.stringify(liveness)})).setHostResolver(async () => ['93.184.216.34']);
   const url = ${JSON.stringify(url)};
   const line = '- [ ] ' + url + ' | Example Corp | Platform Engineer';
   const page = {
-    url: () => url, route: async () => {}, goto: async () => {},
+    url: () => url, context: () => ({ route: async () => {} }), goto: async () => {},
     waitForTimeout: async () => {}, close: async () => {},
     evaluate: async () => 'Build reliable platforms and test production systems. '.repeat(4),
   };

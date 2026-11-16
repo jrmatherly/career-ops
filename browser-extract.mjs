@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
-import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard } from './liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
@@ -1534,18 +1534,16 @@ async function main() {
   try {
     browser = await chromium.launch(browserLaunchOptions({ headless: true }));
     const context = await browser.newContext(LIVENESS_CONTEXT_OPTIONS);
-    // Block every request (main navigation, redirect hop, or subresource) to a
-    // private/loopback/link-local or non-http(s) host. Guarding only the initial
-    // URL isn't enough once we return page CONTENT: a server-side redirect could
-    // otherwise steer the browser at internal infrastructure (SSRF).
+    // Refuses the first URL of every request (navigation, popup, subresource)
+    // that names or resolves to a private host. It never sees a redirect hop,
+    // so the landed URL is judged below before any CONTENT is read (SSRF).
     await installEgressGuard(context);
     const page = await context.newPage();
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     await page.waitForTimeout(HYDRATION_WAIT_MS); // let SPAs hydrate
 
-    // Belt-and-suspenders: never emit content read from a private final URL.
     const finalUrl = page.url();
-    const finalGuard = rejectPrivateOrInvalid(finalUrl);
+    const finalGuard = await rejectLandedUrl(finalUrl);
     if (finalGuard) {
       console.error(JSON.stringify({ error: `blocked final URL: ${finalGuard.reason}`, code: finalGuard.code }));
       process.exitCode = 1;

@@ -30,7 +30,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { captureSlug, reportPrefix } from './jd-capture.mjs';
-import { rejectPrivateOrInvalid, installEgressGuard } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
 export { installEgressGuard } from './liveness-browser.mjs';
 import { cloudflareInterstitial } from './liveness-core.mjs';
 import { validateFlags } from './lib/cli-flags.mjs';
@@ -329,17 +329,16 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     const httpStatus = response?.status() ?? 0;
 
-    // Re-check where we actually landed. The route guard already inspects every
-    // redirect hop, so this is defence-in-depth: a first-hop-only check is the
-    // classic miss here, and asserting on the settled URL costs nothing.
+    // Give SPAs (Ashby, Lever, Workday) time to hydrate
+    await page.waitForTimeout(2000);
+
+    // The route guard never sees a redirect hop, so where we landed is judged
+    // here, after the page settles and before anything is read from it.
     const landedUrl = page.url();
-    const postGuard = rejectPrivateOrInvalid(landedUrl);
+    const postGuard = await rejectLandedUrl(landedUrl);
     if (postGuard) {
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
     }
-
-    // Give SPAs (Ashby, Lever, Workday) time to hydrate
-    await page.waitForTimeout(2000);
 
     const pageTitle = await page.title();
     const h1Text = await page.$eval('h1', el => el.innerText.trim()).catch(() => '');

@@ -114,7 +114,7 @@ const LOW_FIT_SCORE = 4.0;
 import { extractSkills } from './skill-extract.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { browserLaunchOptions } from './lib/browser-launch.mjs';
-import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
 export { extractSkills };
 
 // --- Known-skills text assembly ---
@@ -866,9 +866,11 @@ if (isMain) {
           browser = await chromium.launch(browserLaunchOptions({ headless: true }));
           const page = await browser.newPage();
 
-          await installEgressGuard(page);
+          await installEgressGuard(page.context());
 
           await page.goto(secureUrl, { waitUntil: 'networkidle', timeout: 30000 });
+          const landed = await rejectLandedUrl(page.url());
+          if (landed) throw new Error(`blocked URL after redirect: ${landed.reason}`);
           targetText = await page.innerText('body');
         } catch (err) {
           console.warn('Playwright extraction failed or blocked, trying fallback WebFetch...', err.message);
@@ -879,7 +881,7 @@ if (isMain) {
             const secureUrl = inputSource;
             // validateUrlSecurity only vets the initial URL; a redirect could still
             // steer the fetch at an internal host (SSRF). The Playwright path
-            // re-validates per hop, but this plain fetch must refuse redirects
+            // judges the landed URL, but this plain fetch must refuse redirects
             // outright — fail closed rather than follow an unvetted Location (#1851).
             const res = await fetch(secureUrl, { signal: AbortSignal.timeout(30000), redirect: 'error' });
             if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);

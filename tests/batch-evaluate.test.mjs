@@ -1,5 +1,8 @@
 import { pass, fail, rmSync, ROOT } from './helpers.mjs';
 import { processPipelineBatch, processOffer, PATHS } from '../batch-evaluate-gemini.mjs';
+import { setHostResolver } from '../liveness-browser.mjs';
+// scrapeUrl resolves the landed URL; keep that lookup off the network.
+setHostResolver(async () => ['93.184.216.34']);
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -29,7 +32,7 @@ async function testProcessOffer() {
     const mockBrowser = {
       newPage: async () => ({
         url: () => 'https://example.com/job',
-        route: async () => {},
+        context: () => ({ route: async () => {} }),
         goto: async () => {},
         waitForTimeout: async () => {},
         evaluate: async () => 'Valid JD Text of sufficient length (more than 100 characters). '.repeat(5),
@@ -110,7 +113,7 @@ async function testDeadPostingOutcome() {
     PATHS.trackerAdditions = join(work, 'tracker-additions');
     const mockBrowser = {
       newPage: async () => ({
-        url: () => 'https://example.com/job', route: async () => {}, goto: async () => {},
+        url: () => 'https://example.com/job', context: () => ({ route: async () => {} }), goto: async () => {},
         waitForTimeout: async () => {},
         evaluate: async () => 'Expired job posting content. '.repeat(8),
         close: async () => {}
@@ -135,7 +138,7 @@ async function testDeadPostingOutcome() {
       newPage: async () => {
         let reads = 0;
         return {
-          url: () => 'https://example.com/job', route: async () => {},
+          url: () => 'https://example.com/job', context: () => ({ route: async () => {} }),
           goto: async () => ({ status: () => 410 }),
           waitForTimeout: async () => {},
           evaluate: async () => ++reads === 1 ? 'Job not found' : [],
@@ -168,7 +171,7 @@ async function testDeadPostingOutcome() {
       for (const verdict of ['active', 'uncertain', 'expired']) {
         let evaluated = false;
         const browser = { newPage: async () => ({
-          url: () => 'https://example.com/job', route: async () => {},
+          url: () => 'https://example.com/job', context: () => ({ route: async () => {} }),
           goto: async () => { if (scrapeFails) throw new Error('navigation failed'); },
           waitForTimeout: async () => {}, evaluate: async () => 'Job not found', close: async () => {}
         }) };
@@ -185,7 +188,7 @@ async function testDeadPostingOutcome() {
     const loadingBrowser = { newPage: async () => {
       let reads = 0;
       return {
-        url: () => 'https://example.com/job', route: async () => {},
+        url: () => 'https://example.com/job', context: () => ({ route: async () => {} }),
         goto: async () => ({ status: () => 200 }), waitForTimeout: async () => {},
         evaluate: async () => ++reads === 1 ? 'Loading...' : [], close: async () => {}
       };

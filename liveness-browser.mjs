@@ -303,10 +303,14 @@ export async function validateUrlSecurity(urlString) {
  * Register the egress guard on a Playwright context.
  *
  * Registered on the *context* rather than the page: a route bound to a single
- * page doesn't cover requests the flow makes outside it, and the context is
- * what owns the whole navigation. Both layers of the shared guard run here —
- * the literal-host check first (cheap, no network), then the DNS re-check that
- * catches a public hostname resolving into private space.
+ * page doesn't cover a popup, and the context is what owns the whole
+ * navigation. Both layers of the shared guard run here — the literal-host check
+ * first (cheap, no network), then the DNS re-check that catches a public
+ * hostname resolving into private space.
+ *
+ * Playwright calls a route handler for the first URL of a request only, never
+ * for the hops a 3xx sends it to. So this guard does not see a redirect target:
+ * every caller that reads page content must also call `rejectLandedUrl` first.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
  */
@@ -322,12 +326,34 @@ export async function installEgressGuard(context) {
 
     try {
       await validateUrlSecurity(requestUrl);
-      return route.continue();
+      return await route.continue();
     } catch (err) {
       console.warn(`   Blocked request to restricted destination (DNS): ${requestUrl} - ${err.message}`);
       return route.abort('blockedbyclient');
     }
   });
+}
+
+/**
+ * Judge the URL a navigation landed on, by literal host and then by DNS. Call it
+ * after the navigation settles and before anything is read from the page.
+ *
+ * Remaining limit: the request to a redirect hop is still SENT, blind, before
+ * this runs, and a redirected subresource is not checked at all. Closing those
+ * needs a filtering proxy or Chromium's `--host-resolver-rules`.
+ *
+ * @param {string} url - `page.url()` after the navigation.
+ * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
+ */
+export async function rejectLandedUrl(url) {
+  const literal = rejectPrivateOrInvalid(url);
+  if (literal) return literal;
+  try {
+    await validateUrlSecurity(url);
+    return null;
+  } catch (err) {
+    return { code: 'blocked_host', reason: err.message };
+  }
 }
 
 // Rediscovery can navigate a newly created page before its first liveness

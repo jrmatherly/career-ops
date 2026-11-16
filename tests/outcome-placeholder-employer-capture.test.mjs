@@ -37,6 +37,9 @@ try {
   const body = 'Platform Engineer\n\n' + 'You will run the infrastructure behind our client\'s payments platform, from provisioning to deployment. '.repeat(10);
   const fake = join(root, 'fake-playwright.mjs');
   writeFileSync(fake, `
+import { setHostResolver } from ${JSON.stringify(pathToFileURL(join(ROOT, 'liveness-browser.mjs')).href)};
+// archive-posting resolves the landed URL; keep that lookup off the network.
+setHostResolver(async () => ['93.184.216.34']);
 const page = {
   _url: null,
   async goto(url) { page._url = url; return { status: () => 200 }; },
