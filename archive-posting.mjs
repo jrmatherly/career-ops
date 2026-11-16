@@ -30,7 +30,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { captureSlug, reportPrefix } from './jd-capture.mjs';
-import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedPage } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedPage, recordLandedUrls } from './liveness-browser.mjs';
 export { installEgressGuard } from './liveness-browser.mjs';
 import { cloudflareInterstitial } from './liveness-core.mjs';
 import { validateFlags } from './lib/cli-flags.mjs';
@@ -324,6 +324,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
   const context = await browser.newContext();
   await installEgressGuard(context);
   const page = await context.newPage();
+  const rejectVisited = recordLandedUrls(page);
 
   try {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -334,7 +335,8 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
 
     // The route guard never sees a redirect hop, so where the page and its
     // frames landed is judged here, after the page settles and before anything
-    // is read from it, and again once the PDF is rendered.
+    // is read from it. Once the PDF is rendered, every address any frame
+    // committed to since the page opened is judged.
     const postGuard = await rejectLandedPage(page);
     if (postGuard) {
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
@@ -403,8 +405,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
       margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
       preferCSSPageSize: false,
     });
-    // The page or a frame can move between the first check and the render.
-    const afterRender = await rejectLandedPage(page);
+    const afterRender = await rejectVisited();
     if (afterRender) {
       throw new Error(`refusing to archive restricted destination after redirect: ${afterRender.reason}`);
     }

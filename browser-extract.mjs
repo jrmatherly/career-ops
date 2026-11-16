@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
-import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
@@ -1537,9 +1537,10 @@ async function main() {
     // Refuses the first URL of every routed request (navigation, popup,
     // subresource) that names or resolves to a private host. It never sees a
     // redirect hop, so the landed URL is judged below before any CONTENT is
-    // read, and again after the read (SSRF).
+    // read, and every URL a frame committed to is judged after the read (SSRF).
     await installEgressGuard(context);
     const page = await context.newPage();
+    const rejectVisited = recordLandedUrls(page);
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     await page.waitForTimeout(HYDRATION_WAIT_MS); // let SPAs hydrate
 
@@ -1551,7 +1552,7 @@ async function main() {
       return;
     }
     const raw = await readDom(page);
-    const afterRead = await rejectLandedUrl(page.url());
+    const afterRead = await rejectVisited();
     if (afterRead) {
       console.error(JSON.stringify({ error: `blocked final URL: ${afterRead.reason}`, code: afterRead.code }));
       process.exitCode = 1;

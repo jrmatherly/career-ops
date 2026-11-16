@@ -114,7 +114,7 @@ const LOW_FIT_SCORE = 4.0;
 import { extractSkills } from './skill-extract.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { browserLaunchOptions } from './lib/browser-launch.mjs';
-import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
 export { extractSkills };
 
 // --- Known-skills text assembly ---
@@ -867,12 +867,13 @@ if (isMain) {
           const page = await browser.newPage();
 
           await installEgressGuard(page.context());
+          const rejectVisited = recordLandedUrls(page);
 
           await page.goto(secureUrl, { waitUntil: 'networkidle', timeout: 30000 });
           const landed = await rejectLandedUrl(page.url());
           if (landed) throw new Error(`blocked URL after redirect: ${landed.reason}`);
           const bodyText = await page.innerText('body');
-          const afterRead = await rejectLandedUrl(page.url());
+          const afterRead = await rejectVisited();
           if (afterRead) throw new Error(`blocked URL after redirect: ${afterRead.reason}`);
           targetText = bodyText;
         } catch (err) {

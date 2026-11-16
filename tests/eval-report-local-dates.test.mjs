@@ -74,7 +74,7 @@ const { processOffer, PATHS } = await import(${JSON.stringify(pathToFileURL(join
 PATHS.reports = ${JSON.stringify(reportsDir)};
 PATHS.trackerAdditions = ${JSON.stringify(additionsDir)};
 const mockBrowser = { newPage: async () => ({
-  url: () => 'https://example.com/job', context: () => ({ route: async () => {} }), goto: async () => {},
+  url: () => 'https://example.com/job', context: () => ({ route: async () => {} }), on() {}, goto: async () => {},
   waitForTimeout: async () => {},
   evaluate: async () => 'Valid JD Text of sufficient length (more than 100 characters). '.repeat(5),
   close: async () => {},

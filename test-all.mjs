@@ -2212,6 +2212,7 @@ try {
           },
           url: () => landedUrl,
           frames: () => [],
+          on() {},
           async waitForTimeout() {},
           async title() { throw new Error(STOP); },
           async $eval() { return ''; },

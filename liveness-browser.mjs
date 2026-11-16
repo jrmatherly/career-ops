@@ -310,8 +310,9 @@ export async function validateUrlSecurity(urlString) {
  *
  * Playwright calls a route handler for the first URL of a request only, never
  * for the hops a 3xx sends it to. So this guard does not see a redirect target:
- * every caller that reads page content must also call `rejectLandedUrl` before
- * its first read and again after its last. WebSocket handshakes are not routed.
+ * every caller that reads page content must also call `recordLandedUrls` on a
+ * new page, `rejectLandedUrl` before its first read, and the recorder's check
+ * after its last. WebSocket handshakes are not routed.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void> }} context - Context to guard.
  */
@@ -337,14 +338,14 @@ export async function installEgressGuard(context) {
 
 /**
  * Judge the URL a page is on, by literal host and then by DNS. Call it after
- * the navigation settles and before anything is read from the page, and again
- * after the last read, discarding what was read on a refusal: a page can send
- * itself through a public 302 to a private name between the first check and
- * the read.
+ * the navigation settles and before anything is read from the page, so a page
+ * already known bad is not read. What the page and its frames do after that is
+ * judged by `recordLandedUrls`.
  *
  * Still open: the request to a redirect hop is SENT, blind, before any check
- * sees it. Redirected subresources (images, scripts, styles) are not checked.
- * DNS rebinding, WebSocket handshakes and a lookup with no timeout are not
+ * sees it. A redirected subresource (image, script, style) commits no frame
+ * navigation and is never seen. DNS rebinding between this lookup and
+ * Chromium's own, WebSocket handshakes and a lookup with no timeout are not
  * covered. Closing these needs a filtering proxy in front of Chromium that
  * resolves and connects by address.
  *
@@ -368,7 +369,7 @@ const HOSTLESS_FRAME_URL = /^$|^(?:about:blank|about:srcdoc|data:|blob:|chrome-e
 
 /**
  * `rejectLandedUrl` for a page that is read with its frames, as a PDF render
- * is: judges the page's URL and the URL of every frame in it.
+ * is: judges the page's URL and the URL every frame in it is on now.
  *
  * @param {{ url: () => string, frames: () => { url: () => string }[] }} page - Page to judge.
  * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
@@ -380,6 +381,40 @@ export async function rejectLandedPage(page) {
     if (verdict) return verdict;
   }
   return null;
+}
+
+/**
+ * Record every URL any frame of a page commits to, from now until the page
+ * closes, and the same for every popup it opens. Call it on a new page, before
+ * its first navigation. Where a frame is at one moment proves nothing: a page
+ * can point its iframe at a private name while it is read and point it back
+ * before the next look.
+ *
+ * @param {{ url: () => string, on: (event: string, listener: Function) => unknown }} page - Page to record.
+ * @returns {() => Promise<null|{code: string, reason: string}>} Call after the
+ *   last read of the page. It judges the page's URL now and every URL recorded,
+ *   and returns null only when what was read may be kept.
+ */
+export function recordLandedUrls(page) {
+  const committed = new Set();
+  const record = (url) => {
+    if (!HOSTLESS_FRAME_URL.test(url)) committed.add(url);
+  };
+  const watch = (watched) => {
+    watched.on('framenavigated', (frame) => record(frame.url()));
+    watched.on('popup', (popup) => {
+      record(popup.url());
+      watch(popup);
+    });
+  };
+  watch(page);
+  return async () => {
+    for (const url of new Set([page.url(), ...committed])) {
+      const verdict = await rejectLandedUrl(url);
+      if (verdict) return verdict;
+    }
+    return null;
+  };
 }
 
 // Rediscovery can navigate a newly created page before its first liveness

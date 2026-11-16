@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard, rejectLandedUrl } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
 import { isClosureEvidence } from './liveness-core.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
@@ -373,6 +373,7 @@ async function scrapeUrl(browser, url) {
   const page = await browser.newPage();
   try {
     await installEgressGuard(page.context());
+    const rejectVisited = recordLandedUrls(page);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000); // wait for dynamic content
@@ -386,7 +387,7 @@ async function scrapeUrl(browser, url) {
       document.querySelectorAll('script, style, noscript, iframe, svg, img').forEach(s => s.remove());
       return document.body.innerText;
     });
-    const afterRead = await rejectLandedUrl(page.url());
+    const afterRead = await rejectVisited();
     if (afterRead) {
       throw new Error(`Invalid or blocked URL after redirect: ${afterRead.reason}`);
     }
