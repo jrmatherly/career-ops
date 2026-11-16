@@ -19,7 +19,7 @@ permissions:
   packages: read
 
 # A force-push supersedes the running matrix; cancel it instead of letting
-# stale legs occupy runners (8 jobs per push at this repo's PR volume).
+# stale legs occupy runners (11 jobs per push at this repo's PR volume).
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -51,7 +51,7 @@ jobs:
   test:
     needs: changes
     # !cancelled() and not the implicit success(): a failed or skipped `changes`
-    # must still run this job (upstream requires its checks; this fork requires none).
+    # must still run this job (this fork requires no checks).
     # No `name:` on this job: tests/docs-only-change.test.mjs asserts it is unset.
     if: ${{ !cancelled() }}
     strategy:
@@ -59,7 +59,12 @@ jobs:
       # a platform-specific failure is exactly what this matrix exists to isolate.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            shard: 1/2
+          - os: windows-latest
+            shard: 2/2
     runs-on: ${{ matrix.os }}
     # Without a limit a hung job holds its runner for GitHub's default of six
     # hours. test-all.mjs kills a discovered suite that runs past its budget,
@@ -67,9 +72,8 @@ jobs:
     # own. The slowest leg (macOS) takes about 11 minutes.
     timeout-minutes: 30
     # A docs-only change (PR or push) runs the suite on Ubuntu only (#6402). The
-    # other two legs stay in the matrix and skip their steps, because upstream
-    # requires these three check names, and a job-level `if` cannot read `matrix`
-    # to skip just them.
+    # macOS leg and both Windows shards stay in the matrix and skip their steps,
+    # because a job-level `if` cannot read `matrix` to skip just them.
     # Ubuntu keeps the whole suite: about 45 test files read docs-type files, and
     # the inline sections of test-all.mjs scan every tracked file.
     env:
@@ -127,11 +131,29 @@ jobs:
         run: npm install --ignore-scripts
       - name: "🧪 Run the test suite"
         if: env.SKIP_LEG != 'true'
-        run: node test-all.mjs --quick
+        run: node test-all.mjs --quick ${{ matrix.shard && format('--shard {0}', matrix.shard) || '' }}
       - name: "🐹 Go dashboard tests"
         if: env.SKIP_LEG != 'true'
         run: go test ./...
         working-directory: dashboard
+
+  test-result:
+    name: "✅ Test legs passed"
+    # The one check to require: the leg names change with the matrix, this name
+    # does not. always(), because a failed leg would otherwise skip this job, and
+    # a skipped job counts as passing. `changes` is left out: its failure is
+    # tolerated by design.
+    needs: [test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "🧾 Fail unless every test leg passed"
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          echo "test legs: $TEST_RESULT"
+          [ "$TEST_RESULT" = success ]
 
   cv-visual:
     name: "🖼️ CV visual regression"
