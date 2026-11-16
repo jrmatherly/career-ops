@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Usage: load.sh start N | stop
+# Starts N busy-loop node processes tagged "flake-load", or stops them all.
+set -u
+case "${1:-}" in
+  start)
+    for ((i = 0; i < ${2:-12}; i++)); do
+      nohup node -e 'for(;;){}' flake-load >/dev/null 2>&1 &
+    done
+    sleep 1
+    echo "load procs: $(pgrep -f 'flake-load' | wc -l | tr -d ' ')"
+    ;;
+  stop)
+    pkill -f 'flake-load'
+    sleep 1
+    echo "left: $(pgrep -f 'flake-load' | wc -l | tr -d ' ')"
+    ;;
+  *) echo "usage: load.sh start N | stop" >&2; exit 2 ;;
+esac

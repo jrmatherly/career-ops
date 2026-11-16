@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Usage: html-to-text-parallel.sh <repo-root> <copies> <rounds>
+# Runs <copies> of html-to-text-wall-vs-cpu.mjs at once, the way test-all.mjs
+# runs suites side by side, and prints each copy's counts.
+root=${1:?root}; copies=${2:-8}; rounds=${3:-2}
+here=$(cd "$(dirname "$0")" && pwd)
+for ((i = 0; i < copies; i++)); do
+  node "$here/html-to-text-wall-vs-cpu.mjs" "$root" "$rounds" &
+done
+wait

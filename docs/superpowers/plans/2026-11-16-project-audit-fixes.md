@@ -17,6 +17,7 @@ Seven independent reviewers checked the first draft on 2026-11-16. Six of them w
 - No browser suite ran. WEB-4 and TEST-4 add browser tests that were syntax-checked and not executed. Each task's Step 4 is that first run.
 - No workflow ran. The workflow tasks (CI-1, CI-3, CI-4, TEST-2, TEST-6) were parsed, linted with `actionlint` where noted, and reasoned through. GitHub evaluates them for the first time on the pull request.
 - The SEC-6a canary was never run against a real agent.
+- TEST-8 and TEST-9 were added after that pass, from a separate investigation of three suites that flaked. TEST-8's crash was reproduced twice, by the investigator and again independently, and its fix was measured. TEST-9's one failure was not reproduced.
 - Line numbers are from `2edd1b33`. Where a task edits a file that an earlier task changed, it locates the edit by symbol or by quoted text.
 
 ## Global Constraints
@@ -89,7 +90,7 @@ Not measured: how long 41 tasks take to execute, and whether reviewers catch as 
 | 1. Tracker and pipeline data | CORE-1, CORE-2, CORE-3, CORE-4, CORE-5, CORE-6, TEST-1 | The user's tracker, journal and pipeline |
 | 2. Web app | WEB-1, WEB-2, WEB-3, WEB-4, WEB-5, WEB-6, WEB-7, WEB-8, WEB-9 | Runs, sessions and screens |
 | 3. Security | SEC-1, SEC-2, SEC-3, SEC-4, SEC-5, SEC-6b | Outbound requests, rendered HTML, the agent's environment |
-| 4. Tests and tooling | CI-2, TEST-3, TEST-4, TEST-5, TEST-7 | Test trust and the session-start warning |
+| 4. Tests and tooling | CI-2, TEST-3, TEST-4, TEST-5, TEST-7, TEST-8, TEST-9 | Test trust, the session-start warning, and a batch-runner crash that made the suite flake |
 | 5. Docs and rules | DOCS-1, DOCS-2, DOCS-3, DOCS-4 | The updater and the developer rules |
 | 6. Workflows and images | CI-1, CI-3, CI-4, CI-6, TEST-2, TEST-6 | Runner time and what CI builds |
 | 7. Optional | DOCS-5 | Discovery coverage |
@@ -3069,6 +3070,228 @@ git add tests/providers/jazzhr.test.mjs tests/providers/neogov.test.mjs .claude/
 git commit -m "test(providers): assert the expected error in the JazzHR and NEOGOV rejection cases"
 ```
 
+### Task TEST-8: batch-runner sets LC_ALL for awk through env, so a subshell cannot crash bash
+
+**Finding.** Two of the three suites that flake under load fail on one cause, so this one task fixes both.
+- `tests/split-root.test.mjs:324` fails with `batch-runner exited 139`. The runner's output ends at `=== Batch Summary ===`, before the `Total:` line.
+- `tests/batch-dealbreaker-skip.test.mjs:226` fails with `Command failed: bash <tmp>/career-dealbreaker-batch-XXXX/summary.sh`. That script is `print_summary()` copied out of the runner.
+
+Both die in `print_summary()` (`batch/batch-runner.sh:2140-2195`). Its loop runs `score_sum=$(LC_ALL=C awk ... 2>/dev/null || echo "$score_sum")` at `:2159` for each completed row. The `|| echo` absorbs any awk failure, so a 139 can only come from the bash subshell of the command substitution. A `LC_ALL=C` prefix on a command makes bash reset its own locale when that command ends. Homebrew's bash 5.3.20 links gettext's `libintl.8.dylib` and CoreFoundation (`otool -L /opt/homebrew/bin/bash`). When `LANG` and every `LC_*` variable are unset, `libintl_setlocale` asks CoreFoundation for the user's preferred languages. CoreFoundation is not safe in a forked child that has not called exec. Now and then the forked subshell segfaults there, and `set -euo pipefail` turns the dead substitution into exit 139. Load widens the window.
+
+The machine's own crash reports show the path. `~/Library/Logs/DiagnosticReports/bash-*.ips` from 2026-11-09 to 2026-11-16 hold Homebrew bash processes killed by SIGSEGV in `command_substitute`, then `sv_locale`, `reset_locale_vars`, `libintl_setlocale`, `CFLocaleCopyPreferredLanguages` and `_os_log_preferences_refresh`. Those reports came from other scripts, which reset the locale after a function call. The runs below wrote no new report. The likely reason is the system's limit on reports per process, which was not checked.
+
+This is a product bug, and the tests stay as strict as they are. Claude Code's Bash tool starts commands with `LANG` and `LC_*` empty, which is how the suites flake here. An agent that runs `batch/batch-runner.sh` the same way on macOS with Homebrew bash first on `PATH` gets the same crash. After a finished batch the summary dies and the run exits 139. Under `--parallel` the min-score gate at `:2051` and `:2054` runs inside each worker's `&` subshell. A crash there makes `main` skip the tracker merge (`:2586-2588`). `/bin/bash` 3.2 does not link CoreFoundation and does not crash, and neither does Homebrew bash with `LANG` set.
+
+Measured on 2026-11-16 on an Apple-silicon Mac with 12 cores and `/opt/homebrew/bin/bash` 5.3.20, with `LANG` and `LC_*` unset. The load was 16 background busy loops from `load.sh.txt` plus the machine's other work, at load average 33 to 70. Before is the base commit, after is this task's change.
+
+| Run | Before | After |
+| --- | --- | --- |
+| `print-summary-crash.mjs.txt`, 300 runs of the runner's own `print_summary()` | 19 exit 139 | 0 |
+| `bash-locale-subshell.sh.txt`, 300 fresh shells each, `x=$(LC_ALL=C awk ...)` shape | 20 failed (`prefix`) | 0 (`env`) |
+| the same, the min-score gate inside a `&` worker | 21 failed (`bg`) | 0 (`bg-env`) |
+| `tests/split-root.test.mjs`, `node --test` | 6 of 20 failed | 0 of 20 |
+| `tests/batch-dealbreaker-skip.test.mjs`, `node test-all.mjs --only batch-dealbreaker-skip` | 3 of 60 failed | 0 of 60 |
+
+Controls from the same script, 300 shells each, all 0 failed: no `LC_ALL` prefix (`plain`), the `prefix` shape with `LANG=en_US.UTF-8`, and the `prefix` shape under `/bin/bash` 3.2.57.
+
+The fix runs all seven `LC_ALL=C awk` calls as `env LC_ALL=C awk`. `env` puts `LC_ALL=C` in awk's environment only, so bash never touches its own locale. awk sees the same environment as before, and the comma-locale half of `tests/batch-runner-score-locale.test.mjs` still prints `4.5`. Three other fixes were rejected. Setting `LANG` in the tests hides a bug users can hit. A retry wraps a real crash. An `export LC_ALL=C` at the top of the runner changes the locale of every worker CLI and node child.
+
+The test is a source check. A crash that needs load and an unset `LANG` cannot be a deterministic behaviour test, so the static half of the existing locale suite grows one check, and the repro scripts carry the behaviour proof.
+
+**Files:**
+- Modify: `batch/batch-runner.sh:1088`, `:2051`, `:2054`, `:2159`, `:2186`, `:2225`, `:2245` (`LC_ALL=C awk` becomes `env LC_ALL=C awk`), and the comment above `:2054`
+- Modify: `tests/batch-runner-score-locale.test.mjs` (one new check after the static half)
+- Modify: `.claude/skills/upstream-review/SKILL.md` (row below)
+
+**Interfaces:**
+- Consumes: None
+- Produces: None. `print_summary`, `print_status_table`, `process_offer` and `rate_limit_delay` keep their output.
+
+- [ ] **Step 1: Add the failing check**
+
+In `tests/batch-runner-score-locale.test.mjs`, insert this block after the static half's closing `}` and before `// --- behavioural half`:
+
+```js
+// A bare `LC_ALL=C cmd` prefix makes bash reset its own locale when cmd ends.
+// With no LANG set, Homebrew bash on macOS asks CoreFoundation for the locale
+// there, which is not fork-safe: in a $(...) or & subshell it segfaults now and
+// then, and set -e turns that into exit 139.
+const shellPrefixed = SRC.split('\n').filter((line) => /(^|[\s;&|(])LC_ALL=/.test(line) && !/\benv LC_ALL=/.test(line) && !/^\s*#/.test(line));
+if (shellPrefixed.length === 0) {
+  pass('every LC_ALL=C in batch-runner.sh goes through env, not a shell prefix');
+} else {
+  fail(`${shellPrefixed.length} line(s) set LC_ALL as a shell prefix; use env LC_ALL=C:\n  ${shellPrefixed.map((l) => l.trim()).join('\n  ')}`);
+}
+```
+
+- [ ] **Step 2: See the check fail, and see the crash**
+
+Run: `node test-all.mjs --only batch-runner-score-locale`
+Expected: FAIL.
+
+```
+  ✅ all 6 numeric awk calls run under LC_ALL=C
+  ✅ no numeric awk call relies on LC_NUMERIC, which an exported LC_ALL would override
+  ❌ 7 line(s) set LC_ALL as a shell prefix; use env LC_ALL=C:
+  [[ -e "$log_file" && ! -s "$log_file" ]] || hint=$(LC_ALL=C awk -v cap="$RATE_LIMIT_SLEEP" '
+  if is_decimal_number "$score" && LC_ALL=C awk -v min="$MIN_SCORE" 'BEGIN{exit !(min > 0)}'; then
+  if LC_ALL=C awk -v score="$score" -v min="$MIN_SCORE" 'BEGIN{exit !(score < min)}'; then
+  score_sum=$(LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
+  avg=$(LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
+  score_sum=$(LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
+  avg=$(LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
+  ✅ --status prints a dot decimal under de_DE.UTF-8
+📊 Results: 3 passed, 1 failed, 0 warnings
+```
+
+On a Mac with Homebrew bash first on `PATH`, also see the crash itself. The repro scripts live in `docs/superpowers/research/2026-11-16-project-audit/repro/tests/`. Copy each to `$TMPDIR` without its `.txt` suffix, start the load, run the repro with the locale unset, and stop the load:
+
+```bash
+R=docs/superpowers/research/2026-11-16-project-audit/repro/tests
+for f in load.sh print-summary-crash.mjs bash-locale-subshell.sh; do cp "$R/$f.txt" "$TMPDIR/$f"; done
+chmod +x "$TMPDIR/load.sh" "$TMPDIR/bash-locale-subshell.sh"
+"$TMPDIR/load.sh" start 16
+env -u LANG -u LC_ALL -u LC_CTYPE -u LC_MESSAGES -u LC_NUMERIC node "$TMPDIR/print-summary-crash.mjs" "$PWD" 300
+env -u LANG -u LC_ALL -u LC_CTYPE -u LC_MESSAGES -u LC_NUMERIC "$TMPDIR/bash-locale-subshell.sh" 300 prefix
+"$TMPDIR/load.sh" stop
+```
+
+Expected, at load average 35 to 50 (the counts vary with load):
+
+```
+first exit 139 (run 17); stdout:
+
+=== Batch Summary ===
+stderr:
+
+{"bash":"/opt/homebrew/bin/bash 5.3.20(1)-release","LANG":null,"runs":300,"outcomes":{"exit 0":281,"exit 139":19}}
+shell=5.3.20(1)-release LANG=<unset> variant=prefix runs=300 failed=20 load=45.68 32.84 24.42
+```
+
+`load.sh stop` must print `left: 0`. On Linux, on `/bin/bash` or with `LANG` set, the crash count is 0, and the static check above is the gate.
+
+- [ ] **Step 3: Run every LC_ALL=C awk through env**
+
+In `batch/batch-runner.sh`, replace each of the seven `LC_ALL=C awk` at `:1088`, `:2051`, `:2054`, `:2159`, `:2186`, `:2225` and `:2245` with `env LC_ALL=C awk`. Change nothing else on those lines. Then extend the comment above `:2054` so it reads:
+
+```bash
+      # LC_ALL=C: under a non-English locale awk parses "4.5" as 4, so the
+      # MIN_SCORE comparison would silently run on truncated integers.
+      # Every LC_ALL=C goes through `env`: as a shell prefix it makes bash reset
+      # its own locale, and with no LANG set Homebrew bash on macOS can crash
+      # doing that in a forked subshell (exit 139).
+```
+
+Deviations row:
+
+```markdown
+| `batch/batch-runner.sh` runs its seven `LC_ALL=C awk` calls with a shell prefix, which makes bash reset its own locale in a subshell | `batch/batch-runner.sh` runs them as `env LC_ALL=C awk`; `tests/batch-runner-score-locale.test.mjs` fails on any bare `LC_ALL=` prefix in the runner | landed <date> | ADAPT. Our hunks are the seven `env` words and the three comment lines above the MIN_SCORE gate; take upstream's changes to those awk programs and keep `env` in front of each. Pinned by `tests/batch-runner-score-locale.test.mjs`. |
+```
+
+**Owner step.** Optionally offer the fix upstream as a bug-fix pull request. Upstream's `batch/batch-runner.sh` has the same seven lines.
+
+- [ ] **Step 4: See the check pass and the crash gone**
+
+Run: `node test-all.mjs --only batch-runner-score-locale`
+Expected: PASS, `📊 Results: 4 passed, 0 failed, 0 warnings`, with `✅ every LC_ALL=C in batch-runner.sh goes through env, not a shell prefix` and `✅ --status prints a dot decimal under de_DE.UTF-8` where that locale exists.
+
+Rerun the Step 2 block with the `prefix` variant changed to `env`, and loop the two suites under the same load with `loop.sh.txt` (copied to `$TMPDIR/loop.sh` the same way):
+
+```bash
+env -u LANG -u LC_ALL -u LC_CTYPE -u LC_MESSAGES -u LC_NUMERIC "$TMPDIR/loop.sh" 20 "$TMPDIR/split" node --test tests/split-root.test.mjs
+env -u LANG -u LC_ALL -u LC_CTYPE -u LC_MESSAGES -u LC_NUMERIC "$TMPDIR/loop.sh" 60 "$TMPDIR/deal" node test-all.mjs --only batch-dealbreaker-skip
+```
+
+Expected: `{"bash":"/opt/homebrew/bin/bash 5.3.20(1)-release","LANG":null,"runs":300,"outcomes":{"exit 0":300}}`, `variant=env runs=300 failed=0`, `RESULT runs=20 failures=0` and `RESULT runs=60 failures=0`. Stop the load and confirm `left: 0`.
+
+Then run the suites that drive the runner: `node test-all.mjs --only split-root && node test-all.mjs --only batch-dealbreaker-skip && node test-all.mjs --only batch-runner`. Expected: PASS, `📊 Results: 3 passed`, `📊 Results: 24 passed` and `📊 Results: 164 passed`, each with `0 failed`. Three full `node test-all.mjs --quick` runs with this change passed both flaky suites, at load average 133 falling to 15.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add batch/batch-runner.sh tests/batch-runner-score-locale.test.mjs .claude/skills/upstream-review/SKILL.md
+git commit -m "fix(batch): set LC_ALL for awk through env so a subshell cannot crash bash"
+node --test tests/fork-deviations-covered.test.mjs
+```
+
+### Task TEST-9: closing-soon's near-linear test bounds CPU time, not wall time
+
+**Finding.** `tests/closing-soon.test.mjs:326-337` feeds four hostile 200 KB inputs to `htmlToText` (`closing-soon.mjs:254-297`) and asserts that each one takes under 5000 ms of wall-clock time. A run on 2026-11-16 failed it once, with `"<a \"" took 5265ms`, inside `node test-all.mjs --quick` at load average 21 to 28. The suite passed 3 of 3 runs alone.
+
+The failure was not reproduced. 148 timed inputs, 20 runs of the test and three full quick runs all passed the wall bound, at load averages up to 247. So the cause is inferred, not shown.
+
+What was measured, with `docs/superpowers/research/2026-11-16-project-audit/repro/tests/html-to-text-wall-vs-cpu.mjs.txt`, is that load stretches wall time and leaves CPU time alone:
+
+| Load average | Samples (4 inputs each) | Max wall time | Max CPU time |
+| --- | --- | --- | --- |
+| 33 | 5 | 1741 ms | 729 ms |
+| 60, with 52 busy loops | 5 | 4643 ms | 860 ms |
+| 70, 8 copies side by side | 16 | 2438 ms | 675 ms |
+| 114 | 3 | 4509 ms | 806 ms |
+| 144 to 247, with 48 busy loops | 8 | 3875 ms | 651 ms |
+
+The bound guards a real property. The old tag regex needed about 17 s for this input, and the test exists to catch quadratic or exponential backtracking. `htmlToText` is linear with a large constant: for each `<` whose tag does not close, `tagEnd` (`closing-soon.mjs:231-245`) scans up to `MAX_TAG_CHARS` (4096) characters.
+
+The change bounds CPU time and keeps the 5000 ms figure. It is safe whatever caused the one failure, because a quadratic scan burns CPU time too, and Step 2 proves the new bound still catches one. It follows the precedent of commit `2fc37427`, which took the real timer out of `tests/scan-entry-pacing.test.mjs`. The failure message carries both times, so a future failure says whether the scan did more work or the process waited for a core. CPU time on the efficiency cores of an Apple-silicon Mac was not measured. The largest CPU time seen was 860 ms, which leaves room for a core several times slower.
+
+The wall-clock bounds in `tests/pipeline-lock.test.mjs` and `tests/providers/http-timeout.test.mjs` are out of scope. Neither has failed.
+
+**Files:**
+- Modify: `tests/closing-soon.test.mjs:326-337` (the comment and the timing loop of the near-linear test)
+- Modify: `.claude/skills/upstream-review/SKILL.md` (row below)
+
+**Interfaces:**
+- Consumes: `htmlToText(html)` in `closing-soon.mjs:254`, which returns `string`. `process.cpuUsage(previous?)`, which returns `{ user, system }` in microseconds.
+- Produces: None
+
+- [ ] **Step 1: Bound CPU time in the near-linear test**
+
+In `tests/closing-soon.test.mjs`, replace the comment and the loop of `test('htmlToText: hostile unterminated markup stays near-linear (in-process, generous bound)', ...)` with:
+
+```js
+  // The old tag regex needed ~17s for 200k of this; a linear scan needs well
+  // under a second. CPU time, not wall time: a loaded machine stretches the
+  // wall clock past 5s while the scan's own work stays the same.
+  for (const unit of ['<a ', '<a "', '<script ', '<!-- ']) {
+    const input = unit.repeat(Math.ceil(200000 / unit.length));
+    const t = process.cpuUsage();
+    const w = process.hrtime.bigint();
+    htmlToText(input);
+    const wall = Number(process.hrtime.bigint() - w) / 1e6;
+    const { user, system } = process.cpuUsage(t);
+    const cpu = (user + system) / 1000;
+    assert.ok(cpu < 5000, JSON.stringify(unit) + ' took ' + Math.round(cpu) + 'ms CPU, ' + Math.round(wall) + 'ms wall');
+  }
+```
+
+Deviations row:
+
+```markdown
+| `tests/closing-soon.test.mjs` near-linear test bounds each hostile input at 5000 ms of wall-clock time | `tests/closing-soon.test.mjs` bounds the same inputs at 5000 ms of CPU time from `process.cpuUsage()` and reports both times | landed <date> | ADAPT. Our hunk is the comment and the timing loop of the near-linear test; take upstream's other changes to the file. Pinned by `tests/closing-soon.test.mjs`. |
+```
+
+- [ ] **Step 2: Prove the CPU bound still catches a quadratic scan**
+
+In `closing-soon.mjs`, set `const MAX_TAG_CHARS = Infinity;` for one run.
+
+Run: `node --test --test-name-pattern=near-linear tests/closing-soon.test.mjs`
+Expected: FAIL with a message of the form `"<a " took 11732ms CPU, ...ms wall`. The 11732 ms was measured at load average 15, and the number varies.
+
+Put `MAX_TAG_CHARS` back to `4096`. Run `git diff --stat closing-soon.mjs`. Expected: no output.
+
+- [ ] **Step 3: Run the suite**
+
+Run: `node test-all.mjs --only closing-soon`
+Expected: PASS, with `tests/closing-soon.test.mjs — node:test suite passed (22 tests)` and `0 failed`.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add tests/closing-soon.test.mjs .claude/skills/upstream-review/SKILL.md
+git commit -m "test(closing-soon): bound the near-linear scan by CPU time, not wall time"
+node --test tests/fork-deviations-covered.test.mjs
+```
+
 ## Phase 5. Docs and rules
 
 ### Task DOCS-1: ship every fork module that a shipped file loads
@@ -4481,7 +4704,7 @@ Stop here and report. The report names the tasks done, the tasks dropped with th
 
 Under D8's default, push the branch once and open one pull request. Under the other choice, the first pull request holds PREP-1 and the phase 1 commits, and the rest is pushed and opened only after the first one merges.
 
-The pull request body opens with the goal of this plan. It states that no personal data was added and that `node test-all.mjs` passed. It lists the tasks that change what a user sees: CORE-1, CORE-3, WEB-1, WEB-3, WEB-8 and SEC-6b.
+The pull request body opens with the goal of this plan. It states that no personal data was added and that `node test-all.mjs` passed. It lists the tasks that change what a user sees: CORE-1, CORE-3, WEB-1, WEB-3, WEB-8, SEC-6b and TEST-8.
 
 - [ ] **Step 5: After CI finishes on the pull request**
 

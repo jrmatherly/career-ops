@@ -1,0 +1,42 @@
+// Runs batch-runner.sh's own print_summary() many times, the way
+// tests/batch-dealbreaker-skip.test.mjs does, and counts the runs that die.
+// Usage: node print-summary-crash.mjs <repo-root> [runs] [bash]
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const root = process.argv[2];
+const runs = Number(process.argv[3] ?? 200);
+const bash = process.argv[4] ?? 'bash';
+const runner = readFileSync(join(root, 'batch', 'batch-runner.sh'), 'utf8');
+const printSummary = runner.match(/^print_summary\(\) \{[\s\S]*?^\}/m)[0];
+
+const work = mkdtempSync(join(tmpdir(), 'print-summary-crash-'));
+try {
+  const state = join(work, 'state.tsv');
+  writeFileSync(state, 'id\turl\tstatus\tstarted_at\tcompleted_at\treport_num\tscore\terror\tretries\n'
+    + '1\thttps://jobs.example.test/1\tskipped\ts\te\t042\t-\tdealbreaker: "x"\t0\n'
+    + '2\thttps://jobs.example.test/2\tcompleted\ts\te\t043\t4.1\t-\t0\n');
+  const script = join(work, 'summary.sh');
+  writeFileSync(script, `set -euo pipefail
+STATE_FILE="${state}"
+BATCH_DIR="${work}"
+is_decimal_number() { [[ "$1" =~ ^[0-9]+([.][0-9]+)?$ ]]; }
+${printSummary}
+print_summary
+`);
+  const bashPath = execFileSync(bash, ['-c', 'echo "$BASH $BASH_VERSION"'], { encoding: 'utf8' }).trim();
+  const outcomes = {};
+  for (let i = 0; i < runs; i++) {
+    const r = spawnSync(bash, [script], { encoding: 'utf8', timeout: 30_000 });
+    const key = r.signal ? `signal ${r.signal}` : `exit ${r.status}`;
+    outcomes[key] = (outcomes[key] ?? 0) + 1;
+    if (key !== 'exit 0' && outcomes[key] === 1) {
+      console.log(`first ${key} (run ${i + 1}); stdout:\n${r.stdout}stderr:\n${r.stderr}`);
+    }
+  }
+  console.log(JSON.stringify({ bash: bashPath, LANG: process.env.LANG ?? null, runs, outcomes }));
+} finally {
+  rmSync(work, { recursive: true, force: true });
+}

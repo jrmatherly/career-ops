@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Usage: subst-locale.sh <runs> <variant> [bash]
+# Starts <runs> fresh shells. Each runs one command substitution in the shape
+# of batch-runner.sh's print_summary and reports whether the substitution died.
+#   prefix  x=$(LC_ALL=C awk ... || echo 0)      what batch-runner.sh does today
+#   env     x=$(env LC_ALL=C awk ... || echo 0)  the fix
+#   plain   x=$(awk ... || echo 0)               control, no locale change
+#   bg      the MIN_SCORE gate shape in a & worker, as --parallel runs it
+#   bg-env  the same with env LC_ALL=C
+runs=${1:?runs}; variant=${2:?variant}; shell=${3:-bash}
+case "$variant" in
+  prefix) body='x=$(LC_ALL=C awk "BEGIN{print 1}" 2>/dev/null || echo 0)' ;;
+  env) body='x=$(env LC_ALL=C awk "BEGIN{print 1}" 2>/dev/null || echo 0)' ;;
+  plain) body='x=$(awk "BEGIN{print 1}" 2>/dev/null || echo 0)' ;;
+  bg) body='w() { if LC_ALL=C awk "BEGIN{exit 0}"; then :; fi; }; w & wait $!' ;;
+  bg-env) body='w() { if env LC_ALL=C awk "BEGIN{exit 0}"; then :; fi; }; w & wait $!' ;;
+  *) echo "unknown variant $variant" >&2; exit 2 ;;
+esac
+crashed=0
+for ((i = 0; i < runs; i++)); do
+  "$shell" -c "set -e; $body" 2>/dev/null
+  rc=$?
+  ((rc == 0)) || crashed=$((crashed + 1))
+done
+echo "shell=$("$shell" -c 'echo $BASH_VERSION') LANG=${LANG-<unset>} variant=$variant runs=$runs failed=$crashed load=$(uptime | sed 's/.*load averages*: //')"

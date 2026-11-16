@@ -1,0 +1,30 @@
+// Runs the body of closing-soon's "near-linear" test <rounds> times and records,
+// per unit, the wall-clock time the test asserts on and the CPU time this
+// process actually spent. Wall time grows with machine load; CPU time does not.
+// Usage: node html-to-text-wall-vs-cpu.mjs <repo-root> [rounds]
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { loadavg } from 'node:os';
+
+const root = process.argv[2];
+const rounds = Number(process.argv[3] ?? 5);
+const { htmlToText } = await import(pathToFileURL(join(root, 'closing-soon.mjs')).href);
+const cpuMs = (u) => (u.user + u.system) / 1000;
+let overWall = 0, overCpu = 0, checks = 0;
+const maxWall = {}, maxCpu = {};
+for (let r = 0; r < rounds; r++) {
+  for (const unit of ['<a ', '<a "', '<script ', '<!-- ']) {
+    const input = unit.repeat(Math.ceil(200000 / unit.length));
+    const t = process.hrtime.bigint();
+    const c = process.cpuUsage();
+    htmlToText(input);
+    const cpu = cpuMs(process.cpuUsage(c));
+    const wall = Number(process.hrtime.bigint() - t) / 1e6;
+    checks++;
+    if (wall >= 5000) overWall++;
+    if (cpu >= 5000) overCpu++;
+    maxWall[unit] = Math.max(maxWall[unit] ?? 0, Math.round(wall));
+    maxCpu[unit] = Math.max(maxCpu[unit] ?? 0, Math.round(cpu));
+  }
+}
+console.log(JSON.stringify({ load: loadavg().map((n) => +n.toFixed(1)), rounds, checks, wallOver5s: overWall, cpuOver5s: overCpu, maxWall, maxCpu }));

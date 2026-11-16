@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Usage: loop.sh <runs> <outdir> <command...>
+# Runs the command <runs> times from the repo root, keeps each failing run's
+# stdout+stderr, and prints runs, failures and the load average.
+set -u
+runs=$1; out=$2; shift 2
+mkdir -p "$out"
+fails=0
+for ((i = 1; i <= runs; i++)); do
+  if ! "$@" >"$out/run-$i.log" 2>&1; then
+    fails=$((fails + 1))
+    echo "run $i FAILED ($(uptime | sed 's/.*load averages*: //'))"
+  else
+    rm -f "$out/run-$i.log"
+  fi
+done
+echo "RESULT runs=$runs failures=$fails load=$(uptime | sed 's/.*load averages*: //')"

@@ -1,0 +1,19 @@
+import json, glob, os, sys
+
+pat = sys.argv[1] if len(sys.argv) > 1 else "bash-*.ips"
+for f in sorted(glob.glob(os.path.expanduser("~/Library/Logs/DiagnosticReports/" + pat))):
+    t = open(f).read().split("\n", 1)[1]
+    d = json.loads(t)
+    ex = d.get("exception", {})
+    if ex.get("signal") != "SIGSEGV":
+        print(os.path.basename(f), d.get("procPath"), ex.get("signal"))
+        continue
+    th = [x for x in d.get("threads", []) if x.get("triggered")]
+    imgs = d.get("usedImages", [])
+    fr = []
+    for x in (th[0]["frames"][:10] if th else []):
+        i = x.get("imageIndex")
+        im = imgs[i].get("name", "?") if i is not None and i < len(imgs) else "?"
+        fr.append("%s:%s" % (im, x.get("symbol", hex(x.get("imageOffset", 0)))))
+    print(os.path.basename(f), d.get("procPath"), "parent=", d.get("parentProc"),
+          d.get("procLaunch")[-13:], d.get("captureTime")[-13:], "|", " < ".join(fr))

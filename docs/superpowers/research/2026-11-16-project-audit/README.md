@@ -87,6 +87,8 @@ The id is the task id in the plan. "Measured" means a script or a command showed
 | TEST-5 | `providers/workable.mjs` retries after its board is aborted. An aborted board made 4 widget calls, 4 feed calls and 6 sleeps. | Measured |
 | TEST-6 | CI runs no `go vet` or linter on `dashboard/`. A narrow lint config finds three issues. | Measured |
 | TEST-7 | Three provider tests pass on any thrown error. | Read |
+| TEST-8 | `batch/batch-runner.sh` sets `LC_ALL=C` for awk as a shell prefix in seven places. Homebrew bash 5.3 on macOS, with no `LANG` set, then sometimes segfaults in a forked subshell, and the run exits 139. This is what made `tests/split-root.test.mjs` and `tests/batch-dealbreaker-skip.test.mjs` flake. An agent that runs the batch runner the same way hits it too. | Measured twice: 20 of 300 shells crashed in the investigation and 28 of 400 in an independent rerun. 0 crashed with `env LC_ALL=C`, with `LANG` set, or under `/bin/bash` |
+| TEST-9 | `tests/closing-soon.test.mjs` bounds a parser at 5000 ms of wall-clock time and failed once at 5265 ms on a loaded machine. | The failure was not reproduced. Measured: load stretches wall time to 4643 ms while CPU time stays under 860 ms |
 
 ### Docs and rules
 
@@ -127,7 +129,7 @@ Each of these appeared in a first report or in the lead's first summary and did 
 | 27 web lib modules and 33 API routes have no direct test. | The riskiest one is covered by WEB-9. The rest is a list, not a defect. |
 | `app-events.mjs` has no product caller. | Its own header says so. DOCS-1 ships it because another module runs it by name. |
 | A docs-only push to `main` runs the full suite and rebuilds four images. | By design. The server image copies the whole checkout. |
-| Three suites flake when the machine is under heavy load (load average above 20). `tests/split-root.test.mjs` fails with "batch-runner exited 139": once in ten runs in the audit, then once in a full quick run and once in three runs alone on 2026-11-16. `tests/closing-soon.test.mjs` has a wall-clock bound that failed once with "took 5265ms". `tests/batch-dealbreaker-skip.test.mjs` failed once in a quick run and once in five runs alone. Each passes on a rerun. | No cause is established. The exit 139 is a crash in a child of `batch-runner.sh` and is the one worth a root-cause task. Three quick runs in a row each had a different one of these failures, so a full local run on a loaded machine is not a reliable gate today. Follow-up candidate. |
+| `tests/verify-portals-entry-pacing.test.mjs:66` failed once in a quick run under heavy load. A redirect hop came 163 ms after the first request, against a 180 ms floor. | Seen once and not investigated. It uses real timers, the class of flake that commit `2fc37427` fixed in `tests/scan-entry-pacing.test.mjs`. Watch item. |
 | Four tests have wall-clock upper bounds. | They passed every run. Watch item. |
 | `docker-image.yml` gives the server image no version tag on a web-only release. | The cluster follows the image digest, so the tag is cosmetic, and building it would rebuild four images per web release. |
 | A sixth writer of tracker additions, `persist-evaluation-report.mjs`, also writes in place. It is the path the web pod uses. | Its file-system calls go through a test-stubbed `fsImpl`, so the change is larger than CORE-2. Follow-up candidate. |
