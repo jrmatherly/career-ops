@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { Application, InboxJob } from "@/lib/career-ops";
+import { createPipelineLoader } from "@/lib/pipeline-snapshot.mjs";
 
 // A thin client mirror of the pipeline so BOTH the pages and the assistant
 // console (a different subtree) can read inbox/applications. Hydrated once from
@@ -27,16 +28,10 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loader = useRef(createPipelineLoader());
   const refetch = useCallback(() => {
     setLoading(true);
-    fetch("/api/pipeline")
-      .then((r) => r.json())
-      .then((d) => {
-        setInbox(Array.isArray(d.inbox) ? d.inbox : []);
-        setApplications(Array.isArray(d.applications) ? d.applications : []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    loader.current().then((d) => { if (d) { setInbox(d.inbox as InboxJob[]); setApplications(d.applications as Application[]); } }).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
