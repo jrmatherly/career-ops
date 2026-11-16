@@ -53,6 +53,15 @@ private
 .serena
 .claude/worktrees
 .claude/settings.local.json
+.claude/launch.json
+.claude/skill-stack.json
+.archify
+.impeccable
+.superpowers
+# Session-activity locks (session-activity.mjs) from a local run
+.career-ops-locks
+# Backup copies (.gitignore's *.bak*), e.g. .claude/settings.local.json.bak-<date>
+**/*.bak*
 .tmp-*
 
 # Secrets and local-only files (mirrors .gitignore)

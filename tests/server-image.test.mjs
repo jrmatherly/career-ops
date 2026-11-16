@@ -47,7 +47,8 @@ const uncovered = USER_PATHS.filter((entry) => {
 });
 check(uncovered.length === 0, `.dockerignore covers every USER_PATHS entry${uncovered.length ? `, missing: ${uncovered.join(', ')}` : ''}`);
 
-const LOCAL_ONLY = ['**/.env', '**/.env*.local', '**/.career-ops.env', '.mcp.json', 'private', '.codegraph', '.remember', '.claude/worktrees', '**/.next'];
+const LOCAL_ONLY = ['**/.env', '**/.env*.local', '**/.career-ops.env', '.mcp.json', 'private', '.codegraph', '.remember', '.claude/worktrees', '**/.next',
+  '.archify', '.impeccable', '.superpowers', '.career-ops-locks', '.claude/launch.json', '.claude/skill-stack.json', '**/*.bak*'];
 const missingLocal = LOCAL_ONLY.filter((pattern) => !ignoreLines.has(pattern));
 check(missingLocal.length === 0, `.dockerignore covers the local-only paths${missingLocal.length ? `, missing: ${missingLocal.join(', ')}` : ''}`);
 
