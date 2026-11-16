@@ -9,6 +9,9 @@ import { maskSecrets } from "@/lib/mask-secrets.mjs";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const OUTPUT_MAX = 8000;
+const STEPS_MAX = 500;
+
 type Body = {
   id?: string;
   title?: string;
@@ -38,9 +41,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid evaluation stop" }, { status: 400 });
   }
 
-  // The error line is picked for mentioning credentials, so it is the likeliest to quote one.
-  const error = b.status === "error" && typeof b.error === "string" ? maskSecrets(b.error.trim()).slice(0, 1200) : "";
-  const output = b.status === "error" ? maskSecrets(b.output) : b.output || "";
+  // Every free-text field is capped before masking, so a large body cannot stall the
+  // event loop, then masked: a key can surface in any of them, on any status.
+  const text = (v: unknown, max: number) => maskSecrets(String(v ?? "").trim().slice(0, max));
+  const title = text(b.title, 300);
+  const page = text(b.page, 200);
+  const input = text(b.input, 2000);
+  const gateMessage = gate ? text(gate.message, 1200) : "";
+  const summary = text(b.result?.summary, 1200);
+  const error = b.status === "error" ? text(b.error, 2000).slice(0, 1200) : "";
+  // The client keeps the last 8000 characters. At that bound the first line may start
+  // mid-key with no prefix or label left to mask, so it is dropped.
+  const rawOutput = String(b.output ?? "");
+  let output = rawOutput.slice(-OUTPUT_MAX);
+  if (rawOutput.length >= OUTPUT_MAX) {
+    const nl = output.indexOf("\n");
+    output = nl === -1 ? "" : output.slice(nl + 1);
+  }
+  output = maskSecrets(output);
 
   const dir = path.join(careerOpsRoot(), ".career-ops-web", "runs");
   try {
@@ -48,20 +66,20 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "mkdir failed" }, { status: 500 });
   }
-  const steps = (Array.isArray(b.steps) ? b.steps : []).map((s) => `- ${s.kind === "tool" ? `🔧 ${s.label}` : s.label}`).join("\n");
-  const verdict = b.result?.score != null ? `${b.result.score}/5 — ${b.result.summary || ""}` : "—";
-  const md = `# Web run · ${b.title || b.id}
+  const steps = (Array.isArray(b.steps) ? b.steps : []).slice(-STEPS_MAX).map((s) => `- ${s?.kind === "tool" ? "🔧 " : ""}${text(s?.label, 300)}`).join("\n");
+  const verdict = typeof b.result?.score === "number" ? `${b.result.score}/5 — ${summary}` : "—";
+  const md = `# Web run · ${title || safeId}
 
-- id: ${b.id}
-- page: ${b.page || "-"}
-- input: ${b.input || "-"}
+- id: ${safeId}
+- page: ${page || "-"}
+- input: ${input || "-"}
 ${b.status ? `- status: ${b.status}\n` : ""}- verdict: ${verdict}
 ${gate ? `
 ## Evaluation stop
 - reason: ${gate.reason}
 - confirmation required: ${gate.confirmationRequired ? "yes" : "no"}
 
-${gate.message.trim()}
+${gateMessage}
 ` : ""}${error ? `
 ## Error
 

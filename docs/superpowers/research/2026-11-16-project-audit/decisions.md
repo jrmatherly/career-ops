@@ -71,6 +71,8 @@ As written, and add: before the save route writes an error run, mask key-shaped 
 
 Evidence. Confirmed: the regex. Researcher: nothing redacts saved logs; the assistant preamble tells the assistant to read saved runs; scheduled scans do not use this path; the pod holds 10 run files in 44 KB. Not verified: whether any agent CLI prints a key on stderr.
 
+The first implementation followed "error text and output of an error run". A task review and a commit security review on 2026-11-16 found that too narrow and the masker quadratic. The route now coerces and caps every free-text field, then masks all of them on every status.
+
 ### TEST-4 (D9)
 
 As written, except keep `tests/set-status-lock-scope.test.mjs`. Drop its deletion line, its deviations note and the `git rm`.

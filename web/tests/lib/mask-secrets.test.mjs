@@ -45,3 +45,46 @@ test("empty input", () => {
   assert.equal(maskSecrets(""), "");
   assert.equal(maskSecrets(undefined), "");
 });
+
+test("a JWT with no label keeps its eyJ marker and loses the rest", () => {
+  const jwt = "eyJhbGciOiJGQUtFIn0.eyJzdWIiOiJmYWtlIn0.FAKEsig0000fake1111";
+  assert.equal(maskSecrets(`cookie was ${jwt}.`), "cookie was eyJ[masked].");
+});
+
+test("an AWS access key id keeps its AKIA or ASIA prefix", () => {
+  assert.equal(maskSecrets("using AKIAFAKE0000FAKE1111 now"), "using AKIA[masked] now");
+  assert.equal(maskSecrets("using ASIAFAKE0000FAKE1111 now"), "using ASIA[masked] now");
+});
+
+test("a password inside a URL is masked, scheme, user and host kept", () => {
+  assert.equal(maskSecrets("fetch https://fakeuser:FakePass000@example.invalid/x failed"), "fetch https://fakeuser:[masked]@example.invalid/x failed");
+  assert.equal(maskSecrets("see http://localhost:3000/runs"), "see http://localhost:3000/runs");
+});
+
+test("credential, password, cookie and api key label variants are masked", () => {
+  for (const [s, out] of [
+    ["credential: FAKE0000fake1111FAKE", "credential: [masked]"],
+    ["credentials=FAKE0000fake1111FAKE", "credentials=[masked]"],
+    ["pwd=Fake0000Pass1111word", "pwd=[masked]"],
+    ["passwd: Fake0000Pass1111word", "passwd: [masked]"],
+    ["Cookie: session=FAKE0000fake1111FAKE", "Cookie: [masked]"],
+    ["apikey=FAKE0000fake1111FAKE", "apikey=[masked]"],
+    ["apiKey: FAKE0000fake1111FAKE", "apiKey: [masked]"],
+    ["api-key FAKE0000fake1111FAKE", "api-key [masked]"],
+  ]) assert.equal(maskSecrets(s), out);
+});
+
+test("a path or a word ending in a label is not taken for a key", () => {
+  for (const s of [
+    "Press any key\n/Users/me/cv-2026-11-16.pdf",
+    "cache key: /Users/me/.cache/claude/v2/abc123def456ghi",
+    "the monkey 2024abcdefghijklmnop",
+  ]) assert.equal(maskSecrets(s), s);
+});
+
+test("an 8000-character run of repeated prefixes or labels returns", () => {
+  for (const unit of ["sk-", "key="]) {
+    const s = unit.repeat(Math.ceil(8000 / unit.length)).slice(0, 8000);
+    assert.equal(maskSecrets(s), s);
+  }
+});

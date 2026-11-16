@@ -55,3 +55,51 @@ test("an aborted run saves nothing and reports no error", () => {
   const store = fs.readFileSync(new URL("../../src/components/jobs/job-store.tsx", import.meta.url), "utf8");
   assert.match(store, /const finish = \([^)]*\) => \{\n\s*if \(controller\.signal\.aborted\) return;/);
 });
+
+const fakeKey = "sk-or-v1-FAKE0000fake1111FAKE2222";
+const gate = { reason: "agency_confirmation", message: "Confirm the intermediary before continuing.", confirmationRequired: true };
+
+for (const [status, extra] of [["done", { result: { score: 4.2, summary: "Fictional score." } }], ["gated", { gate }], ["error", { error: "This run hit an error before finishing." }]]) {
+  test(`key-shaped strings in a ${status} run's step labels and output are masked`, async (t) => {
+    const body = { id: `fictional-${status}-leaky`, title: "Fictional evaluation", status, ...extra, steps: [{ kind: "status", label: `using api_key=${fakeKey}` }], output: `fetched with token FAKEtoken0000fake1111\nok` };
+    const { res, file } = await saveRun(t, body);
+    assert.equal(res.status, 200);
+    const md = fs.readFileSync(file, "utf8");
+    assert.ok(!md.includes("FAKE0000fake1111FAKE2222"), md);
+    assert.ok(!md.includes("FAKEtoken0000fake1111"), md);
+    assert.match(md, /- using api_key=sk-\[masked\]/);
+    assert.match(md, /fetched with token \[masked\]\nok/);
+  });
+}
+
+test("output cut at the 8000-character bound loses its first line, so a key cut there is not saved", async (t) => {
+  const tail = "FAKE0000fake1111FAKE2222tail";
+  const rest = "\nsecond line\n";
+  const output = tail + rest + "x".repeat(8000 - tail.length - rest.length);
+  assert.equal(output.length, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-cut", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(tail), "the key stub before the first newline is dropped");
+  assert.match(md, /## Output\nsecond line\n/);
+});
+
+test("every free-text field is capped before masking, so a 256 KB body never reaches the masker whole", async (t) => {
+  const huge = "key=".repeat(64 * 1024);
+  const body = { id: "fictional-huge", title: huge, page: huge, input: huge, status: "error", error: huge, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: huge })), output: huge };
+  const { res, file } = await saveRun(t, body);
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(md.length < 200_000, `saved ${md.length} characters`);
+  for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
+  assert.equal((md.match(/^- key=/gm) || []).length, 500, "steps are capped at 500");
+});
+
+test("non-string field values are saved as text, not a 500", async (t) => {
+  const body = { id: "fictional-odd", title: { a: 1 }, page: 7, input: ["x"], status: "error", error: 42, steps: [null, 5, { kind: "tool", label: { b: 2 } }], output: 123, result: "nope" };
+  const { res, file } = await saveRun(t, body);
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.match(md, /## Error\n+42/);
+  assert.match(md, /## Output\n123/);
+});
