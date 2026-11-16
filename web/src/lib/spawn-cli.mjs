@@ -8,6 +8,22 @@ import { prepareCliLaunch } from "./cli-launch.mjs";
 // which TypeScript resolves without an extension, ESM specifiers for plain
 // JS modules must be fully specified.
 
+/** career-ops' own secrets (lib/settings-registry.mjs). No agent CLI reads them. */
+export const CAREER_OPS_SECRET_ENV = Object.freeze([
+  "PUBLISH_API_KEY", "APIFY_TOKEN", "USAJOBS_API_KEY", "NOTION_ACCESS_TOKEN",
+  "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "H1B_API_TOKEN",
+]);
+
+/**
+ * The other agents' keys a single-provider CLI does not read. A CLI missing here
+ * can be pointed at any provider, so it keeps every agent key. Codex is one: a
+ * Codex provider entry names its own env_key, which can be any of them.
+ */
+const FOREIGN_AGENT_ENV = Object.freeze({
+  claude: ["OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"],
+  gemini: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY", "OPENROUTER_API_KEY"],
+});
+
 /**
  * Spawn a headless agent CLI with stdin closed, under the worker's permissions.
  *
@@ -73,6 +89,13 @@ export function spawnHeadlessCli(binPath, args, options, fencing) {
   // group would kill the server. Windows has no such group kill here, and
   // detached would open a console, so it stays off there.
   const detached = process.platform !== "win32";
+  // A writing worker keeps everything: fix-portal runs verify-portals.mjs, whose plugins read their keys.
+  if (!fencing.capabilities.writes) {
+    const env = { ...(options?.env ?? process.env) };
+    const foreign = Object.hasOwn(FOREIGN_AGENT_ENV, fencing.cliId) ? FOREIGN_AGENT_ENV[fencing.cliId] : [];
+    for (const key of [...CAREER_OPS_SECRET_ENV, ...foreign]) delete env[key];
+    options = { ...options, env };
+  }
   // windowsHide stays in this call. The launch census reads the argument
   // text, and a variable would look like the child can inherit the console.
   const child = spawn(launch.command, launch.args, { ...options, windowsHide: true, detached });

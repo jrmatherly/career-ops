@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { syncBuiltinESMExports } from "node:module";
-import { spawnHeadlessCli } from "../../src/lib/spawn-cli.mjs";
+import { spawnHeadlessCli, CAREER_OPS_SECRET_ENV } from "../../src/lib/spawn-cli.mjs";
 import { CAPS } from "../../src/lib/worker-capabilities.mjs";
 
 // Fencing is required at every call site (#2507). These cases are about stdin,
@@ -151,7 +151,9 @@ test("spawnHeadlessCli never lets a child inherit the server's console (windowsH
     assert.equal(options.windowsHide, true);
     assert.equal(options.detached, process.platform !== "win32");
     assert.equal(options.cwd, process.cwd());
-    assert.equal(options.env, process.env);
+    // A read-only worker gets a copy of the caller's env with keys removed, never changed.
+    assert.deepEqual(options.env, Object.fromEntries(Object.entries(process.env).filter(([key]) => key in options.env)));
+    for (const key of CAREER_OPS_SECRET_ENV) assert.equal(key in options.env, false, key);
   }
 });
 

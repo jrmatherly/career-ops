@@ -8,7 +8,7 @@ import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { assembleDedupContext } from "@/lib/core/discover";
 import { makeKnownOfferFilter } from "@/lib/explore-ai";
 import { CAPS } from "@/lib/worker-capabilities.mjs";
-import { scopeFrom } from "@/lib/claude-invocation.mjs";
+import { readFenceArgs, scopeFrom } from "@/lib/claude-invocation.mjs";
 import { fencingReport } from "@/lib/cli-fencing.mjs";
 import { codexFencingSupported } from "@/lib/cli-fencing-probe.mjs";
 import { readJsonObject } from "@/lib/json-body";
@@ -137,6 +137,7 @@ export async function POST(req: Request) {
         ADVISOR_SCOPE.allowed,
         "--disallowedTools",
         ADVISOR_SCOPE.disallowed,
+        ...readFenceArgs(resolveCodeRoot(process.cwd(), process.env)),
       ]
     : isCodex
       ? [

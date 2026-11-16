@@ -7,7 +7,7 @@ import { resolveCodeRoot } from "@/lib/core/code-root.mjs";
 import { profileRef } from "@/lib/core/profile-path.mjs";
 import { buildSystemPreamble } from "@/lib/assistant-preamble.mjs";
 import { CAPS } from "@/lib/worker-capabilities.mjs";
-import { scopeFrom } from "@/lib/claude-invocation.mjs";
+import { readFenceArgs, scopeFrom } from "@/lib/claude-invocation.mjs";
 import { fencingReport } from "@/lib/cli-fencing.mjs";
 
 // Deny list DERIVED, never hand-written: every one of the six advisor argvs
@@ -117,6 +117,7 @@ export async function POST(req: Request) {
         ADVISOR_SCOPE.allowed,
         "--disallowedTools",
         ADVISOR_SCOPE.disallowed,
+        ...readFenceArgs(resolveCodeRoot(process.cwd(), process.env)),
       ]
     : spec.args(prompt);
 

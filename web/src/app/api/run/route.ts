@@ -26,7 +26,7 @@ import { runCoreCli } from "@/lib/core-cli";
 import { parseCoverRequest } from "@/lib/cover-brief.mjs";
 import { KNOWN_KINDS, capabilitiesFor, isEvaluateKind } from "@/lib/worker-capabilities.mjs";
 import { fencingReport, isCliAllowedForCapabilities } from "@/lib/cli-fencing.mjs";
-import { claudeCliArgs } from "@/lib/claude-invocation.mjs";
+import { claudeCliArgs, readFenceArgs } from "@/lib/claude-invocation.mjs";
 import { resolveCvTemplate, resolveUserTemplatesDir } from "@/lib/core/cv-template.mjs";
 import { getProfilePath, profileRef } from "@/lib/core/profile-path.mjs";
 import { readPageFormatSetting, resolveRenderPageFormat, type PageFormatSetting } from "@/lib/core/page-format.mjs";
@@ -148,8 +148,11 @@ export async function POST(req: Request) {
   // Scripts and system modes live in the code checkout, which on a split-layout
   // install is not the data root (cv.md, reports/ and output stay under that).
   const codeRoot = resolveCodeRoot(process.cwd(), process.env);
+  const capabilities = capabilitiesFor(kind);
+  // An attended run that fetches a posting reads untrusted text, so it gets the denies too.
+  const readFence = cliId === "claude" && Boolean(capabilities.network);
   const denyRoots: { dataRoot?: string; codeRoot?: string } = {};
-  if (fenced) {
+  if (fenced || readFence) {
     // The denies name the real paths, so a symlinked root still covers the files.
     for (const [key, label, root, envName] of [
       ["dataRoot", "data root", careerOpsRoot(), "CAREER_OPS_ROOT"],
@@ -161,9 +164,16 @@ export async function POST(req: Request) {
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
         console.error(`/api/run: ${kind} realpath of the ${label} failed: ${code}`);
+        // claudeCliArgs throws on one root without the other, so an attended skip clears both.
+        if (!fenced) { delete denyRoots.dataRoot; delete denyRoots.codeRoot; break; }
         return Response.json({ error: `${kind} could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
       }
       if (!DENY_SAFE_ROOT.test(real)) {
+        // A Windows path never matches, and a 400 here would break attended evaluate there.
+        if (!fenced) {
+          console.error(`/api/run: ${kind} runs without Read denies: the ${label} ${real} is not deny-safe`);
+          delete denyRoots.dataRoot; delete denyRoots.codeRoot; break;
+        }
         return Response.json({
           error: `${kind} needs a ${label} of letters, digits, . _ - and / only, because the path is spelled into its comma-separated tool denies (got ${real}). Point ${envName} at such a path.`,
         }, { status: 400 });
@@ -172,7 +182,6 @@ export async function POST(req: Request) {
     }
   }
   const substitution = cliSubstitutionNotice(resolved);
-  const capabilities = capabilitiesFor(kind);
   if (!isCliAllowedForCapabilities(cliId, capabilities)) {
     return new Response(
       JSON.stringify({ error: `CLI '${cliId}' cannot run write-capable worker '${kind}' without a verified permission adapter.` }),
@@ -391,7 +400,9 @@ export async function POST(req: Request) {
     // stdout matches spec.parseEvent below; spec.args stays the plain-text argv the
     // envelope-parsing routes rely on.
     const buildArgs = (p: string) =>
-      isClaude ? claudeCliArgs({ kind, prompt: p, ...denyRoots }) : (spec.streamArgs ?? spec.args)(p);
+      isClaude
+        ? [...claudeCliArgs({ kind, prompt: p, ...denyRoots }), ...(readFence ? readFenceArgs(codeRoot) : [])]
+        : (spec.streamArgs ?? spec.args)(p);
     // The prompt inlines the whole _profile.md (#4003), so it can outgrow the OS
     // command-line limit (ENAMETOOLONG on Windows). Every kind that reaches here
     // can Read (see TOOL_SCOPES), so an oversized prompt goes to a file under the
