@@ -20,6 +20,9 @@ import { machineSummarySection } from "./machine-summary-section.mjs";
 import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./evaluation-gate.mjs";
 import { APPLY_LINE } from "./report-sections.mjs";
 
+// Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
+const SCRIPT_TIMEOUT_MS = 120_000;
+
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const YAML_FENCE = /^##\s*Machine Summary\s*\n+```(?:yaml|yml)?\s*\n([\s\S]*?)\n```/i;
 // final_decision's values in batch/batch-prompt.md, keyed in lower case.
@@ -215,7 +218,7 @@ function spawnScript({ spawnFn, execPath, root, cwd = root, script, args = [], i
   return new Promise((resolve) => {
     // windowsHide: see api/doctor/route.ts — a stale inherited console kills
     // every child with 0xC0000142 on Windows; never inherit one.
-    const child = spawnFn(execPath, [path.join(root, script), ...args], { cwd, windowsHide: true });
+    const child = spawnFn(execPath, [path.join(root, script), ...args], { cwd, windowsHide: true, timeout: SCRIPT_TIMEOUT_MS });
     let stdout = "";
     let stderr = "";
     child.stdout?.setEncoding("utf8");

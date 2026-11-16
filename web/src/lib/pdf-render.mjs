@@ -17,6 +17,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataFolderMissingMessage } from "./core/data-root.mjs";
 
+// generate-pdf bounds launch and goto but not fonts.ready or page.pdf; 180 s fits the run route's render budget.
+const RENDER_TIMEOUT_MS = 180_000;
+// Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
+const MARK_READY_TIMEOUT_MS = 120_000;
+
 /**
  * @typedef {Object} PdfRunSignals
  * @property {object|undefined} envelope - parseCvEnvelope's result for this run.
@@ -152,6 +157,7 @@ export function spawnGeneratePdf({ spawnFn, execPath, coreRoot, html, finalPdf, 
         cwd: coreRoot,
         windowsHide: true,
         env,
+        timeout: RENDER_TIMEOUT_MS,
       },
     );
     let stderr = "";
@@ -191,6 +197,7 @@ export function spawnAtsPdf({ spawnFn, execPath, coreRoot, html, finalPdf, forma
         cwd: coreRoot,
         windowsHide: true,
         env,
+        timeout: RENDER_TIMEOUT_MS,
       },
     );
     let stderr = "";
@@ -255,6 +262,7 @@ export function markTrackerReady({ spawnFn, execPath, coreRoot, reportNum, dataR
     const child = spawnFn(execPath, [path.join(coreRoot, "mark-pdf-ready.mjs"), reportNum, "--json"], {
       cwd: coreRoot,
       windowsHide: true,
+      timeout: MARK_READY_TIMEOUT_MS,
       ...(dataRoot ? { env: { ...process.env, CAREER_OPS_ROOT: dataRoot } } : {}),
     });
     let stdout = "";
