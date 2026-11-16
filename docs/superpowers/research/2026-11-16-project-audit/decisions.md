@@ -95,9 +95,9 @@ Keep the first half as written: `openSession` closes its BrowserContext on any t
 
 Replace the second half:
 
-- On `pagehide`, release the session **unless the provider's status is `done`**. After a handoff the status is `done` and the session stays set (`web/src/components/apply/apply-provider.tsx:363-364`), and the user is reviewing and submitting in the headed Chrome window that the session owns. Releasing there would close that window. Ignore `event.persisted`. Do not listen for `visibilitychange`.
-- Add a server-side timer per session in `web/src/lib/apply/session.ts`, at the existing 15-minute prune age, so a crash, a mobile discard or a handed-off session whose tab is gone is reaped. Today `prune()` runs only from `openSession`, and `scheduleIdleClose` closes the browser only when no sessions remain. The timer must be cleared when the session closes, and `unref`'d.
-- Tests: a release on `pagehide` in a non-`done` state, no release in `done`, and the timer closing a session with no further `openSession` call. Update the plan's test to match.
+- On `pagehide`, release the session unless its window has been handed off. The handoff is a sticky fact in the provider, not a status, because after a handoff the status moves on to `filling`, `ready` or `error` while the headed Chrome window stays on screen. It is set when a fill response carries `handedOff` or the agent's fill reports `filled`, and cleared only where `open` and `reset` give up the session id. Ignore `event.persisted`. Do not listen for `visibilitychange`.
+- No server-side timer. The owner decided this on 2026-11-16. A cap from creation would close a window in use, and the server cannot tell an abandoned handed-off window from an active one. A window orphaned by a crash stays until the user closes it or the next apply prunes it.
+- Tests, in `web/tests/lib/apply-session-release.test.mjs`: `openSession` closes its context when a page step throws. The other three read the provider's source, because node cannot import the client component. They pin that `pagehide` releases only when the window is not handed off, that both handoff paths record it, and that only `open` and `reset` clear it, so a later status cannot.
 
 The back-forward-cache question D11 asked is close to moot. Confirmed: `web/src/app/layout.tsx:38` calls `connection()`, and the prefill and drive streams return `Cache-Control: no-store`. Researcher, from Chrome's documentation: such pages are restored rarely and only within three minutes. Not verified in a browser.
 

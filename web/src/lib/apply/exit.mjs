@@ -54,14 +54,3 @@ export function resolveLateSession({ stale, sessionId } = {}) {
   if (!stale) return "apply";
   return sessionId ? "close" : "discard";
 }
-
-/**
- * Should the page going away release the apply session?
- *
- * Not after the handoff: the user is then reviewing and submitting in the Chrome
- * window the session owns, and releasing it would close that window. The
- * session's server-side expiry reaps it instead.
- */
-export function releasesOnPageHide(status) {
-  return status !== "done";
-}

@@ -162,7 +162,7 @@ async function enrichFromAts(url: string, fields: ApplyField[]): Promise<void> {
   }
 }
 
-type Session = { id: string; url: string; title: string; fields: ApplyField[]; context: BrowserContext; page: Page; frame: Frame; createdAt: number; expiry: ReturnType<typeof setTimeout>; formShot?: string };
+type Session = { id: string; url: string; title: string; fields: ApplyField[]; context: BrowserContext; page: Page; frame: Frame; createdAt: number; formShot?: string };
 
 declare global {
   // eslint-disable-next-line no-var
@@ -207,19 +207,9 @@ function scheduleIdleClose() {
   }, 5 * 60_000);
 }
 
-const SESSION_MAX_AGE_MS = 15 * 60_000;
-
 function prune() {
   const now = Date.now();
-  for (const [id, s] of SESSIONS) if (now - s.createdAt > SESSION_MAX_AGE_MS) void closeSession(id);
-}
-
-/** Record a session with its own expiry, so one nothing closes (a crashed or discarded tab, a
- *  handed-off form whose tab is gone) is reaped without waiting for the next openSession. */
-function recordSession(s: Omit<Session, "createdAt" | "expiry">): void {
-  const expiry = setTimeout(() => void closeSession(s.id), SESSION_MAX_AGE_MS);
-  expiry.unref();
-  SESSIONS.set(s.id, { ...s, createdAt: Date.now(), expiry });
+  for (const [id, s] of SESSIONS) if (now - s.createdAt > 15 * 60_000) void closeSession(id);
 }
 
 /** Bounded scroll pass to trigger lazy/virtualized forms that only render their
@@ -387,7 +377,7 @@ export async function openSession(url: string, cliId?: string, forceAgent?: bool
       if (cliId && why.code === "no-form") {
         const id = `apply-${crypto.randomUUID()}`;
         const title = form.title || (await page.title().catch(() => "")) || "Application";
-        recordSession({ id, url, title, fields: [], context, page, frame, formShot: shots[shots.length - 1] });
+        SESSIONS.set(id, { id, url, title, fields: [], context, page, frame, createdAt: Date.now(), formShot: shots[shots.length - 1] });
         return { id, title, fields: [], shots, issues: [], needsDrive: true };
       }
       return abort(why.message);
@@ -413,7 +403,7 @@ export async function openSession(url: string, cliId?: string, forceAgent?: bool
     if (unlabeled > 0) issues.push({ level: "warn", code: "unlabeled-fields", message: `${unlabeled} field${unlabeled > 1 ? "s" : ""} couldn't be labelled cleanly — double-check ${unlabeled > 1 ? "them" : "it"} before submitting.` });
 
     const id = `apply-${crypto.randomUUID()}`;
-    recordSession({ id, url, title: form.title, fields: form.fields, context, page, frame, formShot: shots[shots.length - 1] });
+    SESSIONS.set(id, { id, url, title: form.title, fields: form.fields, context, page, frame, createdAt: Date.now(), formShot: shots[shots.length - 1] });
     return { id, title: form.title, fields: form.fields, shots, issues };
   } catch (e) {
     if (!released) {
@@ -506,7 +496,6 @@ export async function finalizeDrivenSession(id: string, cliId?: string): Promise
 export async function closeSession(id: string): Promise<void> {
   const s = SESSIONS.get(id);
   SESSIONS.delete(id);
-  clearTimeout(s?.expiry);
   await s?.context.close().catch(() => {});
   if (SESSIONS.size === 0) scheduleIdleClose();
 }

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ApplyField } from "@/lib/apply/extract";
 import type { ApplyIssue, DriveStep } from "@/lib/apply/issue";
-import { releasesOnPageHide, resolveLateSession } from "@/lib/apply/exit.mjs";
+import { resolveLateSession } from "@/lib/apply/exit.mjs";
 import { withoutReadbackIssues } from "@/lib/apply/prefilled-banner.mjs";
 import { readFillResult, screenForFill } from "@/lib/apply/fill-stream.mjs";
 import { issuesAfterAgent, issuesAfterFill } from "@/lib/apply/handoff-gate.mjs";
@@ -93,8 +93,9 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
   fieldsRef.current = fields;
   const answersRef = useRef<Record<string, string>>({});
   answersRef.current = answers;
-  const statusRef = useRef<Status>("idle");
-  statusRef.current = status;
+  // Sticky for the life of a session: once its Chrome window is on screen for the user, later
+  // statuses (filling, ready, error) no longer say so.
+  const windowHandedOff = useRef(false);
   // Bumped every time a session is abandoned or replaced. Leaving the page is
   // reachable while a request or stream is still in flight, and none of them can
   // be recalled, so each one carries the generation it started in and drops its
@@ -179,6 +180,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     // leaving the page does, so it is released here too.
     if (sessionId.current) closeSession(sessionId.current);
     sessionId.current = null;
+    windowHandedOff.current = false;
     setStatus("opening");
     setError("");
     setFields([]);
@@ -363,6 +365,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       setIssues((prev) => issuesAfterFill(withoutReadbackIssues(prev), incoming));
       if (d.navigated) setError("Heads up: the form's page changed during fill — review it carefully before submitting (career-ops never submits for you).");
       if (d.handedOff) {
+        windowHandedOff.current = true;
         setStatus("done");
         // ESCALATION ("si no va, full agente"): if deterministic fill clearly
         // didn't land (most fields failed / mismatched), let the agent fill it.
@@ -402,6 +405,8 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       if (controller.signal.aborted || generation.current !== gen) return; // left mid-fill
       const result = await readFillResult(r, (step) => setDriveSteps((p) => [...p, step]), () => generation.current === gen, controller.signal);
       if (!result || controller.signal.aborted || generation.current !== gen) return; // left mid-fill
+      // The drive route raises the window exactly when it reports filled, even if gaps keep the editor up.
+      if (result.status === "done" && result.filled) windowHandedOff.current = true;
       const outcome = screenForFill(result);
       const gaps = "gaps" in outcome && outcome.gaps?.length ? outcome.gaps : [];
       if (gaps.length || outcome.status === "done") {
@@ -434,6 +439,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     dropFill();
     if (sessionId.current) closeSession(sessionId.current);
     sessionId.current = null;
+    windowHandedOff.current = false;
     companyRef.current = "";
     nRef.current = "";
     pendingPrefill.current = false;
@@ -458,10 +464,10 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
 
   // Leaving the app (or entering the back-forward cache) releases the form's browser context. reset also
   // clears sessionId and returns the page to idle, so a restored page never holds a closed session.
-  // The status is read when the event fires: a listener closing over it could miss the handoff.
+  // Not once the window is handed off: the user is reviewing and submitting in it, and a release closes it.
   useEffect(() => {
     const release = () => {
-      if (releasesOnPageHide(statusRef.current)) reset();
+      if (!windowHandedOff.current) reset();
     };
     window.addEventListener("pagehide", release);
     return () => window.removeEventListener("pagehide", release);
