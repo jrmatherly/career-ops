@@ -122,7 +122,7 @@ Ajanın taraması sırasında, **`local_parser_ok`** kümesini bellekte tut. Bu 
 Açık bir API'si veya yapılandırılmış akışı (feed) olan ve **`local_parser_ok` içinde bulunmayan** şirketler için, Seviye 1'e hızlı bir tamamlayıcı olarak JSON/XML yanıtını kullan. Bu yöntem Playwright'tan daha hızlıdır ve görsel kazıma (scraping) hatalarını azaltır.
 
 **Mevcut Destek (`{}` içindeki değişkenler):**
-- Tam sağlayıcı (provider) tablosu: [Supported job boards](../docs/SUPPORTED_JOB_BOARDS.md)
+- Tam sağlayıcı (provider) tablosu: [Supported job boards](../../docs/SUPPORTED_JOB_BOARDS.md)
 
 - **Greenhouse**: `https://boards-api.greenhouse.io/v1/boards/{company}/jobs`
 - **Ashby**: `https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true`
