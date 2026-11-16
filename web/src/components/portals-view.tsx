@@ -53,6 +53,8 @@ export function PortalsView({
   const [revision, setRevision] = useState(loaded);
   // The least time between requests to each company, in ms; null is the board's own pace.
   const [delays, setDelays] = useState(() => watched.map((c) => c.requestDelayMs ?? null));
+  // Companies whose portals.yml value the scanner ignores, until a save replaces it.
+  const [ignored, setIgnored] = useState(() => new Set(watched.flatMap((c, i) => (c.requestDelayIgnored ? [i] : []))));
   const [pacing, setPacing] = useState<{ index: number; draft: string; error?: string } | null>(null);
   const { jobs, startJob } = useJobs();
 
@@ -151,6 +153,7 @@ export function PortalsView({
       if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`);
       setRevision(body.revision);
       setDelays((all) => all.with(index, ms));
+      setIgnored((all) => new Set([...all].filter((i) => i !== index)));
       // The form goes away, so focus returns to the button that opened it.
       const active = document.activeElement;
       // Only while focus is still in the form: the user may have moved on to the search field.
@@ -280,16 +283,16 @@ export function PortalsView({
                       <button
                         type="button"
                         aria-expanded={pacing?.index === c.index}
-                        aria-label={`Wait between requests to ${c.name}${delays[c.index] ? `, ${delays[c.index]! / 1000} seconds` : ""}`}
+                        aria-label={`Wait between requests to ${c.name}${delays[c.index] ? `, ${delays[c.index]! / 1000} seconds` : ignored.has(c.index) ? ", the value in portals.yml is ignored" : ""}`}
                         data-pace={c.index}
                         title="Wait between requests"
-                        // Not `disabled`, as the switch: a save in flight keeps its editor until it lands.
+                        // Not `disabled`, as the switch: savePace returns focus here while the save is still pending.
                         aria-disabled={pending}
                         onClick={() => !pending && setPacing(pacing?.index === c.index ? null : { index: c.index, draft: delays[c.index] ? String(delays[c.index]! / 1000) : "" })}
                         className="inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded-md px-1 text-xs text-muted transition-colors hover:text-brand-text max-sm:min-h-[44px] max-sm:min-w-[44px]"
                       >
                         <Timer className="size-3.5" aria-hidden />
-                        {delays[c.index] ? `${delays[c.index]! / 1000} s` : null}
+                        {delays[c.index] ? `${delays[c.index]! / 1000} s` : ignored.has(c.index) ? <span title="request_delay_ms in portals.yml is not a whole number from 1 to 600000, so the scan ignores it">ignored</span> : null}
                       </button>
                       )}
                       {"index" in c && (
@@ -324,7 +327,7 @@ export function PortalsView({
                           max={600}
                           step="any"
                           autoFocus
-                          // A save in flight closes the editor when it lands, so the draft holds until then.
+                          // Read-only while a write is in flight, so the draft on screen is the one being saved.
                           readOnly={pending}
                           value={pacing.draft}
                           onChange={(e) => setPacing({ index: c.index, draft: e.target.value })}

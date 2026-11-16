@@ -69,13 +69,17 @@ test("a delay on the entry's dash line can change but not be removed", () => {
   assert.equal(setCompanyRequestDelayText(source, "Acme", null), null);
 });
 
-test("watchedCompanies carries a delay the scanner would apply and nothing for any other value", () => {
+test("watchedCompanies carries a delay the scanner would apply and flags any other value as ignored", () => {
   const withGlobex = (value) => yaml.load(PACED.replace("  - name: Globex\n", `  - name: Globex\n    request_delay_ms: ${value}\n`));
   assert.equal(watchedCompanies(withGlobex(1)).find((c) => c.name === "Acme").requestDelayMs, 10000);
   for (const value of [1, MAX_REQUEST_DELAY_MS]) assert.equal(watchedCompanies(withGlobex(value)).find((c) => c.name === "Globex").requestDelayMs, value);
   for (const value of ["fast", '"10000"', 1.5, 0, -5, MAX_REQUEST_DELAY_MS + 1]) {
-    assert.equal("requestDelayMs" in watchedCompanies(withGlobex(value)).find((c) => c.name === "Globex"), false, `value: ${value}`);
+    const globex = watchedCompanies(withGlobex(value)).find((c) => c.name === "Globex");
+    assert.equal("requestDelayMs" in globex, false, `value: ${value}`);
+    assert.equal(globex.requestDelayIgnored, true, `value: ${value}`);
   }
+  // No key is not an ignored value.
+  assert.equal("requestDelayIgnored" in watchedCompanies(yaml.load(PACED)).find((c) => c.name === "Globex"), false);
 });
 
 test("a deeper key of the same name is left alone", () => {
@@ -110,6 +114,11 @@ test("a value the scanner would ignore is 400 and the file is untouched", async 
     const { status } = await post({ company: "Acme", request_delay_ms: bad, revision: revisionOf(SOURCE) });
     assert.equal(status, 400, `value: ${String(bad)}`);
   }
+  assert.equal(readFileSync(portalsFile, "utf8"), SOURCE);
+});
+
+test("a request that also carries enabled is 400 and the file is untouched", async () => {
+  assert.equal((await post({ company: "Acme", enabled: false, request_delay_ms: 10000, revision: revisionOf(SOURCE) })).status, 400);
   assert.equal(readFileSync(portalsFile, "utf8"), SOURCE);
 });
 

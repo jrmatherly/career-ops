@@ -332,7 +332,7 @@ export const setCompanyEnabledText = (source, name, enabled) => setCompanyFieldT
 export const setCompanyRequestDelayText = (source, name, ms) => setCompanyFieldText(source, name, "request_delay_ms", ms);
 
 /**
- * @typedef {{ name: string, enabled: boolean, host: string, board: string, requestDelayMs?: number }} WatchedCompany
+ * @typedef {{ name: string, enabled: boolean, host: string, board: string, requestDelayMs?: number, requestDelayIgnored?: true }} WatchedCompany
  */
 
 /**
@@ -342,6 +342,9 @@ export const setCompanyRequestDelayText = (source, name, ms) => setCompanyFieldT
  * @param {Record<string, unknown>} doc
  * @returns {WatchedCompany[]}
  */
+// A value the scanner would ignore is flagged, so the page does not show the board as unpaced.
+const requestDelayOf = (ms) => (isRequestDelayMs(ms) ? { requestDelayMs: ms } : ms == null ? {} : { requestDelayIgnored: /** @type {const} */ (true) });
+
 export function watchedCompanies(doc) {
   const list = Array.isArray(doc.tracked_companies) ? doc.tracked_companies : [];
   const hostOf = (url) => {
@@ -354,6 +357,6 @@ export function watchedCompanies(doc) {
   return list
     .filter((c) => isMapping(c) && typeof c.name === "string" && c.name.trim())
     // The exact name: the Portals switch sends it back, and "Acme " is not "Acme".
-    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api), board: boardType(c), ...(isRequestDelayMs(c.request_delay_ms) ? { requestDelayMs: c.request_delay_ms } : {}) }))
+    .map((c) => ({ name: c.name, enabled: c.enabled !== false, host: hostOf(c.careers_url ?? c.api), board: boardType(c), ...requestDelayOf(c.request_delay_ms) }))
     .sort((a, b) => Number(b.enabled) - Number(a.enabled));
 }

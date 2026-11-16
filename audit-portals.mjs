@@ -71,7 +71,7 @@ import { getCareerOpsRoot } from './path-resolver.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { applyEntryResponseCap } from './lib/entry-response-cap.mjs';
 import { applyEntryTimeout } from './lib/entry-timeout.mjs';
-import { applyEntryPacing } from './lib/entry-pacing.mjs';
+import { applyEntryPacing, PROBE_MAX_REQUEST_DELAY_MS } from './lib/entry-pacing.mjs';
 import { DEFAULT_SMALL_THRESHOLD, isSmallBoard, smallBoardDetail } from './lib/small-board.mjs';
 
 // Anchored, not cwd-relative. Both paths below used to be bare relative
@@ -286,7 +286,7 @@ export async function auditCompanies(companies, {
         // this look like the company" without sweeping the board. The budget
         // wraps outermost and per entry; a shared one would run out four requests in.
         const { ctx, wasTripped, anySucceeded } = boundedProbeCtx(
-          applyEntryPacing(applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || makeHttpCtx()) }, entry), entry), entry),
+          applyEntryPacing(applyEntryTimeout(applyEntryResponseCap({ ...(httpCtx || makeHttpCtx()) }, entry), entry), entry, { maxDelayMs: PROBE_MAX_REQUEST_DELAY_MS }),
         );
         try {
           result.jobs = (await resolved.provider.fetch(entry, ctx)) || [];

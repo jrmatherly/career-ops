@@ -30,6 +30,7 @@ export async function POST(req: Request) {
   const body = await readJsonObject<{ roles?: string[]; location?: string[]; company?: unknown; enabled?: unknown; request_delay_ms?: unknown; revision?: unknown }>(req);
   if (!body) return Response.json({ error: "bad json" }, { status: 400 });
   if ("company" in body && "request_delay_ms" in body) {
+    if ("enabled" in body) return Response.json({ error: "send enabled and request_delay_ms in separate requests" }, { status: 400 });
     const ms = body.request_delay_ms;
     if (ms !== null && !isRequestDelayMs(ms)) {
       return Response.json({ error: `request_delay_ms must be null or a whole number from 1 to ${MAX_REQUEST_DELAY_MS}` }, { status: 400 });
