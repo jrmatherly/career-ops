@@ -154,8 +154,7 @@ export function isBlockedAddress(address) {
   // multicast and every unallocated block fall outside it.
   if (g[0] >> 13 !== 1) return true;
   if (g[0] === 0x2002) return true;                             // 6to4 2002::/16
-  if (g[0] === 0x2001 && g[1] === 0) return true;               // Teredo 2001::/32
-  if (g[0] === 0x2001 && g[1] === 2 && g[2] === 0) return true; // benchmarking 2001:2::/48
+  if (g[0] === 0x2001 && g[1] < 0x200) return true;             // IETF protocol assignments 2001::/23 (Teredo, benchmarking, ORCHID)
   if (g[0] === 0x2001 && g[1] === 0xdb8) return true;           // documentation 2001:db8::/32
   if (g[0] === 0x3fff && g[1] >> 12 === 0) return true;         // documentation 3fff::/20
   return false;

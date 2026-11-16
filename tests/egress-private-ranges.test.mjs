@@ -76,9 +76,12 @@ test('an IPv6 address outside global unicast 2000::/3 is blocked', () => {
 });
 
 test('unrouted prefixes inside 2000::/3 are blocked', () => {
-  const rows = ['2001:db8::1', '2001:2::1', '3fff::1', '3fff:fff:ffff::1'];
+  const rows = [
+    '2001:db8::1', '2001:2::1', '3fff::1', '3fff:fff:ffff::1',
+    '2001:1::1', '2001:1::2', '2001:3::1', '2001:20::1', '2001:2:1::1', '2001:1ff:ffff::1',
+  ];
   assert.deepEqual(rows.filter((a) => !isBlockedAddress(a)), []);
-  for (const a of ['2001:2:1::1', '2001:db9::1', '3ffe::1', '3fff:1000::1']) {
+  for (const a of ['2001:200::1', '2001:4860:4860::8888', '2001:db9::1', '3ffe::1', '3fff:1000::1']) {
     assert.equal(isBlockedAddress(a), false, a);
   }
 });
