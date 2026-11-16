@@ -47,7 +47,6 @@ test('the NAT64 local-use prefix 64:ff9b:1::/48 is blocked whole', () => {
     assert.equal(isBlockedAddress(a), true, a);
   }
   assert.equal(rejectPrivateOrInvalid('http://[64:ff9b:1::7f00:1]/')?.code, 'blocked_host');
-  assert.equal(isBlockedAddress('64:ff9b:2::808:808'), false, 'the next /48 is not the local-use prefix');
 });
 
 test('a string that is not an address is blocked', () => {
@@ -61,9 +60,32 @@ test('public IPv6 addresses pass in every spelling', () => {
     '2606:4700:4700::1111', '2606:4700:4700:0000:0000:0000:0000:1111', '2606:4700:4700:0:0:0:0:1111', '2606:4700:4700::1111'.toUpperCase(),
     '2001:4860:4860::8888', '2001:4860:4860:0000:0000:0000:0000:8888', '2001:4860:4860:0:0:0:0:8888', '2001:4860:4860::8888'.toUpperCase(),
     '64:ff9b::808:808', '64:ff9b::8.8.8.8',
+    ...['2400:cb00:2048::1', '2800:3f0:4001::200e', '2a00:1450:4001::200e', '2c0f:fb50:4002::200e']
+      .flatMap((c) => [c, c.replace('::', ':0:0:0:0:'), c.toUpperCase()]),
   ]) {
     assert.equal(isBlockedAddress(a), false, a);
   }
+});
+
+test('an IPv6 address outside global unicast 2000::/3 is blocked', () => {
+  const rows = [
+    'fc::1', 'fd::1', 'ff::1', 'fc0::1', 'fe8::1', 'feb::1', 'ff0::1',
+    'fec0::1', '100::1', '64:ff9b:2::808:808', '1::1', '4000::1', 'e000::1',
+  ];
+  assert.deepEqual(rows.filter((a) => !isBlockedAddress(a)), []);
+});
+
+test('unrouted prefixes inside 2000::/3 are blocked', () => {
+  const rows = ['2001:db8::1', '2001:2::1', '3fff::1', '3fff:fff:ffff::1'];
+  assert.deepEqual(rows.filter((a) => !isBlockedAddress(a)), []);
+  for (const a of ['2001:2:1::1', '2001:db9::1', '3ffe::1', '3fff:1000::1']) {
+    assert.equal(isBlockedAddress(a), false, a);
+  }
+});
+
+test('a zone id on an IPv4 address is malformed and blocked', () => {
+  assert.deepEqual(['1.2.3.4%eth0', '8.8.8.8%'].filter((a) => !isBlockedAddress(a)), []);
+  assert.equal(isBlockedAddress('2606:4700::1%eth0'), false);
 });
 
 test('a hostname that only looks like a private address passes the literal check', () => {

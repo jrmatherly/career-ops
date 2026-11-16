@@ -119,7 +119,8 @@ function v6Groups(addr) {
  *
  * Accepts both families. An IPv4-mapped or IPv4-compatible IPv6 address is
  * unwrapped and judged as IPv4 — `::ffff:127.0.0.1` is loopback however it is
- * spelled, and treating the two spellings differently is the bypass.
+ * spelled, and treating the two spellings differently is the bypass. Any
+ * other IPv6 address is allowed only inside global unicast 2000::/3.
  *
  * @param {string} address - Resolved IP literal, as dns.lookup returns it.
  * @returns {boolean} True when the address is private/loopback/reserved.
@@ -129,10 +130,11 @@ export function isBlockedAddress(address) {
   if (!raw) return true; // nothing to validate is not the same as safe
 
   // Strip an RFC 4007 zone id (fe80::1%eth0) before parsing.
-  const addr = raw.split('%')[0].toLowerCase();
+  const [addr, zone] = raw.toLowerCase().split('%');
 
   const asV4 = v4ToInt(addr);
   if (asV4 !== null) {
+    if (zone !== undefined) return true; // only IPv6 takes a zone id
     return V4_BLOCKED.some(([net, bits]) => {
       const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits)) >>> 0;
       return (asV4 & mask) >>> 0 === net;
@@ -147,16 +149,15 @@ export function isBlockedAddress(address) {
   // ::/96 holds unspecified (::) and loopback (::1), which read as 0.0.0.0 and 0.0.0.1.
   if (zero(0, 5) && (g[5] === 0 || g[5] === 0xffff)) return embeddedV4(); // IPv4-compatible ::/96, IPv4-mapped ::ffff:0:0/96
   if (zero(0, 4) && g[4] === 0xffff && g[5] === 0) return embeddedV4();   // IPv4-translated ::ffff:0:0:0/96
-  if (g[0] === 0x64 && g[1] === 0xff9b) {
-    if (zero(2, 6)) return embeddedV4();                  // NAT64 64:ff9b::/96
-    // Where the IPv4 sits in the local-use prefix depends on the operator's prefix length (RFC 6052 section 2.2).
-    if (g[2] === 1) return true;                          // NAT64 local-use 64:ff9b:1::/48
-  }
-  if (g[0] === 0x2002) return true;                       // 6to4 2002::/16
-  if (g[0] === 0x2001 && g[1] === 0) return true;         // Teredo 2001::/32
-  if ((g[0] & 0xfe00) === 0xfc00) return true;            // fc00::/7 unique local
-  if ((g[0] & 0xffc0) === 0xfe80) return true;            // fe80::/10 link-local
-  if (g[0] >> 8 === 0xff) return true;                    // ff00::/8 multicast
+  if (g[0] === 0x64 && g[1] === 0xff9b && zero(2, 6)) return embeddedV4(); // NAT64 64:ff9b::/96
+  // Allow-list: only global unicast 2000::/3 is public. Unique-local, link-local,
+  // multicast and every unallocated block fall outside it.
+  if (g[0] >> 13 !== 1) return true;
+  if (g[0] === 0x2002) return true;                             // 6to4 2002::/16
+  if (g[0] === 0x2001 && g[1] === 0) return true;               // Teredo 2001::/32
+  if (g[0] === 0x2001 && g[1] === 2 && g[2] === 0) return true; // benchmarking 2001:2::/48
+  if (g[0] === 0x2001 && g[1] === 0xdb8) return true;           // documentation 2001:db8::/32
+  if (g[0] === 0x3fff && g[1] >> 12 === 0) return true;         // documentation 3fff::/20
   return false;
 }
 
