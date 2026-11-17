@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Git pre-commit hook for this fork: refuse a newly added gitignored (user-layer)
-// file, token-shaped text in the staged diff and syntax errors. Edits and deletions of tracked files pass, so a leak can
-// be undone with rm --cached and upstream's tracked examples/.../cv.md can be
-// edited; --no-renames makes a rename onto an ignored name count as an addition.
+// file, token-shaped text in the staged diff and syntax errors. Edits and
+// deletions of tracked files pass, so a leak can be undone with rm --cached and
+// upstream's tracked examples/.../cv.md can be edited; --no-renames makes a
+// rename onto an ignored name count as an addition.
 // Every User Layer path is gitignored (enforced by
 // tests/user-layer-gitignored.test.mjs), so "staged and ignored" is the whole
 // personal-data check, with no path list to keep in sync.
@@ -29,12 +30,18 @@ if (hits.length) {
 
 // GitHub push protection refuses token-shaped text only at the push, after the review and
 // the commits built on it, so the staged diff is scanned here. A machine without gitleaks
-// commits unscanned: push protection is still behind it.
-const leaks = spawnSync('gitleaks', ['git', '--pre-commit', '--staged', '--no-banner', '--redact'], { cwd: root, stdio: 'inherit' });
+// commits unscanned: push protection is still behind it. A merge being concluded stages the
+// other side's whole history of changes, which its own repository already published.
+const LEAKS_FOUND = 3;
+const merging = spawnSync('git', ['rev-parse', '-q', '--verify', 'MERGE_HEAD'], { cwd: root }).status === 0;
+const leaks = merging ? { status: 0 } : spawnSync('gitleaks', ['git', '--pre-commit', '--staged', '--no-banner', '--redact', '--verbose', '--exit-code', String(LEAKS_FOUND), '--config', join(root, '.githooks', 'gitleaks.toml')], { cwd: root, stdio: 'inherit' });
 if (leaks.error?.code === 'ENOENT') {
   console.error('pre-commit: gitleaks is not on PATH, so the staged diff was not scanned for secrets.');
+} else if (leaks.status === LEAKS_FOUND) {
+  console.error('pre-commit: gitleaks found token-shaped text in the staged diff, at the file and line above. A test fixture builds such a value at run time; a real false positive takes a `gitleaks:allow` comment on its line.');
+  process.exit(1);
 } else if (leaks.status !== 0) {
-  console.error('pre-commit: gitleaks found token-shaped text in the staged diff (above). A test fixture builds such a value at run time; a real false positive takes a `gitleaks:allow` comment on its line.');
+  console.error(`pre-commit: the gitleaks scan did not run to the end (${leaks.error?.message ?? `exit ${leaks.status}`}), so the commit is refused. Fix what it reports above.`);
   process.exit(1);
 }
 

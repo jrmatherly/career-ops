@@ -1,0 +1,7 @@
+# Rules for the pre-commit secret scan (.githooks/pre-commit.mjs).
+# The default rules minus generic-api-key: it matches any long random-looking value
+# beside a word like "key", which here is the public search keys the provider suites
+# carry. The vendor-specific rules that stay are the ones GitHub push protection refuses.
+[extend]
+useDefault = true
+disabledRules = ["generic-api-key"]

@@ -1,7 +1,7 @@
 # Test suites start fixture servers that redirect and build scripts on purpose, and every
 # alert CodeQL raised on them was classified "test" (PR 104: alerts 28 to 30). The suites
-# are not shipped code, so they are left out of the JavaScript scan. paths-ignore applies
-# to interpreted languages only, so the Go scan is unchanged.
+# are not runtime code, so they are left out of the JavaScript scan. Neither directory holds
+# a Go or workflow file, so the other two scans read what they read before.
 paths-ignore:
   - 'tests/**'
   - 'web/tests/**'

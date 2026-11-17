@@ -72,9 +72,10 @@ const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--
 
 /**
  * What a finished `coderabbit review --agent --gate <GATE>` run established: {state: "findings",
- * findings} whenever its closing event says the gate is blocked, even from a partial review, so
- * they are declined and not skipped; {state: "clean"} only when the CLI exited 0, the gate passed
- * and no file was left unreviewed (`completed_with_warnings` is then still a full review), with
+ * findings} when its closing event says the gate is blocked, or reports findings without saying
+ * the gate passed (a partial review, a gate with no result), so they are declined and not
+ * skipped; {state: "clean"} only when the CLI exited 0, the gate passed with nothing blocking and
+ * no file was left unreviewed (`completed_with_warnings` is then still a full review), with
  * `belowGate` counting the findings under the gate; else null.
  */
 export function reviewResult(status, stdout) {
@@ -86,13 +87,14 @@ export function reviewResult(status, stdout) {
     } catch { /* not an event line */ }
   }
   if (!complete || !Number.isInteger(complete.findings)) return null;
-  if (complete.gate?.status === 'blocked') {
-    const blocking = complete.gate.blockingFindings;
-    return { state: 'findings', findings: Number.isInteger(blocking) && blocking > 0 ? blocking : Math.max(complete.findings, 1) };
-  }
+  const gate = complete.gate?.status;
+  const blocking = Number.isInteger(complete.gate?.blockingFindings) ? complete.gate.blockingFindings : 0;
+  if (gate === 'blocked' || blocking > 0) return { state: 'findings', findings: blocking || Math.max(complete.findings, 1) };
+  // Without a passed gate nothing says these are below it.
+  if (gate !== 'passed' && complete.findings > 0) return { state: 'findings', findings: complete.findings };
   // `review_skipped` is the CLI finding nothing to review, which is not a review.
   const full = complete.status === 'review_completed' && complete.outcome !== 'failed' && !(complete.unreviewedFileCount > 0);
-  if (status !== 0 || !full || complete.gate?.status !== 'passed') return null;
+  if (status !== 0 || !full || gate !== 'passed') return null;
   return { state: 'clean', findings: 0, ...(complete.findings > 0 && { belowGate: complete.findings }) };
 }
 

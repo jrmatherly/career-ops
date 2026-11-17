@@ -143,6 +143,20 @@ test('findings under the gate leave the review clean and are counted, and only t
   assert.deepEqual(pushVerdict(line(sha), repo), { refused: [], notes: [] });
   const mixed = event(5, { gate: { threshold: GATE, status: 'blocked', blockingFindings: 1 } });
   assert.deepEqual(reviewResult(2, mixed), { state: 'findings', findings: 1 });
+  assert.deepEqual(reviewResult(0, event(2, { gate: { status: 'passed', blockingFindings: 2 } })), { state: 'findings', findings: 2 }, 'a passed gate that counts blocking findings is not clean');
+});
+
+test('findings that no passed gate placed below it are findings, so they are declined and not skipped', (t) => {
+  const { repo, commit } = scratchRepo(t);
+  commit();
+  const unplaced = {
+    'a partial review with an incomplete gate': { status: 1, stdout: event(3, { outcome: 'failed', unreviewedFileCount: 2, gate: { status: 'incomplete' } }) },
+    'a closing event with no gate': { status: 0, stdout: event(2, { gate: undefined }) },
+  };
+  for (const [name, result] of Object.entries(unplaced)) {
+    assert.equal(main([], { cwd: repo, run: () => result }).code, 2, name);
+    assert.equal(main(['--skip', 'it only half ran'], { cwd: repo }).code, 1, name);
+  }
 });
 
 test('a review that failed, covered part of the diff or contradicts its exit status records nothing, unless it reports findings', (t) => {
