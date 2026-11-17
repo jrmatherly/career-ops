@@ -33,6 +33,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
+import { writeFileAtomic } from './tracker-utils.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { withJdArchiveSection } from './lib/jd-archive-section.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
@@ -669,10 +670,9 @@ ${evaluationText.replace(/---SCORE_SUMMARY---[\s\S]*?---END_SUMMARY---/, '').tri
       const additionHeader = postingUrl ? `${TSV_ADDITION_HEADER}\turl` : TSV_ADDITION_HEADER;
       saveStage = 'tracker addition';
       mkdirSync(PATHS.trackerAdditions, { recursive: true });
-      writeFileSync(
+      writeFileAtomic(
         join(PATHS.trackerAdditions, additionName),
         `${additionHeader}\n${trackerFields.join('\t')}\n`,
-        'utf-8',
       );
       console.log(`\n📊  Tracker addition saved: batch/tracker-additions/${additionName}`);
       console.log('    Run `node merge-tracker.mjs` to merge it into the tracker.');

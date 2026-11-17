@@ -92,9 +92,10 @@ test('batch-evaluate-gemini reads a bolded summary into clean tracker cells', ()
   const runner = join(dir, 'run-offer.mjs');
   writeFileSync(runner, `
 const { processOffer } = await import(process.argv[2]);
+(await import(new URL('./liveness-browser.mjs', process.argv[2]).href)).setHostResolver(async () => ['93.184.216.34']);
 const url = 'https://jobs.example.com/marrowfield/42';
 const page = {
-  route: async () => {}, goto: async () => {}, url: () => url, waitForTimeout: async () => {},
+  context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {}, goto: async () => {}, url: () => url, waitForTimeout: async () => {},
   evaluate: async () => ${JSON.stringify(JD)}.repeat(3), close: async () => {},
 };
 const result = await processOffer({ newPage: async () => page }, '- [ ] ' + url + ' | Marrowfield Grocers | Senior Data Analyst', 1,

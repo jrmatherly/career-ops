@@ -7,7 +7,8 @@
 
 import { classifyLiveness, jobIdToken, JOB_ID_PATTERN } from './liveness-core.mjs';
 import { BROWSER_LIKE_USER_AGENT } from './user-agent.mjs';
-import { SINKHOLE_ADDRESSES } from './providers/_ip-guard.mjs';
+import { SINKHOLE_ADDRESSES, isBlockedAddress } from './providers/_ip-guard.mjs';
+import { isIP } from 'node:net';
 import { browserLaunchOptions } from './lib/browser-launch.mjs';
 
 const NAVIGATE_TIMEOUT_MS = 15_000;
@@ -92,9 +93,14 @@ export function sameOrigin(frameUrl, pageUrl) {
 // instead of the posting. Presenting a normal desktop Chrome UA clears the wall
 // headlessly (the scan parser scripts/parsers/pracuj-jobs.mjs relies on the same
 // trick), so the common case never needs the slower headed-browser fallback.
+//
+// A service worker's sockets raise no Playwright event, so the recorder never
+// sees them, and no posting needs one to be read once, so registration is
+// blocked.
 export const LIVENESS_CONTEXT_OPTIONS = {
   userAgent: BROWSER_LIKE_USER_AGENT,
   locale: 'en-US',
+  serviceWorkers: 'block',
 };
 
 // Open a page in a context that already presents a realistic UA. Both callers use
@@ -143,39 +149,10 @@ export function createHostSpacer(baseMs, { now = Date.now, delay = jitteredDelay
   };
 }
 
-// Defensive guards: URLs come from ATS feeds (mostly trusted) but a misconfigured
-// portals.yml entry or a hijacked feed shouldn't be able to point Playwright at
-// internal infrastructure. Only allow http(s) and reject loopback/private/link-local.
-//
-// The hostname coming out of `new URL(...)` needs normalization before the regex
-// pass, because the WHATWG URL parser surfaces several encodings that bypass a
-// naive match against `parsed.hostname`:
-//   1. IPv6 hosts are serialized with brackets — `new URL('http://[::1]/').hostname`
-//      is `'[::1]'`, so a regex like `/^::1$/` never fires unless brackets are stripped.
-//   2. FQDN trailing dot is preserved — `localhost.` reaches the network as
-//      localhost, but `/^localhost$/` doesn't match it.
-//   3. IPv4-mapped IPv6 (`::ffff:127.0.0.1` or the hex form `::ffff:7f00:1`)
-//      routes to the embedded IPv4 in Chromium, so the embedded address must
-//      also be matched against the IPv4 block list.
-// `0.0.0.0` and the all-zeros IPv6 `::` both reach loopback on Linux and need
-// explicit entries; the original list omitted them.
-//
-// IPv6 ULA is fc00::/7 (RFC 4193): both fc00::/8 and fd00::/8. IPv6
-// link-local is fe80::/10 (RFC 4291): fe80–febf, not only the fe80: prefix.
-const PRIVATE_HOST_PATTERNS = [
-  /^localhost$/,
-  /^localhost\.localdomain$/,
-  /^0\.0\.0\.0$/,
-  /^127\./,
-  /^10\./,
-  /^192\.168\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^169\.254\./,
-  /^::1$/,
-  /^::$/,
-  /^f[cd][0-9a-f]{2}:/,
-  /^fe[89ab][0-9a-f]:/,
-];
+function isPrivateHost(host) {
+  if (host === 'localhost' || host === 'localhost.localdomain') return true;
+  return isIP(host) !== 0 && isBlockedAddress(host);
+}
 
 // Lowercase, strip IPv6 brackets, strip FQDN trailing dot. The `hostname`
 // returned by `new URL(...)` is already percent-decoded and IDNA-normalized,
@@ -221,13 +198,7 @@ export function rejectPrivateOrInvalid(url) {
     return { code: 'unsupported_protocol', reason: `unsupported protocol ${parsed.protocol}` };
   }
   const host = normalizeHost(parsed.hostname);
-  const mappedIPv4 = extractMappedIPv4(host);
-  const candidates = mappedIPv4 ? [host, mappedIPv4] : [host];
-  for (const candidate of candidates) {
-    if (PRIVATE_HOST_PATTERNS.some((pattern) => pattern.test(candidate))) {
-      return { code: 'blocked_host', reason: `blocked host ${parsed.hostname}` };
-    }
-  }
+  if (isPrivateHost(host)) return { code: 'blocked_host', reason: `blocked host ${parsed.hostname}` };
   return null;
 }
 
@@ -312,8 +283,8 @@ async function resolveDnsCached(hostname) {
 // Second layer of the egress guard: `rejectPrivateOrInvalid` only sees the
 // literal host, so a public hostname that *resolves* to private space still
 // gets through it. Resolve and re-check every address before the request is
-// allowed out. Exported so other Playwright callers (archive-posting.mjs) wire
-// up the same two-layer guard instead of growing a second implementation.
+// allowed out. Exported for upskill.mjs, lib/jd-page-fetch.mjs and the web
+// app's apply URL guard, so none of them grows a second implementation.
 export async function validateUrlSecurity(urlString) {
   const url = new URL(urlString.endsWith('.') ? urlString.slice(0, -1) : urlString);
   const hostname = url.hostname;
@@ -324,15 +295,244 @@ export async function validateUrlSecurity(urlString) {
   const blocked = [];
   for (const ip of addresses) {
     const norm = normalizeHost(ip);
-    const mapped = extractMappedIPv4(norm);
-    const candidates = mapped ? [norm, mapped] : [norm];
-    const hit = candidates.find((candidate) => PRIVATE_HOST_PATTERNS.some((pattern) => pattern.test(candidate)));
-    if (hit) blocked.push({ ip, hit });
+    if (isPrivateHost(norm)) blocked.push({ ip, hit: extractMappedIPv4(norm) ?? norm });
   }
   if (blocked.length > 0) {
     const denied = new Error(`Access denied: Egress guard blocked private target IP ${blocked[0].ip}`);
     if (blocked.every(({ hit }) => SINKHOLE_ADDRESSES.has(hit))) denied.livenessCode = 'dns_sinkhole';
     throw denied;
+  }
+}
+
+/**
+ * Register the egress guard on a Playwright context.
+ *
+ * Registered on the *context* rather than the page: a route bound to a single
+ * page doesn't cover a popup, and the context is what owns the whole
+ * navigation. Both layers of the shared guard run here — the literal-host check
+ * first (cheap, no network), then the DNS re-check that catches a public
+ * hostname resolving into private space.
+ *
+ * Playwright calls a route handler for the first URL of a request only, never
+ * for the hops a 3xx sends it to, and never for a WebSocket handshake. So this
+ * guard does not see a redirect target, of a navigation or of an image, script,
+ * stylesheet or fetch, and what such a hop answers does reach the page. Every
+ * caller that reads page content must also call `recordLandedUrls` on a new
+ * page, `rejectLandedUrl` before its first read, and the recorder's check after
+ * its last.
+ *
+ * Playwright attaches to no shared worker, so what one requests is not routed
+ * and raises no event. A service worker's HTTP requests are routed, but its
+ * sockets raise no event. Both are denied instead. The guard removes the
+ * `SharedWorker` constructor from every document before the page's scripts
+ * run, and the caller creates the context with `serviceWorkers: 'block'`.
+ * `tests/landed-url-guard-armed.test.mjs` pins that a page, or a new iframe in
+ * it, finds no constructor.
+ *
+ * @param {{ route: (pattern: string, handler: Function) => Promise<void>, addInitScript: (script: Function) => Promise<unknown> }} context - Context to guard.
+ */
+export async function installEgressGuard(context) {
+  await context.addInitScript(() => {
+    delete globalThis.SharedWorker;
+  });
+  await context.route('**/*', async (route) => {
+    const requestUrl = route.request().url();
+
+    const verdict = rejectPrivateOrInvalid(requestUrl);
+    if (verdict) {
+      console.warn(`   Blocked request to restricted destination: ${requestUrl} (${verdict.reason})`);
+      return route.abort('blockedbyclient');
+    }
+
+    try {
+      await validateUrlSecurity(requestUrl);
+    } catch (err) {
+      console.warn(`   Blocked request to restricted destination (DNS): ${requestUrl} - ${err.message}`);
+      return route.abort('blockedbyclient');
+    }
+    try {
+      return await route.continue();
+    } catch (err) {
+      console.warn(`   Request could not be continued, aborted: ${requestUrl} - ${err.message}`);
+      return route.abort('blockedbyclient').catch(() => {});
+    }
+  });
+}
+
+/**
+ * Judge the URL a page is on, by literal host and then by DNS. Call it after
+ * the navigation settles and before anything is read from the page, so a page
+ * already known bad is not read. What the page receives after that is judged
+ * by `recordLandedUrls`.
+ *
+ * Still open after both:
+ * - The request to a redirect hop is sent before any check sees it, with
+ *   whatever method and body the redirect keeps. Where the browser lets the
+ *   page's scripts read its answer, a hostile page can relay it to a public
+ *   host before the page closes. Only this tool's output is refused.
+ * - A lookup has no timeout.
+ * - A WebSocket is judged by its name, not by the address dialled. A name that
+ *   answers this module's lookup one way and Chromium's another (DNS
+ *   rebinding) is not caught for a socket.
+ * - A posting whose page opens a WebSocket to a name the local DNS sinkholes
+ *   or does not resolve is refused. That refusal is visible.
+ * - When Playwright fails for a reason other than a refusal, `upskill.mjs`
+ *   falls back to fetching the original URL from Node, which refuses any
+ *   redirect but connects with Node's own lookup.
+ * - `openrouter-runner.mjs` reads postings in a browser with none of these
+ *   guards.
+ * - WebTransport, WebRTC and prerendering were never tested.
+ * - Anything Playwright reports no event for is not seen.
+ * The structural fix is a filtering proxy in front of Chromium that resolves
+ * and connects by address.
+ *
+ * @param {string} url - `page.url()` after the navigation.
+ * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
+ */
+export async function rejectLandedUrl(url) {
+  const literal = rejectPrivateOrInvalid(url);
+  if (literal) return literal;
+  try {
+    await validateUrlSecurity(url);
+    return null;
+  } catch (err) {
+    return { code: 'blocked_host', reason: err.message };
+  }
+}
+
+// Empty is a frame with nothing committed yet. The rest hold what the parent
+// wrote or Chromium's own error page, never a host's answer.
+const HOSTLESS_FRAME_URL = /^$|^(?:about:blank|about:srcdoc|data:|blob:|chrome-error:)/;
+
+/**
+ * `rejectLandedUrl` for a page that is read with its frames, as a PDF render
+ * is: judges the page's URL and the URL every frame in it is on now.
+ *
+ * @param {{ url: () => string, frames: () => { url: () => string }[] }} page - Page to judge.
+ * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
+ */
+export async function rejectLandedPage(page) {
+  const frameUrls = page.frames().map((frame) => frame.url()).filter((url) => !HOSTLESS_FRAME_URL.test(url));
+  for (const url of new Set([page.url(), ...frameUrls])) {
+    const verdict = await rejectLandedUrl(url);
+    if (verdict) return verdict;
+  }
+  return null;
+}
+
+const blockedByAddress = ({ ipAddress }) => isBlockedAddress(normalizeHost(ipAddress));
+let dialledAddressBlocked = blockedByAddress;
+
+/**
+ * Swap the rule that says which dialled address is blocked, returning a restore
+ * function. A real-Chromium test reaches every name on loopback, which the real
+ * rule refuses, so it has to say which of its own listeners stands for a
+ * private host. Nothing is cached per rule, so a swap has nothing to clear.
+ *
+ * @param {((addr: { ipAddress: string, port: number }) => boolean)|null} judge -
+ *   Rule to install, or null to restore the real one.
+ * @returns {() => void} Restores the rule in place before this call.
+ */
+export function setDialledAddressJudge(judge) {
+  const previous = dialledAddressBlocked;
+  dialledAddressBlocked = judge ?? blockedByAddress;
+  return () => {
+    dialledAddressBlocked = previous;
+  };
+}
+
+/**
+ * Record what a page received, from now until its context closes: the address
+ * Chromium dialled for every response in the page's context (redirect hops,
+ * subresources, fetches, dedicated workers and popups included), every URL a
+ * frame of the page or of a popup committed to, and every WebSocket they
+ * opened. Call it on a new page, before its first navigation. Where a frame is
+ * at one moment proves nothing: a page can point its iframe at a private name
+ * while it is read and point it back before the next look.
+ *
+ * A response is judged by the address it came from, which is Chromium's own
+ * connection, so a name that answers this module's lookup one way and
+ * Chromium's another is still caught. A response Playwright gives no address
+ * for is judged by its URL, as frames and sockets are. A request the route
+ * guard aborted or a host that never answered has no response and refuses
+ * nothing.
+ *
+ * A socket is recorded when the page opens it, before it connects. A server
+ * can pass text to the page in its handshake or in a close frame's reason
+ * without sending a message.
+ *
+ * `tests/landed-url-guard.test.mjs` pins, in real Chromium, which frames and
+ * popups are refused, and `tests/landed-url-guard-received.test.mjs` which
+ * responses and sockets.
+ *
+ * Not seen: a shared worker, and a socket a service worker opens. Playwright
+ * raises no event for either, so they are denied instead of recorded (see
+ * `installEgressGuard`).
+ *
+ * @param {{ url: () => string, on: (event: string, listener: Function) => unknown, context: () => { on: (event: string, listener: Function) => unknown } }} page - Page to record.
+ * @returns {() => Promise<null|{code: string, reason: string}>} Call after the
+ *   last read of the page. It judges every address and URL recorded and the
+ *   page's URL now, each once, and returns null only when what was read may be
+ *   kept.
+ */
+export function recordLandedUrls(page) {
+  const committed = new Set();
+  const dialled = new Map();
+  const addressLookups = [];
+  const record = (url) => {
+    if (!HOSTLESS_FRAME_URL.test(url)) committed.add(url);
+  };
+  page.context().on('response', (response) => {
+    addressLookups.push(response.serverAddr().then(
+      (addr) => (addr ? dialled.set(`${addr.ipAddress} ${addr.port}`, addr) : record(response.url())),
+      () => record(response.url()),
+    ));
+  });
+  const watch = (watched) => {
+    watched.on('framenavigated', (frame) => record(frame.url()));
+    watched.on('websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
+    watched.on('popup', (popup) => {
+      record(popup.url());
+      watch(popup);
+    });
+  };
+  watch(page);
+  return async () => {
+    await Promise.all(addressLookups);
+    for (const addr of dialled.values()) {
+      if (dialledAddressBlocked(addr)) {
+        return { code: 'blocked_host', reason: `Access denied: a response came from private target IP ${addr.ipAddress}` };
+      }
+    }
+    for (const url of new Set([page.url(), ...committed])) {
+      const verdict = await rejectLandedUrl(url);
+      if (verdict) return verdict;
+    }
+    return null;
+  };
+}
+
+/**
+ * Await one read of a recorded page. When the read throws, the recorder gives
+ * its verdict before anything can be said about the failure, and the error
+ * raised here never repeats the one caught: a script in the page chooses the
+ * message and the name of what it throws, so both are page content.
+ *
+ * @template T
+ * @param {() => Promise<null|{code: string, reason: string}>} rejectVisited - The recorder's check for the page.
+ * @param {Promise<T>} pending - The read.
+ * @param {string} label - A fixed name for the read (`'pdf render'`, `'dom read'`),
+ *   so a failure says which read failed. Never page-derived text.
+ * @returns {Promise<T>} What the read returned.
+ * @throws {Error & { refused: null|{code: string, reason: string} }} `refused`
+ *   is the recorder's verdict: non-null when the page must be refused.
+ */
+export async function readLanded(rejectVisited, pending, label) {
+  try {
+    return await pending;
+  } catch {
+    const refused = await rejectVisited();
+    throw Object.assign(new Error(refused ? refused.reason : `a read of the page failed: ${label}`), { refused });
   }
 }
 

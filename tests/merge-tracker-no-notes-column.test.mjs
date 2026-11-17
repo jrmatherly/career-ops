@@ -71,7 +71,7 @@ ok('a re-evaluation updates the row and names the note, marker included', () => 
     const [row, ...others] = rows(env);
     assert.deepStrictEqual(others, []);
     assert.match(row, /\| 4\.4\/5 \| Applied \|/);
-    assert.match(output, /no Notes column, so its note was not written: Re-eval 2026-10-02 \(3\.5→4\.4\): referred/);
+    assert.match(output, /no Notes column, so its note was not written: Re-eval 2026-10-02 \(3\.5→4\.4\) — Superseded report \[10\] \(was 3\.5\/5\): referred/);
   });
 });
 

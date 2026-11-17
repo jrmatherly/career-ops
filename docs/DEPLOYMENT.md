@@ -149,5 +149,10 @@ The pod has no `.git`, so `update-system.mjs` is not the path: merge to `main`
 and let the image rebuild (a fork release tag, `career-ops-vX.Y.Z`, also builds
 the image under that version). On a Mac checkout the default
 `node update-system.mjs check` compares against the fork's latest release, and
-`--channel main` against an unreleased `main`. User CV template copies live at `/data/data/templates/`, on the
-volume, never in the image.
+`--channel main` against an unreleased `main`. `node update-system.mjs apply`
+is not supported on this fork. Shipped scripts import fork-local modules that
+`apply` does not deliver, so an install updated that way fails with
+`ERR_MODULE_NOT_FOUND`. Update a checkout with `git pull`.
+
+User CV template copies live at `/data/data/templates/`, on the volume, never
+in the image.

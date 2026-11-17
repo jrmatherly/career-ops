@@ -23,6 +23,9 @@
  *                                             # With more than 1, the inline sections
  *                                             # below run at the same time as the
  *                                             # discovered suites, in one of the N slots.
+ *   node test-all.mjs --shard <i>/<N>         # Run every Nth discovered suite, from the
+ *                                             # i-th, in discovery order. Only shard 1
+ *                                             # runs the inline sections.
  *
  *   A full run (anything but --only) waits for any other full run on this
  *   machine to finish first; CAREER_OPS_TEST_QUEUE=0 skips the wait. See
@@ -312,6 +315,12 @@ async function runDiscovered(filter = null, tools = null) {
     const what = [filter && `--only "${filter}"`, tools && `--needs ${tools.join(',')}`].filter(Boolean).join(' ');
     console.log(`  ❌ no test files matched${what ? ` ${what}` : ''} under tests/`);
     process.exit(1);
+  }
+  // After the empty check: a filter that leaves one shard nothing is not a typo.
+  files = inShard(files);
+  if (files.length === 0) {
+    console.log(`  ✅ shard ${SHARD.index}/${SHARD.count} is empty: the other shards hold every matching suite`);
+    return;
   }
   // One file gains nothing from a child process, and --jobs 1 is the original
   // in-process loop below: the fallback when a parallel run looks wrong, and
@@ -711,6 +720,22 @@ const JOBS = (() => {
 // with the serial runs those suites were written against.
 process.env.CAREER_OPS_TEST_JOBS = '1';
 
+// `--shard i/N`: this run takes every Nth discovered suite, from the i-th. Not
+// put in the environment: a test-all that a suite starts must not shard.
+const SHARD = (() => {
+  if (!hasFlag(process.argv, '--shard')) return null;
+  const raw = flagValue(process.argv, '--shard') ?? '';
+  const m = /^([1-9]\d*)\/([1-9]\d*)$/.exec(raw);
+  if (!m || Number(m[1]) > Number(m[2])) {
+    console.log(`  ❌ --shard takes i/N with 1 <= i <= N, e.g. --shard 2/3 (got "${raw}")`);
+    process.exit(1);
+  }
+  return { index: Number(m[1]), count: Number(m[2]) };
+})();
+function inShard(files) {
+  return SHARD ? files.filter((_, k) => k % SHARD.count === SHARD.index - 1) : files;
+}
+
 const ONLY = hasFlag(process.argv, '--only') ? (flagValue(process.argv, '--only') ?? '') : null;
 
 // `--needs browser,latex`: only the discovered suites that declare one of these
@@ -761,12 +786,19 @@ if (INLINE_CHILD === null) {
   }
 }
 
+// Shards 2..N run the discovered suites only; shard 1 runs the inline sections.
+if (INLINE_CHILD === null && SHARD && SHARD.index > 1) {
+  console.log(`\n🧪 career-ops test suite (--shard ${SHARD.index}/${SHARD.count}: discovered suites only)\n`);
+  await runDiscovered();
+  finish();
+}
+
 // More than one job: the inline sections go to a child and the discovered
 // suites start now, not after them. One suite gains nothing from a process of
 // its own, as in runDiscovered(), and none at all is the hard failure
 // runDiscovered() reports once the sections have run.
 if (INLINE_CHILD === null && JOBS > 1) {
-  const files = discoverTests(TESTS_DIR);
+  const files = inShard(discoverTests(TESTS_DIR));
   if (files.length > 1) {
     await runDiscoveredParallel(files, JOBS, { withInlineSections: true });
     finish();
@@ -2200,6 +2232,7 @@ try {
   function makeMockBrowser({ landedUrl = 'https://example.com/job/1' } = {}) {
     const state = { routeCallback: null, contextCreated: false, closed: false };
     const context = {
+      async addInitScript() {},
       async route(pattern, callback) {
         state.pattern = pattern;
         state.routeCallback = callback;
@@ -2211,8 +2244,10 @@ try {
             return { status: () => 200 };
           },
           url: () => landedUrl,
-          async waitForTimeout() { throw new Error(STOP); },
-          async title() { return ''; },
+          frames: () => [],
+          on() {}, context: () => ({ on() {} }),
+          async waitForTimeout() {},
+          async title() { throw new Error(STOP); },
           async $eval() { return ''; },
         };
       },
@@ -10746,7 +10781,7 @@ try {
   // on the shared contract means the check tracks the contract, not the spelling.
   // Presence of the string "tracker-additions" is deliberately NOT the test: a
   // comment satisfies that.
-  const writeSinkRe = /write(?:File|FileSync)\([\s\S]{0,200}?\$\{[A-Za-z0-9_]*(?:HEADER|Header)\}\\n\$\{([^}]+)\}/;
+  const writeSinkRe = /write(?:File|FileSync|FileAtomic)\([\s\S]{0,200}?\$\{[A-Za-z0-9_]*(?:HEADER|Header)\}\\n\$\{([^}]+)\}/;
   // ...and the payload has to BE the row. Accepting any identifier let a mutation
   // that replaced `${trackerFields.join('\t')}` with `${placeholder}` pass, which
   // is the failure-wearing-a-pass this check exists to stop. Either the join is
@@ -17444,11 +17479,11 @@ try {
         if (existsSync(join(ROOT, 'web', 'tests', 'lib'))) {
           fail('web/tests/lib contains no *.test.mjs — the #2185 unit suites are not being gated');
         }
-      } else if (run(NODE, ['--experimental-strip-types', '--test', ...webUnits], { timeout: 180000 }) !== null) {
+      } else if (run(NODE, ['--experimental-strip-types', '--test', ...webUnits], { timeout: Math.max(180_000, webUnits.length * 1_000) }) !== null) {
         pass('web pdf write-scope unit suites pass (#2185)');
       } else {
         // The signal distinguishes a timeout/kill from an assertion failure —
-        // run()'s default 30s is short for six suites in one child process.
+        // run()'s default 30s is far too short for every web/tests/lib suite in one child, so the budget grows by a second per file.
         const killed = lastRunFailure()?.signal;
         // Surface the child's own output, for the same reason the per-file
         // node:test path does (see runDiscovered): a bare "failed" is not

@@ -12,8 +12,11 @@
  *
  * Dedup: posting URL first, then report number, then company normalized + role fuzzy match
  * A duplicate is updated in place whether the score goes up, down or stays the same;
- * a downgrade records the superseded report number in notes (#2411)
+ * a re-evaluation that replaces the report records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
+ * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
+ * row is short of the header (a dry run only warns; --backfill-urls repairs a row
+ * short only by its URL cell)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -32,7 +35,7 @@ import { normalizeReportLink as normalizeLink } from './tracker-links.mjs';
 import { getCareerOpsRoot, resolveBatchStatePaths } from './path-resolver.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 import { parsePdfIndex, livePdfIndex, normNum } from './find.mjs';
-import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
+import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, parseTrackerRow, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
 // The ATS vendor table shared with analyze-patterns.mjs and the scanners, so
 // the URL cell's label and the per-vendor analysis name a board identically.
 import { atsVendorOf } from './ats-vendor.mjs';
@@ -630,11 +633,11 @@ export async function mergeTracker(options = {}) {
    * @param {number} oldScore - Score currently on the row.
    * @param {number} newScore - Score from the addition.
    * @param {string} [extraMarker] - Appended to the re-eval marker, before any
-   *   incoming notes. Used by the downgrade path to record the superseded report
-   *   (#2411). It rides on the marker rather than on `addition.notes` so that the
-   *   repeat detection below keeps comparing the user's own text against the
+   *   incoming notes. Used by a re-evaluation that replaces the Report cell to
+   *   record the superseded report (#2411). It rides on the marker rather than
+   *   on `addition.notes` so that the repeat detection below keeps comparing the user's own text against the
    *   user's own text — a generated fragment in that comparison would make every
-   *   downgrade look like a new note and defeat it.
+   *   re-evaluation look like a new note and defeat it.
    * @returns {string} Combined Notes cell.
    */
   function mergeNotes(existingNotes, addition, oldScore, newScore, extraMarker = '') {
@@ -1666,9 +1669,29 @@ export async function mergeTracker(options = {}) {
       );
     }
     const existingApps = [];
+    const shortRows = [];
+    // A numbered row under another table's header is not a tracker row. A block
+    // of rows with no header of its own (the tracker after a blank line) still is,
+    // so only a first line that a separator row follows counts as a header. With
+    // no recognised tracker header the legacy layout is in use, and the first
+    // block is the tracker whatever its first line says.
+    const trackerHeaderFound = appLines.some(line => isHeaderRow(line));
+    const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
+    // parseTrackerRow sizes a row by the last mapped column, so with an unmapped
+    // column after it a row missing an interior cell still passes, shifted.
+    const narrowerThanHeader = line => HEADER_WIDTH != null
+      && line.split('|').length + (line.trimEnd().endsWith('|') ? 0 : 1) < HEADER_WIDTH;
+    let underOtherHeader = false;
+    let inBlock = false;
+    let blocksSeen = 0;
     let maxNum = 0;
 
-    for (const line of appLines) {
+    for (const [at, line] of appLines.entries()) {
+      if (line.startsWith('|') && !inBlock) {
+        underOtherHeader = (trackerHeaderFound || blocksSeen > 0) && !isHeaderRow(line) && SEPARATOR_ROW_RE.test(appLines[at + 1] ?? '');
+        blocksSeen++;
+      }
+      inBlock = line.startsWith('|');
       // Skip only on the NaN check inside parseAppLine, which already rejects the
       // header and separator rows because neither has a numeric `#` cell. The old
       // `.includes('---') / .includes('Empresa')` heuristic was redundant for those
@@ -1681,10 +1704,14 @@ export async function mergeTracker(options = {}) {
       // below; this is the dedup half (#2265).
       if (!line.startsWith('|')) continue;
       const app = parseAppLine(line);
-      if (app) {
+      if (app && parseTrackerRow(line, COLMAP) && !narrowerThanHeader(line)) {
         existingApps.push(app);
         if (app.num > maxNum) maxNum = app.num;
+        continue;
       }
+      // A numbered row too short for parseAppLine is just as unmatchable.
+      const num = rowNum(line);
+      if (!isNaN(num) && num !== 0 && !underOtherHeader) shortRows.push(num);
     }
 
     // One-time backfill populating the URL column on existing
@@ -1758,6 +1785,18 @@ export async function mergeTracker(options = {}) {
       }
       trackerLock.release();
       return 0;
+    }
+    // A short row cannot be matched, so a re-evaluation of it would be appended
+    // as a second row and its TSV archived; a later fix to the row cannot undo
+    // that. Stop before any addition is read. A dry run writes nothing, so it
+    // only warns.
+    for (const num of shortRows) {
+      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} Row #${num} is short of the header, so an addition for it would be appended as a duplicate. Add the missing cell to that row in applications.md (or run --backfill-urls if only the URL cell is missing), then re-run.${DRY_RUN ? ' A real run stops here and merges nothing.' : ''}`);
+    }
+    if (shortRows.length && !DRY_RUN) {
+      console.error(`❌ Nothing merged: ${shortRows.length} tracker row(s) are short of the header. The additions are still pending.`);
+      trackerLock.release();
+      return 1;
     }
     // Full set of numbers already on the tracker (#1704). Deliberately broader than
     // the existingApps loop above: it reserves the number from any row with a
@@ -2306,14 +2345,14 @@ export async function mergeTracker(options = {}) {
         // the notes and report link are still fresher than what the row holds.
         //
         // Because the fuzzy matcher can mis-pair genuinely different roles (see
-        // role-matcher.mjs — "Senior" is a stopword and short tokens are dropped), a
-        // downgrade records the superseded report number so a bad match stays
-        // recoverable from the tracker alone. mergeNotes() keeps the existing cell
-        // verbatim and first, so a second downgrade preserves the earlier marker
-        // rather than overwriting it.
+        // role-matcher.mjs — "Senior" is a stopword and short tokens are dropped), any
+        // re-evaluation that replaces the Report cell records the superseded report
+        // number, so the old report and a bad match stay reachable from the tracker.
+        // mergeNotes() keeps the existing cell verbatim and first, so a second
+        // downgrade preserves the earlier marker rather than overwriting it.
         const downgrade = newScore < oldScore;
         const oldReportNum = extractReportNum(duplicate.report, duplicate.notes);
-        const supersededNote = downgrade && oldReportNum && oldReportNum !== reportNum
+        const supersededNote = oldReportNum && oldReportNum !== reportNum
           ? `Superseded report [${oldReportNum}] (was ${oldScore}/5)`
           : '';
 

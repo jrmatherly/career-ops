@@ -47,7 +47,8 @@ const uncovered = USER_PATHS.filter((entry) => {
 });
 check(uncovered.length === 0, `.dockerignore covers every USER_PATHS entry${uncovered.length ? `, missing: ${uncovered.join(', ')}` : ''}`);
 
-const LOCAL_ONLY = ['**/.env', '**/.env*.local', '**/.career-ops.env', '.mcp.json', 'private', '.codegraph', '.remember', '.claude/worktrees', '**/.next'];
+const LOCAL_ONLY = ['**/.env', '**/.env*.local', '**/.career-ops.env', '.mcp.json', 'private', '.codegraph', '.remember', '.claude/worktrees', '**/.next',
+  '.archify', '.impeccable', '.superpowers', '.career-ops-locks', '.claude/launch.json', '.claude/skill-stack.json', '**/*.bak*'];
 const missingLocal = LOCAL_ONLY.filter((pattern) => !ignoreLines.has(pattern));
 check(missingLocal.length === 0, `.dockerignore covers the local-only paths${missingLocal.length ? `, missing: ${missingLocal.join(', ')}` : ''}`);
 
@@ -71,6 +72,6 @@ check(steps.find((step) => /build and push/i.test(step.name ?? ''))?.with?.push 
   'docker-image.yml pushes only outside pull requests');
 check(triggers.push && !('paths' in triggers.push) && !('paths-ignore' in triggers.push),
   'docker-image.yml builds every push with no path filter');
-const PR_PATHS = ['Dockerfile', 'deploy/**', '.dockerignore', '.hadolint.yaml', 'package.json', 'web/package.json', 'web/package-lock.json', 'tests/cv-visual/Dockerfile', '.github/workflows/docker-image.yml'];
+const PR_PATHS = ['Dockerfile', 'deploy/**', 'publish/**', '.dockerignore', '.hadolint.yaml', 'package.json', 'web/package.json', 'web/package-lock.json', 'tests/cv-visual/Dockerfile', '.github/workflows/docker-image.yml'];
 check(JSON.stringify([...(triggers.pull_request?.paths ?? [])].sort()) === JSON.stringify([...PR_PATHS].sort()),
   'docker-image.yml builds pull requests that touch any image input');

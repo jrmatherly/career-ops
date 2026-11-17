@@ -3,8 +3,12 @@ name: "🧪 Tests"
 on:
   pull_request:
     branches: [main]
-  # Fork: work lands on branches and on main without a PR, so run on every push too.
+  # Fork: work also lands on main without a PR, so run on every push to main.
+  # A pushed branch runs through its pull request, which tests the merge result
+  # and classifies the whole PR. `branches:` alone means tag pushes (the release
+  # tags) run nothing. A branch with no PR runs only by workflow_dispatch.
   push:
+    branches: [main]
   workflow_dispatch:
 
 # Nothing in this workflow writes, and no other secret is referenced here, so
@@ -15,10 +19,11 @@ permissions:
   packages: read
 
 # A force-push supersedes the running matrix; cancel it instead of letting
-# stale legs occupy runners (8 jobs per push at this repo's PR volume).
+# stale legs occupy runners (11 jobs per push at this repo's PR volume).
+# A run on main finishes: cancelled, its always() aggregate job shows red on that commit.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -47,7 +52,7 @@ jobs:
   test:
     needs: changes
     # !cancelled() and not the implicit success(): a failed or skipped `changes`
-    # must still run this job (upstream requires its checks; this fork requires none).
+    # must still run this job (this fork requires no checks).
     # No `name:` on this job: tests/docs-only-change.test.mjs asserts it is unset.
     if: ${{ !cancelled() }}
     strategy:
@@ -55,7 +60,12 @@ jobs:
       # a platform-specific failure is exactly what this matrix exists to isolate.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            shard: 1/2
+          - os: windows-latest
+            shard: 2/2
     runs-on: ${{ matrix.os }}
     # Without a limit a hung job holds its runner for GitHub's default of six
     # hours. test-all.mjs kills a discovered suite that runs past its budget,
@@ -63,9 +73,8 @@ jobs:
     # own. The slowest leg (macOS) takes about 11 minutes.
     timeout-minutes: 30
     # A docs-only change (PR or push) runs the suite on Ubuntu only (#6402). The
-    # other two legs stay in the matrix and skip their steps, because upstream
-    # requires these three check names, and a job-level `if` cannot read `matrix`
-    # to skip just them.
+    # macOS leg and both Windows shards stay in the matrix and skip their steps,
+    # because a job-level `if` cannot read `matrix` to skip just them.
     # Ubuntu keeps the whole suite: about 45 test files read docs-type files, and
     # the inline sections of test-all.mjs scan every tracked file.
     env:
@@ -123,16 +132,42 @@ jobs:
         run: npm install --ignore-scripts
       - name: "🧪 Run the test suite"
         if: env.SKIP_LEG != 'true'
-        run: node test-all.mjs --quick
+        run: node test-all.mjs --quick ${{ matrix.shard && format('--shard {0}', matrix.shard) || '' }}
       - name: "🐹 Go dashboard tests"
         if: env.SKIP_LEG != 'true'
         run: go test ./...
         working-directory: dashboard
+      - name: "🐹 Go vet"
+        if: env.SKIP_LEG != 'true' && runner.os == 'Linux'
+        run: go vet ./...
+        working-directory: dashboard
+      - name: "🐹 Go lint"
+        if: env.SKIP_LEG != 'true' && runner.os == 'Linux'
+        run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...
+        working-directory: dashboard
+
+  test-result:
+    name: "✅ Test legs passed"
+    # The one check to require: the leg names change with the matrix, this name
+    # does not. always(), because a failed leg would otherwise skip this job, and
+    # a skipped job counts as passing. `changes` is left out: its failure is
+    # tolerated by design.
+    needs: [test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: "🧾 Fail unless every test leg passed"
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          echo "test legs: $TEST_RESULT"
+          [ "$TEST_RESULT" = success ]
 
   cv-visual:
     name: "🖼️ CV visual regression"
     # Not a required check: a red run blocks nothing here (the fork has no
-    # merge queue). It still runs on every push and PR, where a red result is
+    # merge queue). It still runs on every PR and every push to main, where a red result is
     # seen (#5723).
     needs: changes
     # Skipped for a docs-only PR too: nothing this job checks depends on what a
@@ -153,12 +188,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: "🐳 Pull the canonical CV rendering environment (build it if GHCR has none yet)"
-        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
-        # fresh fork or an unpublished Dockerfile change green.
+      - name: "🐳 Pull the canonical CV rendering environment (build it when tests/cv-visual/Dockerfile changed since that image)"
+        # Published by docker-image.yml from tests/cv-visual. The image records the
+        # commit it was built from; when this checkout's Dockerfile differs from that
+        # commit's, or GHCR has no image yet, build here so the change is what runs.
         run: |
-          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
-            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          img=ghcr.io/${{ github.repository }}-cv-visual:latest
+          if docker pull --platform linux/amd64 "$img" \
+            && rev=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$img") \
+            && [ -n "$rev" ] \
+            && git fetch --quiet --no-tags --depth=1 origin "$rev" \
+            && git diff --quiet "$rev" HEAD -- tests/cv-visual/Dockerfile; then
+            docker tag "$img" career-ops-cv-visual
           else
             docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
           fi
@@ -205,12 +246,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: "🐳 Pull the canonical CV rendering environment (build it if GHCR has none yet)"
-        # Published by docker-image.yml from tests/cv-visual; the fallback keeps a
-        # fresh fork or an unpublished Dockerfile change green.
+      - name: "🐳 Pull the canonical CV rendering environment (build it when tests/cv-visual/Dockerfile changed since that image)"
+        # Published by docker-image.yml from tests/cv-visual. The image records the
+        # commit it was built from; when this checkout's Dockerfile differs from that
+        # commit's, or GHCR has no image yet, build here so the change is what runs.
         run: |
-          if docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}-cv-visual:latest; then
-            docker tag ghcr.io/${{ github.repository }}-cv-visual:latest career-ops-cv-visual
+          img=ghcr.io/${{ github.repository }}-cv-visual:latest
+          if docker pull --platform linux/amd64 "$img" \
+            && rev=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$img") \
+            && [ -n "$rev" ] \
+            && git fetch --quiet --no-tags --depth=1 origin "$rev" \
+            && git diff --quiet "$rev" HEAD -- tests/cv-visual/Dockerfile; then
+            docker tag "$img" career-ops-cv-visual
           else
             docker build --platform linux/amd64 --tag career-ops-cv-visual tests/cv-visual
           fi

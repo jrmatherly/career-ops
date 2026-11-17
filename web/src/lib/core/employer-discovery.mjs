@@ -43,11 +43,13 @@ export function runEmployerWorker(
     if (signal?.aborted) abort();
     child.stdin.on("error", () => {});
     child.stdin.end(JSON.stringify(request));
+    child.stdout.setEncoding("utf8");
     child.stdout.on("data", (data) => {
       output += data;
       if (output.length > 16_000_000)
         stop("source response exceeded size limit");
     });
+    child.stderr.setEncoding("utf8");
     child.stderr.on("data", (data) => {
       warnings = (warnings + data).slice(-4000);
     });

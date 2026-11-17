@@ -257,9 +257,20 @@ before(() => {
   jobs = load(readFileSync(join(ROOT, '.github', 'workflows', 'test.yml'), 'utf8')).jobs;
 });
 
-test('the three required legs keep their names, so the checks still report', () => {
-  assert.deepEqual(jobs.test.strategy.matrix.os, ['ubuntu-latest', 'macos-latest', 'windows-latest']);
+test('the legs keep stable names', () => {
+  assert.deepEqual(jobs.test.strategy.matrix.os, ['ubuntu-latest', 'macos-latest']);
+  assert.deepEqual(jobs.test.strategy.matrix.include, [{ os: 'windows-latest', shard: '1/2' }, { os: 'windows-latest', shard: '2/2' }]);
   assert.equal(jobs.test.name, undefined, 'a job name would change the required check names');
+});
+
+test('one stably named job fails unless every test leg passed', () => {
+  const job = jobs['test-result'];
+  assert.equal(job.name, '✅ Test legs passed');
+  assert.deepEqual(job.needs, ['test'], 'the classifier is left out: its failure is tolerated');
+  assert.equal(job.if, '${{ always() }}', 'without always() a failed leg skips this job, and skipped counts as passing');
+  const [step] = job.steps;
+  assert.equal(step.env.TEST_RESULT, '${{ needs.test.result }}');
+  assert.match(step.run, /\[ "\$TEST_RESULT" = success \]/);
 });
 
 test('a failed or skipped classifier cannot stop the required legs', () => {
@@ -278,7 +289,7 @@ test('every step of a skipped leg is skipped, apart from the one saying why', ()
   for (const step of rest) {
     assert.match(String(step.if), /env\.SKIP_LEG != 'true'/, `step without the guard: ${step.name || step.run || step.uses}`);
   }
-  assert.ok(rest.some((step) => step.run === 'node test-all.mjs --quick'), 'the suite is still a step of this job');
+  assert.ok(rest.some((step) => /^node test-all\.mjs --quick\b/.test(step.run)), 'the suite is still a step of this job');
 });
 
 test('the optional jobs skip on a docs-only PR, and a failed classifier runs them', () => {

@@ -17,6 +17,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataFolderMissingMessage } from "./core/data-root.mjs";
 
+// generate-pdf bounds launch and goto but not fonts.ready or page.pdf; 180 s fits the run route's render budget.
+const RENDER_TIMEOUT_MS = 180_000;
+// Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
+const MARK_READY_TIMEOUT_MS = 120_000;
+// Node's spawn timeout sends SIGTERM and nothing else in the app signals these children; any other signal came from outside.
+export const stoppedBy = (step, ms, signal, stderr) => (signal === "SIGTERM"
+  ? `${step} was stopped after ${ms / 1000} seconds.`
+  : `${step} was killed by ${signal}. ${stderr.trim()}`.trim());
+
 /**
  * @typedef {Object} PdfRunSignals
  * @property {object|undefined} envelope - parseCvEnvelope's result for this run.
@@ -152,6 +161,7 @@ export function spawnGeneratePdf({ spawnFn, execPath, coreRoot, html, finalPdf, 
         cwd: coreRoot,
         windowsHide: true,
         env,
+        timeout: RENDER_TIMEOUT_MS,
       },
     );
     let stderr = "";
@@ -160,11 +170,11 @@ export function spawnGeneratePdf({ spawnFn, execPath, coreRoot, html, finalPdf, 
     // text the error message is built from.
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (d) => { stderr += d; });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const ok = code === 0;
       const after = pdfFingerprint(finalPdf);
       const landed = after !== null && after !== before;
-      resolve({ ok, delivered: ok && landed, stderr: stderr.trim() });
+      resolve({ ok, delivered: ok && landed, stderr: signal ? stoppedBy("PDF rendering", RENDER_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, delivered: false, stderr: `PDF rendering failed to start: ${e.message}` }));
   });
@@ -191,16 +201,17 @@ export function spawnAtsPdf({ spawnFn, execPath, coreRoot, html, finalPdf, forma
         cwd: coreRoot,
         windowsHide: true,
         env,
+        timeout: RENDER_TIMEOUT_MS,
       },
     );
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (d) => { stderr += d; });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const ok = code === 0;
       const after = pdfFingerprint(finalPdf);
       const landed = after !== null && after !== before;
-      resolve({ ok, delivered: ok && landed, stderr: stderr.trim() });
+      resolve({ ok, delivered: ok && landed, stderr: signal ? stoppedBy("ATS PDF rendering", RENDER_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, delivered: false, stderr: `ATS PDF rendering failed to start: ${e.message}` }));
   });
@@ -255,16 +266,19 @@ export function markTrackerReady({ spawnFn, execPath, coreRoot, reportNum, dataR
     const child = spawnFn(execPath, [path.join(coreRoot, "mark-pdf-ready.mjs"), reportNum, "--json"], {
       cwd: coreRoot,
       windowsHide: true,
+      timeout: MARK_READY_TIMEOUT_MS,
       ...(dataRoot ? { env: { ...process.env, CAREER_OPS_ROOT: dataRoot } } : {}),
     });
     let stdout = "";
     let stderr = "";
+    child.stdout.setEncoding("utf8");
     child.stdout.on("data", (d) => { stdout += d.toString(); });
+    child.stderr.setEncoding("utf8");
     child.stderr.on("data", (d) => { stderr += d.toString(); });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       let data = null;
       try { data = JSON.parse(stdout); } catch { /* not JSON, or exited before printing any */ }
-      resolve({ ok: code === 0, code, data, stderr: stderr.trim() });
+      resolve({ ok: code === 0, code, data, stderr: signal ? stoppedBy("mark-pdf-ready.mjs", MARK_READY_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, code: null, data: null, stderr: `mark-pdf-ready.mjs failed to start: ${e.message}` }));
   });

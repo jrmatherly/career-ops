@@ -46,9 +46,11 @@ function runJob(runner: string, id: string) {
       return;
     }
 
-    const append = (current: string, chunk: Buffer) => (current + chunk.toString()).slice(-MAX_OUTPUT);
-    child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
+    const append = (current: string, chunk: string) => (current + chunk.toString()).slice(-MAX_OUTPUT);
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => { stdout = append(stdout, chunk); });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => { stderr = append(stderr, chunk); });
 
     timeoutTimer = setTimeout(() => {
       if (settled) return;

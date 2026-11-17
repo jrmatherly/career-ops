@@ -1085,7 +1085,7 @@ rate_limit_delay() {
   # A log that exists and is empty has no header to find, and awk would print
   # nothing for it: skip the two processes. A missing log still reaches awk.
   hint=""
-  [[ -e "$log_file" && ! -s "$log_file" ]] || hint=$(LC_ALL=C awk -v cap="$RATE_LIMIT_SLEEP" '
+  [[ -e "$log_file" && ! -s "$log_file" ]] || hint=$(env LC_ALL=C awk -v cap="$RATE_LIMIT_SLEEP" '
     tolower($0) ~ /^[[:space:]]*retry-after:[[:space:]]*[0-9]+[[:space:]]*$/ {
       value=$0
       sub(/^[^:]*:[[:space:]]*/, "", value)
@@ -1480,7 +1480,7 @@ process_offer() {
         be_code=$(node -e '
           let d = "";
           process.stdin.on("data", (c) => d += c);
-          process.stdin.on("end", () => { try { process.stdout.write(String(JSON.parse(d).code || "")); } catch { /* none */ } });
+          process.stdin.on("end", () => { try { process.stdout.write(String(JSON.parse(d.split("\n").filter((l) => l.startsWith("{")).pop() ?? "").code || "")); } catch { /* none */ } });
         ' < "$be_err" 2>/dev/null) || be_code=""
         echo "    🎭 Browser extract failed${be_code:+ ($be_code)}"
         # Allowlist of transient failures worth another try. Everything else
@@ -2048,10 +2048,13 @@ process_offer() {
     fi
 
     # Check min-score gate
-    if is_decimal_number "$score" && LC_ALL=C awk -v min="$MIN_SCORE" 'BEGIN{exit !(min > 0)}'; then
+    if is_decimal_number "$score" && env LC_ALL=C awk -v min="$MIN_SCORE" 'BEGIN{exit !(min > 0)}'; then
       # LC_ALL=C: under a non-English locale awk parses "4.5" as 4, so the
       # MIN_SCORE comparison would silently run on truncated integers.
-      if LC_ALL=C awk -v score="$score" -v min="$MIN_SCORE" 'BEGIN{exit !(score < min)}'; then
+      # Every LC_ALL=C goes through `env`: as a shell prefix it makes bash reset
+      # its own locale, and with no LANG set Homebrew bash on macOS can crash
+      # doing that in a forked subshell (exit 139).
+      if env LC_ALL=C awk -v score="$score" -v min="$MIN_SCORE" 'BEGIN{exit !(score < min)}'; then
         local score_state_rc=0
         update_state_retrying "$id" "$url" "skipped" "$started_at" "$completed_at" "$report_num" "$score" "below-min-score" "$retries" || score_state_rc=$?
         if (( score_state_rc != 2 )); then
@@ -2156,7 +2159,7 @@ print_summary() {
     case "$sstatus" in
       completed) completed=$((completed + 1))
         if is_decimal_number "$sscore"; then
-          score_sum=$(LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
+          score_sum=$(env LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
           score_count=$((score_count + 1))
         fi
         ;;
@@ -2183,7 +2186,7 @@ print_summary() {
     local avg
     # LC_ALL=C: under e.g. a German locale awk formats "%.1f" as "4,5"
     # instead of "4.5", and a decimal comma breaks every downstream parser.
-    avg=$(LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
+    avg=$(env LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
     echo "Average score: $avg/5 ($score_count scored)"
   fi
 
@@ -2222,7 +2225,7 @@ print_status_table() {
       completed)
         completed=$((completed + 1))
         if is_decimal_number "$sscore"; then
-          score_sum=$(LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
+          score_sum=$(env LC_ALL=C awk -v sum="$score_sum" -v score="$sscore" 'BEGIN{print sum + score}' 2>/dev/null || echo "$score_sum")
           score_count=$((score_count + 1))
         fi
         ;;
@@ -2242,7 +2245,7 @@ print_status_table() {
     local avg
     # LC_ALL=C: under e.g. a German locale awk formats "%.1f" as "4,5"
     # instead of "4.5", and a decimal comma breaks every downstream parser.
-    avg=$(LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
+    avg=$(env LC_ALL=C awk -v sum="$score_sum" -v count="$score_count" 'BEGIN{printf "%.1f", sum / count}' 2>/dev/null || echo "N/A")
     echo "Average score: $avg/5 ($score_count scored)"
   fi
 

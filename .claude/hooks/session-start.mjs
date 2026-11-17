@@ -6,10 +6,21 @@
 //     printing only when an update exists (SessionStart stdout enters context).
 // Always exits 0: a failed chore must not block the session.
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = process.env.CLAUDE_PROJECT_DIR || join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// This checkout's .githooks, or the main checkout's when root is a linked worktree.
+function isForkHooksPath(root, value) {
+  // The native call also expands a Windows short name, which git and a temp path spell differently.
+  const real = (p) => { try { return realpathSync.native(p); } catch { return null; } };
+  const got = real(resolve(root, value));
+  if (!got) return false;
+  const commonDir = resolve(root, spawnSync('git', ['rev-parse', '--git-common-dir'], { cwd: root, encoding: 'utf-8' }).stdout.trim());
+  return [join(root, '.githooks'), join(dirname(commonDir), '.githooks')].some((p) => real(p) === got);
+}
 
 try {
   const git = (...args) => spawnSync('git', ['config', ...args], { cwd: root, encoding: 'utf-8' });
@@ -22,7 +33,7 @@ try {
       const note = shadowed ? ` (this clone now uses .githooks instead of the ${scope} core.hooksPath "${shadowed}")` : '';
       console.log(`Set git core.hooksPath to .githooks for this clone: the pre-commit hook now blocks newly added user-layer files and syntax errors.${note}`);
     }
-  } else if (local !== '.githooks') {
+  } else if (!isForkHooksPath(root, local)) {
     console.log(`WARNING: git core.hooksPath is "${local}" in this clone's local config, so the fork's pre-commit guard in .githooks is not active here.`);
   }
 } catch { /* git missing or not a repo: nothing to do */ }

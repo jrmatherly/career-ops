@@ -9,8 +9,8 @@ import (
 
 // Every platform variant must still compile.
 //
-// internal/data splits three times on build tags — tracker_process_*.go,
-// tracker_replace_*.go — and `go build` only ever compiles the variant for the
+// internal/data splits three ways on build tags in tracker_process_*.go, and
+// `go build` only ever compiles the variant for the
 // host. CI runs `go test ./...` on each runner, so the Windows files are
 // compiled by exactly one job: the Windows one, which is also the flakiest.
 //

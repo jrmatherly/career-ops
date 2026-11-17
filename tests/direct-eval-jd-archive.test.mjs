@@ -127,10 +127,11 @@ test('batch-evaluate-gemini writes the scraped JD into the report', (t) => {
   const driver = join(dir, 'driver.mjs');
   writeFileSync(driver, `
 const { processOffer, PATHS } = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'batch-evaluate-gemini.mjs')).href)});
+(await import(${JSON.stringify(pathToFileURL(join(ROOT, 'liveness-browser.mjs')).href)})).setHostResolver(async () => ['93.184.216.34']);
 PATHS.reports = ${JSON.stringify(join(dir, 'reports'))};
 PATHS.trackerAdditions = ${JSON.stringify(join(dir, 'tracker-additions'))};
 const browser = { newPage: async () => ({
-  url: () => 'https://example.com/job', route: async () => {}, goto: async () => {},
+  url: () => 'https://example.com/job', context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {}, goto: async () => {},
   waitForTimeout: async () => {}, evaluate: async () => ${JSON.stringify(JD)}, close: async () => {},
 }) };
 const evaluate = async () => ${JSON.stringify(`${BLOCKS}\n\n${SUMMARY}`)};

@@ -42,6 +42,7 @@ import { withPipelineLock } from './pipeline-lock.mjs';
 import { createAdmissionGate, formatSkipCounts } from './lib/admission-gate.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
+import { writeFileAtomic } from './tracker-utils.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { withJdArchiveSection } from './lib/jd-archive-section.mjs';
 import { locateApplyReport } from './apply-scope.mjs';
@@ -253,7 +254,9 @@ function saveBlacklist(set) {
   try {
     fs.mkdirSync(BLACKLIST_DIR, { recursive: true });
     fs.writeFileSync(BLACKLIST_FILE, JSON.stringify([...set], null, 2), 'utf-8');
-  } catch { }
+  } catch (err) {
+    console.warn(`⚠️  Could not save the model blacklist to ${BLACKLIST_FILE}: ${err.message}. Models blacklisted in this run may be tried again next run.`);
+  }
 }
 
 // Models that failed permanently (403, timeout, persistent 429) — never retry
@@ -365,7 +368,7 @@ function readSystemFile(relPath) {
 function writeFile(relPath, content) {
   const full = path.join(DATA_ROOT, relPath);
   fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, content, 'utf-8');
+  writeFileAtomic(full, content);
 }
 
 function fileExists(relPath) {

@@ -192,24 +192,24 @@ try {
     fail(`upgrade path regressed: ${upRow.trim()}`);
   }
 
-  if (!/Superseded report/.test(upRow) && !/DOWNGRADE/.test(up.output)) {
-    pass('upgrade does not add the superseded-report marker');
+  if (/Re-eval 2026-03-01 \(3\.8→4\.5\) — Superseded report \[7\] \(was 3\.8\/5\)/.test(upRow) && !/DOWNGRADE/.test(up.output)) {
+    pass('upgrade records the superseded report without calling it a downgrade');
   } else {
-    fail(`upgrade wrongly marked as a downgrade: ${upRow.trim()}`);
+    fail(`upgrade lost the superseded report: ${upRow.trim()}`);
   }
 
   // Equal scores write through too: the notes and report link are still fresher
-  // than what the row holds, and no superseded marker is warranted.
+  // than what the row holds.
   const same = runMergeDetailed({
     '10-initech.tsv': '10\t2026-03-02\tInitech\tPayments PM\tEvaluated\t3.8/5\t✅\t[10](reports/10-initech-2026-03-02.md)\tsame score, fresher read\n',
   }, { rows: SEED });
   const sameRow = same.tracker.split('\n').find(l => /\bInitech\b/.test(l)) || '';
 
-  if (/\[10\]/.test(sameRow) && /Re-eval 2026-03-02 \(3\.8→3\.8\)/.test(sameRow)
-      && !/Superseded report/.test(sameRow) && /🔄1 updated/.test(same.output)) {
-    pass('equal-scored re-evaluation writes through without a superseded marker');
+  if (/\[10\]/.test(sameRow) && /Re-eval 2026-03-02 \(3\.8→3\.8\) — Superseded report \[7\] \(was 3\.8\/5\)/.test(sameRow)
+      && /🔄1 updated/.test(same.output)) {
+    pass('equal-scored re-evaluation records the superseded report');
   } else {
-    fail(`equal-score re-eval mishandled: ${sameRow.trim()} | ${same.output.trim()}`);
+    fail(`equal-score re-eval lost the superseded report: ${sameRow.trim()} | ${same.output.trim()}`);
   }
 
   // --- Unscoreable re-evals must NOT overwrite a real score (#2803) -----------

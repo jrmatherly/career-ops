@@ -41,7 +41,9 @@ These come from `.claude/rules/dev-workflow.md` and the owner's standing instruc
 
 ## Owner decisions
 
-Each default below is what the plan does unless the owner says otherwise. Change a default before its task starts.
+**Decided 2026-11-16.** The owner's outcomes and the amendments they make to tasks are in [`decisions.md`](../research/2026-11-16-project-audit/decisions.md). Where that file differs from the table below or from a task's text, it wins: DOCS-1 is replaced by a docs edit (D2), DOCS-5 is dropped (D3), TEST-4 keeps `tests/set-status-lock-scope.test.mjs` (D9), and CORE-3, WEB-3, WEB-8, SEC-6b, TEST-2 and CI-7 are amended. The release is career-ops 2.6.1.
+
+The table records the defaults as first written.
 
 | # | Decision | Default in this plan | The other choice |
 | --- | --- | --- | --- |
@@ -113,7 +115,7 @@ CI-5 from the audit is not in the plan. Its finding was withdrawn, as the spec r
 - Consumes: None
 - Produces: the section `### Project audit fixes (2026-11-16)` with an empty four-column table, where later tasks append rows. The launch configuration `audit-web`, which FINAL-1 uses.
 
-- [ ] **Step 1: Create the worktree and the branch**
+- [x] **Step 1: Create the worktree and the branch**
 
 Run from the main checkout:
 
@@ -132,7 +134,7 @@ ls ../career-ops-audit-fixes/docs/superpowers/plans/2026-11-16-project-audit-fix
 
 Expected: both paths print. If either is missing, stop. The plan was not pushed to `main`.
 
-- [ ] **Step 2: Give the worktree its dependencies**
+- [x] **Step 2: Give the worktree its dependencies**
 
 Clone them from the main checkout. Do not run `npm install`: the root `package-lock.json` is gitignored, so an install would resolve the version ranges again and could differ from the main checkout.
 
@@ -144,12 +146,12 @@ cp -c -R ../career-ops/web/node_modules web/node_modules
 
 `web/node_modules` must be a clone and not a symlink, because Turbopack refuses a symlink.
 
-- [ ] **Step 3: Check which hooks run in the worktree**
+- [x] **Step 3: Check which hooks run in the worktree**
 
 Run: `git rev-parse --git-path hooks`
 Expected: the absolute path of the main checkout's `.githooks` directory. That is correct. The `commit-msg` and `pre-commit` wrappers there run `$(git rev-parse --show-toplevel)/.githooks/*.mjs`, which is this worktree's own copy. The `pre-push` wrapper runs the main checkout's `pre-push.mjs` on purpose.
 
-- [ ] **Step 4: Write the worktree's launch configuration**
+- [x] **Step 4: Write the worktree's launch configuration**
 
 `.claude/launch.json` is not tracked, so the worktree has none, and the main checkout's copy starts the main checkout's `web/`. Write this file in the worktree, replacing `<worktree>` with the output of `pwd`:
 
@@ -173,7 +175,7 @@ Expected: the absolute path of the main checkout's `.githooks` directory. That i
 Run: `git status --short .claude/launch.json`
 Expected: no output, because the file is excluded.
 
-- [ ] **Step 5: Append the deviations section**
+- [x] **Step 5: Append the deviations section**
 
 Append this after the last section under "Deviations decided" in `.claude/skills/upstream-review/SKILL.md`:
 
@@ -186,7 +188,7 @@ Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `doc
 | --- | --- | --- | --- |
 ```
 
-- [ ] **Step 6: Run the baseline and commit**
+- [x] **Step 6: Run the baseline and commit**
 
 Run: `node scripts/check-syntax.mjs && node --test tests/fork-deviations-covered.test.mjs`
 Expected: a line that ends `.mjs files passed syntax check.` and then PASS. An empty table section passes the deviations test.
@@ -343,7 +345,7 @@ git commit -m "docs(security): record the canary result"
 - Consumes: `parseTrackerRow(line, colmap = LEGACY_COLMAP, { allowTabs = false, allowIndentation = false } = {}) → object|null` from `tracker-parse.mjs`; `COLMAP` and `parseAppLine(line)` inside `mergeTracker` in `merge-tracker.mjs`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // tests/merge-tracker-short-row.test.mjs: a row short of the header is not rewritten by a merge.
@@ -396,12 +398,12 @@ test('a complete row with no trailing pipe is still matched and updated', (t) =>
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/merge-tracker-short-row.test.mjs`
 Expected: the first test FAILS with `row #1 was rewritten:`. The rewritten row reads `| 1 | 2026-02-01 | Acme | Data Engineer | 4.5/5 | Applied | ❌ | [2](reports/002-acme-2026-02-01.md) | https://jobs.acme.com/1. Re-eval 2026-02-01 (3→4.5): re-eval | [jobs.acme.com](https://jobs.acme.com/1) |`. The second test already PASSES. It guards the fix, so that the gate never treats a complete row with no trailing pipe as short.
 
-- [ ] **Step 3: Gate the `existingApps` loop in `mergeTracker` with `parseTrackerRow(line, COLMAP)`**
+- [x] **Step 3: Gate the `existingApps` loop in `mergeTracker` with `parseTrackerRow(line, COLMAP)`**
 
 Add `parseTrackerRow` to the `./tracker-parse.mjs` import on line 35. In the loop that starts `for (const line of appLines) {` right after `const existingApps = [];`, replace the `if (app) {` branch so that it reads:
 
@@ -417,12 +419,12 @@ Add `parseTrackerRow` to the `./tracker-parse.mjs` import on line 35. In the loo
 
 The row keeps its number, because the `usedNumbers` pass (the loop after `const MAX_COL_IDX = Math.max(...Object.values(COLMAP));`) reads every row with a numeric `#` cell. An addition for the same posting is then added as a new row with a new number. That is the deliberate trade. A visible duplicate the user can remove is better than a silent rewrite. Leave `parseAppLine` and the `--backfill-urls` path as they are.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/merge-tracker-short-row.test.mjs && node test-all.mjs --quick --only merge-tracker`
 Expected: PASS. The second command reports `275 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Add this row to the deviations table in `.claude/skills/upstream-review/SKILL.md`, under `### Project audit fixes (2026-11-16)` (opened by PREP-1):
 
@@ -458,7 +460,7 @@ The web writer (`web/src/lib/report-persist.mjs` → `persist-evaluation-report.
 - Consumes: `writeFileAtomic(path, content, { mode } = {}) → void` from `tracker-utils.mjs:786`. It writes `.<name>.<pid>.<time>.<uuid>.tmp` in the same directory with `writeFileSync`, then renames it over `path`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The sandbox and fetch hook come from `tests/gemini-eval-jd-once.test.mjs`. A CommonJS preload makes a direct write to a final addition file store 19 characters and throw ENOSPC, as `tests/batch-evaluate-gemini-pipeline-atomic.test.mjs` does for `pipeline.md`. The temp file of `writeFileAtomic` starts with a dot, so the preload lets it through. The test relies on the fixture having no `data/applications.md`. gemini-eval runs `merge-tracker.mjs` after it saves, and with no tracker the merge leaves the addition in place.
 
@@ -527,12 +529,12 @@ globalThis.fetch = async (url, init) => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/tracker-addition-atomic-write.test.mjs`
 Expected: FAIL with `partial addition on disk: "num\tdate\tcompany\tro"`.
 
-- [ ] **Step 3: Replace each tracker-addition `writeFileSync` with `writeFileAtomic(path, content)` from `./tracker-utils.mjs`**
+- [x] **Step 3: Replace each tracker-addition `writeFileSync` with `writeFileAtomic(path, content)` from `./tracker-utils.mjs`**
 
 - `gemini-eval.mjs`. Swap the `writeFileSync(trackerPath, …, 'utf-8')` call for `writeFileAtomic(trackerPath, …)`. Add `import { writeFileAtomic } from './tracker-utils.mjs';` after the `./tracker-parse.mjs` import.
 - `ollama-eval.mjs` and `openai-eval.mjs`. The call spans five lines and starts `writeFileSync(` followed by `join(PATHS.trackerAdditions, additionName),`. Rename it to `writeFileAtomic(` and delete its `'utf-8',` line. Add `import { writeFileAtomic } from './tracker-utils.mjs';` after the `./path-resolver.mjs` import.
@@ -541,12 +543,12 @@ Expected: FAIL with `partial addition on disk: "num\tdate\tcompany\tro"`.
 
 `writeFileAtomic` writes a string as UTF-8, so no encoding argument is passed. Content is unchanged everywhere, including the missing trailing newline in openrouter's TSV. Only the gemini-eval case gets a spawn test, because each other writer needs its own model-API stub. The `git grep` in Step 4 holds the other four.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/tracker-addition-atomic-write.test.mjs && git grep -nE "writeFileSync\((trackerPath|full,|join\(PATHS\.trackerAdditions)|writeFileSync\($" -- gemini-eval.mjs ollama-eval.mjs openai-eval.mjs batch-evaluate-gemini.mjs openrouter-runner.mjs; node test-all.mjs --quick --only openrouter && node test-all.mjs --quick --only eval-`
 Expected: the test PASSES. The `git grep` prints nothing; before Step 3 it printed exactly the five call sites, the two multi-line ones as `writeFileSync(`. The openrouter and `eval-` suites pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -580,7 +582,7 @@ CORE-1 runs first and edits the `existingApps` loop of the same file, which move
 - Consumes: `mergeNotes(existingNotes, addition, oldScore, newScore, extraMarker = '')` and `extractReportNum(report, notes)` inside `mergeTracker` in `merge-tracker.mjs`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `tests/merge-tracker.test.mjs`, replace the two "no marker" checks with positive ones. The seed row is `| 7 | … | 3.8/5 | … | [7](../reports/7-initech-2026-02-01.md) | …`. Replace the block that starts `if (!/Superseded report/.test(upRow) && !/DOWNGRADE/.test(up.output)) {` with:
 
@@ -609,12 +611,12 @@ In `tests/merge-tracker-no-notes-column.test.mjs`, in the test `'a re-evaluation
 /no Notes column, so its note was not written: Re-eval 2026-10-02 \(3\.5→4\.4\) — Superseded report \[10\] \(was 3\.5\/5\): referred/
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `node test-all.mjs --quick --only merge-tracker`
 Expected: `3 failed`. They are `upgrade lost the superseded report:`, `equal-score re-eval lost the superseded report:`, and `a re-evaluation updates the row and names the note, marker included — The input did not match the regular expression`.
 
-- [ ] **Step 3: In `mergeTracker`, drop `downgrade &&` from the `supersededNote` condition**
+- [x] **Step 3: In `mergeTracker`, drop `downgrade &&` from the `supersededNote` condition**
 
 The line `const supersededNote = downgrade && oldReportNum && oldReportNum !== reportNum` becomes `const supersededNote = oldReportNum && oldReportNum !== reportNum`. The text stays `` `Superseded report [${oldReportNum}] (was ${oldScore}/5)` ``. `downgrade` still drives the `🔽` log line and the `DOWNGRADE` word. In the comment above it, replace the sentence that starts `a downgrade records the superseded report number` so the comment reads:
 
@@ -627,12 +629,12 @@ The line `const supersededNote = downgrade && oldReportNum && oldReportNum !== r
 
 Keep the rest of that comment (`mergeNotes() keeps the existing cell verbatim and first, …`) as it is. `verify-pipeline.mjs` already treats this marker as linking the old report (`tests/verify-pipeline-reeval-duplicates.test.mjs:50-52`).
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `node test-all.mjs --quick --only merge-tracker && node test-all.mjs --quick --only reeval && node test-all.mjs --quick --only reply-matcher`
 Expected: PASS. `merge-tracker` reports `275 passed, 0 failed` with CORE-1 landed, and `reeval` reports `65 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -662,7 +664,7 @@ CORE-1 and CORE-3 both edit `merge-tracker.mjs` in different regions. Land CORE-
 - Consumes: `acquireDirLock(lockDir, options)` and `releaseOrWarn(lock)` from `lib/dir-lock.mjs` (already imported at `outcome.mjs:43`); `writeFileAtomic(path, content)` from `tracker-utils.mjs`; `failExit(msg, code, exitCode)` in `outcome.mjs`, which calls `process.exit`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 A preload makes every write to `outcome.md`, or to its `.outcome.md.*` temp file, store 10 characters and throw ENOSPC. `CAREER_OPS_ACTIVITY_DIR` keeps set-status's session markers in the temp directory instead of `.career-ops-locks/` in the checkout.
 
@@ -725,12 +727,12 @@ fs.writeFileSync = (f, c, o) => { const b = typeof f === 'string' ? path.basenam
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/outcome-journal-atomic.test.mjs`
 Expected: FAIL with `the journal was truncated`. The file holds the first 10 characters of the new journal.
 
-- [ ] **Step 3: Wrap the journal block in the outcome-directory lock and write with `writeFileAtomic`**
+- [x] **Step 3: Wrap the journal block in the outcome-directory lock and write with `writeFileAtomic`**
 
 Add `writeFileAtomic,` to the `./tracker-utils.mjs` import list after `resolveWorkspaceRoot,`. Replace the whole `try { … } catch (err) { failExit(\`Tracker updated, but outcome journal could not be saved: …\`) }` block under the comment `// Publish the committed journal only after set-status confirms the transition.` with this, keeping the comment:
 
@@ -766,12 +768,12 @@ if (journalError) failExit(`Tracker updated, but outcome journal could not be sa
 
 The lock options are the ones the CV snapshot uses at `:415-417`. `failExit` runs after the `finally`, because `failExit` calls `process.exit` and would otherwise leave the lock behind. Reusing the CV lock directory gives each application directory one lock, so no second lock name is introduced.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/outcome-journal-atomic.test.mjs tests/outcome-journal-fork.test.mjs tests/outcome-cv-lock-error.test.mjs && node test-all.mjs --quick --only outcome`
 Expected: PASS. The first command reports `pass 8`, and the second `163 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -804,7 +806,7 @@ Which rule wins. When the file has a Pending heading, that section wins. It is w
 - Consumes: `sectionKind(line) → 'pending'|'processed'|null` from `lib/pipeline-sections.mjs`.
 - Produces: `export function pendingRange(lines: string[]): { start: number, end: number }` in `lib/pipeline-sections.mjs`, a half-open range of line indexes. With a Pending heading, `start` is the index after the first line whose `sectionKind` is `'pending'`, and `end` is the index of the next line matching `/^##\s+/`, or `lines.length`. With no Pending heading, `start` is 0 and `end` is the index of the first line whose `sectionKind` is `'processed'`, or `lines.length`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The URLs use `jobs.example.com`, because `parsePending` drops a reserved host such as `x.test`.
 
@@ -836,12 +838,12 @@ test('pendingRange', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/pipeline-pending-range.test.mjs`
 Expected: FAIL with `SyntaxError: The requested module '../lib/pipeline-sections.mjs' does not provide an export named 'pendingRange'`. With only the export added, `no heading` fails with `AssertionError [ERR_ASSERTION]: sync-batch-input`, and the other two fail with `AssertionError [ERR_ASSERTION]: rank-pipeline`.
 
-- [ ] **Step 3: Add `pendingRange(lines)` to `lib/pipeline-sections.mjs` and use it in `parsePending` and `parsePendingEntries`**
+- [x] **Step 3: Add `pendingRange(lines)` to `lib/pipeline-sections.mjs` and use it in `parsePending` and `parsePendingEntries`**
 
 Append to `lib/pipeline-sections.mjs`:
 
@@ -869,12 +871,12 @@ In `sync-batch-input.mjs`, change the import to `import { pendingRange } from '.
 
 In `rank-pipeline.mjs`, add `import { pendingRange } from './lib/pipeline-sections.mjs';` after the `./lib/is-main-module.mjs` import. In `parsePendingEntries`, add `const { start, end } = pendingRange(lines);` after `lines` is built, and make the first line of the `forEach` callback `if (index < start || index >= end) return;`. Keep `index` as the absolute line index, because the annotation write uses it, and keep the `'- [ ] '` and `RANK_LABEL` filters.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/pipeline-pending-range.test.mjs tests/pipeline-sections.test.mjs && node test-all.mjs --quick --only rank-pipeline && node test-all.mjs --quick --only sync-batch-input && node test-all.mjs --quick --only pipeline && node --test web/tests/lib/pipeline-sections-parity.test.mjs`
 Expected: PASS. `rank-pipeline` reports `62 passed`, `sync-batch-input` `111 passed`, `pipeline` `161 passed`, all with `0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -900,7 +902,7 @@ git commit -m "fix(pipeline): rank and batch-queue the same pending lines"
 - Consumes: `callOpenRouter(system, user)` and `blacklistedModels` exported from `openrouter-runner.mjs`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/openrouter-runner-blacklist-save-warning.test.mjs`. Its first lines are a header comment naming the file. Then copy lines 15-102 of `tests/openrouter-runner-429-reset.test.mjs` unchanged except for two edits. Those lines hold the imports, `ROOT`, `MODEL_A`, `MODEL_B`, `scriptedFetch`, `loadRunner`, `callOnce` and `withRunner`, ending at the closing brace of `withRunner`. The first edit adds `mkdirSync` to the `node:fs` import, so it reads `import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';`. The second changes the module query key in `loadRunner` from `?429-reset=` to `?blacklist-save=`. Then append this test. It creates the blacklist path as a directory inside the `withRunner` body, after the runner is loaded, so the save throws `EISDIR`. The load reads that path in a `try`, so the directory does no harm there.
 
@@ -922,12 +924,12 @@ test('a blacklist that cannot be saved is reported', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/openrouter-runner-blacklist-save-warning.test.mjs`
 Expected: FAIL with `expected a blacklist-save warning, got []`.
 
-- [ ] **Step 3: In `saveBlacklist`, turn `catch { }` into `catch (err)` with one warning**
+- [x] **Step 3: In `saveBlacklist`, turn `catch { }` into `catch (err)` with one warning**
 
 ```js
   } catch (err) {
@@ -935,12 +937,12 @@ Expected: FAIL with `expected a blacklist-save warning, got []`.
   }
 ```
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/openrouter-runner-blacklist-save-warning.test.mjs && node test-all.mjs --quick --only openrouter`
 Expected: PASS. With CORE-2 landed, `openrouter` reports `39 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -969,7 +971,7 @@ CORE-2 and CORE-6 both edit `openrouter-runner.mjs` in different functions. CORE
 - Consumes: `findUnarchivedApplications(trackerPath, reportsDir, jdsDir, statesPath = STATES_FILE)` in `check-jd-archive.mjs`. It returns `Array<{type, row, company, role, status, detail}>`, where `row` is the tracker number as a number.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // tests/check-jd-archive-assessment.test.mjs: a sent application in Assessment is flagged when it has no JD archive.
@@ -1002,21 +1004,21 @@ test('a sent application in Assessment with no report or capture is flagged', (t
 
 Row 3 uses the `screening` alias, so the test also proves the alias resolves to Assessment. Row 4 stays out because Evaluated was never sent.
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/check-jd-archive-assessment.test.mjs`
 Expected: FAIL with `actual: [ [ 1, 'Applied' ] ]` against `expected: [ [ 1, 'Applied' ], [ 2, 'Assessment' ], [ 3, 'Assessment' ] ]`.
 
-- [ ] **Step 3: Add `'Assessment'` to `SUBMITTED_LABELS` in `check-jd-archive.mjs`**
+- [x] **Step 3: Add `'Assessment'` to `SUBMITTED_LABELS` in `check-jd-archive.mjs`**
 
 Insert it after `'Responded'`. The line becomes `const SUBMITTED_LABELS = new Set(['Applied', 'Responded', 'Assessment', 'Interview', 'Offer', 'Hired', 'Rejected']);`, in states.yml order.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/check-jd-archive-assessment.test.mjs && node --test tests/jd-tracker-capture-formats.test.mjs && node check-jd-archive.mjs --self-test && node test-all.mjs --quick --only jd-archive`
 Expected: PASS. `--self-test` (`check-jd-archive.mjs:123`) prints `check-jd-archive self-test: 103 passed, 0 failed`, and `jd-archive` reports `27 passed, 0 failed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1060,7 +1062,7 @@ Why the test reads source. Node cannot import `job-store.tsx` (`ERR_UNKNOWN_FILE
 
 Every web unit test in this phase runs from `web/` in the same form as `npm test` (`web/package.json`), with `node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test <file>`. On Node 24 the tests also pass with plain `node --test`, because Node 24 strips types by default and the preload only sets `CAREER_OPS_SETTINGS=off`. Use the one form throughout. The first `npm run typecheck` after an edit can report a spurious `src/lib/core/scan.ts` `datasetStatus` error (`web/tsconfig.json` sets `incremental: true`), so run it once more before treating that error as real.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // Dismissing a running worker must stop its run, and its control must say so.
@@ -1088,12 +1090,12 @@ test("removeJob aborts the run request, and an aborted run reports nothing", () 
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/worker-dismiss-stops-run.test.mjs`
 Expected: FAIL with `SyntaxError: The requested module '../../src/lib/worker-feedback.mjs' does not provide an export named 'workerDismissLabel'`
 
-- [ ] **Step 3: Add `workerDismissLabel` and an AbortController per job in `JobsProvider`**
+- [x] **Step 3: Add `workerDismissLabel` and an AbortController per job in `JobsProvider`**
 
 In `web/src/lib/worker-feedback.mjs`, after `workerDetailsLabel`:
 
@@ -1126,12 +1128,12 @@ const removeJob = useCallback((id: string) => {
 
 Leave the `catch` as it is. The guard in `finish` covers it.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/worker-dismiss-stops-run.test.mjs tests/lib/worker-feedback.test.mjs tests/lib/jobs-persist.test.mjs tests/lib/job-stream.test.mjs tests/lib/run-prompts.test.mjs tests/lib/scheduled-job-store-hold-groups.test.mjs && npm run typecheck`
 Expected: PASS. The browser asserts on "Dismiss worker: …" in `web/tests/lib/worker-feedback.browser.test.mjs` dismiss failed or done jobs, so their names do not change.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1186,7 +1188,7 @@ The full list is 29 handlers in 16 files, all under `web/src/`:
 - Consumes: `markTrackerReady({ spawnFn, execPath, coreRoot, reportNum, dataRoot }): Promise<{ ok: boolean, code: number|null, data: object|null, stderr: string }>` in `web/src/lib/pdf-render.mjs`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // A multibyte character split across two chunks of child output must survive, and every child
@@ -1237,21 +1239,21 @@ test("every data handler that reads its chunk is on a stream set to utf8", () =>
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/child-output-utf8.test.mjs`
 Expected: FAIL, 2 tests. The first reports `actual: 'Caf�� Ünïcode 日本'` against `expected: 'Café Ünïcode 日本'`. The second lists 29 offender entries, such as `lib/cli-fencing-probe.mjs: child.stdout (1 handler(s), 0 setEncoding)` and `lib/pdf-render.mjs: child.stderr (3 handler(s), 2 setEncoding)`. Their order follows `readdirSync` and can differ between machines.
 
-- [ ] **Step 3: Set each listed stream to utf8 where it is read**
+- [x] **Step 3: Set each listed stream to utf8 where it is read**
 
 One `setEncoding("utf8")` per stream, placed as the Files list says. Do not add a decode helper. The platform call is the whole fix, as in `run/route.ts:436-437`.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/child-output-utf8.test.mjs && npm test && npm run typecheck`
 Expected: PASS, and `npm test` reports `fail 0`. Before the three fakes are fixed, `npm test` fails 13 tests in `report-persist.test.mjs`, `gated-evaluation-lifecycle.test.mjs` and `external-data-root.test.mjs`. After they are fixed, none fail.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1285,7 +1287,7 @@ The release on page exit calls the provider's existing `reset`. `reset` closes t
 - Consumes: `openSession(url: string, cliId?: string, forceAgent?: boolean, noApplyBtn?: boolean)` and `scheduleIdleClose()` in `session.ts`. `reset` in `ApplyProvider`. `setHostResolver` from `liveness-browser.mjs`, and the Playwright stub `web/tests/fixtures/playwright-launch-stub.mjs` (`globalThis.__applyCareerPage`).
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // An apply session's browser context is released on a failed open and when the page goes away.
@@ -1327,12 +1329,12 @@ test("the provider resets, and so releases its session, when the page is hidden"
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/apply-session-release.test.mjs`
 Expected: FAIL, 2 tests. The first reports `actual: []` against `expected: [ true ]`. The second reports `The input did not match the regular expression /addEventListener\("pagehide", reset\)/`.
 
-- [ ] **Step 3: Close the context on any throw in `openSession`, and reset on pagehide in `ApplyProvider`**
+- [x] **Step 3: Close the context on any throw in `openSession`, and reset on pagehide in `ApplyProvider`**
 
 In `openSession` (`session.ts`):
 - Directly after `const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });` add `let released = false;`.
@@ -1363,12 +1365,12 @@ In `ApplyProvider` (`apply-provider.tsx`), directly after the `reset` callback (
 
 `closeSession` already posts with `keepalive: true`, so the request survives the page going away.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/apply-session-release.test.mjs tests/lib/apply-unsupported-ats.test.mjs tests/lib/apply-login-wall.test.mjs tests/lib/apply-handoff-wiring.test.mjs tests/lib/apply-prefill-wiring.test.mjs && npm run typecheck`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1417,7 +1419,7 @@ All three component files are in `web/src/components/scheduled-scans/`. Static i
 - Consumes: the `page` and the sub-test `t` in `accessible-names.browser.test.mjs`, and `page` and `dialog` in `location-hold.browser.test.mjs`.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // accessible-names.browser.test.mjs, after the "Use portals.yml filters" sub-test (the create dialog is still open)
@@ -1440,21 +1442,21 @@ for (const [role, name] of [["button", "Close"], ["textbox", "Scan Name"], ["com
 
 The drawer assert waits for the drawer's heading first, because `count()` does not wait and the drawer renders after the click. The edit-dialog asserts sit after the existing waits for the same reason.
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && npm run build && node tests/browser-suites.mjs accessible-names && node tests/browser-suites.mjs location-hold`
 Expected: FAIL with `create dialog: button "Close"` (`0 !== 1`). Run the second suite on its own if the first stops the chain. It fails with `edit dialog: button "Close"` (`0 !== 1`).
 
-- [ ] **Step 3: Add the names in the table to the three components**
+- [x] **Step 3: Add the names in the table to the three components**
 
 Add only the attributes listed. Leave the visible text unchanged.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && npm run build && node tests/browser-suites.mjs accessible-names && node tests/browser-suites.mjs location-hold`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1494,7 +1496,7 @@ Every production caller passes Node's own `spawn` as `spawnFn` (`web/src/app/api
   - `persistEvaluation({ spawnFn, execPath, root, coreRoot, markdown, url, today, postedAt, evaluationSections })` in `report-persist.mjs`
 - Produces: None. Node's own `spawn` option `timeout` does the kill, with SIGTERM as `killSignal`. `runCoreCli` (`web/src/lib/core-cli.ts`) already uses the same mechanism through `execFile`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // Every script the run route spawns after the agent finishes carries a Node kill timeout.
@@ -1610,7 +1612,7 @@ WEB-2 edits the stdout handlers in `planner.ts` and `drive.ts`. Locate the edits
   - `runPlanner(opts: { …existing; signal?: AbortSignal }): Promise<PlannerRun>`
   - `driveSession(page, cliId, goal, isFormReady, emit, budget = 10, answers?, signal?: AbortSignal): Promise<DriveResult>`, which returns `{ reached: false, turns: turn - 1, reason: "stopped", steps }` when `signal.aborted` at the top of a turn
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // Leaving the apply page stops the planner.
@@ -1641,12 +1643,12 @@ test("both apply streams abort on cancel and pass the signal down", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/apply-stream-cancel.test.mjs`
 Expected: FAIL, 2 tests. The first reports `'test timed out after 5000ms'`. The second reports `AssertionError [ERR_ASSERTION]: prefill`, followed by the prefill route's source as `actual` and `expected: /cancel\(\) \{ abort\.abort\(\); \}/`. The run takes about 10 s, because the sleeping child keeps the process alive after the timeout.
 
-- [ ] **Step 3: Thread an AbortSignal from each route's `cancel()` into the spawn**
+- [x] **Step 3: Thread an AbortSignal from each route's `cancel()` into the spawn**
 
 Copy the shape of `web/src/app/api/explore/route.ts`, which creates `const abort = new AbortController();` and gives its stream `cancel() { abort.abort(); },`.
 
@@ -1672,12 +1674,12 @@ In the drive route:
 - Inside the multi-line `} finally {` block, the line `controller.close();` becomes `try { controller.close(); } catch { /* cancelled */ }`. Keep the block on its own lines, because `drive-stream-close.test.mjs` finds it by `} finally {` and its closing brace.
 - Add `cancel() { abort.abort(); },` after the `async start(controller) { … },` member.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/apply-stream-cancel.test.mjs tests/lib/drive-stream-close.test.mjs tests/lib/apply-planner-fencing.test.mjs tests/lib/apply-drive.test.mjs tests/lib/apply-prefill-wiring.test.mjs tests/lib/apply-handoff-wiring.test.mjs && npm run typecheck`
 Expected: PASS. The first file now finishes in well under a second.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1706,7 +1708,7 @@ The consumers, `web/src/components/command-palette.tsx:17` and `web/src/componen
 - Consumes: `GET /api/pipeline`, which returns `{ inbox, applications, root, rootExists }` (`web/src/app/api/pipeline/route.ts:9-17`).
 - Produces: `export function createPipelineLoader(fetchFn = fetch): () => Promise<{ inbox: unknown[]; applications: unknown[] } | null>`. It returns `null` when the response is not ok, when either field is not an array, when the fetch rejects, or when a newer load has started since. `null` means "keep what you have".
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // A failed or superseded pipeline load must not replace what the provider shows.
@@ -1734,12 +1736,12 @@ test("an older response that lands after a newer one yields null", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/pipeline-snapshot.test.mjs`
 Expected: FAIL with `Error [ERR_MODULE_NOT_FOUND]: Cannot find module '…/web/src/lib/pipeline-snapshot.mjs'`
 
-- [ ] **Step 3: Write `createPipelineLoader` and use it in `PipelineProvider`**
+- [x] **Step 3: Write `createPipelineLoader` and use it in `PipelineProvider`**
 
 `web/src/lib/pipeline-snapshot.mjs`:
 
@@ -1781,14 +1783,14 @@ In `pipeline-provider.tsx`:
 
 The casts are required. Without them `npm run typecheck` fails with `TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'SetStateAction<InboxJob[]>'`, and the same for `Application[]`.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/pipeline-snapshot.test.mjs && npm run typecheck`
 Expected: PASS
 
 Then, from the worktree root, run `node validate-system-paths-coverage.mjs` after `git add` of the new files. Expected: `OK: … tracked files covered by SYSTEM_PATHS or USER_PATHS`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -1819,7 +1821,7 @@ This task depends on WEB-1. WEB-1 makes `if (controller.signal.aborted) return;`
 - Consumes: `POST` in `web/src/app/api/runs/save/route.ts`, and the abort guard in `finish` that WEB-1 produces.
 - Produces: the body type gains `status?: "done" | "gated" | "error"` and `error?: string`. The markdown gains a `## Error` section with the message when `status === "error"`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Lines 1-18 are the harness of `web/tests/lib/gated-run-log.test.mjs` (imports, the `next/server` stub, the `POST` import), copied unchanged.
 
@@ -1866,12 +1868,12 @@ test("an aborted run saves nothing and reports no error", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/failed-run-log.test.mjs`
 Expected: FAIL in the first test with `actual: 400` / `expected: 200`. The second test already passes, because WEB-1 put the guard in `finish`. It is there so that this task's change to `finish` cannot drop the guard unnoticed.
 
-- [ ] **Step 3: Accept `error` in the save route and post it from `finish`**
+- [x] **Step 3: Accept `error` in the save route and post it from `finish`**
 
 In `route.ts`:
 - In `type Body`, `status?: "done" | "gated";` becomes `status?: "done" | "gated" | "error";` and a new line `error?: string;` follows it.
@@ -1927,7 +1929,7 @@ This is a guard test. It passes on its first run, and Step 2 shows how to make i
   - `resolveCodeRoot` in `web/src/lib/core/code-root.mjs`
 - Produces: None.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 ```js
 // The web's status canonicalizer must agree with the core's for every state, id and alias.
@@ -1959,23 +1961,23 @@ test("web canonicalizeStatus matches the core for every spelling of every state"
 });
 ```
 
-- [ ] **Step 2: Run the test. It passes today, then make it fail by hand**
+- [x] **Step 2: Run the test. It passes today, then make it fail by hand**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/status-canonical-parity.test.mjs`
 Expected: PASS, 1 test. This is correct, because the mirror agrees with the core today.
 
 To see it fail, delete the line `.replace(/̇/gu, "");` from `foldStatusInput` in `web/src/lib/core/states.ts` (line 115) and end the line above it, `.toLowerCase()`, with a `;`. Run the same command. Expected: FAIL with `AssertionError [ERR_ASSERTION]: disagreed on "TEKLİF"`. Then restore the file with `git checkout -- web/src/lib/core/states.ts` from the worktree root.
 
-- [ ] **Step 3: No production change**
+- [x] **Step 3: No production change**
 
 The test is the deliverable. If it ever fails, change `states.ts` to match the core, never the reverse.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/status-canonical-parity.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2009,7 +2011,7 @@ One behaviour changes on purpose. Today the literal check refuses any hostname t
 - Consumes: `isBlockedAddress(address: string): boolean` from `providers/_ip-guard.mjs`. `isIP(input: string): 0 | 4 | 6` from `node:net`. `extractMappedIPv4(host: string): string | null`, kept in `liveness-browser.mjs` (line 195) for the sinkhole tag. `setHostResolver(resolver)` from `liveness-browser.mjs` in the test.
 - Produces: no new export. `isBlockedAddress` now also returns true for `64:ff9b::/96` when the embedded IPv4 is blocked, for `::ffff:0:0:0/96` (written `::ffff:0:a.b.c.d`) when the embedded IPv4 is blocked, for all of `2002::/16`, and for all of `2001:0::/32`. `rejectPrivateOrInvalid` and `validateUrlSecurity` keep their signatures and return codes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // tests/egress-private-ranges.test.mjs. Every egress check judges addresses the same way.
@@ -2047,7 +2049,7 @@ test('a name whose only answer is 0.0.0.0 is still a DNS sinkhole', async (t) =>
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test --test-reporter=spec tests/egress-private-ranges.test.mjs`
 Expected: `ℹ pass 1` and `ℹ fail 3`.
@@ -2056,7 +2058,7 @@ Expected: `ℹ pass 1` and `ℹ fail 3`.
 - The third fails with `AssertionError [ERR_ASSERTION]: Missing expected rejection.`
 - The fourth (`a name whose only answer is 0.0.0.0 is still a DNS sinkhole`) already passes. The regex list tags `0.0.0.0` as a sinkhole today, and the test is there to keep that true after Step 3.
 
-- [ ] **Step 3: Extend `isBlockedAddress` in `providers/_ip-guard.mjs` and route `liveness-browser.mjs` through it**
+- [x] **Step 3: Extend `isBlockedAddress` in `providers/_ip-guard.mjs` and route `liveness-browser.mjs` through it**
 
 In `_ip-guard.mjs`, add a private `v6Groups(addr: string): number[] | null` just above the JSDoc of `isBlockedAddress`. Call it in `isBlockedAddress` after the `hexEmbedded` block and before the line `if (addr === '::' || addr === '::1') return true;`. The existing dotted-tail branch already covers `64:ff9b::127.0.0.1`.
 
@@ -2090,12 +2092,12 @@ In `liveness-browser.mjs`:
 - In `rejectPrivateOrInvalid`, replace the `mappedIPv4` / `candidates` loop with one test: `if (isPrivateHost(host)) return { code: 'blocked_host', reason: \`blocked host ${parsed.hostname}\` };`.
 - In `validateUrlSecurity`, replace the four lines from `const mapped = extractMappedIPv4(norm);` to `if (hit) blocked.push({ ip, hit });` with `if (isPrivateHost(norm)) blocked.push({ ip, hit: extractMappedIPv4(norm) ?? norm });`. This keeps `0.0.0.0`, `::` and `::ffff:0.0.0.0` tagged `dns_sinkhole` as they are today.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/egress-private-ranges.test.mjs && node --test tests/providers/private-address-guard.test.mjs && node tests/plugin-net-ip-guard.test.mjs && node tests/liveness-browser-dns-sinkhole.test.mjs && node tests/liveness-browser-dns-cache.test.mjs && node --test tests/scan-verify-dns.test.mjs && (cd web && node --test tests/lib/apply-url-guard.test.mjs) && node test-all.mjs --quick`
 Expected: PASS. The new file reports `ℹ pass 4`, the suites end with no ❌ line, `apply-url-guard` reports `ℹ pass 23`, and test-all's "SSRF guard blocks 14 known bypass vectors" and "SSRF guard lets legitimate ATS URLs through" stay ✅. Run test-all only when no other process is running it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2133,7 +2135,7 @@ Choice: reuse `installEgressGuard`, not `installLivenessRouteGuard`, and do not 
 
 Known cost: the moved function logs one `console.warn` per blocked request on stderr. browser-extract prints its `{ error, code }` JSON on stderr only on failure (`modes/scan.md:138`), and those warn lines come before it. Requests whose name does not resolve are now aborted too, where the literal-only route let them continue to fail on their own.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The resolver is injected through `setHostResolver`, so nothing leaves the machine.
 
@@ -2162,24 +2164,24 @@ test('a hostname that resolves to loopback is aborted, a public one continues', 
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/egress-guard-dns.test.mjs`
 Expected: `ℹ fail 1`, with `TypeError [Error]: lb.installEgressGuard is not a function`.
 
-- [ ] **Step 3: Move `installEgressGuard` into `liveness-browser.mjs` and call it from both scripts**
+- [x] **Step 3: Move `installEgressGuard` into `liveness-browser.mjs` and call it from both scripts**
 
 - Cut the JSDoc and the whole `export async function installEgressGuard(context) { … }` from `archive-posting.mjs` (lines 313-342 before this task) and paste them, unchanged, into `liveness-browser.mjs` after `validateUrlSecurity`.
 - In `archive-posting.mjs`, change `import { rejectPrivateOrInvalid, validateUrlSecurity } from './liveness-browser.mjs';` to `import { rejectPrivateOrInvalid, installEgressGuard } from './liveness-browser.mjs';` and add `export { installEgressGuard } from './liveness-browser.mjs';` below it. Both lines are needed. The re-export creates no local binding, and `archiveUrl` still calls `installEgressGuard(context)`.
 - In `browser-extract.mjs`, change the import to `import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard } from './liveness-browser.mjs';`. Replace the four-line `await context.route('**/*', (route) => { … });` after `browser.newContext(LIVENESS_CONTEXT_OPTIONS)` with `await installEgressGuard(context);`. The pre-check `const guard = rejectPrivateOrInvalid(url);` and the landed-URL check `const finalGuard = rejectPrivateOrInvalid(finalUrl);` stay.
 - In `batch-evaluate-gemini.mjs`, change the import to `import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard } from './liveness-browser.mjs';` and replace the eight-line `await page.route('**/*', (route) => { … });` in `scrapeUrl` with `await installEgressGuard(page);`. The abort code changes from `accessdenied` to `blockedbyclient`, and nothing reads it.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/egress-guard-dns.test.mjs && for f in tests/browser-extract*.test.mjs tests/batch-evaluate-gemini-*.test.mjs tests/archive-posting*.test.mjs tests/egress-private-ranges.test.mjs; do node "$f" || exit 1; done && node scripts/check-syntax.mjs && node test-all.mjs --quick`
 Expected: PASS. No ❌ line in any suite, and test-all's six archive-posting egress checks stay ✅, among them "archive-posting egress guard blocks a hostname that resolves to loopback". Run test-all only when no other process is running it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2206,7 +2208,7 @@ Then rerun `node --test tests/fork-deviations-covered.test.mjs`. Expected: PASS.
 - Consumes: `rejectPrivateOrInvalid(url)`, `validateUrlSecurity(urlString): Promise<void>` and `installEgressGuard(target)` from `liveness-browser.mjs`. SEC-2 provides `installEgressGuard` there, so this task runs after SEC-2.
 - Produces: None.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The test spawns the CLI the way `tests/upskill-targeted-input.test.mjs` does, because the branch lives under `isMain`. The browser path is pointed at a missing binary so today's code fails fast to its fetch fallback. After the fix, the literal check refuses before any browser or socket.
 
@@ -2229,12 +2231,12 @@ test('--url-text refuses an IPv4-mapped loopback URL with the shared guard', () 
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/upskill-url-guard.test.mjs`
 Expected: `ℹ fail 1`, with `AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Fatal: Failed to fetch JD from URL: blocked host \[::ffff:7f00:1\]/`. Its input is stderr, which reads `Playwright extraction failed or blocked, trying fallback WebFetch... browserType.launch: Failed to launch chromium because executable doesn't exist at <repo>/no-such-browser` followed by `Fatal: Failed to fetch JD from URL: fetch failed`. Today's copy lets the URL through, the browser cannot start, and the fallback fetch is refused on local port 9.
 
-- [ ] **Step 3: Replace the copy with the shared guard in `upskill.mjs`**
+- [x] **Step 3: Replace the copy with the shared guard in `upskill.mjs`**
 
 - Add `import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard } from './liveness-browser.mjs';` directly below `import { browserLaunchOptions } from './lib/browser-launch.mjs';`.
 - Delete the private copy, from the comment `// Helper function to enforce egress guard against SSRF (Private/Loopback IPs)` through the closing `}` of `async function validateUrlSecurity(urlString)`, which ends just above `// --- CLI ---`. Its `dnsCache` goes with it.
@@ -2248,12 +2250,12 @@ Expected: `ℹ fail 1`, with `AssertionError [ERR_ASSERTION]: The input did not 
   The first is in the Playwright `try` at 10 spaces of indent. The second is in the fallback `try` inside the `catch` at 12 spaces. The 10-space text is a substring of the 12-space line, so a find-and-replace on it matches both. Edit each by hand.
 - Replace the `await page.route('**/*', async (route) => { … });` block after `const page = await browser.newPage();` with `await installEgressGuard(page);`. This drops the `process.exit(1)` from the route callback. A blocked main document makes `page.goto` throw into the existing catch, whose fallback re-checks and fetches with `redirect: 'error'`. Under the shared guard a dead third-party script is aborted, where today it would kill the run.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/upskill-url-guard.test.mjs && for f in tests/upskill-targeted-input.test.mjs tests/upskill-known-skills.test.mjs tests/upskill-company-names.test.mjs tests/upskill-tracker-path.test.mjs tests/egress-guard-dns.test.mjs tests/egress-private-ranges.test.mjs; do node "$f" || exit 1; done && node upskill.mjs --self-test`
 Expected: PASS. The new test reports `ℹ pass 1`, no suite prints a ❌ line, and the self-test prints `upskill self-test OK (extraction, suppression guards, weighting, tiering, report parsing)`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2289,7 +2291,7 @@ Rendering is unchanged by the CSP, but this is inferred.
 - The CV templates load fonts by relative URL (`templates/resume-template.html:24`). A srcdoc resolves that against the page URL, and `web/` has no `public/` directory, so those fonts already 404 in the preview today.
 - An `https:` photo (`build-cv-html.mjs:139`) stops showing in the preview. That matches the PDF, which already aborts non-local requests.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // web/tests/lib/cv-preview-csp.test.mjs. The live CV preview cannot reach the network.
@@ -2309,26 +2311,26 @@ test("a fragment with no <head> gets the CSP first", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --test tests/lib/cv-preview-csp.test.mjs`
 Expected: `ℹ fail 2`. The first fails with `AssertionError [ERR_ASSERTION]: <html><head><title>x</title><style data-cv-preview-fit>…`. The second fails with `AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value`, because the output starts `<style data-cv-preview-fit>`.
 
-- [ ] **Step 3: Move `PREVIEW_CSP` and `withPreviewCsp` into `preview-html.mjs` and apply it in `previewHtml`**
+- [x] **Step 3: Move `PREVIEW_CSP` and `withPreviewCsp` into `preview-html.mjs` and apply it in `previewHtml`**
 
 - Cut `const PREVIEW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:";` and the `withPreviewCsp` function with its JSDoc (`The page with a CSP of its own. …`) from `web/src/lib/template-gallery.mjs`, and put `export { withPreviewCsp } from "./cv-studio/preview-html.mjs";` in their place.
 - Paste both, unchanged, at the top of `web/src/lib/cv-studio/preview-html.mjs`.
 - In `previewHtml`, change `return injectFit(mapText(String(html ?? "")));` to `return withPreviewCsp(injectFit(mapText(String(html ?? ""))));`.
 - In `web/tests/lib/cv-preview-html.test.mjs`, chain `.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "")` onto the existing `.replace(…)` in `shown()`.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --test tests/lib/cv-preview-csp.test.mjs tests/lib/cv-preview-html.test.mjs tests/lib/template-gallery.test.mjs && npm run typecheck`
 Expected: PASS, `ℹ tests 26`, `ℹ fail 0`, and no TypeScript error. If `tsc` reports an error in a file this task did not touch, rerun `npx tsc --noEmit --incremental false` before treating it as real. A stale `tsconfig.tsbuildinfo` can report one.
 
 Then start the app (`cd web && npm run dev`) and open CV Studio, the CV page and the resume editor. Each preview must render, show its page count and print. DevTools must show no new console errors apart from the existing font 404s, which now appear as CSP violations instead.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2363,7 +2365,7 @@ No CSP here, on purpose.
 
 `no-referrer` is safe to set. Nothing in `web/src` reads the Referer header. Most `target="_blank"` links already carry `rel="noreferrer"`, and the policy covers the ones that do not (`web/src/components/shares/shares-view.tsx:67` has `rel="noopener"` only). `checkRequest` decides on `Sec-Fetch-Site` first, which the referrer policy does not change. The app has no HTML form posts and no server actions, so the `Origin: null` that `no-referrer` causes on a non-CORS POST reaches no code.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // web/tests/lib/next-config-headers.test.mjs. Every response says nosniff and sends no referrer.
@@ -2381,12 +2383,12 @@ test("next.config sends nosniff and no-referrer on every path", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `cd web && node --test tests/lib/next-config-headers.test.mjs`
 Expected: `ℹ fail 1`, with `TypeError [Error]: config.headers is not a function`.
 
-- [ ] **Step 3: Add `async headers()` to `nextConfig` in `web/next.config.mjs`**
+- [x] **Step 3: Add `async headers()` to `nextConfig` in `web/next.config.mjs`**
 
 Add it as the last key, after the `...(process.env.BUILD_DIST ? … : {})` spread:
 
@@ -2401,14 +2403,14 @@ Add it as the last key, after the `...(process.env.BUILD_DIST ? … : {})` sprea
   },
 ```
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `cd web && node --test tests/lib/next-config-headers.test.mjs tests/lib/server-launcher.test.mjs && npm run typecheck`
 Expected: PASS, `ℹ tests 23`, `ℹ fail 0`, and no TypeScript error.
 
 Then start the app (`cd web && npm run dev`) and run `curl -sI -H 'Host: localhost' http://127.0.0.1:3000/api/healthz`. The output must list `x-content-type-options: nosniff` and `referrer-policy: no-referrer`. Also `curl -sI -H 'Host: localhost' 'http://127.0.0.1:3000/api/templates/preview?name=standard&kind=cv'` must still show that route's own `content-security-policy`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2455,7 +2457,7 @@ The strip lives in `spawnHeadlessCli`, so it reaches all eight call sites. All o
 - Consumes: `claudeCliArgs({ kind, prompt, dataRoot?, codeRoot? }): string[]` and `argValue(args, flag): string` (`web/src/lib/claude-invocation.mjs`). `claudeCliArgs` throws unless both roots are absolute whenever either is given. `capabilitiesFor(kind): { writes: boolean, network: false | string }` (`web/src/lib/worker-capabilities.mjs`, where `research`, `evaluate` and `cover` are `CAPS.networkReadOnly`). `spawnHeadlessCli(binPath, args, options, fencing)` (`web/src/lib/spawn-cli.mjs`).
 - Produces: `CAREER_OPS_SECRET_ENV: readonly string[]`, exported from `web/src/lib/spawn-cli.mjs`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `web/tests/lib/run-route-attended-read-denies.test.mjs` is a copy of the harness of `web/tests/lib/run-route-kinds.test.mjs`, followed by one test. The file is:
 1. The comment line `// web/tests/lib/run-route-attended-read-denies.test.mjs. An attended network run on Claude carries the Read denies.`
@@ -2501,12 +2503,12 @@ test("a read-only worker does not inherit career-ops' own secrets, and keeps the
 });
 ```
 
-- [ ] **Step 2: Run the tests and see them fail**
+- [x] **Step 2: Run the tests and see them fail**
 
 Run: `cd web && node --test tests/lib/run-route-attended-read-denies.test.mjs tests/lib/spawn-cli-secret-env.test.mjs`
 Expected: `ℹ fail 2`. The first fails with `AssertionError [ERR_ASSERTION]: Write,Edit,MultiEdit,NotebookEdit,Bash,Task`, the deny list without `Read(//proc/**)`. The second fails with `actual: true`, `expected: false` on `PUBLISH_API_KEY`.
 
-- [ ] **Step 3: Apply the denies to every Claude network run in `route.ts`, and strip career-ops secrets in `spawnHeadlessCli`**
+- [x] **Step 3: Apply the denies to every Claude network run in `route.ts`, and strip career-ops secrets in `spawnHeadlessCli`**
 
 In `web/src/app/api/run/route.ts`:
 - Delete `const capabilities = capabilitiesFor(kind);` from below `const substitution = cliSubstitutionNotice(resolved);` and put it directly above `const denyRoots: { dataRoot?: string; codeRoot?: string } = {};`.
@@ -2557,12 +2559,12 @@ In `web/tests/lib/spawn-cli.test.mjs`, the windowsHide test asserts that spawn r
     assert.deepEqual(options.env, Object.fromEntries(Object.entries(process.env).filter(([key]) => !CAREER_OPS_SECRET_ENV.includes(key))));
 ```
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `cd web && node --test tests/lib/run-route-attended-read-denies.test.mjs tests/lib/spawn-cli-secret-env.test.mjs tests/lib/run-route-kinds.test.mjs tests/lib/run-route-stderr-handoff.test.mjs tests/lib/run-route-local-today.test.mjs tests/lib/spawn-cli.test.mjs tests/lib/claude-invocation.test.mjs && PUBLISH_API_KEY=x node --test tests/lib/spawn-cli.test.mjs && node --experimental-strip-types --import=./tests/helpers/saved-settings-off.mjs --test tests/lib/apply-planner-fencing.test.mjs tests/lib/cli-fencing.test.mjs tests/lib/evaluation-instructions-route.test.mjs tests/lib/external-data-root.test.mjs tests/lib/pdf-run-scratch-close.test.mjs tests/lib/scheduled-jobs-runner.test.mjs tests/lib/scheduled-location-hold.test.mjs tests/lib/scheduled-source-groups.test.mjs tests/lib/web-child-windows-hide.test.mjs && npm run typecheck`
 Expected: PASS. The first run reports `ℹ tests 75` and `ℹ fail 0`, the second `ℹ pass 8`, the third `ℹ tests 172` and `ℹ fail 0`, and `tsc` reports no error.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Deviations row:
 
@@ -2600,7 +2602,7 @@ The warning needs a second accepted spelling for the same reason. In a worktree 
 - Consumes: `spawnSync` from `node:child_process`; `realpathSync` from `node:fs`; `resolve`, `join` and `dirname` from `node:path`.
 - Produces: an internal (not exported) `isForkHooksPath(root: string, value: string) => boolean`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `tests/claude-hooks.test.mjs`, insert these lines right after the line that ends `'session-start warns on a foreign local hooksPath and does not change it');` (line 129 today). The fixture `repo` has commits by then, and its `.githooks/` directory exists.
 
@@ -2621,7 +2623,7 @@ In `tests/claude-hooks.test.mjs`, insert these lines right after the line that e
   ok(/WARNING: git core.hooksPath is ".*elsewhere/.test(r.stdout), 'session-start still warns on a .githooks outside this repository');
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 This file reports through `pass`/`fail` from `tests/helpers.mjs`, and run on its own it exits 0 even when it prints `❌`. The `❌` lines are the failure signal.
 
@@ -2635,7 +2637,7 @@ Expected exactly two lines:
 
 The third new case, `session-start still warns on a .githooks outside this repository`, passes today. It is there to pin that the fix does not silence a real foreign path.
 
-- [ ] **Step 3: Add `isForkHooksPath(root, value)` to `.claude/hooks/session-start.mjs`**
+- [x] **Step 3: Add `isForkHooksPath(root, value)` to `.claude/hooks/session-start.mjs`**
 
 Change the imports and add the function after the `const root = …` line:
 
@@ -2661,7 +2663,7 @@ Then change `} else if (local !== '.githooks') {` to `} else if (!isForkHooksPat
 
 A path that does not exist now counts as no match and warns. The literal `.githooks` still matches, because `.githooks/` is tracked and exists in every checkout.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node tests/claude-hooks.test.mjs | grep -c "❌"`
 Expected: `0`.
@@ -2672,7 +2674,7 @@ Expected: `📊 Results: 20 passed, 0 failed, 0 warnings`.
 Run from the worktree: `CLAUDE_PROJECT_DIR=$PWD node .claude/hooks/session-start.mjs`
 Expected: no `WARNING` line (the worktree's local config names the main checkout's absolute `.githooks`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .claude/hooks/session-start.mjs tests/claude-hooks.test.mjs
@@ -2695,16 +2697,16 @@ TEST-2 edits `test-all.mjs` first, so find the call by its text, not by its line
 - Consumes: `run(cmd, args = [], opts = {})` in `tests/helpers.mjs`. `opts` reaches `execFileSync` and overrides its default `timeout: 30000`, so `timeout` is in milliseconds.
 - Produces: None.
 
-- [ ] **Step 1: Verification instead of a test**
+- [x] **Step 1: Verification instead of a test**
 
 There is no sensible automated test. The value only matters on a slow runner with hundreds of files, and a test that sleeps past 180 s to prove it would itself be the slowest suite in the repository. Verify by reading the expression and the next CI log. No test asserts the old `180000`.
 
-- [ ] **Step 2: Note today's value**
+- [x] **Step 2: Note today's value**
 
 Run: `grep -n "webUnits\], { timeout" test-all.mjs`
 Expected: one line, ending `{ timeout: 180000 }) !== null) {`.
 
-- [ ] **Step 3: Replace the fixed 180 s**
+- [x] **Step 3: Replace the fixed 180 s**
 
 In that line, change `{ timeout: 180000 }` to `{ timeout: Math.max(180_000, webUnits.length * 1_000) }`. `Math.max` keeps the budget at 180 s or more, so it can never be shorter than today. One second per file is about three times the 0.3 s per file measured on Windows. With 412 files that is 412 s, still well under the 30-minute job limit.
 
@@ -2716,12 +2718,12 @@ Deviations row:
 | `test-all.mjs` runs every `web/tests/lib` suite in one child killed at 180 s | `test-all.mjs` kills that child at `Math.max(180_000, webUnits.length * 1_000)` ms | landed <date> | ADAPT. Our hunk is the `timeout` value in the web unit `run()` call and its comment; an upstream change to that call keeps our expression. Pinned by no test; Step 4's grep checks it, and the Windows log of 2026-11-15 measured 122 s for 412 files. |
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `node --check test-all.mjs && grep -n "webUnits.length \* 1_000" test-all.mjs`
 Expected: no syntax error, and one match on the `run(...)` line. In the next Windows CI log, the line `✅ web pdf write-scope unit suites pass (#2185)` appears and no `killed: SIGTERM` does.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add test-all.mjs .claude/skills/upstream-review/SKILL.md
@@ -2769,7 +2771,7 @@ The new browser suite was written against the source and checked with `node --ch
   - the `pipeline-status` fixture, `web/tests/fixtures/pipeline-status.mjs` (rows #11 Evaluated with report 011, #12 Applied, #13 Evaluated, plus `cv.md`)
 - Produces: None.
 
-- [ ] **Step 1: Write the suite**
+- [x] **Step 1: Write the suite**
 
 Create `web/tests/lib/applied-confirm-flows.browser.test.mjs`. Next.js renders its route announcer with `role="alert"` in an open shadow root (`next/dist/client/components/app-router-announcer.js`), and Playwright's role locator reaches into it, so the suite finds the confirm by its prompt text. The row, `statusOf` and `until` helpers follow `web/tests/lib/tracker-keys.browser.test.mjs`.
 
@@ -2865,12 +2867,12 @@ test("Applied asks before it writes, from the bulk bar, the checklist and a key"
 });
 ```
 
-- [ ] **Step 2: See the runner refuse it before it is registered**
+- [x] **Step 2: See the runner refuse it before it is registered**
 
 Run: `cd web && node --check tests/lib/applied-confirm-flows.browser.test.mjs && node tests/browser-suites.mjs applied-confirm-flows`
 Expected: the check passes, then the runner exits 1 with `❌ not in tests/browser-suites.mjs SUITES, so they would never run: applied-confirm-flows`. It checks this before it looks for a build.
 
-- [ ] **Step 3: Register the suite, and apply D9**
+- [x] **Step 3: Register the suite, and apply D9**
 
 In `web/tests/browser-suites.mjs`, add this entry to `SUITES` between `"analytics-views"` and `"apply-field-accessibility"`:
 
@@ -2892,7 +2894,7 @@ Deletion line under "Deleted or moved paths", only under D9's default:
 - `tests/set-status-lock-scope.test.mjs` (<date>): read `set-status.mjs` source for the lock-before-read order. `tests/tracker-writer-lock.test.mjs` (`writerCase` "set-status") proves the same order by behaviour. An upstream commit touching it is SKIP and the merge keeps the deletion.
 ```
 
-- [ ] **Step 4: Run the suite in a browser, then prove it can fail**
+- [x] **Step 4: Run the suite in a browser, then prove it can fail**
 
 Run: `cd web && npm run build && node tests/browser-suites.mjs applied-confirm-flows`
 Expected: PASS, with no skipped tests (the runner fails on any skip). The behaviour is correct today, so this suite passes on unchanged code. If a locator does not resolve, fix it against the rendered page, not by weakening an assertion.
@@ -2902,7 +2904,7 @@ Then prove it can fail. Temporarily make `appliedWriteAllowed` in `web/src/lib/a
 Then run: `node --test tests/tracker-writer-lock.test.mjs && node scripts/check-syntax.mjs` from the worktree root.
 Expected: PASS. With D9's default, `tests/set-status-lock-scope.test.mjs` no longer exists, and `tracker-writer-lock` covers its order.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/tests/lib/applied-confirm-flows.browser.test.mjs web/tests/browser-suites.mjs .claude/skills/upstream-review/SKILL.md
@@ -2928,7 +2930,7 @@ The audit report suggested switching to `fetchJsonWithRetry` and keeping the 30 
   - `withAbortScope(signal, fn)` in `providers/_connection-scope.mjs:102`, used by the test
 - Produces: None. `fetchWithRetry(ctx, fn)` keeps its signature.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 import { test } from 'node:test';
@@ -2953,12 +2955,12 @@ test('an aborted board is not retried and does not sleep', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node --test tests/providers/workable-abort.test.mjs`
 Expected: FAIL with `actual: { json: 4, text: 4, sleep: 6 }` against `expected: { json: 1, text: 1, sleep: 0 }`.
 
-- [ ] **Step 3: Add the abort checks to `fetchWithRetry(ctx, fn)` in `providers/workable.mjs`**
+- [x] **Step 3: Add the abort checks to `fetchWithRetry(ctx, fn)` in `providers/workable.mjs`**
 
 Change the `_http.mjs` import to `import { BROWSER_LIKE_USER_AGENT, abortableSleep, fetchTextStream, isRetryableError, parseRetryAfterMs } from './_http.mjs';`. `sleep` leaves it because nothing else in the file calls it. Add `import { currentAbortSignal } from './_connection-scope.mjs';` below it. Then make three changes in `fetchWithRetry`:
 - `if (attempt === MAX_RETRIES || !isRetryableError(err)) throw err;` becomes `if (attempt === MAX_RETRIES || !isRetryableError(err) || currentAbortSignal()?.aborted) throw err;`.
@@ -2975,12 +2977,12 @@ Deviations row:
 
 **Owner step.** Optionally offer the fix upstream as a bug-fix pull request.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node --test tests/providers/workable-abort.test.mjs && node test-all.mjs --only workable && node test-all.mjs --only providers/registry-loads-every-provider && node test-all.mjs --only providers/host-guard-anchoring`
 Expected: PASS. `--only workable` covers the provider, feed and new abort suites plus the `scan-ats-full` Workable suites (106 passed at 2edd1b33 plus this task). The existing give-up and retry-and-recover cases still pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add providers/workable.mjs tests/providers/workable-abort.test.mjs .claude/skills/upstream-review/SKILL.md
@@ -3008,7 +3010,7 @@ Measured at 2edd1b33:
   - `isRefusedRedirectError(err)` in `providers/_http.mjs:715`, which returns `boolean`
 - Produces: None.
 
-- [ ] **Step 1: Write the stricter assertions**
+- [x] **Step 1: Write the stricter assertions**
 
 In `tests/providers/jazzhr.test.mjs`, replace each of the three `} catch { pass('<message>'); }` lines with this shape, keeping that case's own pass message and naming its input in the fail message:
 
@@ -3030,7 +3032,7 @@ In `tests/providers/neogov.test.mjs`, add `import { isRefusedRedirectError } fro
     }
 ```
 
-- [ ] **Step 2: Run the tests and see the new assertions fail on a planted bug**
+- [x] **Step 2: Run the tests and see the new assertions fail on a planted bug**
 
 The behaviour is correct today, so the new assertions pass on it. Prove they can fail with two temporary plants.
 - In `providers/jazzhr.mjs`, add `if (/\/apply\/(\?ref=1|\/|1\/role)/.test(html)) throw new TypeError('x');` as the first line of `parseJazzHRList`. It hits only the three cases' inputs. A plant that throws on every call crashes the suite at an earlier unguarded call (`❌ jazzhr provider tests crashed: x`) before these cases run.
@@ -3050,7 +3052,7 @@ Expected:
 
 With the same plants and the unmodified test files, all four cases print ✅, which is the defect. Revert both plants.
 
-- [ ] **Step 3: Keep the four catch blocks as written in Step 1**
+- [x] **Step 3: Keep the four catch blocks as written in Step 1**
 
 Deviations row:
 
@@ -3058,12 +3060,12 @@ Deviations row:
 | `tests/providers/jazzhr.test.mjs` (two board-root cases and the titleless-link case) and `tests/providers/neogov.test.mjs` (refused redirect) pass on any thrown error | `tests/providers/jazzhr.test.mjs` passes only on the "could not parse any posting cards" message, and `tests/providers/neogov.test.mjs` only when `isRefusedRedirectError(e)` holds | landed <date> | ADAPT. Our hunks are the four catch blocks and the neogov import; upstream hunks elsewhere in the two files are ADOPT. Pinned by `tests/providers/jazzhr.test.mjs` and `tests/providers/neogov.test.mjs`. |
 ```
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `node test-all.mjs --only providers/jazzhr && node test-all.mjs --only providers/neogov`
 Expected: PASS, `📊 Results: 33 passed, 0 failed, 0 warnings` and `📊 Results: 42 passed, 0 failed, 0 warnings`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/providers/jazzhr.test.mjs tests/providers/neogov.test.mjs .claude/skills/upstream-review/SKILL.md
@@ -3107,7 +3109,7 @@ The test is a source check. A crash that needs load and an unset `LANG` cannot b
 - Consumes: None
 - Produces: None. `print_summary`, `print_status_table`, `process_offer` and `rate_limit_delay` keep their output.
 
-- [ ] **Step 1: Add the failing check**
+- [x] **Step 1: Add the failing check**
 
 In `tests/batch-runner-score-locale.test.mjs`, insert this block after the static half's closing `}` and before `// --- behavioural half`:
 
@@ -3124,7 +3126,7 @@ if (shellPrefixed.length === 0) {
 }
 ```
 
-- [ ] **Step 2: See the check fail, and see the crash**
+- [x] **Step 2: See the check fail, and see the crash**
 
 Run: `node test-all.mjs --only batch-runner-score-locale`
 Expected: FAIL.
@@ -3170,7 +3172,7 @@ shell=5.3.20(1)-release LANG=<unset> variant=prefix runs=300 failed=20 load=45.6
 
 `load.sh stop` must print `left: 0`. On Linux, on `/bin/bash` or with `LANG` set, the crash count is 0, and the static check above is the gate.
 
-- [ ] **Step 3: Run every LC_ALL=C awk through env**
+- [x] **Step 3: Run every LC_ALL=C awk through env**
 
 In `batch/batch-runner.sh`, replace each of the seven `LC_ALL=C awk` at `:1088`, `:2051`, `:2054`, `:2159`, `:2186`, `:2225` and `:2245` with `env LC_ALL=C awk`. Change nothing else on those lines. Then extend the comment above `:2054` so it reads:
 
@@ -3190,7 +3192,7 @@ Deviations row:
 
 **Owner step.** Optionally offer the fix upstream as a bug-fix pull request. Upstream's `batch/batch-runner.sh` has the same seven lines.
 
-- [ ] **Step 4: See the check pass and the crash gone**
+- [x] **Step 4: See the check pass and the crash gone**
 
 Run: `node test-all.mjs --only batch-runner-score-locale`
 Expected: PASS, `📊 Results: 4 passed, 0 failed, 0 warnings`, with `✅ every LC_ALL=C in batch-runner.sh goes through env, not a shell prefix` and `✅ --status prints a dot decimal under de_DE.UTF-8` where that locale exists.
@@ -3206,7 +3208,7 @@ Expected: `{"bash":"/opt/homebrew/bin/bash 5.3.20(1)-release","LANG":null,"runs"
 
 Then run the suites that drive the runner: `node test-all.mjs --only split-root && node test-all.mjs --only batch-dealbreaker-skip && node test-all.mjs --only batch-runner`. Expected: PASS, `📊 Results: 3 passed`, `📊 Results: 24 passed` and `📊 Results: 164 passed`, each with `0 failed`. Three full `node test-all.mjs --quick` runs with this change passed both flaky suites, at load average 133 falling to 15.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add batch/batch-runner.sh tests/batch-runner-score-locale.test.mjs .claude/skills/upstream-review/SKILL.md
@@ -3244,7 +3246,7 @@ The wall-clock bounds in `tests/pipeline-lock.test.mjs` and `tests/providers/htt
 - Consumes: `htmlToText(html)` in `closing-soon.mjs:254`, which returns `string`. `process.cpuUsage(previous?)`, which returns `{ user, system }` in microseconds.
 - Produces: None
 
-- [ ] **Step 1: Bound CPU time in the near-linear test**
+- [x] **Step 1: Bound CPU time in the near-linear test**
 
 In `tests/closing-soon.test.mjs`, replace the comment and the loop of `test('htmlToText: hostile unterminated markup stays near-linear (in-process, generous bound)', ...)` with:
 
@@ -3270,7 +3272,7 @@ Deviations row:
 | `tests/closing-soon.test.mjs` near-linear test bounds each hostile input at 5000 ms of wall-clock time | `tests/closing-soon.test.mjs` bounds the same inputs at 5000 ms of CPU time from `process.cpuUsage()` and reports both times | landed <date> | ADAPT. Our hunk is the comment and the timing loop of the near-linear test; take upstream's other changes to the file. Pinned by `tests/closing-soon.test.mjs`. |
 ```
 
-- [ ] **Step 2: Prove the CPU bound still catches a quadratic scan**
+- [x] **Step 2: Prove the CPU bound still catches a quadratic scan**
 
 In `closing-soon.mjs`, set `const MAX_TAG_CHARS = Infinity;` for one run.
 
@@ -3279,12 +3281,12 @@ Expected: FAIL with a message of the form `"<a " took 11732ms CPU, ...ms wall`. 
 
 Put `MAX_TAG_CHARS` back to `4096`. Run `git diff --stat closing-soon.mjs`. Expected: no output.
 
-- [ ] **Step 3: Run the suite**
+- [x] **Step 3: Run the suite**
 
 Run: `node test-all.mjs --only closing-soon`
 Expected: PASS, with `tests/closing-soon.test.mjs — node:test suite passed (22 tests)` and `0 failed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/closing-soon.test.mjs .claude/skills/upstream-review/SKILL.md
@@ -3602,7 +3604,7 @@ An earlier audit report also called line 10's "four" wrong. That was wrong.
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Replace the first sentence of the bullet**
+- [x] **Step 1: Replace the first sentence of the bullet**
 
 Old: "Twenty market directories (`modes/de/`, `modes/fr/`, ...) each localize `_shared.md`, `pipeline.md`, an evaluation mode and an apply mode under their own file names (Language Modes table in `AGENTS.md`); `modes/tr/` carries more."
 
@@ -3610,14 +3612,14 @@ New: "Each market directory (a subdirectory of `modes/` with its own `_shared.md
 
 The rest of the bullet is unchanged. The sentence names the rule rather than a count, so a new market cannot make it stale.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 No automated test reads `.claude/rules/modes.md`. Run: `for d in modes/*/; do [ -f "$d/_shared.md" ] || echo "$d"; done`
 Expected: exactly `modes/heuristics/`, `modes/interview/`, `modes/oferta-signals/`, `modes/pdf/` and `modes/regional/`, the five the sentence names.
 
 `.claude/rules/` is fork-local (`config/local-paths.txt`), so the change needs no deviations row.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .claude/rules/modes.md
@@ -3645,12 +3647,12 @@ The same stale paths also appear in two historical records, which stay as writte
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Make the three replacements**
+- [x] **Step 1: Make the three replacements**
 - `.claude/skills/upstream-review/SKILL.md`, in the bullet that starts "- **Scan automation and platform** (": `docs/superpowers/plans/2026-11-08-scan-automation-and-platform.md` becomes `docs/superpowers/plans/completed/2026-11-08-scan-automation-and-platform.md`.
 - `publish/README.md`, line 3: `docs/superpowers/plans/2026-11-06-reactive-resume-convergence.md` becomes `docs/superpowers/plans/completed/2026-11-06-reactive-resume-convergence.md`.
 - `modes/tr/scan.md`, the line that starts "- Tam sağlayıcı (provider) tablosu": `(../docs/SUPPORTED_JOB_BOARDS.md)` becomes `(../../docs/SUPPORTED_JOB_BOARDS.md)`.
 
-- [ ] **Step 2: Add the deviations row for `modes/tr/scan.md`**
+- [x] **Step 2: Add the deviations row for `modes/tr/scan.md`**
 
 `modes/tr/scan.md` is an upstream file, so the fork change gets a row. Add this row to the table under `### Project audit fixes (2026-11-16)`:
 
@@ -3660,7 +3662,7 @@ The same stale paths also appear in two historical records, which stay as writte
 
 The first backticked token of each cell must be the bare path. `tests/fork-deviations-covered.test.mjs` matches whole backticked tokens, so `modes/tr/scan.md:125` would name no file.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 No automated test. A repo-wide link test would need an allowlist for 45 intentional placeholder links, which is more than this fix warrants.
 
@@ -3670,7 +3672,7 @@ Expected: the summary line reports one broken link fewer than before the edit (`
 Run: `git grep -n "docs/superpowers/plans/2026-11-0[68]" -- ':!docs/superpowers/plans/completed' ':!.upstream-review/reviews' ':!docs/superpowers/research'`
 Expected: no output.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .claude/skills/upstream-review/SKILL.md publish/README.md modes/tr/scan.md
@@ -3695,11 +3697,11 @@ This task runs after DOCS-1, which also edits `.claude/skills/upstream-review/SK
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Update the description**
+- [x] **Step 1: Update the description**
 
 In the frontmatter `description`, replace "branch-wide user-layer file check)" with "branch-wide user-layer file check, CodeRabbit review of the tip commit)".
 
-- [ ] **Step 2: Add step 7 after step 6**
+- [x] **Step 2: Add step 7 after step 6**
 
 Insert this line directly after the item that starts "6. If the diff touches an evaluation mode":
 
@@ -3707,7 +3709,7 @@ Insert this line directly after the item that starts "6. If the diff touches an 
 7. Only when steps 1 to 6 passed and the work is committed: `node .githooks/coderabbit-review.mjs`, as its own command and never chained with a push. It records a review of the tip commit, and `.githooks/pre-push` refuses the push without one; a fix committed after the review needs a new one. Exit 2 means findings: check each against the code, fix and commit the confirmed ones and run it again, and for the rest run it with `--decline "<reason>"`. When the quota is spent (`coderabbit review --usage`) or CodeRabbit is down, `--skip "<reason>"` records that instead; it is refused on a commit whose review has findings.
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 No automated test reads this skill. Run: `grep -c "coderabbit-review.mjs" .claude/skills/pr-ready/SKILL.md`
 Expected: `1`.
@@ -3716,7 +3718,7 @@ Then confirm by reading that each flag and behaviour in the new step matches `.c
 
 `.claude/skills/` is covered by an existing deviations row, so the change needs no new row. Run `node test-all.mjs --only fork-deviations-covered` after the commit. Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .claude/skills/pr-ready/SKILL.md
@@ -3745,7 +3747,7 @@ Cost of the default. A branch pushed with no pull request gets no Tests run unti
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Replace the `on:` block in `test.yml`**
+- [x] **Step 1: Replace the `on:` block in `test.yml`**
 
 Replace these lines:
 
@@ -3791,7 +3793,7 @@ Which runs happen for each event:
 
 One release cycle drops from 5 runs to 2. `classifyCheckout` still gets the `pull_request` merge checkout at `fetch-depth: 2` that the `changes` job's checkout step asks for, and `classifyPush` still gets `github.event.before` on `main`.
 
-- [ ] **Step 2: Add a `branches:` filter to `copilot-setup-steps.yml`**
+- [x] **Step 2: Add a `branches:` filter to `copilot-setup-steps.yml`**
 
 ```yaml
 on:
@@ -3805,7 +3807,7 @@ on:
 
 With `branches:` defined and no `tags:`, a tag push runs nothing. GitHub's workflow-syntax reference says that with only `branches` defined "the workflow won't run for events affecting the undefined Git ref".
 
-- [ ] **Step 3: Update the workflows deviations row**
+- [x] **Step 3: Update the workflows deviations row**
 
 In `.claude/skills/upstream-review/SKILL.md`, find the row whose first cell begins `| 28 workflows incl. maintainer bots`. In its fourth cell, replace only this clause:
 
@@ -3817,7 +3819,7 @@ with:
 
 Keep the rest of that sentence, which continues "and pulls the cv-visual image from GHCR with a local-build fallback; upstream hunks to its triggers or the two build steps are `~`, keep ours." Right after that sentence, insert: "`copilot-setup-steps.yml` has `branches: ['**']` on push, so a tag push runs nothing." Keep the rest of the row.
 
-- [ ] **Step 4: Verify (no automated test: the change is trigger YAML, which only GitHub evaluates)**
+- [x] **Step 4: Verify (no automated test: the change is trigger YAML, which only GitHub evaluates)**
 
 Run: `node -e "const y=require('js-yaml');const fs=require('fs');for(const f of ['test','copilot-setup-steps']){const w=y.load(fs.readFileSync('.github/workflows/'+f+'.yml','utf8'));console.log(f,JSON.stringify(w.on),JSON.stringify(w.concurrency))}"`
 Expected:
@@ -3835,7 +3837,7 @@ Expected: 23 pass and 0 fail, no `❌` line, then 14 pass and 0 fail.
 
 After the merge and the next release, run `gh run list -w "🧪 Tests" -L 10 --json event,headBranch`. Expected: no `headBranch` starting `career-ops-v` or `web-v`, and no `push` event on a branch other than `main`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/test.yml .github/workflows/copilot-setup-steps.yml .claude/skills/upstream-review/SKILL.md
@@ -3907,7 +3909,7 @@ This variant was applied and run. The YAML command printed `test {"push":{"branc
 - Consumes: the `org.opencontainers.image.revision` label that `docker/metadata-action` writes in `.github/workflows/docker-image.yml` (the `meta` step, passed to "🚀 Build and push" as `labels:`).
 - Produces: None
 
-- [ ] **Step 1: Replace both pull steps with this one (identical in both jobs)**
+- [x] **Step 1: Replace both pull steps with this one (identical in both jobs)**
 
 Replace each whole step, from its `- name:` line through its closing `fi`, with:
 
@@ -3931,7 +3933,7 @@ Replace each whole step, from its `- name:` line through its closing `fi`, with:
 
 The checkout keeps `persist-credentials: false`. The fetch needs no token because the repository is public. Any failure in the chain falls back to a build, as the current step does when the pull fails. `{{ index … }}` has no leading `$`, so GitHub leaves it to `docker inspect`.
 
-- [ ] **Step 2: Lint the workflow and dry-run the step locally**
+- [x] **Step 2: Lint the workflow and dry-run the step locally**
 
 Run: `actionlint .github/workflows/test.yml`
 Expected: no output, exit 0.
@@ -3967,14 +3969,14 @@ The first run is an image built from `origin/main`, whose Dockerfile matches thi
 
 Three things were not run locally. They are the step on a GitHub runner, `docker inspect` under the containerd image store, and a real `docker pull`. A wrong answer from any of them falls back to a build, which is today's behaviour on a failed pull.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/test.yml
 git commit -m "ci(test): build the CV rendering image when its Dockerfile differs from the published one"
 ```
 
-- [ ] **Step 4: Confirm on the pull request's CI run**
+- [x] **Step 4: Confirm on the pull request's CI run**
 
 After the pull request's CI run, open the "🖼️ CV visual regression" job log, step "🐳 Pull the canonical CV rendering environment (build it when tests/cv-visual/Dockerfile changed since that image)". This branch does not change `tests/cv-visual/Dockerfile`, so expect `Status: Downloaded newer image` or `Status: Image is up to date`, then no `load build definition from Dockerfile` line. A build line there means the label or the fetch failed, and the step fell back. That is safe but slow, and is worth reading before merge. The first pull request that does change the Dockerfile should show `load build definition from Dockerfile` in the same step.
 
@@ -3994,7 +3996,7 @@ The audit also found that the web-only releases `web-v1.1.1` (714ff5fe) and `web
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `tests/server-image.test.mjs`, add `'publish/**'` after `'deploy/**'` in `PR_PATHS`:
 
@@ -4002,14 +4004,14 @@ In `tests/server-image.test.mjs`, add `'publish/**'` after `'deploy/**'` in `PR_
 const PR_PATHS = ['Dockerfile', 'deploy/**', 'publish/**', '.dockerignore', '.hadolint.yaml', 'package.json', 'web/package.json', 'web/package-lock.json', 'tests/cv-visual/Dockerfile', '.github/workflows/docker-image.yml'];
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 The file reports through `pass`/`fail` and exits 0 on its own, so the `❌` line is the failure signal.
 
 Run: `node tests/server-image.test.mjs | grep "❌"`
 Expected: `  ❌ docker-image.yml builds pull requests that touch any image input`
 
-- [ ] **Step 3: Edit `docker-image.yml`**
+- [x] **Step 3: Edit `docker-image.yml`**
 
 Add `'publish/**'` to the `pull_request` paths, after `'deploy/**'`:
 
@@ -4037,12 +4039,12 @@ In the header comment, delete the two lines after "# On a pull request that touc
 
 Keep the "On a pull request…" line and the `# Tags:` paragraph after it unchanged.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node tests/server-image.test.mjs | grep -c "❌"; node tests/deployment-doc.test.mjs | grep -c "❌"; node tests/publish-image.test.mjs | grep -c "❌"; actionlint .github/workflows/docker-image.yml`
 Expected: `0`, `0`, `0`, then no actionlint output. `deployment-doc` still sees no `paths:` on push.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .github/workflows/docker-image.yml tests/server-image.test.mjs
@@ -4071,7 +4073,7 @@ No tracked file matches `*.bak*` (`git ls-files | grep -i '\.bak'` is empty), an
 - Consumes: None
 - Produces: None
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `tests/server-image.test.mjs`, replace the `LOCAL_ONLY` line with:
 
@@ -4080,14 +4082,14 @@ const LOCAL_ONLY = ['**/.env', '**/.env*.local', '**/.career-ops.env', '.mcp.jso
   '.archify', '.impeccable', '.superpowers', '.career-ops-locks', '.claude/launch.json', '.claude/skill-stack.json', '**/*.bak*'];
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 The file exits 0 on its own, so the `❌` line is the failure signal.
 
 Run: `node tests/server-image.test.mjs | grep "❌"`
 Expected: `  ❌ .dockerignore covers the local-only paths, missing: .archify, .impeccable, .superpowers, .career-ops-locks, .claude/launch.json, .claude/skill-stack.json, **/*.bak*`
 
-- [ ] **Step 3: Add these lines to `.dockerignore` after `.claude/settings.local.json`**
+- [x] **Step 3: Add these lines to `.dockerignore` after `.claude/settings.local.json`**
 
 ```
 .claude/launch.json
@@ -4101,12 +4103,12 @@ Expected: `  ❌ .dockerignore covers the local-only paths, missing: .archify, .
 **/*.bak*
 ```
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node tests/server-image.test.mjs | grep -c "❌"; node tests/deployment-doc.test.mjs | grep -c "❌"; node tests/publish-image.test.mjs | grep -c "❌"`
 Expected: `0`, `0`, `0`.
 
-- [ ] **Step 5: Amend the deviations row**
+- [x] **Step 5: Amend the deviations row**
 
 In `.claude/skills/upstream-review/SKILL.md`, find the row whose first cell begins with this text:
 
@@ -4128,7 +4130,7 @@ with:
 
 Keep the rest of the row.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .dockerignore tests/server-image.test.mjs .claude/skills/upstream-review/SKILL.md
@@ -4163,7 +4165,7 @@ A filter can leave a shard with no suites. That shard must pass and print a line
   - Module constant `SHARD` in `test-all.mjs`: `{ index: number, count: number } | null`.
   - Function `inShard(files)` in `test-all.mjs`: `(files: string[]) => string[]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```js
 // tests/test-all-shard.test.mjs: `test-all.mjs --shard i/N` splits the discovered suites.
@@ -4219,12 +4221,12 @@ try {
 }
 ```
 
-- [ ] **Step 2: Run the test and see it fail**
+- [x] **Step 2: Run the test and see it fail**
 
 Run: `node test-all.mjs --only test-all-shard`
 Expected: FAIL with `📊 Results: 5 passed, 11 failed`. Today `--shard` is an unknown flag that test-all ignores, so the first failure reads `❌ shard 1/2 runs discovery positions 1, 3 and 5 — ["✅ a","✅ b","✅ c","✅ d","✅ e"]`. Five checks already pass, and they stay as guards: both shard runs exit 0, the same shard twice gives the same list, the two "matches nothing still fails" cases hold today, and shard 1/2 of a full run runs the inline sections.
 
-- [ ] **Step 3: Add `SHARD`, `inShard(files)` and the shard 2..N branch to `test-all.mjs`**
+- [x] **Step 3: Add `SHARD`, `inShard(files)` and the shard 2..N branch to `test-all.mjs`**
 
 Add the usage line to the header comment, right after the `--jobs` entry that ends `# discovered suites, in one of the N slots.`:
 
@@ -4319,7 +4321,7 @@ Deviations row:
 | `test-all.mjs` has no way to split the discovered suites; `.github/workflows/test.yml` runs one `test` leg per OS | `test-all.mjs` takes `--shard i/N` (`SHARD`, `inShard()`), round-robin over discovery order, an empty shard passes, and only shard 1 runs the inline sections; `.github/workflows/test.yml` runs Windows as two `include` legs, `--shard 1/2` and `--shard 2/2`; `tests/docs-only-change.test.mjs` asserts that matrix; new `tests/test-all-shard.test.mjs` | landed <date> | ADAPT. Our hunks are the `--shard` parse after `JOBS`, `inShard()` and its two call sites, the shard 2..N branch after `holdTestQueue()`, and the matrix, comments and run line in `test.yml`; upstream hunks elsewhere are ADOPT. Pinned by `tests/test-all-shard.test.mjs` and `tests/docs-only-change.test.mjs`. |
 ```
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `node test-all.mjs --only test-all-shard && node --test tests/docs-only-change.test.mjs && node test-all.mjs --only test-all-jobs && node test-all.mjs --only test-all-inline-jobs`
 Expected: PASS. `test-all-shard` prints `📊 Results: 16 passed, 0 failed, 0 warnings`.
@@ -4335,7 +4337,7 @@ grep Results /tmp/shard-*.txt
 
 Expected: all three exit 0, and the shard totals add up to the unsharded one. At 2edd1b33 plus this task they were 105, 49 and 56 over 7 suites (4 in shard 1, 3 in shard 2). After the push, each Windows leg in `gh run view <id> --json jobs` shows a test step well under the 664–966 s baseline.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add test-all.mjs tests/test-all-shard.test.mjs tests/docs-only-change.test.mjs .github/workflows/test.yml .claude/skills/upstream-review/SKILL.md
@@ -4371,7 +4373,7 @@ All of these are upstream code. `git grep writeFileAtomic upstream/main -- dashb
 
 No test for `internal/model`: it is 139 lines of struct types (`dashboard/internal/model/*.go`) with no functions.
 
-- [ ] **Step 1: Verification instead of a test**
+- [x] **Step 1: Verification instead of a test**
 
 This is a lint gate, a dead-code deletion and an error-path change. A Go test that makes `Close` fail on an append-mode file needs a failing filesystem, and no fixture here gives one. The lint run is the check. Write `dashboard/.golangci.yml` first:
 
@@ -4385,7 +4387,7 @@ linters:
       checks: ["all", "-ST*", "-QF*", "-S1011"]
 ```
 
-- [ ] **Step 2: Run the linter and see it fail**
+- [x] **Step 2: Run the linter and see it fail**
 
 Run: `cd dashboard && go vet ./... && GOTOOLCHAIN=go1.26.0 go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./...`
 Expected: `go vet` prints nothing, then the linter fails with exactly these three:
@@ -4399,7 +4401,7 @@ internal/data/tracker_replace_unix.go:7:6: func replaceFileAtomic is unused (unu
 * unused: 2
 ```
 
-- [ ] **Step 3: Make the code changes**
+- [x] **Step 3: Make the code changes**
 
 - Delete `func writeFileAtomic(filePath string, content []byte) error { … }` from the end of `tracker_lock.go`, and delete the three `tracker_replace_*.go` files.
 - In `pipeline_pdf_index_test.go`, change `index := filepath.Join(root, "data", "pdf-index.tsv")` to `var index string`. Both branches below assign it.
@@ -4457,12 +4459,12 @@ Deletion line, under "Deleted or moved paths":
 
 **Owner step.** Optionally offer the deletion and the `Close` fix upstream.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `cd dashboard && go vet ./... && GOTOOLCHAIN=go1.26.0 go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4 run ./... && go build ./... && go test ./... && GOOS=windows go build ./... && GOOS=windows go vet ./... && node --test ../tests/docs-only-change.test.mjs`
 Expected: the linter prints `0 issues.`, `go test` passes (648 tests in 6 packages at 2edd1b33 plus this task), the Windows build and vet succeed with no build-tag file left dangling, and the workflow test passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add dashboard/.golangci.yml dashboard/internal/data/tracker_lock.go dashboard/internal/data/career.go dashboard/internal/ui/screens/pipeline_pdf_index_test.go dashboard/cross_compile_test.go .github/workflows/test.yml .claude/skills/upstream-review/SKILL.md
@@ -4656,7 +4658,7 @@ This task runs last, after DOCS-1 and DOCS-3, which also edit `.claude/skills/up
 - Consumes: every commit on `fix/audit-2026-11-16`, and the launch configuration `audit-web` from PREP-1
 - Produces: None
 
-- [ ] **Step 1: Run every gate on the branch tip**
+- [x] **Step 1: Run every gate on the branch tip**
 
 ```bash
 node scripts/check-syntax.mjs

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { previewHtml } from "../../src/lib/cv-studio/preview-html.mjs";
 
 function shown(html) {
-  return previewHtml(html).replace(/<style data-cv-preview-fit>[\s\S]*?<\/style>/, "");
+  return previewHtml(html).replace(/<style data-cv-preview-fit>[\s\S]*?<\/style>/, "").replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, "");
 }
 
 test("live preview renders markdown bold, including quotes and a leading tilde", () => {

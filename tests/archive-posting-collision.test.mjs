@@ -9,11 +9,13 @@ const root = mkdtempSync(join(tmpdir(), 'career-ops-capture-collision-'));
 const previousRoot = process.env.CAREER_OPS_ROOT;
 process.env.CAREER_OPS_ROOT = root;
 const { archiveUrl } = await import('../archive-posting.mjs?archive-posting-collision');
+// archiveUrl resolves the landed URL; these fixtures stay off the network.
+const restoreResolver = (await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
 function browser() {
   return { async newContext() {
     let url;
-    return { async route() {}, async close() {}, async newPage() {
-      return { async goto(value) { url = value; return { status: () => 200 }; }, url() { return url; },
+    return { async route() {}, async addInitScript() {}, async close() {}, async newPage() {
+      return { async goto(value) { url = value; return { status: () => 200 }; }, url() { return url; }, frames() { return []; }, on() {}, context: () => ({ on() {} }),
         async waitForTimeout() {}, async title() { return 'Engineer | Fictional'; }, async $eval() { return 'Engineer'; },
         async evaluate() { return 'Fictional engineering role with responsibilities and requirements. '.repeat(40); },
         async pdf() { return Buffer.from('%PDF-fixture ' + url); } };
@@ -92,6 +94,7 @@ try {
     }
   }
 } finally {
+  restoreResolver();
   if (previousRoot === undefined) delete process.env.CAREER_OPS_ROOT;
   else process.env.CAREER_OPS_ROOT = previousRoot;
   rmSync(root, { recursive: true, force: true, maxRetries: 10 });

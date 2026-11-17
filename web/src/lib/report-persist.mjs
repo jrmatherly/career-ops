@@ -19,6 +19,10 @@ import { parseEvaluationOptions } from "./evaluation-options.mjs";
 import { machineSummarySection } from "./machine-summary-section.mjs";
 import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./evaluation-gate.mjs";
 import { APPLY_LINE } from "./report-sections.mjs";
+import { stoppedBy } from "./pdf-render.mjs";
+
+// Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
+const SCRIPT_TIMEOUT_MS = 120_000;
 
 const ISO_DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const YAML_FENCE = /^##\s*Machine Summary\s*\n+```(?:yaml|yml)?\s*\n([\s\S]*?)\n```/i;
@@ -215,12 +219,18 @@ function spawnScript({ spawnFn, execPath, root, cwd = root, script, args = [], i
   return new Promise((resolve) => {
     // windowsHide: see api/doctor/route.ts — a stale inherited console kills
     // every child with 0xC0000142 on Windows; never inherit one.
-    const child = spawnFn(execPath, [path.join(root, script), ...args], { cwd, windowsHide: true });
+    const child = spawnFn(execPath, [path.join(root, script), ...args], { cwd, windowsHide: true, timeout: SCRIPT_TIMEOUT_MS });
     let stdout = "";
     let stderr = "";
+    child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (d) => { stdout += d.toString(); });
+    child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (d) => { stderr += d.toString(); });
-    child.on("close", (code) => resolve({ ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() }));
+    child.on("close", (code, signal) => resolve({
+      ok: code === 0,
+      stdout: stdout.trim(),
+      stderr: signal ? stoppedBy(script, SCRIPT_TIMEOUT_MS, signal, stderr) : stderr.trim(),
+    }));
     child.on("error", (e) => resolve({ ok: false, stdout: "", stderr: `${script} failed to start: ${e.message}` }));
     if (input != null) {
       child.stdin?.write(input);

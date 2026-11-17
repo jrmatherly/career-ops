@@ -102,7 +102,8 @@ function runPlanner(binPath: string, cliId: string, argsFor: (p: string) => stri
       { cliId, capabilities: CAPS.localReadOnly },
     );
     let buf = "";
-    child.stdout.on("data", (d: Buffer) => (buf += d.toString()));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => (buf += d.toString()));
     child.stderr.on("data", () => {});
     const killer = setTimeout(() => {
       try {

@@ -18,11 +18,11 @@ import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 import { isClosureEvidence } from './liveness-core.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
-import { replaceUserFile } from './tracker-utils.mjs';
+import { replaceUserFile, writeFileAtomic } from './tracker-utils.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { TSV_ADDITION_HEADER } from './tracker-parse.mjs';
 import { flagValue, hasFlag, validateFlags } from './lib/cli-flags.mjs';
@@ -364,35 +364,29 @@ LEGITIMACY: <High Confidence | Proceed with Caution | Suspicious>
   return systemPromptTemplate;
 }
 
+const refusal = (verdict) => Object.assign(new Error(`Invalid or blocked URL: ${verdict.reason}`), { refused: verdict });
+
 async function scrapeUrl(browser, url) {
   const rejected = rejectPrivateOrInvalid(url);
-  if (rejected) {
-    throw new Error(`Invalid or blocked URL: ${rejected.reason}`);
-  }
+  if (rejected) throw refusal(rejected);
   
-  const page = await browser.newPage();
+  const page = await browser.newPage({ serviceWorkers: 'block' });
   try {
-    await page.route('**/*', (route) => {
-      const targetUrl = route.request().url();
-      const interceptedRejected = rejectPrivateOrInvalid(targetUrl);
-      if (interceptedRejected) {
-        return route.abort('accessdenied');
-      }
-      return route.continue();
-    });
+    await installEgressGuard(page.context());
+    const rejectVisited = recordLandedUrls(page);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    
-    const finalRejected = rejectPrivateOrInvalid(page.url());
-    if (finalRejected) {
-      throw new Error(`Invalid or blocked URL after redirect: ${finalRejected.reason}`);
-    }
-
     await page.waitForTimeout(2000); // wait for dynamic content
-    const text = await page.evaluate(() => {
+
+    const finalRejected = await rejectLandedUrl(page.url());
+    if (finalRejected) throw refusal(finalRejected);
+
+    const text = await readLanded(rejectVisited, page.evaluate(() => {
       document.querySelectorAll('script, style, noscript, iframe, svg, img').forEach(s => s.remove());
       return document.body.innerText;
-    });
+    }), 'dom read');
+    const afterRead = await rejectVisited();
+    if (afterRead) throw refusal(afterRead);
     return text.trim();
   } finally {
     await page.close();
@@ -470,7 +464,9 @@ export async function processOffer(browser, line, idx, _evaluate = evaluateWithR
     let jdText;
     try {
       jdText = await scrapeUrl(browser, url);
-    } catch {
+    } catch (err) {
+      if (err.refused) console.warn(`⚠️  ${url}: refused by the egress guard (${err.refused.code}), not evaluated.`);
+      else console.warn(`⚠️  ${url}: could not be read (${String(err.message).split('\n')[0]}).`);
       return await resolveDeadPosting();
     }
     if (!jdText || jdText.length < 100) {
@@ -547,7 +543,7 @@ ${withJdArchiveSection(evaluationText.replace(/---SCORE_SUMMARY---[\s\S]*?---END
     ];
     // Header row first: merge-tracker resolves the fields by name, so this row
     // cannot be ingested into the wrong columns (#3517).
-    writeFileSync(trackerPath, `${TSV_ADDITION_HEADER}\n${trackerFields.join('\t')}\n`, 'utf-8');
+    writeFileAtomic(trackerPath, `${TSV_ADDITION_HEADER}\n${trackerFields.join('\t')}\n`);
 
     console.log(`✅ Success: ${company} - ${role} | Score: ${score}/5 | Saved as ${filename}`);
     
@@ -641,6 +637,7 @@ async function main() {
     console.log(mergeOutput.trim());
   } catch (err) {
     console.error(`⚠️ Failed to merge tracker: ${err.message}`);
+    process.exitCode = 1;
   }
 }
 

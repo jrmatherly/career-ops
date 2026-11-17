@@ -120,3 +120,19 @@ test("pendingRows reads pending and ranked rows the way rank-pipeline.mjs does",
     parsePendingEntries(text).map((entry) => entry.url),
   );
 });
+
+test("pendingRows skips rows outside the Pending section, as rank-pipeline.mjs does", async () => {
+  const { parsePendingEntries } = await import("../../../rank-pipeline.mjs");
+  const text = [
+    "- [ ] https://a.test/4 | A | Role",
+    "## Pending",
+    "- [ ] https://a.test/5 | B | Role",
+    "## Processed",
+    "- [ ] https://a.test/6 | C | Role",
+  ].join("\n");
+  assert.deepEqual(pendingRows(text).map((row) => row.url), ["https://a.test/5"]);
+  assert.deepEqual(
+    pendingRows(text).filter((row) => !row.ranked).map((row) => row.url),
+    parsePendingEntries(text).map((entry) => entry.url),
+  );
+});

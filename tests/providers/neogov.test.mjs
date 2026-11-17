@@ -3,6 +3,7 @@
 // host/path gating, the HTML parser (entities, off-site links, empty-vs-wrong-page),
 // and the pagination contract.
 import { pass, fail, ROOT } from '../helpers.mjs';
+import { isRefusedRedirectError } from '../../providers/_http.mjs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 
@@ -186,7 +187,10 @@ try {
     try {
       await neogov.fetch(entry, { fetchText: async () => { const e = new TypeError('fetch failed'); e.cause = new Error('unexpected redirect'); throw e; }, sleep: noSleep });
       fail('neogov.fetch() should fail on a refused redirect');
-    } catch (e) { pass('neogov.fetch() surfaces a refused redirect (wrong agency slug) as an error, not an empty board'); }
+    } catch (e) {
+      if (isRefusedRedirectError(e)) pass('neogov.fetch() surfaces a refused redirect (wrong agency slug) as an error, not an empty board');
+      else fail(`refused redirect surfaced as a different error: ${e?.stack ?? e}`);
+    }
   } finally {
     console.warn = realWarn;
   }

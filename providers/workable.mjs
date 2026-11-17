@@ -39,7 +39,8 @@
 // uses it; scan-ats-full.mjs does, as its Workable source.
 
 import { decodeEntities } from './_html-entities.mjs';
-import { BROWSER_LIKE_USER_AGENT, fetchTextStream, isRetryableError, parseRetryAfterMs, sleep } from './_http.mjs';
+import { BROWSER_LIKE_USER_AGENT, abortableSleep, fetchTextStream, isRetryableError, parseRetryAfterMs } from './_http.mjs';
+import { currentAbortSignal } from './_connection-scope.mjs';
 
 const ALLOWED_WORKABLE_HOSTS = new Set(['apply.workable.com']);
 
@@ -84,12 +85,13 @@ async function fetchWithRetry(ctx, fn) {
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (attempt === MAX_RETRIES || !isRetryableError(err)) throw err;
+      if (attempt === MAX_RETRIES || !isRetryableError(err) || currentAbortSignal()?.aborted) throw err;
       const retryAfterMs = parseRetryAfterMs(err?.retryAfter);
       if (retryAfterMs !== null && retryAfterMs > GIVE_UP_RETRY_AFTER_MS) throw err;
       const backoff = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS);
       const delayMs = retryAfterMs !== null ? retryAfterMs : (backoff + Math.random() * 250);
-      await sleep(delayMs, ctx);
+      await abortableSleep(delayMs, ctx, currentAbortSignal());
+      if (currentAbortSignal()?.aborted) throw lastErr;
     }
   }
   throw lastErr;

@@ -62,7 +62,8 @@ export async function POST(req: Request) {
         resolve({ code: 1, err: e instanceof Error ? e.message : "failed to start tracker.mjs" });
         return;
       }
-      child.stderr.on("data", (d: Buffer) => {
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (d: string) => {
         err += d.toString();
       });
       child.stdout.on("data", () => {

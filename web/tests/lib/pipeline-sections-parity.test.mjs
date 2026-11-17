@@ -80,3 +80,16 @@ test("mirror recognizes a Pending heading in every shipped language", () => {
     assert.equal(mirror.sectionKind(line), "pending", `expected pending for ${JSON.stringify(line)}`);
   }
 });
+
+test("mirror pendingRange matches the core", { skip: core ? false : "core lib/pipeline-sections.mjs not resolvable" }, () => {
+  const inputs = [
+    ["# P", "## Pending", "a", "## Processed", "b"],
+    ["a", "b"],
+    ["a", "## Processed", "b"],
+    ["a", "## Pendientes", "b"],
+    [],
+  ];
+  for (const lines of inputs) {
+    assert.deepEqual(mirror.pendingRange(lines), core.pendingRange(lines), `pendingRange disagreed on ${JSON.stringify(lines)}`);
+  }
+});

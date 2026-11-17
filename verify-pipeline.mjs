@@ -517,9 +517,11 @@ if (dupReports === 0) ok('No duplicate reports for the same company+role');
 // Links are matched GLOBALLY. A cell can carry more than one — "[901](…) /
 // [902](…)" is the documented form for a re-evaluation that keeps both reports
 // on record — and a single .match() sees only the first, so every later link
-// in the cell false-positives as an orphan.
+// in the cell false-positives as an orphan. A `Superseded report [N]` marker in
+// Notes keeps report N on record too, as it does for Check 9.
 const referencedNums = new Set();
 for (const e of entries) {
+  for (const m of e.notes.matchAll(SUPERSEDED_RE)) referencedNums.add(parseInt(m[1], 10));
   const nums = linkedReportNums(e.report);
   if (nums.length === 0 && parseMarkdownLinks(e.report).length === 0) {
     referencedNums.add(e.num);

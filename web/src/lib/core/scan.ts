@@ -334,7 +334,8 @@ function runScanner(
       }
     };
 
-    child.stdout.on("data", (d: Buffer) => {
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => {
       if (useJson) {
         jsonOut += d.toString(); // one JSON object — parsed at close
         return;
@@ -344,7 +345,8 @@ function runScanner(
       outBuf = parts.pop() ?? "";
       for (const p of parts) handleLine(p);
     });
-    child.stderr.on("data", (d: Buffer) => {
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d: string) => {
       errBuf += d.toString();
       const parts = errBuf.split(/\r?\n/);
       errBuf = parts.pop() ?? "";

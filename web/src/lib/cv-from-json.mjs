@@ -60,7 +60,9 @@ function runNode(dataRoot, args) {
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => child.kill(), 20_000);
+    child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     child.on("close", (code) => {
       clearTimeout(timer);

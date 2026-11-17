@@ -114,6 +114,7 @@ const LOW_FIT_SCORE = 4.0;
 import { extractSkills } from './skill-extract.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { browserLaunchOptions } from './lib/browser-launch.mjs';
+import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 export { extractSkills };
 
 // --- Known-skills text assembly ---
@@ -775,39 +776,6 @@ soft_gaps:
   process.exit(0);
 }
 
-// Helper function to enforce egress guard against SSRF (Private/Loopback IPs)
-const dnsCache = new Map();
-
-async function validateUrlSecurity(urlString) {
-  const dns = await import('dns/promises');
-  const url = new URL(urlString.endsWith('.') ? urlString.slice(0, -1) : urlString);
-  const hostname = url.hostname;
-
-  if (hostname === 'localhost' || hostname.endsWith('.local')) {
-    throw new Error('Access denied: Localhost or internal domain target detected.');
-  }
-
-  let addresses;
-  if (dnsCache.has(hostname)) {
-    addresses = dnsCache.get(hostname);
-  } else {
-    addresses = await dns.resolve(hostname).catch(() => []);
-    const lookupRes = await dns.lookup(hostname).catch(() => null);
-    if (lookupRes) addresses.push(lookupRes.address);
-    dnsCache.set(hostname, addresses);
-  }
-
-  for (const ip of addresses) {
-    if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|169\.254\.)/.test(ip)) {
-      throw new Error(`Access denied: Egress guard blocked private target IP ${ip}`);
-    }
-    if (ip === '::1' || ip.startsWith('fe80:') || ip.startsWith('fc00:') || ip.startsWith('fd00:')) {
-      throw new Error(`Access denied: Egress guard blocked private target IPv6 ${ip}`);
-    }
-  }
-  return url.toString();
-}
-
 // --- CLI ---
 // Everything below runs ONLY when upskill.mjs is the process entry point.
 //
@@ -890,32 +858,42 @@ if (isMain) {
       if (inputSource.startsWith('http://') || inputSource.startsWith('https://')) {
         let browser;
         try {
-          const secureUrl = await validateUrlSecurity(inputSource);
+          const guard = rejectPrivateOrInvalid(inputSource);
+          if (guard) throw new Error(guard.reason);
+          await validateUrlSecurity(inputSource);
+          const secureUrl = inputSource;
           const { chromium } = await import('playwright');
           browser = await chromium.launch(browserLaunchOptions({ headless: true }));
-          const page = await browser.newPage();
+          const page = await browser.newPage({ serviceWorkers: 'block' });
 
-          await page.route('**/*', async (route) => {
-            const requestUrl = route.request().url();
-            try {
-              await validateUrlSecurity(requestUrl);
-              await route.continue();
-            } catch (err) {
-              console.error(`Security Violation on Redirect: ${err.message}`);
-              await route.abort('blockedbyclient');
-              process.exit(1);
-            }
-          });
+          await installEgressGuard(page.context());
+          const rejectVisited = recordLandedUrls(page);
 
           await page.goto(secureUrl, { waitUntil: 'networkidle', timeout: 30000 });
-          targetText = await page.innerText('body');
+          const refusal = (verdict) => Object.assign(new Error(`blocked URL after redirect: ${verdict.reason}`), { refused: verdict });
+          const landed = await rejectLandedUrl(page.url());
+          if (landed) throw refusal(landed);
+          const bodyText = await readLanded(rejectVisited, page.innerText('body'), 'body text read');
+          const afterRead = await rejectVisited();
+          if (afterRead) throw refusal(afterRead);
+          targetText = bodyText;
         } catch (err) {
-          console.warn('Playwright extraction failed or blocked, trying fallback WebFetch...', err.message);
+          // A refused page is not fetched again from Node: that would read the
+          // same posting with a lookup the browser checks never saw.
+          if (err.refused) {
+            console.error(`Fatal: Refused to read the JD from ${inputSource}: ${err.refused.reason}`);
+            process.exitCode = 1;
+            return;
+          }
+          console.warn('Playwright extraction failed, trying fallback WebFetch...', err.message);
           try {
-            const secureUrl = await validateUrlSecurity(inputSource);
+            const guard = rejectPrivateOrInvalid(inputSource);
+            if (guard) throw new Error(guard.reason);
+            await validateUrlSecurity(inputSource);
+            const secureUrl = inputSource;
             // validateUrlSecurity only vets the initial URL; a redirect could still
             // steer the fetch at an internal host (SSRF). The Playwright path
-            // re-validates per hop, but this plain fetch must refuse redirects
+            // judges the landed URL, but this plain fetch must refuse redirects
             // outright — fail closed rather than follow an unvetted Location (#1851).
             const res = await fetch(secureUrl, { signal: AbortSignal.timeout(30000), redirect: 'error' });
             if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);

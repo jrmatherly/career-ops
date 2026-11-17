@@ -47,7 +47,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadYaml } from './lib/yaml-document.mjs';
-import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid } from './liveness-browser.mjs';
+import { LIVENESS_CONTEXT_OPTIONS, rejectPrivateOrInvalid, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { resolveAtsApi, JD_TEXT_API_ATS, findAtlassianListing } from './liveness-api.mjs';
 import { classifyLiveness, cloudflareInterstitial } from './liveness-core.mjs';
@@ -1534,27 +1534,31 @@ async function main() {
   try {
     browser = await chromium.launch(browserLaunchOptions({ headless: true }));
     const context = await browser.newContext(LIVENESS_CONTEXT_OPTIONS);
-    // Block every request (main navigation, redirect hop, or subresource) to a
-    // private/loopback/link-local or non-http(s) host. Guarding only the initial
-    // URL isn't enough once we return page CONTENT: a server-side redirect could
-    // otherwise steer the browser at internal infrastructure (SSRF).
-    await context.route('**/*', (route) => {
-      if (rejectPrivateOrInvalid(route.request().url())) return route.abort('blockedbyclient');
-      return route.continue();
-    });
+    // Refuses the first URL of every routed request (navigation, popup,
+    // subresource) that names or resolves to a private host. It never sees a
+    // redirect hop, so the landed URL is judged below before any CONTENT is
+    // read, and what the page received (the address behind every response,
+    // frame URLs, WebSockets) is judged after the read (SSRF).
+    await installEgressGuard(context);
     const page = await context.newPage();
+    const rejectVisited = recordLandedUrls(page);
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     await page.waitForTimeout(HYDRATION_WAIT_MS); // let SPAs hydrate
 
-    // Belt-and-suspenders: never emit content read from a private final URL.
     const finalUrl = page.url();
-    const finalGuard = rejectPrivateOrInvalid(finalUrl);
+    const finalGuard = await rejectLandedUrl(page.url());
     if (finalGuard) {
       console.error(JSON.stringify({ error: `blocked final URL: ${finalGuard.reason}`, code: finalGuard.code }));
       process.exitCode = 1;
       return;
     }
-    const raw = await readDom(page);
+    const raw = await readLanded(rejectVisited, readDom(page), 'dom read');
+    const afterRead = await rejectVisited();
+    if (afterRead) {
+      console.error(JSON.stringify({ error: `blocked final URL: ${afterRead.reason}`, code: afterRead.code }));
+      process.exitCode = 1;
+      return;
+    }
 
     if (mode === 'listing') {
       process.stdout.write(JSON.stringify(normalizeListing(raw.anchors, finalUrl, max)));
@@ -1568,7 +1572,11 @@ async function main() {
       }
     }
   } catch (err) {
-    console.error(JSON.stringify({ error: `navigation error: ${String(err.message).split('\n')[0]}`, code: 'navigation_error' }));
+    if (err.refused) {
+      console.error(JSON.stringify({ error: `blocked final URL: ${err.refused.reason}`, code: err.refused.code }));
+    } else {
+      console.error(JSON.stringify({ error: `navigation error: ${String(err.message).split('\n')[0]}`, code: 'navigation_error' }));
+    }
     process.exitCode = 1;
   } finally {
     if (browser) await browser.close().catch(() => {});

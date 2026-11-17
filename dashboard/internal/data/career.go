@@ -1355,7 +1355,7 @@ func LoadReportDiscardReasons(careerOpsPath, reportPath string) []string {
 }
 
 // SaveAnonymousStat records an anonymized win stat to data/reported-hires.tsv.
-func SaveAnonymousStat(careerOpsPath string, role string, weeks int) error {
+func SaveAnonymousStat(careerOpsPath string, role string, weeks int) (err error) {
 	dirPath := filepath.Join(careerOpsPath, "data")
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return err
@@ -1365,7 +1365,11 @@ func SaveAnonymousStat(careerOpsPath string, role string, weeks int) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
 
 	fi, err := f.Stat()
 	if err == nil && fi.Size() == 0 {

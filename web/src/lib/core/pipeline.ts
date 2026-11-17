@@ -109,8 +109,10 @@ process.stdin.on("end", async () => {
     });
     let out = "";
     let err = "";
-    child.stdout.on("data", (d: Buffer) => (out += d.toString()));
-    child.stderr.on("data", (d: Buffer) => (err += d.toString()));
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (d: string) => (out += d.toString()));
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d: string) => (err += d.toString()));
     child.on("error", (e) => resolve({ added: 0, error: e instanceof Error ? e.message : "spawn failed" }));
     child.on("close", (code, signal) => resolve(pipelineWriterResult(out, err, { code, signal })));
     child.stdin.write(JSON.stringify(clean));

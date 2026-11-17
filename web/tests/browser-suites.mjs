@@ -52,6 +52,7 @@ process.env.TMPDIR = fs.realpathSync(os.tmpdir());
 const SUITES = {
   "accessible-names": { url: "ACCESSIBLE_NAMES_TEST_URL", fixture: "pipeline-status" },
   "analytics-views": { url: "ANALYTICS_TEST_URL", root: "ANALYTICS_TEST_ROOT", fixture: "pipeline-status" },
+  "applied-confirm-flows": { url: "APPLIED_CONFIRM_TEST_URL", root: "APPLIED_CONFIRM_TEST_ROOT", fixture: "pipeline-status" },
   "apply-field-accessibility": { url: "APPLY_FIELDS_TEST_URL", fixture: "blank" },
   "assistant-confirmation-accessibility": { url: "ASSISTANT_CONFIRM_TEST_URL", fixture: "blank" },
   "assistant-focus": { url: "ASSISTANT_FOCUS_TEST_URL", fixture: "blank" },
@@ -148,6 +149,23 @@ async function waitReady(url, server) {
   throw new Error(`server did not answer ${url} within ${READY_TIMEOUT_MS / 1000}s`);
 }
 
+// server.mjs starts the PDF painter detached, in a group of its own, so stop()
+// never signals it and it would idle for 30 minutes after every suite. A socket
+// path this run chose says where its pid file is.
+async function stopPainter(socketPath) {
+  let pid;
+  try { pid = Number(fs.readFileSync(`${socketPath}.pid`, "utf8")); } catch { return; }
+  // An empty pid file reads as 0, and signalling pid 0 would stop this runner's own group.
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  try { process.kill(pid, "SIGTERM"); } catch { return; }
+  for (let i = 0; i < 100; i++) {
+    try { process.kill(pid, 0); } catch { return; }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  console.warn(`⚠️  PDF painter ${pid} ignored SIGTERM for 5 s; killing it`);
+  try { process.kill(pid, "SIGKILL"); } catch { /* gone */ }
+}
+
 async function stop(server) {
   try { process.kill(-server.child.pid, "SIGTERM"); } catch { return; }
   const timer = setTimeout(() => { try { process.kill(-server.child.pid, "SIGKILL"); } catch { /* gone */ } }, 10_000);
@@ -208,6 +226,7 @@ async function attempt(name) {
   let proxy;
   let logPath;
   let claudeConfig;
+  let painterDir;
   let problem = null;
   try {
     root = makeRoot(suite.fixture);
@@ -218,7 +237,12 @@ async function attempt(name) {
     let url = `http://127.0.0.1:${port}`;
     logPath = path.join(root, "..", `${path.basename(root)}-server.log`);
     const log = fs.openSync(logPath, "w");
-    server = startServer(root, port, log, claudeConfig ? { CLAUDE_CONFIG_DIR: claudeConfig } : {});
+    // Windows names the painter's pipe itself; a file path is not one.
+    if (process.platform !== "win32") painterDir = fs.mkdtempSync(path.join(os.tmpdir(), "co-suite-pdf-"));
+    server = startServer(root, port, log, {
+      ...(claudeConfig ? { CLAUDE_CONFIG_DIR: claudeConfig } : {}),
+      ...(painterDir ? { CAREER_OPS_PDF_SOCKET: path.join(painterDir, "p.sock") } : {}),
+    });
     fs.closeSync(log);
     await waitReady(url, server);
     if (SEGMENT_DELAY_MS) {
@@ -247,6 +271,10 @@ async function attempt(name) {
   } finally {
     if (proxy) { proxy.closeAllConnections(); proxy.close(); }
     if (server) await stop(server);
+    if (painterDir) {
+      await stopPainter(path.join(painterDir, "p.sock"));
+      fs.rmSync(painterDir, { recursive: true, force: true });
+    }
     if (problem && logPath && fs.existsSync(logPath)) {
       console.log(`--- ${name} server log ---\n${fs.readFileSync(logPath, "utf8").slice(-8_000)}`);
     }

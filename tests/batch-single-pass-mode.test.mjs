@@ -11,6 +11,9 @@ import {
   PATHS, parseCliMode, loadContext,
   parseLegitimacy, processOffer,
 } from '../batch-evaluate-gemini.mjs';
+import { setHostResolver } from '../liveness-browser.mjs';
+// scrapeUrl resolves the landed URL; keep that lookup off the network.
+const restoreResolver = setHostResolver(async () => ['93.184.216.34']);
 
 console.log('\nbatch-single-pass-mode.test.mjs — Single-Pass CV-Match Evaluation Mode');
 
@@ -236,7 +239,7 @@ try {
   const mockBrowser = {
     newPage: async () => ({
       url: () => 'https://example.com/test-job',
-      route: async () => {},
+      context: () => ({ route: async () => {}, addInitScript: async () => {}, on() {} }), on() {},
       goto: async () => {},
       waitForTimeout: async () => {},
       evaluate: async () => rawJd,
@@ -444,3 +447,5 @@ try {
     rmSync(base, { recursive: true, force: true });
   }
 }
+
+restoreResolver();

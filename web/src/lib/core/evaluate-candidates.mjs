@@ -6,6 +6,7 @@
  * same day see the same new rows. A row added by hand has no scan-history row
  * and is never a candidate.
  */
+import { pendingRange } from "./pipeline-sections.mjs";
 import { normalizeUrl } from "./url-key.mjs";
 
 // rank-pipeline.mjs treats any row holding RANK_LABEL as ranked; RANK_SEGMENT is the score and reason it writes.
@@ -20,15 +21,17 @@ export function hostLocalDate(epochMs) {
 }
 
 /**
- * The pending `- [ ]` rows of pipeline.md, in file order, read the way
- * rank-pipeline.mjs reads them: the URL is the first cell.
+ * The `- [ ]` rows in the Pending section of pipeline.md (pendingRange), in
+ * file order, read the way rank-pipeline.mjs reads them: the URL is the first cell.
  *
  * @param {string} text
  * @returns {Array<{ url: string, ranked: boolean, rank?: number, reason?: string }>}
  */
 export function pendingRows(text) {
   const rows = [];
-  for (const line of String(text ?? "").split(/\r?\n/)) {
+  const lines = String(text ?? "").split(/\r?\n/);
+  const { start, end } = pendingRange(lines);
+  for (const line of lines.slice(start, end)) {
     if (!line.startsWith("- [ ] ")) continue;
     const url = line.slice(6).split("|")[0].trim();
     const ranked = line.includes(RANK_LABEL);

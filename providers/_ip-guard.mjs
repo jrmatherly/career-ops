@@ -96,14 +96,40 @@ function v4ToInt(address) {
   return value >>> 0;
 }
 
+/** The eight 16-bit groups of an IPv6 address, or null when it is not one. */
+function v6Groups(addr) {
+  let hex = addr;
+  if (addr.includes('.')) {
+    const cut = addr.lastIndexOf(':') + 1;
+    const v4 = v4ToInt(addr.slice(cut));
+    if (v4 === null) return null;
+    hex = `${addr.slice(0, cut)}${(v4 >>> 16).toString(16)}:${(v4 & 0xffff).toString(16)}`;
+  }
+  const halves = hex.split('::');
+  if (halves.length > 2) return null;
+  const [left, right] = halves.map((half) => (half ? half.split(':') : []));
+  const fill = right ? 8 - left.length - right.length : 0;
+  if (right ? fill < 1 : left.length !== 8) return null;
+  const groups = [...left, ...Array(fill).fill('0'), ...(right ?? [])];
+  return groups.every((g) => /^[0-9a-f]{1,4}$/.test(g)) ? groups.map((g) => Number.parseInt(g, 16)) : null;
+}
+
 /**
- * Does this address belong to a range a provider must never connect to?
+ * Does this address belong to a range career-ops must never connect to? It
+ * judges what a provider's lookup resolved, the host literal of a URL, and the
+ * address a browser dialled.
  *
- * Accepts both families. An IPv4-mapped or IPv4-compatible IPv6 address is
- * unwrapped and judged as IPv4 — `::ffff:127.0.0.1` is loopback however it is
- * spelled, and treating the two spellings differently is the bypass.
+ * Accepts both families. An IPv6 address that embeds an IPv4 one in its last
+ * 32 bits is unwrapped and judged as that IPv4 address: IPv4-compatible
+ * `::/96`, IPv4-mapped `::ffff:0:0/96`, IPv4-translated `::ffff:0:0:0/96` and
+ * NAT64 `64:ff9b::/96`. So `::ffff:127.0.0.1` is loopback however it is
+ * spelled, and treating the spellings differently is the bypass, while
+ * `64:ff9b::808:808` is allowed because 8.8.8.8 is public. Any other IPv6
+ * address is allowed only inside global unicast 2000::/3, less the blocks
+ * refused below.
  *
- * @param {string} address - Resolved IP literal, as dns.lookup returns it.
+ * @param {string} address - An IP literal: a resolved address, a URL's host
+ *   literal or a dialled address.
  * @returns {boolean} True when the address is private/loopback/reserved.
  */
 export function isBlockedAddress(address) {
@@ -111,37 +137,33 @@ export function isBlockedAddress(address) {
   if (!raw) return true; // nothing to validate is not the same as safe
 
   // Strip an RFC 4007 zone id (fe80::1%eth0) before parsing.
-  const addr = raw.split('%')[0].toLowerCase();
+  const [addr, zone] = raw.toLowerCase().split('%');
 
   const asV4 = v4ToInt(addr);
   if (asV4 !== null) {
+    if (zone !== undefined) return true; // only IPv6 takes a zone id
     return V4_BLOCKED.some(([net, bits]) => {
       const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits)) >>> 0;
       return (asV4 & mask) >>> 0 === net;
     });
   }
 
-  if (!addr.includes(':')) return true; // neither v4 nor v6 — refuse to guess
+  const g = v6Groups(addr);
+  if (!g) return true; // neither v4 nor v6 — refuse to guess
 
-  // IPv4-mapped (::ffff:a.b.c.d) and IPv4-compatible (::a.b.c.d).
-  const tail = addr.slice(addr.lastIndexOf(':') + 1);
-  if (tail.includes('.')) {
-    const embedded = v4ToInt(tail);
-    return embedded === null ? true : isBlockedAddress(tail);
-  }
-  // The same two forms written in hex, which is how the URL parser prints them:
-  // `new URL('http://[::ffff:127.0.0.1]/').hostname` is `[::ffff:7f00:1]`.
-  const hexEmbedded = /^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(addr);
-  if (hexEmbedded) {
-    const high = Number.parseInt(hexEmbedded[1], 16);
-    const low = Number.parseInt(hexEmbedded[2], 16);
-    return isBlockedAddress(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
-  }
-
-  if (addr === '::' || addr === '::1') return true;      // unspecified, loopback
-  if (/^f[cd]/.test(addr)) return true;                   // fc00::/7 unique local
-  if (/^fe[89ab]/.test(addr)) return true;                // fe80::/10 link-local
-  if (/^ff/.test(addr)) return true;                      // ff00::/8 multicast
+  const zero = (from, to) => g.slice(from, to).every((x) => x === 0);
+  const embeddedV4 = () => isBlockedAddress(`${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`);
+  // ::/96 holds unspecified (::) and loopback (::1), which read as 0.0.0.0 and 0.0.0.1.
+  if (zero(0, 5) && (g[5] === 0 || g[5] === 0xffff)) return embeddedV4(); // IPv4-compatible ::/96, IPv4-mapped ::ffff:0:0/96
+  if (zero(0, 4) && g[4] === 0xffff && g[5] === 0) return embeddedV4();   // IPv4-translated ::ffff:0:0:0/96
+  if (g[0] === 0x64 && g[1] === 0xff9b && zero(2, 6)) return embeddedV4(); // NAT64 64:ff9b::/96
+  // Allow-list: only global unicast 2000::/3 is public. Unique-local, link-local,
+  // multicast and every unallocated block fall outside it.
+  if (g[0] >> 13 !== 1) return true;
+  if (g[0] === 0x2002) return true;                             // 6to4 2002::/16
+  if (g[0] === 0x2001 && g[1] < 0x200) return true;             // IETF protocol assignments 2001::/23 (Teredo, benchmarking, ORCHID)
+  if (g[0] === 0x2001 && g[1] === 0xdb8) return true;           // documentation 2001:db8::/32
+  if (g[0] === 0x3fff && g[1] >> 12 === 0) return true;         // documentation 3fff::/20
   return false;
 }
 

@@ -159,7 +159,10 @@ try {
   try {
     mod.parseJazzHRList('<a href="/apply/?ref=1">Board root, not a posting</a>', board, 'X');
     fail('an href resolving to the board root should not be accepted as a posting');
-  } catch { pass('rejects an href that resolves to the board root, not a posting'); }
+  } catch (e) {
+    if (/could not parse any posting cards/.test(e?.message)) pass('rejects an href that resolves to the board root, not a posting');
+    else fail(`board-root href threw the wrong error: ${e?.stack ?? e}`);
+  }
 
   // Regression: "/apply//" satisfies a naive ".+ after /apply/" check (the
   // extra "/" itself counts as "something"), but it is not a real posting
@@ -167,7 +170,10 @@ try {
   try {
     mod.parseJazzHRList('<a href="/apply//">Double slash, not a posting</a>', board, 'X');
     fail('an "/apply//" href should not be accepted as a posting');
-  } catch { pass('rejects an "/apply//" href with no real posting segment'); }
+  } catch (e) {
+    if (/could not parse any posting cards/.test(e?.message)) pass('rejects an "/apply//" href with no real posting segment');
+    else fail(`"/apply//" href threw the wrong error: ${e?.stack ?? e}`);
+  }
 
   // Regression: a PARTIAL redesign (one posting still in a list-group-item
   // card, another already migrated off it) must recover both — the fallback
@@ -181,5 +187,8 @@ try {
   try {
     mod.parseJazzHRList('<a href="/apply/1/role"></a>', board, 'X');
     fail('a titleless ApplyToJob link should throw');
-  } catch { pass('throws when ApplyToJob links exist but no posting title parses'); }
+  } catch (e) {
+    if (/could not parse any posting cards/.test(e?.message)) pass('throws when ApplyToJob links exist but no posting title parses');
+    else fail(`titleless ApplyToJob link threw the wrong error: ${e?.stack ?? e}`);
+  }
 } catch (e) { fail(`jazzhr provider tests crashed: ${e.message}`); }

@@ -93,6 +93,9 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
   fieldsRef.current = fields;
   const answersRef = useRef<Record<string, string>>({});
   answersRef.current = answers;
+  // Sticky for the life of a session: once its Chrome window is on screen for the user, later
+  // statuses (filling, ready, error) no longer say so.
+  const windowHandedOff = useRef(false);
   // Bumped every time a session is abandoned or replaced. Leaving the page is
   // reachable while a request or stream is still in flight, and none of them can
   // be recalled, so each one carries the generation it started in and drops its
@@ -102,9 +105,14 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
   // not unblock it, so the controller is aborted in the same places the
   // generation moves.
   const fillAbort = useRef<AbortController | null>(null);
+  // Leaving mid-prefill must end the request too, or the server never sees a
+  // cancel and its planner runs to the end.
+  const prefillAbort = useRef<AbortController | null>(null);
   const dropFill = () => {
     fillAbort.current?.abort();
     fillAbort.current = null;
+    prefillAbort.current?.abort();
+    prefillAbort.current = null;
   };
   // When a session opens with {prefill:true}, auto-fire prefill once fields are
   // ready — driven by an effect (not a fragile setTimeout) so it can't race the
@@ -177,6 +185,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     // leaving the page does, so it is released here too.
     if (sessionId.current) closeSession(sessionId.current);
     sessionId.current = null;
+    windowHandedOff.current = false;
     setStatus("opening");
     setError("");
     setFields([]);
@@ -268,7 +277,10 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     try {
       // company + application travel with the pre-fill for the same reason they
       // travel with the fill: both halves resolve the one tailored CV from them.
-      const r = await fetch("/api/apply/prefill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sessionId.current, cliId: cliId(), company: companyRef.current, application: nRef.current }) });
+      prefillAbort.current?.abort();
+      const controller = new AbortController();
+      prefillAbort.current = controller;
+      const r = await fetch("/api/apply/prefill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sessionId.current, cliId: cliId(), company: companyRef.current, application: nRef.current }), signal: controller.signal });
       if (generation.current !== gen) return; // left mid-prefill
       if (!r.body) {
         setError("Couldn't pre-fill — no response stream.");
@@ -361,6 +373,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       setIssues((prev) => issuesAfterFill(withoutReadbackIssues(prev), incoming));
       if (d.navigated) setError("Heads up: the form's page changed during fill — review it carefully before submitting (career-ops never submits for you).");
       if (d.handedOff) {
+        windowHandedOff.current = true;
         setStatus("done");
         // ESCALATION ("si no va, full agente"): if deterministic fill clearly
         // didn't land (most fields failed / mismatched), let the agent fill it.
@@ -400,6 +413,8 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       if (controller.signal.aborted || generation.current !== gen) return; // left mid-fill
       const result = await readFillResult(r, (step) => setDriveSteps((p) => [...p, step]), () => generation.current === gen, controller.signal);
       if (!result || controller.signal.aborted || generation.current !== gen) return; // left mid-fill
+      // The drive route raises the window exactly when it reports filled, even if gaps keep the editor up.
+      if (result.status === "done" && result.filled) windowHandedOff.current = true;
       const outcome = screenForFill(result);
       const gaps = "gaps" in outcome && outcome.gaps?.length ? outcome.gaps : [];
       if (gaps.length || outcome.status === "done") {
@@ -432,6 +447,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     dropFill();
     if (sessionId.current) closeSession(sessionId.current);
     sessionId.current = null;
+    windowHandedOff.current = false;
     companyRef.current = "";
     nRef.current = "";
     pendingPrefill.current = false;
@@ -453,6 +469,17 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     setCvAttached(false);
     setError("");
   }, []);
+
+  // Leaving the app (or entering the back-forward cache) releases the form's browser context. reset also
+  // clears sessionId and returns the page to idle, so a restored page never holds a closed session.
+  // Not once the window is handed off: the user is reviewing and submitting in it, and a release closes it.
+  useEffect(() => {
+    const release = () => {
+      if (!windowHandedOff.current) reset();
+    };
+    window.addEventListener("pagehide", release);
+    return () => window.removeEventListener("pagehide", release);
+  }, [reset]);
 
   const value = useMemo(
     () => ({ status, url, title, company, n, from, fields, answers, meta, steps, shots, prefillLog, issues, driveSteps, error, blockedAts, cvAttached, open, prefill, setAnswer, fill, agentFill, reset }),

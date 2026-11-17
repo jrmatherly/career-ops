@@ -30,7 +30,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { getCareerOpsRoot } from './path-resolver.mjs';
 import { captureSlug, reportPrefix } from './jd-capture.mjs';
-import { rejectPrivateOrInvalid, validateUrlSecurity } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, installEgressGuard, rejectLandedPage, recordLandedUrls, readLanded } from './liveness-browser.mjs';
+export { installEgressGuard } from './liveness-browser.mjs';
 import { cloudflareInterstitial } from './liveness-core.mjs';
 import { validateFlags } from './lib/cli-flags.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
@@ -310,37 +311,6 @@ async function extractPipelineEntries() {
 
 // ── Core archive function ────────────────────────────────────────────────────
 
-/**
- * Register the egress guard on a Playwright context.
- *
- * Registered on the *context* rather than the page: a route bound to a single
- * page doesn't cover requests the flow makes outside it, and the context is
- * what owns the whole navigation. Both layers of the shared guard run here —
- * the literal-host check first (cheap, no network), then the DNS re-check that
- * catches a public hostname resolving into private space.
- *
- * @param {import('playwright').BrowserContext} context - Context to guard.
- */
-export async function installEgressGuard(context) {
-  await context.route('**/*', async (route) => {
-    const requestUrl = route.request().url();
-
-    const verdict = rejectPrivateOrInvalid(requestUrl);
-    if (verdict) {
-      console.warn(`   Blocked request to restricted destination: ${requestUrl} (${verdict.reason})`);
-      return route.abort('blockedbyclient');
-    }
-
-    try {
-      await validateUrlSecurity(requestUrl);
-      return route.continue();
-    } catch (err) {
-      console.warn(`   Blocked request to restricted destination (DNS): ${requestUrl} - ${err.message}`);
-      return route.abort('blockedbyclient');
-    }
-  });
-}
-
 export async function archiveUrl(browser, url, { company: companyHint, role: roleHint } = {}) {
   console.log(`\n🔗  ${url}`);
 
@@ -351,27 +321,29 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     throw new Error(`refusing to archive restricted destination: ${preGuard.reason}`);
   }
 
-  const context = await browser.newContext();
+  const context = await browser.newContext({ serviceWorkers: 'block' });
   await installEgressGuard(context);
   const page = await context.newPage();
+  const rejectVisited = recordLandedUrls(page);
 
   try {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     const httpStatus = response?.status() ?? 0;
 
-    // Re-check where we actually landed. The route guard already inspects every
-    // redirect hop, so this is defence-in-depth: a first-hop-only check is the
-    // classic miss here, and asserting on the settled URL costs nothing.
-    const landedUrl = page.url();
-    const postGuard = rejectPrivateOrInvalid(landedUrl);
+    // Give SPAs (Ashby, Lever, Workday) time to hydrate
+    await page.waitForTimeout(2000);
+
+    // The route guard never sees a redirect hop, so where the page and its
+    // frames landed is judged here, after the page settles and before anything
+    // is read from it. Once the PDF is rendered, everything the page received
+    // since it opened is judged: the address behind every response, every URL
+    // a frame committed to, every WebSocket.
+    const postGuard = await rejectLandedPage(page);
     if (postGuard) {
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
     }
 
-    // Give SPAs (Ashby, Lever, Workday) time to hydrate
-    await page.waitForTimeout(2000);
-
-    const pageTitle = await page.title();
+    const pageTitle = await readLanded(rejectVisited, page.title(), 'title read');
     const h1Text = await page.$eval('h1', el => el.innerText.trim()).catch(() => '');
     const urlCompany = extractCompanyFromUrl(url);
 
@@ -394,7 +366,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     // ever having been checked — a capture-time gap in the exact protection
     // this block exists to add. Fail closed: propagate the error, refusing
     // to archive rather than archiving blind.
-    const bodyText = await page.evaluate(() => document.body?.innerText ?? '');
+    const bodyText = await readLanded(rejectVisited, page.evaluate(() => document.body?.innerText ?? ''), 'body text read');
     if (!bodyText.trim()) {
       throw new Error('refusing to archive: page has no visible text');
     }
@@ -415,27 +387,32 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     const company = resolvedCompany.replace(/^job\s+application\s+for\s+/i, '').trim();
     const role = resolvedRole.replace(/^job\s+application\s+for\s+/i, '').trim();
 
-    console.log(`   Company: ${company}`);
-    console.log(`   Role:    ${role}`);
     if (httpStatus === 404) {
       throw new Error('refusing to archive: HTTP 404');
     }
     const interstitial = httpStatus >= 400 ? cloudflareInterstitial(pageTitle) : null;
     if (interstitial) {
-      throw new Error(`refusing to archive: HTTP ${httpStatus} Cloudflare ${interstitial} ("${pageTitle.trim()}"), not a posting`);
+      throw new Error(`refusing to archive: HTTP ${httpStatus} Cloudflare ${interstitial}, not a posting`);
     }
     if (httpStatus && httpStatus >= 400) {
       console.log(`HTTP ${httpStatus} — page may be closed, archiving anyway`);
     }
 
-    mkdirSync(JDS_DIR, { recursive: true });
-
-    const pdfBuffer = await page.pdf({
+    const pdfBuffer = await readLanded(rejectVisited, page.pdf({
       format: 'a4',
       printBackground: true,
       margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
       preferCSSPageSize: false,
-    });
+    }), 'pdf render');
+    const afterRender = await rejectVisited();
+    if (afterRender) {
+      throw new Error(`refusing to archive restricted destination after redirect: ${afterRender.reason}`);
+    }
+    // Printed only now: before the verdict these could be an internal page's title.
+    console.log(`   Company: ${company}`);
+    console.log(`   Role:    ${role}`);
+
+    mkdirSync(JDS_DIR, { recursive: true });
 
     const baseFilename = captureFilename(company, role, url);
     let filename;
@@ -470,6 +447,11 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
 
     return { filename, reference, url, size: pdfBuffer.length };
 
+  } catch (err) {
+    if (err.refused) {
+      throw new Error(`refusing to archive restricted destination after redirect: ${err.refused.reason}`);
+    }
+    throw err;
   } finally {
     await context.close();
   }

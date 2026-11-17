@@ -74,6 +74,17 @@ if (numericAwk.length === 0) {
   }
 }
 
+// A bare `LC_ALL=C cmd` prefix makes bash reset its own locale when cmd ends.
+// With no LANG set, Homebrew bash on macOS asks CoreFoundation for the locale
+// there, which is not fork-safe: in a $(...) or & subshell it segfaults now and
+// then, and set -e turns that into exit 139.
+const shellPrefixed = SRC.split('\n').filter((line) => /(^|[\s;&|(])LC_ALL=/.test(line) && !/\benv LC_ALL=/.test(line) && !/^\s*#/.test(line));
+if (shellPrefixed.length === 0) {
+  pass('every LC_ALL=C in batch-runner.sh goes through env, not a shell prefix');
+} else {
+  fail(`${shellPrefixed.length} line(s) set LC_ALL as a shell prefix; use env LC_ALL=C:\n  ${shellPrefixed.map((l) => l.trim()).join('\n  ')}`);
+}
+
 // --- behavioural half: --status under a comma-decimal locale ---------------
 function commaDecimalLocale() {
   let available = '';

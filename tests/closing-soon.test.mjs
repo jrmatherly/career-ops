@@ -325,14 +325,17 @@ test('captures: pathological unterminated markup is still read around', () => {
 
 test('htmlToText: hostile unterminated markup stays near-linear (in-process, generous bound)', () => {
   // The old tag regex needed ~17s for 200k of this; a linear scan needs well
-  // under a second. 5s leaves ample headroom for a loaded CI runner while still
-  // failing on quadratic or exponential backtracking.
+  // under a second. CPU time, not wall time: a loaded machine stretches the
+  // wall clock past 5s while the scan's own work stays the same.
   for (const unit of ['<a ', '<a "', '<script ', '<!-- ']) {
     const input = unit.repeat(Math.ceil(200000 / unit.length));
-    const t = process.hrtime.bigint();
+    const t = process.cpuUsage();
+    const w = process.hrtime.bigint();
     htmlToText(input);
-    const ms = Number(process.hrtime.bigint() - t) / 1e6;
-    assert.ok(ms < 5000, JSON.stringify(unit) + ' took ' + Math.round(ms) + 'ms');
+    const wall = Number(process.hrtime.bigint() - w) / 1e6;
+    const { user, system } = process.cpuUsage(t);
+    const cpu = (user + system) / 1000;
+    assert.ok(cpu < 5000, JSON.stringify(unit) + ' took ' + Math.round(cpu) + 'ms CPU, ' + Math.round(wall) + 'ms wall');
   }
 });
 

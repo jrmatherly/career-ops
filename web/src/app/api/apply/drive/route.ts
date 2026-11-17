@@ -25,6 +25,7 @@ export async function POST(req: Request) {
   if (!s) return Response.json({ error: "apply session not found (it may have expired)" }, { status: 404 });
 
   const encoder = new TextEncoder();
+  const abort = new AbortController();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const emit = (o: unknown) => {
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
           }
         };
         const budget = goal === "full" ? 16 : 7;
-        const result = await driveSession(page, cliId, goal, isFormReady, (step) => emit({ t: "step", ...step }), budget, answers);
+        const result = await driveSession(page, cliId, goal, isFormReady, (step) => emit({ t: "step", ...step }), budget, answers, abort.signal);
 
         if (goal === "full") {
           // Open the window only when required screening answers have values and a claimed résumé file landed.
@@ -65,9 +66,12 @@ export async function POST(req: Request) {
             cvPath = null;
             cvResolveError = error instanceof Error ? error.message.slice(0, 160) : "Could not resolve the résumé.";
           }
+          if (abort.signal.aborted) return;
           // Snapshot first. Finalizing replaces s.fields and reassigns positional ids.
           const beforeFields = Array.isArray(s.fields) ? s.fields.slice() : [];
           const fin = await finalizeDrivenSession(s.id, cliId);
+          // A cancel that lands after the drive must not go on to attach the résumé.
+          if (abort.signal.aborted) return;
           if (!fin) {
             const unread = { level: "warn" as const, code: "fill-unverified", message: "Couldn't read the form back, so it is not counted as pre-filled." };
             emit({
@@ -139,9 +143,10 @@ export async function POST(req: Request) {
       } catch (e) {
         emit({ t: "error", message: e instanceof Error ? e.message.slice(0, 160) : "drive failed" });
       } finally {
-        controller.close();
+        try { controller.close(); } catch { /* cancelled */ }
       }
     },
+    cancel() { abort.abort(); },
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
 }

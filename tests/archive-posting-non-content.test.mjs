@@ -14,14 +14,14 @@
 // through a real headless browser, and a unit test that launched Chromium
 // against a live URL would be flaky, slow, and network-dependent for no
 // benefit. The fake page satisfies exactly the Playwright surface
-// archiveUrl() calls (goto/url/title/$eval/waitForTimeout/evaluate/pdf) so the
+// archiveUrl() calls (goto/url/frames/on/title/$eval/waitForTimeout/evaluate/pdf) so the
 // REAL function logic runs end to end; only the browser layer underneath it
 // is faked. CAREER_OPS_ROOT is set to a temp dir BEFORE import, so JDS_DIR
 // resolves there instead of the real project's jds/.
 //
 // Run:  node --test tests/archive-posting-non-content.test.mjs
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,6 +31,8 @@ const tmp = mkdtempSync(join(tmpdir(), 'career-ops-archive-nc-'));
 process.env.CAREER_OPS_ROOT = tmp;
 
 const { archiveUrl } = await import('../archive-posting.mjs');
+// archiveUrl resolves the landed URL; these fixtures stay off the network.
+after((await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']));
 
 function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Backend Engineer', httpStatus = 200, evaluateRejects = false }) {
   let pdfCalled = false;
@@ -38,6 +40,8 @@ function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Ba
     _landedUrl: null,
     async goto(url) { page._landedUrl = url; return { status: () => httpStatus }; },
     url() { return page._landedUrl; },
+    frames() { return []; },
+    on() {}, context: () => ({ on() {} }),
     async waitForTimeout() {},
     async title() { return title; },
     async $eval(selector) {
@@ -66,6 +70,7 @@ function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Ba
     // logic (rejectPrivateOrInvalid / validateUrlSecurity) is exercised on the
     // real navigation URL passed to archiveUrl(), not through this handler.
     async route() {},
+    async addInitScript() {},
   };
   const browser = { async newContext() { return context; } };
   return { browser, pdfCalled: () => pdfCalled };
@@ -128,11 +133,12 @@ test('a real extraction FAILURE (page.evaluate rejects) fails CLOSED — refuses
   // content is UNKNOWN, not confirmed empty. Coercing that to '' (as an
   // earlier version of this code did) let a page that genuinely couldn't be
   // inspected reach page.pdf() anyway — the exact capture-time gap this
-  // whole check exists to close. The error must propagate.
+  // whole check exists to close. The failure must propagate, as fixed text:
+  // a script in the page chooses the message of what it throws.
   const { browser, pdfCalled } = makeFakeBrowser({ bodyText: 'unused — evaluate() rejects before returning it', evaluateRejects: true });
   await assert.rejects(
     () => archiveUrl(browser, 'https://boards.greenhouse.io/acme/jobs/4', {}),
-    /page\.evaluate\(\) failed/,
+    /^Error: a read of the page failed: body text read$/,
   );
   assert.equal(pdfCalled(), false, 'an extraction failure must not reach page.pdf()');
 });
