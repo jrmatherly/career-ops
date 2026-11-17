@@ -326,8 +326,8 @@ export async function validateUrlSecurity(urlString) {
  * sockets raise no event. Both are denied instead. The guard removes the
  * `SharedWorker` constructor from every document before the page's scripts
  * run, and the caller creates the context with `serviceWorkers: 'block'`.
- * `tests/landed-url-guard.test.mjs` pins that a page, or a new iframe in it,
- * finds no constructor.
+ * `tests/landed-url-guard-armed.test.mjs` pins that a page, or a new iframe in
+ * it, finds no constructor.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void>, addInitScript: (script: Function) => Promise<unknown> }} context - Context to guard.
  */
@@ -461,8 +461,9 @@ export function setDialledAddressJudge(judge) {
  * can pass text to the page in its handshake or in a close frame's reason
  * without sending a message.
  *
- * `tests/landed-url-guard.test.mjs` pins, in real Chromium, which responses,
- * frames, popups and sockets are refused.
+ * `tests/landed-url-guard.test.mjs` pins, in real Chromium, which frames and
+ * popups are refused, and `tests/landed-url-guard-received.test.mjs` which
+ * responses and sockets.
  *
  * Not seen: a shared worker, and a socket a service worker opens. Playwright
  * raises no event for either, so they are denied instead of recorded (see
