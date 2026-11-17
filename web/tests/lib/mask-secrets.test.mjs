@@ -155,8 +155,9 @@ test("a credential passed as a command-line flag is masked", () => {
   for (const s of ["--max-tokens 4096", "--token-limit 4096", "--password --verbose"]) assert.equal(maskSecrets(s), s);
 });
 
-test("a URL password holding an @ is masked up to the host", () => {
+test("a URL password holding an @ or a # is masked up to the host", () => {
   assert.equal(maskSecrets("fetch https://fakeuser:fake@pass@example.invalid/x failed"), "fetch https://fakeuser:[masked]@example.invalid/x failed");
+  assert.equal(maskSecrets("redis://user:fake#pass@host.invalid/db"), "redis://user:[masked]@host.invalid/db");
 });
 
 test("a path assigned to PWD is not taken for a password", () => {
@@ -249,6 +250,7 @@ test("a password keeps nothing after the mark an earlier rule left in it", () =>
   // A URL password that starts with a known value keeps the name and loses the rest.
   assert.equal(maskSecrets("redis://:correcthorsebatteryPrivateSuffix99@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
   assert.equal(maskSecrets("redis://:correcthorsebattery@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
+  assert.equal(maskSecrets("redis://user:correcthorsebattery!Private@host.invalid/db", known), "redis://user:[masked:DB_PASSWORD]@host.invalid/db", "a rest that starts with no credential character");
   // A known value that is assigned to in turn still labels what follows it.
   assert.equal(maskSecrets("PASSWORD: correcthorsebattery: realsecret99", known), "PASSWORD: [masked:DB_PASSWORD]: [masked]");
   assert.equal(maskSecrets("PASSWORD= correcthorsebattery = other", known), "PASSWORD= [masked:DB_PASSWORD] = [masked]");
@@ -258,6 +260,11 @@ test("a credential that starts with a known value is masked whole, and what a se
   const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
   assert.equal(maskSecrets("Authorization: Bearer correcthorsebatteryPrivateSuffix99", known), "Authorization: Bearer [masked:DB_PASSWORD]");
   assert.equal(maskSecrets("token correcthorsebatteryPrivateSuffix99 done", known), "token [masked:DB_PASSWORD] done");
+  // Every character a credential can hold, not letters and digits alone.
+  assert.equal(maskSecrets("Authorization: Bearer correcthorsebattery-Private.Suffix_9/9+x=", known), "Authorization: Bearer [masked:DB_PASSWORD]");
+  assert.equal(maskSecrets("got correcthorsebattery-Private.Suffix_9/9+x= back", known), "got [masked:DB_PASSWORD] back");
+  // A mark with = straight after it is left as a label for the password rule.
+  assert.equal(maskSecrets("correcthorsebattery=Tr0ub4dor&3 ok", known), "[masked:DB_PASSWORD]=[masked] ok");
   assert.equal(maskSecrets('{"p":"correcthorsebattery","user":"bob"}', known), '{"p":"[masked:DB_PASSWORD]","user":"bob"}');
   assert.equal(maskSecrets("a correcthorsebattery b, correcthorsebattery, c", known), "a [masked:DB_PASSWORD] b, [masked:DB_PASSWORD], c");
 });
@@ -288,10 +295,12 @@ test("200 known secrets mask a 128,000-character text in linear time (under 2 s)
   }
 });
 
-test("a known value that is a label word still lets the value it labels be masked", () => {
-  const known = masker.knownSecrets([{ FAKE_FIELD_PASSWORD_REF: "password" }]);
-  assert.equal(maskSecrets('login password: "plum vexed 47" ok', known), 'login [masked:FAKE_FIELD_PASSWORD_REF]: "[masked]" ok');
-  assert.equal(maskSecrets("run --password hunter2 now", known), "run --[masked:FAKE_FIELD_PASSWORD_REF] [masked] now");
+test("a known value that is itself a label word is not masked by value, so the label still reads", () => {
+  const known = masker.knownSecrets([{ FAKE_FIELD_PASSWORD_REF: "password", FAKE_AUTH_SECRET: "Authorization" }]);
+  assert.deepEqual(known, []);
+  assert.equal(maskSecrets('login password: "plum vexed 47" ok', known), 'login password: "[masked]" ok');
+  assert.equal(maskSecrets("run --password hunter2 now", known), "run --password [masked] now");
+  assert.equal(maskSecrets("password Tr0ub4dorAbcdefgh123456", known), "password [masked]");
 });
 
 test("a password that looks like a path is masked, and the shell's PWD is not", () => {
