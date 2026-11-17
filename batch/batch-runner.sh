@@ -1480,7 +1480,7 @@ process_offer() {
         be_code=$(node -e '
           let d = "";
           process.stdin.on("data", (c) => d += c);
-          process.stdin.on("end", () => { try { process.stdout.write(String(JSON.parse(d).code || "")); } catch { /* none */ } });
+          process.stdin.on("end", () => { try { process.stdout.write(String(JSON.parse(d.split("\n").filter((l) => l.startsWith("{")).pop() ?? "").code || "")); } catch { /* none */ } });
         ' < "$be_err" 2>/dev/null) || be_code=""
         echo "    🎭 Browser extract failed${be_code:+ ($be_code)}"
         # Allowlist of transient failures worth another try. Everything else
