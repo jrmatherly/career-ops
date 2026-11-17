@@ -129,7 +129,7 @@ test('real Chromium: upskill.mjs refuses a page that received a private response
   const env = await chromiumAndServer(t);
   if (!env) return;
   const { code, stdout, stderr } = await cliWithSeams(t, env, 'upskill.mjs', ['--url-text', env.publicUrl('/fetch-then-armed')]);
-  assert.notEqual(code, 0, stderr);
+  assert.equal(code, 1, stderr);
   assert.equal(stdout, '');
   assert.match(stderr, /a response came from private target IP 127\.0\.0\.1/);
   assert.deepEqual(env.nodeHits, [], 'Node fetched the posting itself after the refusal');
