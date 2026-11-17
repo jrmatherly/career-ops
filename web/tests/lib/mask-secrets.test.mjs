@@ -125,3 +125,8 @@ test("the bare word password in prose is left alone", () => {
   for (const line of ["password required for this portal", "Enter your password to continue", "the password is wrong"]) assert.equal(maskSecrets(line), line);
 });
 
+test("a value after an explicit Basic or Bearer scheme is masked even with no digit", () => {
+  assert.equal(maskSecrets("Authorization: Basic dXNlcjphYmNkZWZnaA=="), "Authorization: Basic [masked]");
+  assert.equal(maskSecrets("authorization: bearer abcdefghijklmnopqrstuvwx"), "authorization: bearer [masked]");
+});
+

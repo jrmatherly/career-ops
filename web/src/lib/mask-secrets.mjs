@@ -1,6 +1,7 @@
 // Masks key-shaped strings in text a saved run writes, keeping the label or
 // prefix so a reader can still tell what kind of credential was there. A value
-// must hold a digit, so prose after "key" or "token" ("API key missing") stays.
+// must hold a digit, so prose after "key" or "token" ("API key missing") stays,
+// unless a Bearer or Basic scheme names it as a credential.
 // The digit is checked in the replacer, not in a lookahead: a lookahead re-scans
 // the rest of the run at every candidate start, which is quadratic on "key=key=…".
 const MARK = "[masked]";
@@ -44,6 +45,6 @@ export function maskSecrets(s) {
     })
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
-    .replace(LABELLED, (m, label, sep, scheme = "", value) => (hasDigit(value) && !isPath(value) ? label + sep + scheme + MARK : m))
+    .replace(LABELLED, (m, label, sep, scheme = "", value) => ((scheme || hasDigit(value)) && !isPath(value) ? label + sep + scheme + MARK : m))
     .replace(PASSWORD_ASSIGNED, `$1${MARK}`);
 }
