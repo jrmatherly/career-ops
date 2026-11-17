@@ -21,7 +21,7 @@ The planned cases are fixed and tested. Three of the four areas kept needing rev
 `merge-tracker.mjs:1682-1707`. A row missing its PDF cell whose note holds an unescaped `|` has the right pipe count, so the stop does not fire. The merge exits 0, drops part of the note and the old report link, and writes no `Superseded report` marker. This is the audit's original CORE-1 failure, reachable without `--backfill-urls`.
 
 ```bash
-node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/tracker-probe.mjs pipeMask
+node --input-type=module - pipeMask < docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/tracker-probe.mjs.txt
 ```
 
 ### 2. Egress: the liveness check reads a page after a redirect into private address space, and the batch runner sends refused postings there. Re-run.
@@ -29,8 +29,8 @@ node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/track
 `liveness-browser.mjs:795-1009`, `batch-evaluate-gemini.mjs:450-469`. `checkUrlLiveness` never calls `rejectLandedUrl` or `recordLandedUrls`. A 302 to a name that resolves to `10.0.0.5` was read and judged `active`. In the batch path, a posting the scrape refused is visited again by this weaker check and its pipeline line is closed as expired from the internal page's text. `check-liveness.mjs` and `scan --verify` share the gap.
 
 ```bash
-node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/egress-repro.mjs
-node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/egress-batch.mjs
+node --input-type=module < docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/egress-repro.mjs.txt
+node --input-type=module < docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/egress-batch.mjs.txt
 ```
 
 ### 3. Masking: four misses and one over-mask. Re-run.
@@ -52,7 +52,7 @@ The first and third are the two CodeRabbit threads left open on the PR (comments
 `merge-tracker.mjs:1705`. A complete row with two leading spaces is valid Markdown. The merge adds a second row and archives the TSV, which is the outcome the stop was added to prevent. A short row whose `#` is `0`, `—` or blank does the same (Reproduced).
 
 ```bash
-node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/tracker-probe.mjs indentedFull
+node --input-type=module - indentedFull < docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/tracker-probe.mjs.txt
 ```
 
 ### 5. Egress: behind a proxy on a private or loopback address, every page read is refused. Re-run.
@@ -85,11 +85,11 @@ node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/track
 
 ### 12. The LaTeX compile timeout is 120 s in the product, and the test's 5 minutes never applies. Re-run (CI logs).
 
-`generate-latex.mjs:233`. Failed `main` twice (runs 43913402133 and 44024516165). Fixed in the pull request that carries this file: 240 s.
+`generate-latex.mjs:234`. Failed `main` twice (runs 43913402133 and 44024516165). Fixed in the pull request that carries this file: 240 s.
 
 ## Minor
 
-- `dashboard/internal/data/tracker_lock.go`: 354 lines of lock code with no production caller. The dashboard writes the tracker only through `set-status.mjs`. Read.
+- `dashboard/internal/data/tracker_lock.go`: 297 lines of lock code with no production caller. The dashboard writes the tracker only through `set-status.mjs`. Read.
 - `outcome.mjs:635, 641`: the journal rewrite drops file permissions and replaces a symlink. `replaceUserFile` in the same module keeps both. Read.
 - `merge-tracker.mjs:1794`: when the `#` cell is the missing one, the refusal names "Row #2026" (the date). Reproduced.
 - `import-tracker.mjs:359`, `fix-report-links.mjs:177`: two writers still use a plain `writeFileSync`. Read.
@@ -99,7 +99,7 @@ node docs/superpowers/research/2026-11-16-project-audit/repro/pr100-review/track
 - `tests/landed-url-guard-armed.test.mjs:166` stubs the liveness fallback that finding 2 goes through, so it passes with the gap in place. Read.
 - Source-text tests: `web/tests/lib/apply-stream-cancel.test.mjs`, `apply-session-release.test.mjs`, `worker-dismiss-stops-run.test.mjs` pin spellings, not behaviour. `attended-read-fence-routes.test.mjs` shows route handlers can be driven under a stub loader. Read.
 - `.github/scripts/docs-only-push.mjs:4` still says the fork has no PR flow. Read.
-- Windows shard 1 runs 1.1 to 1.3 times longer than shard 2, because only it runs the inline sections. Reproduced from run timings.
+- Windows shard 1 ran 1.1 to 1.3 times longer than shard 2 in four of five runs. Only it runs the inline sections. Reproduced from run timings.
 
 ## What held up
 
