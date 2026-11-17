@@ -134,9 +134,10 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 // job outside onsite_locations into an eligible country-wide remote role.
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
 // Home-working words in a location. Read only under a policy that allows the United States.
-const HOME_WORKING = /\b(?:virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?))\b|(?:^|[·;] ?)home ?[-,]/;
-// Negates every word that REMOTE or HOME_WORKING reads as remote, so one is not added per marker.
-const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*(?:remote|virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office))\b/;
+const HOME_WORDS = 'virtual|telework\\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?)';
+const HOME_WORKING = new RegExp(`\\b(?:${HOME_WORDS})\\b|(?:^|[·;] ?)home ?[-,]`);
+// Built from the same words, so a marker that reads as remote is always one that can be negated.
+const NOT_REMOTE = new RegExp(`\\b(?:non|not|no)[^a-z]*(?:remote|${HOME_WORDS})\\b`);
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
 // A location lists its places between middle dots and semicolons.

@@ -70,7 +70,7 @@ test('"Home" inside a place name is not home working', () => {
 });
 test('a negated home-working marker does not make an office posting remote', () => {
   const atlanta = buildWorkplacePolicy({ onsite_locations: ['Atlanta'], remote_countries: ['United States'] });
-  for (const marker of ['No telework', 'Non-virtual', 'Not virtual', 'No work from home', 'Not home based']) {
+  for (const marker of ['No telework', 'Non-virtual', 'Not virtual', 'No work from home', 'Not home based', 'No home workers', 'No home teleworkers', 'Not home office']) {
     assert.deepEqual(atlanta(`Austin, Texas (${marker})`, 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' }, marker);
   }
   assert.deepEqual(atlanta('Austin, Texas (Telework)', 'Platform Lead'), REMOTE_OK);
