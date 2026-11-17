@@ -120,3 +120,16 @@ test("an attended evaluate whose data root is not deny-safe still runs, with the
   assert.equal(JSON.parse(argValue(args, "--settings")).permissions.blockReadsOutsideWorkingDirectories, true);
   assert.equal(argValue(args, "--add-dir"), root);
 });
+
+test("an attended fix-portal on Claude keeps Bash and carries the read block and the Read denies", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t, "co-run-route-fix-portal-", { codeRoot: "checkout" });
+  let args;
+  globalThis.__onSpawn = (a) => { args = a; };
+  await events(await run({ kind: "fix-portal", input: "Fictional Co" }));
+  const denied = argValue(args, "--disallowedTools");
+  assert.ok(denied.includes(`Read(/${root}/.env)`), denied);
+  assert.equal(denied.split(",").includes("Bash"), false, denied);
+  const settings = JSON.parse(argValue(args, "--settings"));
+  assert.equal(settings.permissions.blockReadsOutsideWorkingDirectories, true);
+  assert.equal(argValue(args, "--add-dir"), CHECKOUT);
+});

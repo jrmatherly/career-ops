@@ -154,6 +154,10 @@ test("spawnHeadlessCli never lets a child inherit the server's console (windowsH
     // A read-only worker gets a copy of the caller's env with keys removed, never changed.
     assert.deepEqual(options.env, Object.fromEntries(Object.entries(process.env).filter(([key]) => key in options.env)));
     for (const key of CAREER_OPS_SECRET_ENV) assert.equal(key in options.env, false, key);
+    // Windows spells PATH as Path and sets USERPROFILE instead of HOME.
+    const kept = Object.keys(process.env).filter((key) => /^(path|home|userprofile)$/i.test(key));
+    assert.ok(kept.some((key) => /^path$/i.test(key)), "the test env has a PATH");
+    for (const key of kept) assert.equal(options.env[key], process.env[key], key);
   }
 });
 

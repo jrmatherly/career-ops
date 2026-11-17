@@ -8,16 +8,22 @@ import { prepareCliLaunch } from "./cli-launch.mjs";
 // which TypeScript resolves without an extension, ESM specifiers for plain
 // JS modules must be fully specified.
 
-/** career-ops' own secrets (lib/settings-registry.mjs). No agent CLI reads them. */
+/**
+ * career-ops' own secrets (lib/settings-registry.mjs) and the privacy guard's
+ * second factor (lib/privacy-guard.mjs). No agent CLI reads them.
+ */
 export const CAREER_OPS_SECRET_ENV = Object.freeze([
   "PUBLISH_API_KEY", "APIFY_TOKEN", "USAJOBS_API_KEY", "NOTION_ACCESS_TOKEN",
   "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "H1B_API_TOKEN",
+  "PRIVACY_BYPASS_TOKEN",
 ]);
 
 /**
  * The other agents' keys a single-provider CLI does not read. A CLI missing here
- * can be pointed at any provider, so it keeps every agent key. Codex is one: a
- * Codex provider entry names its own env_key, which can be any of them.
+ * keeps every agent key. Codex can be pointed at any provider: a Codex provider
+ * entry names its own env_key, which can be any of them. copilot, grok and
+ * antigravity are single-vendor, but the repo does not record which variables
+ * they read for their own auth.
  */
 const FOREIGN_AGENT_ENV = Object.freeze({
   claude: ["OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY"],

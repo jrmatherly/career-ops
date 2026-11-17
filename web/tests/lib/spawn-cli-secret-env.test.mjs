@@ -8,7 +8,7 @@ const PRINT_ENV_KEYS = "process.stdout.write(JSON.stringify(Object.keys(process.
 // Node hands the arguments after `-e <script> --` to the script, so these pass Claude's fencing check and do nothing.
 const CLAUDE_FENCE_ARGS = ["--", "--strict-mcp-config", "--disallowedTools", "Write,Edit,MultiEdit,NotebookEdit,Bash,Task"];
 const MADE_UP_ENV = {
-  PUBLISH_API_KEY: "x", GMAIL_REFRESH_TOKEN: "x", ANTHROPIC_API_KEY: "x",
+  PUBLISH_API_KEY: "x", GMAIL_REFRESH_TOKEN: "x", PRIVACY_BYPASS_TOKEN: "x", ANTHROPIC_API_KEY: "x",
   OPENAI_API_KEY: "x", GEMINI_API_KEY: "x", OPENROUTER_API_KEY: "x",
 };
 
@@ -26,6 +26,7 @@ test("a read-only worker does not inherit career-ops' own secrets, and keeps the
   const keys = await childEnvKeys("gemini", CAPS.networkReadOnly);
   assert.equal(keys.includes("PUBLISH_API_KEY"), false);
   assert.equal(keys.includes("GMAIL_REFRESH_TOKEN"), false);
+  assert.equal(keys.includes("PRIVACY_BYPASS_TOKEN"), false);
   assert.equal(keys.includes("GEMINI_API_KEY"), true);
 });
 
