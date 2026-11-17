@@ -16,7 +16,8 @@
  * Validates status against states.yml (rejects non-canonical, logs warning)
  * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
  * row cannot be read (trackerRowFault in tracker-parse.mjs; a dry run only warns;
- * --backfill-urls repairs a row that lacks only its URL cell)
+ * --backfill-urls repairs a row that lacks only its URL cell). An addition whose
+ * own row would not read back is left pending and never written
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -35,11 +36,11 @@ import { normalizeReportLink as normalizeLink } from './tracker-links.mjs';
 import { getCareerOpsRoot, resolveBatchStatePaths } from './path-resolver.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 import { parsePdfIndex, livePdfIndex, normNum } from './find.mjs';
-import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, inspectTrackerRows, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
+import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, inspectTrackerRows, trackerRowFault, trackerFaultText, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
 // The ATS vendor table shared with analyze-patterns.mjs and the scanners, so
 // the URL cell's label and the per-vendor analysis name a board identically.
 import { atsVendorOf } from './ats-vendor.mjs';
-import { resolveTrackerPath, resolveWorkspaceRoot, resolvePdfIndexPath, trackerLockDirFor, acquireTrackerLock, writeFileAtomic, backupFileAtomically, normalizeCompany, companiesMatchIgnoringCorporateForm, cell, loadCanonicalStates, findDeadReportLink, rebuildRow, trackerLinkDirsFor, containedReportTarget, containedReportFile, reportUrlToken, resolveCanonicalStateId, stripStatusDecoration, isTrackerStatusCell } from './tracker-utils.mjs';
+import { resolveTrackerPath, resolveWorkspaceRoot, resolvePdfIndexPath, trackerLockDirFor, acquireTrackerLock, writeFileAtomic, backupFileAtomically, normalizeCompany, companiesMatchIgnoringCorporateForm, cell, loadCanonicalStates, findDeadReportLink, rebuildRow, trackerLinkDirsFor, containedReportTarget, containedReportFile, reportUrlToken, resolveCanonicalStateId, stripStatusDecoration } from './tracker-utils.mjs';
 // Canonical posting-URL key and URL comparison, shared with the other tracker
 // scripts and scan.mjs so the definitions cannot drift apart.
 import { normalizeUrl, isAggregatorUrl, aggregatorPostingId, postingUrlRelation } from './url-key.mjs';
@@ -479,6 +480,9 @@ export async function mergeTracker(options = {}) {
 
     return null;
   }
+
+  // A known status word under Score is a sign the row's cells have moved.
+  const isKnownStatus = cell => resolveCanonicalStateId(cell, _canonicalStates) !== null;
 
   function refuseUnknownStatus(filename, status) {
     console.warn(`⚠️  Skipping ${filename}: status "${status}" is not a tracker state. The addition was left pending.`);
@@ -1670,28 +1674,28 @@ export async function mergeTracker(options = {}) {
     }
     const existingApps = [];
     let maxNum = 0;
-    // Only a row whose cells hold what their columns are for is matched or
+    // Only a row whose cells sit under their own columns is matched or
     // rewritten. --backfill-urls exists to repair a row that stops before its
     // URL cell, so there that one shape is a row and not a fault.
-    const inspected = inspectTrackerRows(appLines, COLMAP, {
-      isStatus: status => isTrackerStatusCell(status, _canonicalStates),
-      urlOptional: BACKFILL_URLS,
-    });
+    const inspected = inspectTrackerRows(appLines, COLMAP, { isStatus: isKnownStatus, urlOptional: BACKFILL_URLS });
     for (const { line } of inspected.rows) {
       const app = parseAppLine(line);
       existingApps.push(app);
       if (app.num > maxNum) maxNum = app.num;
+    }
+    for (const { label } of inspected.strays) {
+      console.warn(`⚠️  ${label} in ${basename(APPS_FILE)} is not a tracker row. It was left alone.`);
     }
     // A row that cannot be read cannot be matched, so a re-evaluation of it
     // would be appended as a second row and its TSV archived, and rewriting it
     // would move its cells under the wrong columns. A later fix to the row
     // cannot undo either. Stop before anything is read or written. A dry run
     // writes nothing, so it only warns.
-    for (const { label, why } of inspected.faults) {
-      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} ${label} cannot be read as a tracker row: ${why}. Correct that line in ${basename(APPS_FILE)} (--backfill-urls adds a URL cell to a row that only lacks one), then re-run.${DRY_RUN ? ' A real run stops here and changes nothing.' : ''}`);
+    for (const fault of inspected.faults) {
+      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} ${trackerFaultText(fault)}${DRY_RUN ? '\n   A real run stops here and changes nothing.' : ''}`);
     }
     if (inspected.faults.length && !DRY_RUN) {
-      console.error(`❌ Nothing ${BACKFILL_URLS ? 'backfilled' : 'merged'}: ${inspected.faults.length} tracker row(s) cannot be read.${BACKFILL_URLS ? '' : ' The additions are still pending.'}`);
+      console.error(`❌ Nothing ${BACKFILL_URLS ? 'backfilled' : 'merged'}: ${inspected.faults.length} tracker row(s) cannot be read. Correct ${basename(APPS_FILE)}, then re-run.${BACKFILL_URLS ? '' : ' The additions are still pending.'}`);
       trackerLock.release();
       return 1;
     }
@@ -1879,6 +1883,22 @@ export async function mergeTracker(options = {}) {
       return false;
     }
 
+    /**
+     * Whether a row the merge is about to write would be refused by the next
+     * merge. The tracker is judged by trackerRowFault on every run, so a row
+     * that fails it must never be written: it would stop every later merge.
+     *
+     * @param {string} file - The addition the row came from.
+     * @param {string} line - A row from buildRow().
+     * @returns {boolean} True when the row must not be written.
+     */
+    function refuseUnreadableRow(file, line) {
+      const fault = trackerRowFault(line, COLMAP, { cellCount: HEADER_WIDTH != null ? HEADER_WIDTH - 2 : null, isStatus: isKnownStatus });
+      if (!fault) return false;
+      console.warn(`⚠️  Skipping ${file}: the row it would add could not be read back from the tracker: ${fault.why} Correct that value in ${file}, then re-run. The addition was left pending.\n     ${line}`);
+      return true;
+    }
+
     for (const file of tsvFiles) {
       // NOT trimmed here: a trailing tab is the row's final empty cell, and
       // parseTsvContent needs to see it. It trims internally for the legacy path.
@@ -1915,6 +1935,13 @@ export async function mergeTracker(options = {}) {
       // would populate the column while leaving Pass 0 nothing to match on, which is
       // the original bug with extra steps.
       if (!addition.url) addition.url = resolveReportUrl(addition.report).url;
+
+      // Checked before the dedup and the PDF re-key, so a refusal changes nothing.
+      if (refuseUnreadableRow(file, buildRow({ ...addition, via: addition.via || '—', location: addition.location || '—' }))) {
+        skipped++;
+        refusedAdditions.push(file);
+        continue;
+      }
 
       // Check for duplicate by:
       // 0. Exact normalized posting URL (deterministic, authoritative)
@@ -2396,7 +2423,9 @@ export async function mergeTracker(options = {}) {
           // it, silently demoting every later merge back to the fuzzy tiers.
           url: keepRowUrl ? rowUrl : (addition.url || duplicate.url || ''),
         });
-        if (replaceTrackerLine(duplicate.raw, updatedLine)) {
+        if (refuseUnreadableRow(file, updatedLine)) {
+          failedAdditions.push(file);
+        } else if (replaceTrackerLine(duplicate.raw, updatedLine)) {
           // Refresh the cached row from the line just written (#2392). `raw` was
           // captured when applications.md was parsed and used to be left stale
           // after the write, so a SECOND addition matching this same row found

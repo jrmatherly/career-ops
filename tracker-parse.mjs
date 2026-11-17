@@ -380,13 +380,61 @@ const UNNUMBERED_RE = /^(?:n\/a|—|–|-)$/i;
 // Digits that are not the start of a date or a score. A numeric prefix counts,
 // as it does for parseInt everywhere else: `12draft` is row 12.
 const NUM_CELL_RE = /^\d+(?![\d.,/-])/;
-// A report link, or the bare `[12]` a hand-edited cell is left with.
-const REPORT_CELL_RE = /\[[^\]]+\]/;
+// `[12]`, `[12](…)`, or a link to a Markdown file.
+const REPORT_LINK_RE = /^\[\d+\](?:\(.+\))?$|^\[[^\]]+\]\(.+\.md>?\)$/i;
 // A markdown link whose target never closes: a `|` cut the cell in two.
 const CUT_LINK_RE = /\]\([^)]*$/;
-// A bare URL (a hand-pasted one may hold a space), a `local:jds/…` pointer, or
-// a markdown link.
-const URL_CELL_RE = /^(?:https?:\/\/|local:)\S|\[[^\]]*\]\([^)]+\)/i;
+// A bare or `<bracketed>` URL (a hand-pasted one may hold a space), a
+// `local:jds/…` pointer, or a markdown link to a URL.
+const URL_RE = /^<?(?:https?:\/\/|local:)\S|^\[[^\]]*\]\(<?https?:\/\//i;
+// One word with a dot in it: a URL typed without its scheme.
+const SCHEMELESS_URL_RE = /^[^\s.]+\.\S+$/;
+
+/**
+ * What a cell is recognisably, keyed by the column that holds it. A cell that
+ * matches none of these is free text, which no column can be told from.
+ */
+const CELL_KINDS = {
+  date: cell => TRACKER_DATE_RE.test(cell),
+  score: cell => SCORE_CELL_RE.test(cell.replace(/\*\*/g, '').replace(',', '.')),
+  pdf: cell => cell === '✅' || cell === '❌',
+  report: cell => REPORT_LINK_RE.test(cell),
+  url: cell => URL_RE.test(cell),
+  status: (cell, isStatus) => Boolean(isStatus?.(cell)),
+};
+const isTypedCell = cell => ['date', 'score', 'pdf', 'report', 'url'].some(kind => CELL_KINDS[kind](cell));
+const KIND_NAMES = { date: 'a date', score: 'a score', pdf: 'a PDF mark', report: 'a report link', url: 'a URL', status: 'a status' };
+const TEXT_COLUMN_SIGNS = ['date', 'score', 'pdf'];
+/**
+ * Per column, the kinds of cell that only another column holds. Finding one
+ * means the row's cells have moved. Notes is absent: a note may be anything.
+ * Whether a Status is a known state, or a Date is filled in, is not asked
+ * here. verify-pipeline Check 1 and normalize-statuses.mjs own that.
+ */
+const SHIFT_SIGNS = {
+  date: ['score', 'pdf', 'report', 'url'],
+  company: TEXT_COLUMN_SIGNS,
+  via: TEXT_COLUMN_SIGNS,
+  role: TEXT_COLUMN_SIGNS,
+  location: TEXT_COLUMN_SIGNS,
+  score: ['date', 'pdf', 'report', 'url', 'status'],
+  status: ['date', 'score', 'pdf', 'report', 'url'],
+  // No URL here: a Materials column mapped to PDF may link a hosted CV.
+  pdf: ['date', 'score', 'report'],
+  url: ['score', 'report'],
+};
+/**
+ * The two columns free text cannot sit in, so a note that slid into one is
+ * seen. A Report cell is `[12]`, a markdown link or a bare .md path.
+ */
+const OWN_FORMAT = {
+  report: { name: 'a report link such as [12](reports/012-acme.md)',
+    test: cell => !CUT_LINK_RE.test(cell) && (/^\[\d+\]$/.test(cell) || /^\S+\.md$/i.test(cell) || parseMarkdownLinks(cell).length > 0) },
+  url: { name: 'a URL', test: cell => URL_RE.test(cell) || SCHEMELESS_URL_RE.test(cell) || parseMarkdownLinks(cell).length > 0 },
+};
+const COLUMN_NAMES = { num: '#', date: 'Date', company: 'Company', via: 'Via', role: 'Role', location: 'Location', score: 'Score', status: 'Status', pdf: 'PDF', report: 'Report', notes: 'Notes', url: 'URL' };
+const ADD_A_CELL = 'Add the missing cell (an empty one, "|  |", is enough).';
+const REPLACE_THE_PIPE = 'replace that | with / or -';
 
 /** A pipe row's cells between its outer pipes, trimmed. */
 function innerCells(line) {
@@ -400,70 +448,114 @@ function innerCells(line) {
 /**
  * Why a line cannot be read as a tracker row, or null when it can.
  *
- * A row is judged by what its cells hold, not by how many pipes it has: a
- * dropped cell and a stray `|` cancel out in a count, but they leave a report
- * link under PDF or half a note under URL. The count is checked as well, for
- * the damage that leaves every cell in place: a row short at its tail, or a
- * last cell split by a `|`. A tracker with no Notes column has no upper bound,
- * because there the merge keeps notes in cells past the header.
+ * A cell is evidence of damage only when it holds what a different column
+ * holds: a report link under PDF, a ✅ under Status, a note under Report. A
+ * dropped cell and a stray `|` cancel out in a count, but they leave exactly
+ * that. The count is checked as well, for the damage that leaves every cell
+ * in place: a row short at its tail, or a last cell split by a `|`. A tracker
+ * with no Notes column has no upper bound, because there the merge keeps
+ * notes in cells past the header.
  *
- * Company, Role and Notes are free text, so a cell dropped from one of two
- * neighbouring free-text columns and a `|` typed in the other still pass.
+ * Company, Role, Status and Notes are free text, so a cell dropped from one
+ * of two neighbouring free-text columns and a `|` typed in the other still
+ * pass.
  *
  * `#` is read as every other path reads it (a numeric prefix, so `12draft` is
  * row 12) and is checked last, so a `num` fault means every other cell passed.
  *
  * @param {string} line - One `|` line from applications.md.
  * @param {Object<string,number>} colmap - From resolveColumns().
- * @param {{cellCount?: number|null, isStatus?: ((cell: string) => boolean)|null, urlOptional?: boolean}} [options]
- *   `cellCount` is the header's cell count, when there is a header.
- *   `urlOptional` accepts a row that stops before its URL cell, the one
- *   shape --backfill-urls repairs.
- * @returns {{cell: string, why: string}|null}
+ * @param {{cellCount?: number|null, labels?: string[]|null, isStatus?: ((cell: string) => boolean)|null, urlOptional?: boolean}} [options]
+ *   `cellCount` and `labels` are the header's cell count and cells, when
+ *   there is a header. `isStatus` recognises a status word, so one under
+ *   Score is seen. `urlOptional` accepts a row that stops before its URL
+ *   cell, the one shape --backfill-urls repairs.
+ * @returns {{cell: string, why: string}|null} `why` says what happened and what to do.
  */
-export function trackerRowFault(line, colmap, { cellCount = null, isStatus = null, urlOptional = false } = {}) {
-  if (/^\s/.test(line)) return { cell: 'line', why: 'the line is indented, so no reader sees it' };
+export function trackerRowFault(line, colmap, options = {}) {
+  const { cellCount = null, labels = null, isStatus = null, urlOptional = false } = options;
+  if (/^\s/.test(line)) {
+    return { cell: 'line', why: 'the line starts with a space or a tab, and the merge cannot match an indented row. Remove the leading spaces.' };
+  }
   const cells = innerCells(line);
   const need = cellCount ?? Math.max(...Object.values(colmap));
   const least = urlOptional && colmap.url != null ? colmap.url - 1 : need;
-  if (cells.length < least) return { cell: 'short', why: `it has ${cells.length} cells where the header has ${need}` };
-  if (colmap.notes != null && cellCount != null && cells.length > cellCount) {
-    return { cell: 'wide', why: `it has ${cells.length} cells where the header has ${cellCount} (a | typed inside a cell splits it)` };
+  if (cells.length < least) {
+    const onlyUrl = !urlOptional && colmap.url === need && cells.length === need - 1
+      && trackerRowFault(line, colmap, { ...options, urlOptional: true }) === null;
+    return { cell: 'short', why: `it has ${cells.length} cells where the header has ${need}, so a cell is missing. ${ADD_A_CELL}`
+      + (onlyUrl ? ' Only the URL cell at the end is missing here, and node merge-tracker.mjs --backfill-urls adds it.' : '') };
   }
-  const at = key => (colmap[key] != null ? cells[colmap[key] - 1] ?? '' : null);
-  const holds = (cell, name, expected) => ({ cell, why: `its ${name} cell holds "${at(cell)}", not ${expected}` });
-  // isUnsetUrlCell is the tracker's empty-cell test: blank, `—`, `-` or `N/A`.
-  const filled = key => at(key) !== null && !isUnsetUrlCell(at(key));
-  if (at('date') !== null && !TRACKER_DATE_RE.test(at('date'))) return holds('date', 'Date', 'a YYYY-MM-DD date');
-  if (!looksLikeScoreCell(at('score').replace(',', '.'))) return holds('score', 'Score', 'a score such as 4.2/5 or N/A');
-  if (isStatus && !isStatus(at('status'))) return holds('status', 'Status', 'a tracker status');
-  if (filled('pdf') && at('pdf') !== '✅' && at('pdf') !== '❌') return holds('pdf', 'PDF', '✅ or ❌');
-  if (filled('report') && (!REPORT_CELL_RE.test(at('report')) || CUT_LINK_RE.test(at('report')))) return holds('report', 'Report', 'a report link');
-  if (filled('url') && !URL_CELL_RE.test(at('url'))) return holds('url', 'URL', 'a URL');
-  if (!NUM_CELL_RE.test(at('num')) || !(parseInt(at('num'), 10) > 0)) return holds('num', '#', 'a row number');
+  if (colmap.notes != null && cellCount != null && cells.length > cellCount) {
+    return { cell: 'wide', why: `it has ${cells.length} cells where the header has ${cellCount}. A | typed inside a cell splits it in two: ${REPLACE_THE_PIPE}.` };
+  }
+  const nameOf = key => labels?.[colmap[key] - 1] || COLUMN_NAMES[key] || key;
+  for (const [key, index] of Object.entries(colmap).sort((a, b) => a[1] - b[1])) {
+    const value = cells[index - 1] ?? '';
+    // isUnsetUrlCell is the tracker's empty-cell test: blank, `—`, `-` or `N/A`.
+    if (key === 'num' || isUnsetUrlCell(value)) continue;
+    if (key === 'score' && looksLikeScoreCell(value.replace(',', '.'))) continue;
+    const held = `its ${nameOf(key)} cell holds`;
+    const kind = (SHIFT_SIGNS[key] ?? []).find(k => CELL_KINDS[k](value, isStatus));
+    if (kind) {
+      const what = `${held} ${KIND_NAMES[kind]} ("${value}")`;
+      if (colmap[kind] > index) {
+        return { cell: key, why: `${what}, so the cells from ${nameOf(key)} onward look shifted one place to the left: a cell is probably missing at ${nameOf(key)} or before it. ${ADD_A_CELL}` };
+      }
+      if (colmap[kind] < index) {
+        return { cell: key, why: `${what}, so the cells before it look shifted one place to the right: a | typed inside an earlier cell probably split it, so ${REPLACE_THE_PIPE}.` };
+      }
+      return { cell: key, why: `${what}, which belongs under another column. Move it back.` };
+    }
+    const own = OWN_FORMAT[key];
+    if (own && !own.test(value)) {
+      return { cell: key, why: `${held} "${value}", which is not ${own.name}, so the cells look shifted: a cell is probably missing before ${nameOf(key)}, or a | typed inside a cell split it (${REPLACE_THE_PIPE}).` };
+    }
+  }
+  const num = cells[colmap.num - 1] ?? '';
+  if (!NUM_CELL_RE.test(num) || !(parseInt(num, 10) > 0)) {
+    return { cell: 'num', why: `its ${nameOf('num')} cell holds "${num}", not a row number. Give the row its number.` };
+  }
   return null;
 }
 
 /**
- * Sort the tracker's table lines into rows a writer may touch and rows it must
- * refuse. Shared by merge-tracker.mjs and verify-pipeline.mjs so the health
- * check reports exactly what the merge stops on.
+ * The one refusal text the merge and verify-pipeline print for a row: which
+ * line, what happened, what to do, and the row itself.
+ *
+ * @param {{label: string, why: string, line: string}} fault - From inspectTrackerRows().
+ * @returns {string}
+ */
+export function trackerFaultText({ label, why, line }) {
+  return `${label} cannot be read as a tracker row: ${why}\n     ${line.trim()}`;
+}
+
+/**
+ * Sort the tracker's table lines into rows a writer may touch, rows it must
+ * refuse, and lines that are not tracker rows. Shared by merge-tracker.mjs and
+ * verify-pipeline.mjs so the health check reports exactly what the merge
+ * stops on.
  *
  * A table that brings its own header is not the tracker and is skipped. A
  * block with no header (rows after a blank line) still is. A complete row
- * whose `#` is a backfill sentinel (`N/A`, `—`, `-`) is neither: it has no
- * number to match on, and it is not damaged.
+ * whose `#` is a backfill sentinel (`N/A`, `—`, `-`) is neither a row nor a
+ * fault: it has no number to match on, and it is not damaged. A line with no
+ * row number and nothing a tracker cell is recognised by (`| Totals | 1 |`)
+ * is a stray: worth a warning, not a stop. A row that lost its `#` cell still
+ * holds a date or a score, so it is a fault.
  *
  * @param {string[]} lines - All lines of applications.md.
  * @param {Object<string,number>} colmap - From resolveColumns().
  * @param {{isStatus?: ((cell: string) => boolean)|null, urlOptional?: boolean}} [options]
- * @returns {{rows: {at: number, line: string}[], faults: {at: number, label: string, cell: string, why: string}[]}}
+ * @returns {{rows: {at: number, line: string}[], faults: {at: number, label: string, line: string, cell: string, why: string}[], strays: {at: number, label: string}[]}}
  */
 export function inspectTrackerRows(lines, colmap, options = {}) {
   const hasTrackerHeader = lines.some(line => isHeaderRow(line));
   const rows = [];
   const faults = [];
+  const strays = [];
   let cellCount = null;
+  let labels = null;
   let otherTable = false;
   let inBlock = false;
   let tables = 0;
@@ -477,21 +569,25 @@ export function inspectTrackerRows(lines, colmap, options = {}) {
       otherTable = ownHeader && !isHeaderRow(line) && (hasTrackerHeader || tables > 0);
       tables++;
       if (ownHeader) {
-        if (!otherTable) cellCount = innerCells(line).length;
+        if (!otherTable) { labels = innerCells(line); cellCount = labels.length; }
         continue;
       }
     }
     if (otherTable || isSeparatorRow(line.trim()) || isHeaderRow(line)) continue;
-    const fault = trackerRowFault(line, colmap, { ...options, cellCount });
+    const fault = trackerRowFault(line, colmap, { ...options, cellCount, labels });
     if (!fault) { rows.push({ at, line: raw }); continue; }
-    const num = innerCells(line)[colmap.num - 1] ?? '';
+    const cells = innerCells(line);
+    const num = cells[colmap.num - 1] ?? '';
     if (fault.cell === 'num' && UNNUMBERED_RE.test(num)) continue;
-    const label = /^[1-9]\d*$/.test(num) && fault.cell !== 'num'
-      ? `Row #${num} (line ${at + 1})`
-      : `Line ${at + 1} ("${line.trim().slice(0, 60)}")`;
-    faults.push({ at, label, ...fault });
+    const unnamed = `Line ${at + 1} ("${line.trim().slice(0, 60)}")`;
+    if (!NUM_CELL_RE.test(num) && !UNNUMBERED_RE.test(num) && !cells.some(isTypedCell)) {
+      strays.push({ at, label: unnamed });
+      continue;
+    }
+    const label = /^[1-9]\d*$/.test(num) && fault.cell !== 'num' ? `Row #${num} (line ${at + 1})` : unnamed;
+    faults.push({ at, label, line, ...fault });
   }
-  return { rows, faults };
+  return { rows, faults, strays };
 }
 
 // Matches the req/job-number labels actually seen in this tracker's free-text
