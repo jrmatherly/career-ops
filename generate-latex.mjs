@@ -230,7 +230,8 @@ export async function compileLatexFile(absPath, content, outputPath, compileOnly
       execFileSync(resolvedEngineBin || 'tectonic', ['--outdir', texDir, compilePath], {
         cwd: texDir,
         stdio: 'pipe',
-        timeout: 120_000,
+        // A first compile downloads the TeX bundle, which has taken over 120 s.
+        timeout: 240_000,
       });
     } else {
       const pdflatexArgs = [
