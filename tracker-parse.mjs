@@ -380,8 +380,8 @@ const UNNUMBERED_RE = /^(?:n\/a|—|–|-)$/i;
 // Digits that are not the start of a date or a score. A numeric prefix counts,
 // as it does for parseInt everywhere else: `12draft` is row 12.
 const NUM_CELL_RE = /^\d+(?![\d.,/-])/;
-// `[12]`, `[12](…)`, or a link to a Markdown file.
-const REPORT_LINK_RE = /^\[\d+\](?:\(.+\))?$|^\[[^\]]+\]\(.+\.md>?\)$/i;
+// `[12]`, `[12](…)`, or a link to a Markdown file. A numbered link to a web address is a posting URL, not a report.
+const REPORT_LINK_RE = /^\[\d+\](?:\((?!<?https?:).+\))?$|^\[[^\]]+\]\(.+\.md>?\)$/i;
 // A markdown link whose target never closes: a `|` cut the cell in two.
 const CUT_LINK_RE = /\]\([^)]*$/;
 // A bare or `<bracketed>` URL (a hand-pasted one may hold a space), a
