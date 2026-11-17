@@ -119,6 +119,7 @@ test("a password assigned with : or = is masked whatever its length or character
   assert.equal(maskSecrets("password=fictionalAlphabeticPassword"), "password=[masked]");
   assert.equal(maskSecrets('{"dbPassword": "hunter"}'), '{"dbPassword": "[masked]"}');
   assert.equal(maskSecrets("PWD: abcd"), "PWD: [masked]");
+  for (const short of ["a", "ab", "abc"]) assert.equal(maskSecrets(`password=${short}`), "password=[masked]");
 });
 
 test("the bare word password in prose is left alone", () => {

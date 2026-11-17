@@ -28,7 +28,7 @@ const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?
 // whatever it holds. Prose after the bare word ("password required") stays.
 const PASSWORD_WORDS = ["password", "passwd", "pwd"];
 const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
-const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*["']?)([^\\s"']{4,})`, "g");
+const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*["']?)([^\\s"']+)`, "g");
 
 // An Authorization header names its value as a credential, however short.
 const AUTH_SCHEME = /(authorization["']?[ \t]*[:=][ \t]*["']?(?:basic|bearer)[ \t]+)([A-Za-z0-9._~+/=-]{4,})/gi;

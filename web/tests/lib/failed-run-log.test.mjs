@@ -189,3 +189,11 @@ test("a label split by the output bound takes its value with it when a space pre
   assert.match(md, /## Output\nword word/);
 });
 
+test("a failed run's error does not save an assigned password with no digit", async (t) => {
+  const { res, file } = await saveRun(t, { id: "fictional-alpha-password", status: "error", error: "login failed with password=fictionalAlphabeticPassword", steps: [], output: "" });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes("fictionalAlphabeticPassword"));
+  assert.match(md, /password=\[masked\]/);
+});
+
