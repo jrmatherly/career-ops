@@ -162,6 +162,8 @@ async function stopPainter(socketPath) {
     try { process.kill(pid, 0); } catch { return; }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
+  console.warn(`⚠️  PDF painter ${pid} ignored SIGTERM for 5 s; killing it`);
+  try { process.kill(pid, "SIGKILL"); } catch { /* gone */ }
 }
 
 async function stop(server) {
