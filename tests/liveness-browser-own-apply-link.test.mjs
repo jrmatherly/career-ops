@@ -11,9 +11,12 @@
 // a warning where it cannot launch (a failure under `test-all.mjs --needs
 // browser`, which the tool-suites CI job runs). The page is served by a route
 // registered after the liveness guard's, which makes it run first: nothing is
-// resolved or fetched.
+// fetched.
 import { pass, fail, toolUnavailable } from './helpers.mjs';
-import { checkUrlLiveness, installLivenessRouteGuard, newLivenessPage } from '../liveness-browser.mjs';
+import { checkUrlLiveness, installLivenessRouteGuard, newLivenessPage, setHostResolver } from '../liveness-browser.mjs';
+
+// The landed-URL check resolves the posting's name, which is made up here.
+setHostResolver(async () => ['93.184.216.34']);
 
 console.log('\nliveness-browser — Apply link to the posting in the page chrome');
 

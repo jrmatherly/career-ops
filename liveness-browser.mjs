@@ -470,34 +470,40 @@ export function setDialledAddressJudge(judge) {
  * `installEgressGuard`).
  *
  * @param {{ url: () => string, on: (event: string, listener: Function) => unknown, context: () => { on: (event: string, listener: Function) => unknown } }} page - Page to record.
- * @returns {() => Promise<null|{code: string, reason: string}>} Call after the
+ * @returns {(() => Promise<null|{code: string, reason: string}>) & { stop: () => void }} Call after the
  *   last read of the page. It judges every address and URL recorded and the
  *   page's URL now, each once, and returns null only when what was read may be
- *   kept.
+ *   kept. `stop()` detaches the recorder, for a page that is reused for
+ *   another URL and gets a new recorder.
  */
 export function recordLandedUrls(page) {
   const committed = new Set();
   const dialled = new Map();
   const addressLookups = [];
+  const listeners = [];
+  const listen = (emitter, event, listener) => {
+    emitter.on(event, listener);
+    listeners.push(() => emitter.off(event, listener));
+  };
   const record = (url) => {
     if (!HOSTLESS_FRAME_URL.test(url)) committed.add(url);
   };
-  page.context().on('response', (response) => {
+  listen(page.context(), 'response', (response) => {
     addressLookups.push(response.serverAddr().then(
       (addr) => (addr ? dialled.set(`${addr.ipAddress} ${addr.port}`, addr) : record(response.url())),
       () => record(response.url()),
     ));
   });
   const watch = (watched) => {
-    watched.on('framenavigated', (frame) => record(frame.url()));
-    watched.on('websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
-    watched.on('popup', (popup) => {
+    listen(watched, 'framenavigated', (frame) => record(frame.url()));
+    listen(watched, 'websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
+    listen(watched, 'popup', (popup) => {
       record(popup.url());
       watch(popup);
     });
   };
   watch(page);
-  return async () => {
+  const rejectVisited = async () => {
     await Promise.all(addressLookups);
     for (const addr of dialled.values()) {
       if (dialledAddressBlocked(addr)) {
@@ -510,6 +516,8 @@ export function recordLandedUrls(page) {
     }
     return null;
   };
+  rejectVisited.stop = () => listeners.splice(0).forEach((off) => off());
+  return rejectVisited;
 }
 
 /**
@@ -801,6 +809,12 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     page._blockedByGuard = null;
   }
   await installLivenessRouteGuard(page);
+  // The route guard never sees a redirect hop, so what the page landed on and
+  // received is judged as every other reader does. A test double with no
+  // context has no hops to judge. One recorder per check: the page is reused.
+  const rejectVisited = typeof page?.context === 'function' ? recordLandedUrls(page) : null;
+  const refused = ({ code, reason }) => ({ result: 'uncertain', code, reason });
+  let landed = false;
   try {
     const response = await gotoWithTimeoutRetry(page, url, timeoutRetry ? {} : { retryTimeoutMs: 0 });
     const status = response?.status() ?? 0;
@@ -808,6 +822,10 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     // extraSettleMs is slack for the headed retry, where a JS anti-bot
     // interstitial needs a moment to clear before the first read.
     if (extraSettleMs > 0) await page.waitForTimeout(extraSettleMs);
+
+    const landedRefusal = rejectVisited && await rejectLandedUrl(page.url());
+    if (landedRefusal) return refused(landedRefusal);
+    landed = true;
 
     // Frame aggregation is an enhancement, never a requirement. Callers may pass
     // a lightweight page object that only implements goto/url/evaluate — the
@@ -991,12 +1009,18 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     if (page && page._blockedByGuard) {
       return { result: 'uncertain', code: page._blockedByGuard.code, reason: page._blockedByGuard.reason };
     }
+    const visitedRefusal = rejectVisited && await rejectVisited();
+    if (visitedRefusal) return refused(visitedRefusal);
 
     return verdict;
   } catch (err) {
     if (page && page._blockedByGuard) {
       return { result: 'uncertain', code: page._blockedByGuard.code, reason: page._blockedByGuard.reason };
     }
+    // A read that threw on a page that received a private response: the error
+    // can carry that page's text, so the refusal is reported instead.
+    const visitedRefusal = landed && rejectVisited && await rejectVisited();
+    if (visitedRefusal) return refused(visitedRefusal);
     // Transient failures (timeout, DNS, TLS, 5xx) shouldn't be treated as expired —
     // doing so would cause scan --verify to drop the URL and write it to scan-history,
     // permanently filtering it out on subsequent scans.
@@ -1005,6 +1029,8 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
       code: 'navigation_error',
       reason: `navigation error: ${err.message.split('\n')[0]}`,
     };
+  } finally {
+    rejectVisited?.stop();
   }
 }
 
