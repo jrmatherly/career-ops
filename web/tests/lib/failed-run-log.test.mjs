@@ -247,3 +247,32 @@ test("an Authorization label the output bound would split is masked with its val
   assert.match(md, /Bearer \[masked\] word word/);
 });
 
+
+test("an 8000-character output from a client that cut it there loses its first line", async (t) => {
+  const output = ("m2Xv9Rk4Tw8Np3HsFAKE' https://example.invalid\n" + "lorem ipsum dolor\n".repeat(500)).slice(0, 8000);
+  assert.equal(output.length, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-old-client", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes("m2Xv9Rk4Tw8Np3Hs"), "the key stub before the first newline was saved");
+  assert.match(md, /## Output\nlorem ipsum dolor\n/);
+});
+
+test("a variable listed as secret outside the name rule is masked by value", async (t) => {
+  const previous = process.env.GMAIL_CLIENT_ID;
+  process.env.GMAIL_CLIENT_ID = "FAKEclientIdentifierValue";
+  t.after(() => { if (previous === undefined) delete process.env.GMAIL_CLIENT_ID; else process.env.GMAIL_CLIENT_ID = previous; });
+  const { res, file } = await saveRun(t, { id: "fictional-listed", status: "error", error: "failed", steps: [], output: "client FAKEclientIdentifierValue rejected" });
+  assert.equal(res.status, 200);
+  assert.match(fs.readFileSync(file, "utf8"), /client \[masked:GMAIL_CLIENT_ID\] rejected/);
+});
+
+test("a known secret longer than the cut slack is masked whole in a short field", async (t) => {
+  const pem = "-----BEGIN FAKE PRIVATE KEY-----\n" + Array.from({ length: 12 }, (_, i) => `FAKEpemLine${String(i).padStart(2, "0")}`.padEnd(64, "Zq")).join("\n") + "\n-----END FAKE PRIVATE KEY-----";
+  assert.ok(pem.length > 256);
+  process.env.FAKE_APP_PRIVATE_KEY = pem;
+  t.after(() => { delete process.env.FAKE_APP_PRIVATE_KEY; });
+  const { res, file } = await saveRun(t, { id: "fictional-long-known", status: "error", error: `${"lorem ipsum ".repeat(80).slice(0, 950)} key rejected: ${pem} (exit 1)`, steps: [], output: "" });
+  assert.equal(res.status, 200);
+  assert.ok(!fs.readFileSync(file, "utf8").includes("FAKEpemLine"), "a line of the known key was saved");
+});
