@@ -238,19 +238,32 @@ test("a URL password with an empty user name is masked", () => {
   assert.equal(maskSecrets("see http://a.invalid:8080/x and mail me@b.invalid"), "see http://a.invalid:8080/x and mail me@b.invalid");
 });
 
-test("a variable the name rule matches is secret unless it is named as a location and holds a plain path or URL", () => {
+test("a password keeps nothing after the mark an earlier rule left in it", () => {
+  // The labelled-token rule masks the run of token characters and stops at the "!".
+  assert.equal(maskSecrets("password=passwordValue000000!RemainingPrivateMaterial"), "password=[masked]");
+  assert.equal(maskSecrets('password="passwordValue000000!Remaining Private" next'), 'password="[masked]" next');
+  assert.equal(maskSecrets("--password passwordValue000000!Remaining --user bob"), "--password [masked] --user bob");
+  const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
+  assert.equal(maskSecrets("password=correcthorsebattery", known), "password=[masked:DB_PASSWORD]", "a known value keeps its name");
+  assert.equal(maskSecrets("password=correcthorsebattery!tail", known), "password=[masked:DB_PASSWORD]");
+  // A known value that is assigned to in turn still labels what follows it.
+  assert.equal(maskSecrets("PASSWORD: correcthorsebattery: realsecret99", known), "PASSWORD: [masked:DB_PASSWORD]: [masked]");
+  assert.equal(maskSecrets("PASSWORD= correcthorsebattery = other", known), "PASSWORD= [masked:DB_PASSWORD] = [masked]");
+});
+
+test("a variable the name rule matches is secret whatever its value looks like, a path or a URL included", () => {
   const env = {
     LOCAL_BIN_KEY: "/usr/local/bin", SSH_KEY_PATH: "~/.ssh/id_ed25519", API_KEY_FILE: "./run/secrets/key", KEYCLOAK_URL: "https://sso.example.invalid/realms/main",
     TOKEN_ENDPOINT: "https://example.invalid/oauth/token", PARTITION_KEY: "location", CACHE_KEY: "evaluate", I18N_FALLBACK_KEY: "evaluation.fallback", TOKEN_TYPE_TOKEN: "access-token",
     MAX_TOKENS: "12000000", DB_PASSWORD: "correcthorsebattery", TOKEN_BUDGET_MODE: "standard", SORT_KEY: "createdAt", FAKE_TOKEN: "FAKEnodigitsatallHERE",
     PROXY_URL_SECRET: "https://fakeuser:FakePass000@proxy.invalid", JWT_SECRET: "/x9/FAKEbase64ish+00", GMAIL_CLIENT_ID: "/usr/local/bin/listed",
-    // A path or URL under a name that is not a location stays secret: a base64 key can start with "/", and a webhook URL is one.
+    // A base64 key can start with "/", and a webhook URL is a secret.
     FAKE_SECRET_ACCESS_KEY: "/FAKEbase64ishABCDEFGHijklmnopqrstuvwxyz", FAKE_WEBHOOK_TOKEN: "https://hooks.example.invalid/services/FAKE/FAKE",
-    // A location name does not exempt a URL or path that carries a long token-like run.
-    FAKE_HOOK_SECRET_URL: "https://hooks.example.invalid/services/FAKEtokenFAKEtokenFAKEtoken", FAKE_KEY_FILE: "/run/FAKEtokenFAKEtokenFAKEtoken",
+    // A name that says location exempts nothing: the secret of a capability URL is its short path.
+    FAKE_HOOK_SECRET_URL: "https://hooks.example.invalid/Ab3dEf5gHi7jKl9m", FAKE_KEY_FILE: "/run/FAKEtokenFAKEtokenFAKEtoken",
   };
   const names = [...new Set(masker.knownSecrets([env], ["GMAIL_CLIENT_ID"]).map((k) => k.name))].sort();
-  assert.deepEqual(names, ["CACHE_KEY", "DB_PASSWORD", "FAKE_HOOK_SECRET_URL", "FAKE_KEY_FILE", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "I18N_FALLBACK_KEY", "JWT_SECRET", "LOCAL_BIN_KEY", "MAX_TOKENS", "PARTITION_KEY", "PROXY_URL_SECRET", "SORT_KEY", "TOKEN_BUDGET_MODE", "TOKEN_TYPE_TOKEN"]);
+  assert.deepEqual(names, ["API_KEY_FILE", "CACHE_KEY", "DB_PASSWORD", "FAKE_HOOK_SECRET_URL", "FAKE_KEY_FILE", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "I18N_FALLBACK_KEY", "JWT_SECRET", "KEYCLOAK_URL", "LOCAL_BIN_KEY", "MAX_TOKENS", "PARTITION_KEY", "PROXY_URL_SECRET", "SORT_KEY", "SSH_KEY_PATH", "TOKEN_BUDGET_MODE", "TOKEN_ENDPOINT", "TOKEN_TYPE_TOKEN"]);
 });
 
 test("200 known secrets mask a 128,000-character text in linear time (under 2 s)", () => {

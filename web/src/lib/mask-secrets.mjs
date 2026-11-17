@@ -3,8 +3,9 @@
 // First by value: the server holds secrets a run could print (its own env and
 // the data root .env the scripts load). A value of 8 or more characters, under
 // a variable that is listed or whose name says secret, is replaced wherever it
-// occurs with [masked:NAME], whatever it looks like. A location-style setting
-// (a path or URL under a name ending in PATH, FILE, URL and the like) is skipped.
+// occurs with [masked:NAME], whatever it looks like. A path or a URL is no
+// exception: a webhook URL carries its secret in its path, and no rule on the
+// value's shape told the two apart.
 //
 // Then by pattern, for secrets the server does not hold, keeping the label or
 // prefix so a reader can still tell what kind of credential was there. A value
@@ -26,23 +27,13 @@ const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|PASSWD/i;
 
 /**
  * The name half of the rule, used by the tests: the variable's name says secret, or
- * `names` lists it. knownSecrets also skips a location-style setting and a value under 8 characters.
+ * `names` lists it. knownSecrets also skips a value under 8 characters.
  * @param {string} name
  * @param {Iterable<string>} [names]
  */
 export function isSecretName(name, names = []) {
   return SECRET_NAME.test(name) || [...names].includes(name);
 }
-
-// A name the rule matches is treated as a secret whatever its value looks like, with one
-// exception: a path or a URL with no user info, under a name that says it is a location
-// (API_KEY_FILE, KEYCLOAK_URL), holding no long token-like run. A base64 key can start with
-// "/" and a webhook URL carries its secret in the path, so shape alone never exempts a value.
-const LOCATION_NAME = /(?:PATH|FILE|DIR|URL|URI|ENDPOINT|HOST)$/i;
-const SETTING_PATH = /^[~.]{0,2}\/[\w./-]*$/;
-const SETTING_URL = /^[a-z][a-z0-9+.-]*:\/\/[^\s@]+$/i;
-const TOKEN_RUN = /[A-Za-z0-9_-]{20,}/;
-const isSetting = (name, value) => LOCATION_NAME.test(name) && (SETTING_PATH.test(value) || SETTING_URL.test(value)) && !TOKEN_RUN.test(value);
 
 /**
  * The secret values in `envs`, as written and JSON-escaped and URL-encoded, longest first.
@@ -58,7 +49,7 @@ export function knownSecrets(envs, names = []) {
       if (typeof raw !== "string") continue;
       // A secret mounted from a file often ends in a newline the run never prints.
       const value = raw.trim();
-      if (value.length < MIN_SECRET || !(listed.has(name) || (SECRET_NAME.test(name) && !isSetting(name, value)))) continue;
+      if (value.length < MIN_SECRET || !(listed.has(name) || SECRET_NAME.test(name))) continue;
       const forms = [value, JSON.stringify(value).slice(1, -1), value.isWellFormed() ? encodeURIComponent(value) : value];
       for (const form of forms) if (!byValue.has(form)) byValue.set(form, name);
     }
@@ -136,17 +127,24 @@ const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?
 const PASSWORD_WORDS = ["password", "passwd", "pwd"];
 const KNOWN_MARK = "\\[masked:\\w+\\]";
 const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})|${KNOWN_MARK}`;
-const VALUE = `(?!\\[masked)("(?:[^"\\\\\\n]|\\\\.)*"?|'(?:[^'\\\\\\n]|\\\\.)*'?|[^\\s"']+)`;
-const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*)${VALUE}`, "g");
+const VALUE = `("(?:[^"\\\\\\n]|\\\\.)*"?|'(?:[^'\\\\\\n]|\\\\.)*'?|[^\\s"']+)`;
+// A mark that is itself assigned to (password: [masked:X]: next) is left to match as the label, so what follows it is masked.
+const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*)(?!${KNOWN_MARK}["']?[ \\t]*[:=][ \\t]*\\S)${VALUE}`, "g");
 
 // A command-line flag names its value: --password x, --api-key=x, --github-token x.
 const FLAG = new RegExp(`((?<![\\w-])--[\\w-]{0,40}?(?:password|passwd|token|secret|api-?key|${KNOWN_MARK})(?:=|[ \\t]+))(?!--)${VALUE}`, "gi");
 
+// A value an earlier rule marked keeps that mark, and what runs on after it goes with it:
+// the labelled-token rule stops at the first character a token cannot hold, so the rest of
+// password=abc123...!rest was left in the open.
+const MARKED = /^["']?(\[masked(?::\w+)?\])/;
+
 /** @param {string} label @param {string} value */
 const maskValue = (label, value) => {
+  const mark = value.match(MARKED)?.[1] ?? MARK;
   const q = value[0];
-  if (q !== '"' && q !== "'") return label + MARK;
-  return label + q + MARK + (value.length > 1 && value.endsWith(q) ? q : "");
+  if (q !== '"' && q !== "'") return label + mark;
+  return label + q + mark + (value.length > 1 && value.endsWith(q) ? q : "");
 };
 
 // An Authorization header names its value as a credential, however short.
