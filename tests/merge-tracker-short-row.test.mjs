@@ -74,3 +74,11 @@ test('a complete row with no trailing pipe is still matched and updated', (t) =>
   assert.equal(rows.length, 1, `expected one row, got:\n${rows.join('\n')}`);
   assert.match(rows[0], /^\| 1 \|.*\| 4\.5\/5 \|.*\[2\]\(/, `row #1 was not updated: ${rows[0]}`);
 });
+
+test('a numbered row in another table further down the file does not stop the merge', (t) => {
+  const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
+  const r = mergeOver(t, [FULL, '', '## Totals', '', '| # | Metric |', '|---|---|', '| 1 | Applied |']);
+  assert.equal(r.status, 0, describeSpawn(r.spawn, 'expected the merge to run'));
+  assert.doesNotMatch(r.out, /short of the header/);
+  assert.equal(r.pending, false, 'the addition was left pending');
+});
