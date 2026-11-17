@@ -367,9 +367,9 @@ export async function installEgressGuard(context) {
  *
  * Still open after both:
  * - The request to a redirect hop is sent before any check sees it, with
- *   whatever method and body the redirect keeps. Its answer reaches the page's
- *   scripts until the last read, so a hostile page can relay it to a public
- *   host. Only this tool's output is refused.
+ *   whatever method and body the redirect keeps. Where the browser lets the
+ *   page's scripts read its answer, a hostile page can relay it to a public
+ *   host before the page closes. Only this tool's output is refused.
  * - A lookup has no timeout.
  * - A WebSocket is judged by its name, not by the address dialled. A name that
  *   answers this module's lookup one way and Chromium's another (DNS

@@ -137,7 +137,7 @@ which fetches the fork's release tag by git and replaces the system files with
 it. Shipped scripts import fork-local modules that `apply` does not deliver, so
 an install updated that way fails with `ERR_MODULE_NOT_FOUND`. Update this
 setup with `git pull` and `./cops rebuild`: the checkout is mounted over `/app`,
-so a newer image alone changes nothing here. A server that runs the pre-built
+so a newer image alone does not change the career-ops code here. A server that runs the pre-built
 image with no mount updates by pulling a newer image. In the
 checkout that develops this fork, bring upstream in through the
 `/upstream-review` skill (`.claude/skills/upstream-review/SKILL.md`).
