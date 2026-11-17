@@ -29,40 +29,74 @@ export function isSecretName(name, names = []) {
   return SECRET_NAME.test(name) || [...names].includes(name);
 }
 
+// A name the rule matches can hold a setting: a path, a URL with no user info, or
+// for a key or token, lowercase words (PARTITION_KEY=location). Digits stay secret.
+const SETTING_PATH = /^[~.]{0,2}\/[\w./-]*$/;
+const SETTING_URL = /^[a-z][a-z0-9+.-]*:\/\/[^\s@]+$/i;
+const SETTING_WORDS = /^[a-z]+(?:[-_.][a-z]+)*$/;
+const isSetting = (name, value) => SETTING_PATH.test(value) || SETTING_URL.test(value) || (/(?:KEY|TOKEN)$/i.test(name) && SETTING_WORDS.test(value));
+
 /**
- * The secret values in `envs`, longest first so a value holding another is masked whole.
+ * The secret values in `envs`, as written and JSON-escaped and URL-encoded, longest first.
  * @param {Array<Record<string, string | undefined>>} envs
- * @param {Iterable<string>} [names] variables that are secret whatever their name
+ * @param {Iterable<string>} [names] variables that are secret whatever their name or value
  * @returns {{ name: string, value: string }[]}
  */
 export function knownSecrets(envs, names = []) {
+  const listed = new Set(names);
   const byValue = new Map();
   for (const env of envs) {
-    for (const [name, value] of Object.entries(env)) {
-      if (typeof value === "string" && value.length >= MIN_SECRET && !byValue.has(value) && isSecretName(name, names)) byValue.set(value, name);
+    for (const [name, raw] of Object.entries(env)) {
+      if (typeof raw !== "string") continue;
+      // A secret mounted from a file often ends in a newline the run never prints.
+      const value = raw.trim();
+      if (value.length < MIN_SECRET || !(listed.has(name) || (SECRET_NAME.test(name) && !isSetting(name, value)))) continue;
+      const forms = [value, JSON.stringify(value).slice(1, -1), value.isWellFormed() ? encodeURIComponent(value) : value];
+      for (const form of forms) if (!byValue.has(form)) byValue.set(form, name);
     }
   }
   return [...byValue].map(([value, name]) => ({ name, value })).sort((a, b) => b.value.length - a.value.length);
 }
 
 /**
+ * Every known value is found in `s` as given, and overlapping finds are masked as one.
  * @param {string} s
  * @param {{ name: string, value: string }[]} known
  */
 function maskKnown(s, known) {
+  if (!known.length) return s;
+  const ends = new Uint32Array(s.length);
+  const names = new Map();
+  const found = (start, end, name) => {
+    if (end > ends[start]) {
+      ends[start] = end;
+      names.set(start, name);
+    }
+  };
+  const head = s.slice(0, MIN_SECRET);
   for (const { name, value } of known) {
-    const mark = `[masked:${name}]`;
-    s = s.split(value).join(mark);
+    for (let i = s.indexOf(value); i !== -1; i = s.indexOf(value, i + value.length)) found(i, i + value.length, name);
     // A cut through a secret leaves its tail at the start of the text.
-    const head = s.slice(0, MIN_SECRET);
     for (let i = value.indexOf(head, 1); head.length === MIN_SECRET && i !== -1; i = value.indexOf(head, i + 1)) {
       if (s.startsWith(value.slice(i))) {
-        s = mark + s.slice(value.length - i);
+        found(0, value.length - i, name);
         break;
       }
     }
   }
-  return s;
+  let out = "";
+  let from = 0;
+  for (let i = 0; i < s.length; ) {
+    if (!ends[i]) {
+      i++;
+      continue;
+    }
+    let end = ends[i];
+    for (let j = i + 1; j < end; j++) end = Math.max(end, ends[j]);
+    out += `${s.slice(from, i)}[masked:${names.get(i)}]`;
+    from = i = end;
+  }
+  return out + s.slice(from);
 }
 
 const PREFIXED = /\b(sk-ant-|sk-|gh[pousr]_|github_pat_|glpat-|hf_|AIza|xox[abprs]-)([A-Za-z0-9_-]{12,})/g;
@@ -73,7 +107,7 @@ const JWT_RUN = /\beyJ[\w.-]+/g;
 const JWT = /^eyJ[\w-]*\.[\w-]+\.[\w-]+/;
 
 // The host cannot hold an @, so the password runs to the last @ before the path.
-const URL_PASSWORD = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)(?!\[masked)[^\s/?#]*@/gi;
+const URL_PASSWORD = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)(?!\[masked)[^\s/?#]*@/gi;
 
 // A label is a whole word, the tail of an identifier (OPENROUTER_API_KEY, api_key) or
 // a capitalised camelCase tail (accessToken), never the end of a lowercase word
@@ -87,13 +121,16 @@ const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?
 // A password is short and often has no digit, so one assigned with : or = is masked
 // whatever it holds, a quoted one to its closing quote. Prose after the bare word
 // ("password required") stays, and so does a path (PWD=/srv/app is a directory).
+// A known value can be a label word (a variable holding "password"), so its mark
+// labels what is assigned to it too. A quoted value runs past escaped quotes.
 const PASSWORD_WORDS = ["password", "passwd", "pwd"];
-const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
-const VALUE = `(?!\\[masked)("[^"\\n]*"?|'[^'\\n]*'?|[^\\s"']+)`;
+const KNOWN_MARK = "\\[masked:\\w+\\]";
+const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})|${KNOWN_MARK}`;
+const VALUE = `(?!\\[masked)("(?:[^"\\\\\\n]|\\\\.)*"?|'(?:[^'\\\\\\n]|\\\\.)*'?|[^\\s"']+)`;
 const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*)${VALUE}`, "g");
 
 // A command-line flag names its value: --password x, --api-key=x, --github-token x.
-const FLAG = new RegExp(`((?<![\\w-])--[\\w-]{0,40}?(?:password|passwd|token|secret|api-?key)(?:=|[ \\t]+))(?!--)${VALUE}`, "gi");
+const FLAG = new RegExp(`((?<![\\w-])--[\\w-]{0,40}?(?:password|passwd|token|secret|api-?key|${KNOWN_MARK})(?:=|[ \\t]+))(?!--)${VALUE}`, "gi");
 
 /** @param {string} label @param {string} value */
 const maskValue = (label, value) => {

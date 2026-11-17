@@ -55,14 +55,16 @@ export async function POST(req: Request) {
   }
 
   // A key can surface in any free-text field, on any status. Each field is masked
-  // with CUT_SLACK characters of context past its length, then cut, so a label and
-  // its value are never separated before masking. Capping first keeps a large body
+  // with some context past its length, then cut, so a label and its value, or a
+  // known secret, are never separated before masking. The context is CUT_SLACK, or
+  // the longest known secret when that is longer. Capping first keeps a large body
   // from stalling the event loop. The word a cut lands in is dropped.
   const known = knownSecrets([process.env, readDotenv()], CAREER_OPS_SECRET_ENV);
+  const slack = Math.max(CUT_SLACK, known[0]?.value.length ?? 0);
   const text = (v: unknown, max: number) => {
     const raw = String(v ?? "").trim();
-    const masked = maskSecrets(raw.slice(0, max + CUT_SLACK), known);
-    if (raw.length <= max + CUT_SLACK && masked.length <= max) return masked.trimEnd();
+    const masked = maskSecrets(raw.slice(0, max + slack), known);
+    if (raw.length <= max + slack && masked.length <= max) return masked.trimEnd();
     if (/\s/.test(masked[max] ?? "")) return masked.slice(0, max).trimEnd();
     let end = Math.min(max, masked.length);
     while (end > 0 && !/\s/.test(masked[end - 1])) end--;
@@ -75,14 +77,16 @@ export async function POST(req: Request) {
   const summary = text(b.result?.summary, 1200);
   const error = b.status === "error" ? text(b.error, 1200) : "";
   // The client sends the last SAVED_OUTPUT_MAX + CUT_SLACK characters. The whole of
-  // that is masked, then the last SAVED_OUTPUT_MAX kept. Where anything was cut, the
-  // first line, or in a single-line output the first token, may be the tail of a
-  // value the masker did not know, so it is dropped. An unbroken run that long is
-  // unreadable and may be a key.
+  // that is masked, then the last SAVED_OUTPUT_MAX kept. A tab still on an older
+  // bundle cuts at exactly SAVED_OUTPUT_MAX, so the first CUT_SLACK of that is
+  // context and dropped too. Where anything may have been cut, the first line, or
+  // in a single-line output the first token, may be the tail of a value the masker
+  // did not know, so it is dropped. An unbroken run that long is unreadable and may
+  // be a key.
   const rawOutput = String(b.output ?? "");
   let output = maskSecrets(rawOutput.slice(-(SAVED_OUTPUT_MAX + CUT_SLACK)), known);
-  if (rawOutput.length > SAVED_OUTPUT_MAX) {
-    output = output.slice(-SAVED_OUTPUT_MAX);
+  if (rawOutput.length >= SAVED_OUTPUT_MAX) {
+    output = output.slice(-(rawOutput.length === SAVED_OUTPUT_MAX ? SAVED_OUTPUT_MAX - CUT_SLACK : SAVED_OUTPUT_MAX));
     const nl = output.indexOf("\n");
     if (nl !== -1) output = output.slice(nl + 1);
     else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
