@@ -130,3 +130,8 @@ test("a value after an explicit Basic or Bearer scheme is masked even with no di
   assert.equal(maskSecrets("authorization: bearer abcdefghijklmnopqrstuvwx"), "authorization: bearer [masked]");
 });
 
+test("a short value after an Authorization scheme is masked", () => {
+  assert.equal(maskSecrets("Authorization: Basic YTpi"), "Authorization: Basic [masked]");
+  assert.equal(maskSecrets("Proxy-Authorization: Bearer abc1"), "Proxy-Authorization: Bearer [masked]");
+});
+

@@ -178,3 +178,14 @@ test("a label split by the output bound takes its value with it", async (t) => {
   assert.ok(!md.includes(hex), "the value of the split label was saved");
   assert.match(md, /## Output\nword word/);
 });
+
+test("a label split by the output bound takes its value with it when a space precedes the colon", async (t) => {
+  const value = "FAKE0000fake1111FAKE";
+  const kept = `sword : ${value} ${"word ".repeat(1600)}`.slice(0, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-split-spaced", title: "t", status: "done", steps: [], output: `lead pas${kept}` });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(value), "the value of the split label was saved");
+  assert.match(md, /## Output\nword word/);
+});
+

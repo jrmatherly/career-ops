@@ -30,6 +30,9 @@ const PASSWORD_WORDS = ["password", "passwd", "pwd"];
 const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
 const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*["']?)([^\\s"']{4,})`, "g");
 
+// An Authorization header names its value as a credential, however short.
+const AUTH_SCHEME = /(authorization["']?[ \t]*[:=][ \t]*["']?(?:basic|bearer)[ \t]+)([A-Za-z0-9._~+/=-]{4,})/gi;
+
 // "/home/me/.cache/…" is a path; "/9j4AAQ…" with no second slash is base64.
 const isPath = (s) => /^\/[^/]+\//.test(s);
 
@@ -46,5 +49,6 @@ export function maskSecrets(s) {
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
     .replace(LABELLED, (m, label, sep, scheme = "", value) => ((scheme || hasDigit(value)) && !isPath(value) ? label + sep + scheme + MARK : m))
-    .replace(PASSWORD_ASSIGNED, `$1${MARK}`);
+    .replace(PASSWORD_ASSIGNED, `$1${MARK}`)
+    .replace(AUTH_SCHEME, `$1${MARK}`);
 }
