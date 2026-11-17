@@ -115,14 +115,21 @@ function v6Groups(addr) {
 }
 
 /**
- * Does this address belong to a range a provider must never connect to?
+ * Does this address belong to a range career-ops must never connect to? It
+ * judges what a provider's lookup resolved, the host literal of a URL, and the
+ * address a browser dialled.
  *
- * Accepts both families. An IPv4-mapped or IPv4-compatible IPv6 address is
- * unwrapped and judged as IPv4 — `::ffff:127.0.0.1` is loopback however it is
- * spelled, and treating the two spellings differently is the bypass. Any
- * other IPv6 address is allowed only inside global unicast 2000::/3.
+ * Accepts both families. An IPv6 address that embeds an IPv4 one in its last
+ * 32 bits is unwrapped and judged as that IPv4 address: IPv4-compatible
+ * `::/96`, IPv4-mapped `::ffff:0:0/96`, IPv4-translated `::ffff:0:0:0/96` and
+ * NAT64 `64:ff9b::/96`. So `::ffff:127.0.0.1` is loopback however it is
+ * spelled, and treating the spellings differently is the bypass, while
+ * `64:ff9b::808:808` is allowed because 8.8.8.8 is public. Any other IPv6
+ * address is allowed only inside global unicast 2000::/3, less the blocks
+ * refused below.
  *
- * @param {string} address - Resolved IP literal, as dns.lookup returns it.
+ * @param {string} address - An IP literal: a resolved address, a URL's host
+ *   literal or a dialled address.
  * @returns {boolean} True when the address is private/loopback/reserved.
  */
 export function isBlockedAddress(address) {
