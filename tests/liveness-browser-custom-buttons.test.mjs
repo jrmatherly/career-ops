@@ -16,7 +16,7 @@ import { pass, fail, toolUnavailable } from './helpers.mjs';
 import { checkUrlLiveness, installLivenessRouteGuard, newLivenessPage, setHostResolver } from '../liveness-browser.mjs';
 
 // The landed-URL check resolves the posting's name, which is made up here.
-setHostResolver(async () => ['93.184.216.34']);
+const restoreResolver = setHostResolver(async () => ['93.184.216.34']);
 
 console.log('\nliveness-browser — custom-element buttons');
 
@@ -77,4 +77,6 @@ try {
   fail(`custom-element button tests crashed: ${e.message}`);
 } finally {
   await browser?.close();
+  // Suites can share a process, so the stub must not outlive this one.
+  restoreResolver();
 }

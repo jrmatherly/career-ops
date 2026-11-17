@@ -16,7 +16,7 @@ function backfill(rows) {
   mkdirSync(join(work, 'batch', 'tracker-additions'), { recursive: true });
   const tracker = join(work, 'data', 'applications.md');
   writeFileSync(tracker, [...HEAD, ...rows, ''].join('\n'));
-  const run = spawnSync(process.execPath, [join(ROOT, 'merge-tracker.mjs'), '--backfill-urls'], { encoding: 'utf-8', env: { ...process.env, CAREER_OPS_ROOT: work } });
+  const run = spawnSync(process.execPath, [join(ROOT, 'merge-tracker.mjs'), '--backfill-urls'], { encoding: 'utf-8', env: { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: join(work, 'batch', 'tracker-additions'), CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv') } });
   const after = readFileSync(tracker, 'utf-8');
   rmSync(work, { recursive: true, force: true });
   return { status: run.status, out: run.stdout + run.stderr, after };

@@ -482,7 +482,8 @@ export function trackerRowFault(line, colmap, options = {}) {
   // A row may stop before its URL cell wherever that column sits: a layout can keep its own columns after URL.
   const least = urlOptional && colmap.url != null ? colmap.url - 1 : need;
   if (cells.length < least) {
-    const onlyUrl = !urlOptional && colmap.url === need && cells.length === need - 1
+    // The backfill reads only a row that closes with a pipe, so the hint is given only for one.
+    const onlyUrl = !urlOptional && /\|\s*$/.test(line) && colmap.url === need && cells.length === need - 1
       && trackerRowFault(line, colmap, { ...options, urlOptional: true }) === null;
     return { cell: 'short', why: `it has ${cells.length} cells where the header has ${need}, so a cell is missing. ${ADD_A_CELL}`
       + (onlyUrl ? ' Only the URL cell at the end is missing here, and node merge-tracker.mjs --backfill-urls adds it.' : '') };

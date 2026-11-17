@@ -16,7 +16,7 @@ import { pass, fail, toolUnavailable } from './helpers.mjs';
 import { checkUrlLiveness, installLivenessRouteGuard, newLivenessPage, setHostResolver } from '../liveness-browser.mjs';
 
 // The landed-URL check resolves the posting's name, which is made up here.
-setHostResolver(async () => ['93.184.216.34']);
+const restoreResolver = setHostResolver(async () => ['93.184.216.34']);
 
 console.log('\nliveness-browser — Apply link to the posting in the page chrome');
 
@@ -267,4 +267,6 @@ try {
   fail(`own Apply link tests crashed: ${e.message}`);
 } finally {
   await browser?.close();
+  // Suites can share a process, so the stub must not outlive this one.
+  restoreResolver();
 }
