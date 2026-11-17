@@ -29,7 +29,12 @@ const readsAfterPrivateAnswer = (env) => ({ newContext: async () => {
   context.newPage = async () => {
     const page = await newPage();
     const answered = new Promise((resolve) => {
-      context.on('response', (response) => { if (new URL(response.url()).port === String(env.privatePort)) resolve(); });
+      // Chromium sometimes reports a followed redirect under the first URL, so the
+      // address the response came from is asked too.
+      context.on('response', async (response) => {
+        const from = await response.serverAddr().catch(() => null);
+        if (new URL(response.url()).port === String(env.privatePort) || from?.port === env.privatePort) resolve();
+      });
       page.on('websocket', (socket) => socket.on('framereceived', resolve));
     });
     const title = page.title.bind(page);
