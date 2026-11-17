@@ -80,8 +80,9 @@ as its default; a supplied nonempty country list must name a recognized country.
   way, by a full state name or by one of the other codes (`Remote; Colorado
   Springs, CO`, where `Colorado` is the name, and `Remote (CA, NY, TX)`;
   `Remote - Denver, CO` is refused). Next to a capital code that is no state
-  they are the country (`Remote - Bogota, DC, CO`, Workday's `CO-DC-Bogota`,
-  `Remote - Delaware, ON, CA`). `Georgia` alone is the country; it is the
+  they are the country (`Remote - Delaware, ON, CA`). `DC` is a state beside
+  every code but `CO`, where it is Bogota's district (`Remote - Bogota, DC,
+  CO`, Workday's `CO-DC-Bogota`; `Remote (CA, DC)` is admitted). `Georgia` alone is the country; it is the
   state where its code stands in the same place (`GEORGIA - VIRTUAL - GA01`).
   A foreign country in the same place wins (`Remote - Chennai, TN, India`).
   For this check a bar or a spaced slash separates places as a middle dot and

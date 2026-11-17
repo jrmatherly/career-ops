@@ -412,12 +412,13 @@ const US_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:HI|ME|OH|OK|OR)(?!\\s
 const US_STATE_NAME = new RegExp(`(?<![\\p{L}\\p{N}])(?:district of columbia|${USPS_STATES.map(([name]) => name).filter(name => name !== 'georgia').join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 const GEORGIA_CODE = /(?<![\p{L}\p{N}])GA(?!\p{L})/u;
 const AMBIGUOUS_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:${AMBIGUOUS_STATE_CODES.join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
-// A capital two-letter code on either side that is not one of the fifty states, as in "Bogota, DC, CO",
-// "Delaware, ON, CA" and Workday's "CO-DC-Bogota". A state beside it is a list of states ("CA, NY, TX").
+// A capital two-letter code on either side that is not a state, as in "Delaware, ON, CA". A state beside it
+// is a list of states ("CA, NY, TX", "CA, DC"). DC is a state beside every code but CO, where it is Bogota's
+// district ("Bogota, DC, CO", Workday's "CO-DC-Bogota").
 const CODE_BEFORE = /(?<![\p{L}\p{N}])([A-Z]{2})\s*[,-]\s*$/u;
 const CODE_AFTER = /^\s*[,-]\s*([A-Z]{2})(?![\p{L}\p{N}])/u;
 const STATE_ABBRS = new Set(USPS_STATES.map(([, abbr]) => abbr.toUpperCase()));
-const foreignCode = (pattern, text) => { const code = pattern.exec(text)?.[1]; return code !== undefined && !STATE_ABBRS.has(code); };
+const foreignCode = (pattern, text, code) => { const beside = pattern.exec(text)?.[1]; return beside !== undefined && !STATE_ABBRS.has(beside) && (beside !== 'DC' || code === 'CO'); };
 // "U.S" and "U.S.A" without the last dot, which the aliases "u.s." and "u.s.a." do not match.
 const US_DOTTED = /(?<![\p{L}\p{N}.])u\.s(?:\.a)?(?![\p{L}\p{N}.])/giu;
 // A street number, then the words up to the next comma, slash, bar, bracket or spaced dash.
@@ -434,7 +435,7 @@ function withoutStateCodes(location) {
 /** A raw place with its US states taken out, folded, or null when it names none. Georgia counts where its
  * code GA stands in the same place ("GEORGIA - VIRTUAL - GA01"). CA, CO, DE, IL and IN count only in a place
  * that also names a state by its full name or by another code ("Colorado Springs, CO", "CA, NY, TX"), and not
- * next to a capital code that is no state, where they are the country ("Bogota, DC, CO").
+ * next to a capital code that is no state, where they are the country ("Delaware, ON, CA", "Bogota, DC, CO").
  * @param {string} place
  * @param {boolean} codes whether capital state codes are read; false where the place is written all in capitals
  */
@@ -442,7 +443,7 @@ function withoutUsStates(place, codes) {
   const named = (GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place).replace(US_STATE_NAME, ' ');
   if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === place) return null;
   // Judged before the other codes go, so the code next to an ambiguous one is still there to see.
-  const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (foreignCode(CODE_BEFORE, named.slice(0, at)) || foreignCode(CODE_AFTER, named.slice(at + 2)) ? code : ' '));
+  const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (foreignCode(CODE_BEFORE, named.slice(0, at), code) || foreignCode(CODE_AFTER, named.slice(at + 2), code) ? code : ' '));
   // Between states "and" is the word, not Andorra's three-letter code.
   return fold((codes ? sure.replace(US_STATE_CODE, ' ') : sure).replace(/\band\b/gi, ' '));
 }

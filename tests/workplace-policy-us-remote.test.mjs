@@ -25,6 +25,7 @@ const stateRemote = [
   'Remote - San Francisco, CA, USA', 'Remote - U.S',
   // A list of states: the code beside CA or CO is a state, not a country.
   'Remote (CA, CO, NY, WA)', 'Remote - NY, CA', 'Remote - CO, UT, AZ', 'Remote - New York, NY, CA', 'Remote - TX-CO',
+  'Remote (CA, DC)', 'Remote - California, CA, DC', 'Remote - DC, IL',
   // A spaced slash separates places, so the US place stands beside the foreign one.
   'Remote - Austin, TX / Toronto, Canada',
 ];
