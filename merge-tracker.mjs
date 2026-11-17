@@ -14,6 +14,8 @@
  * A duplicate is updated in place whether the score goes up, down or stays the same;
  * a re-evaluation that replaces the report records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
+ * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
+ * row is short of the header (a dry run only warns; --backfill-urls repairs rows)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -1666,6 +1668,7 @@ export async function mergeTracker(options = {}) {
       );
     }
     const existingApps = [];
+    const shortRows = [];
     let maxNum = 0;
 
     for (const line of appLines) {
@@ -1681,12 +1684,14 @@ export async function mergeTracker(options = {}) {
       // below; this is the dedup half (#2265).
       if (!line.startsWith('|')) continue;
       const app = parseAppLine(line);
-      if (app && !parseTrackerRow(line, COLMAP)) {
-        console.warn(`⚠️  Row #${app.num} is short of the header, so no addition will update it. Add the missing cell to that row in applications.md, then re-run.`);
-      } else if (app) {
+      if (app && parseTrackerRow(line, COLMAP)) {
         existingApps.push(app);
         if (app.num > maxNum) maxNum = app.num;
+        continue;
       }
+      // A numbered row too short for parseAppLine is just as unmatchable.
+      const num = parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
+      if (!isNaN(num) && num !== 0) shortRows.push(num);
     }
 
     // One-time backfill populating the URL column on existing
@@ -1760,6 +1765,18 @@ export async function mergeTracker(options = {}) {
       }
       trackerLock.release();
       return 0;
+    }
+    // A short row cannot be matched, so a re-evaluation of it would be appended
+    // as a second row and its TSV archived; a later fix to the row cannot undo
+    // that. Stop before any addition is read. A dry run writes nothing, so it
+    // only warns.
+    for (const num of shortRows) {
+      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} Row #${num} is short of the header, so an addition for it would be appended as a duplicate. Add the missing cell to that row in applications.md (or run --backfill-urls if only the URL cell is missing), then re-run.`);
+    }
+    if (shortRows.length && !DRY_RUN) {
+      console.error(`❌ Nothing merged: ${shortRows.length} tracker row(s) are short of the header. The additions are still pending.`);
+      trackerLock.release();
+      return 1;
     }
     // Full set of numbers already on the tracker (#1704). Deliberately broader than
     // the existingApps loop above: it reserves the number from any row with a
