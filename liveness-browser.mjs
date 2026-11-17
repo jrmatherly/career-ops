@@ -375,7 +375,8 @@ export async function installEgressGuard(context) {
  *   answers this module's lookup one way and Chromium's another (DNS
  *   rebinding) is not caught for a socket.
  * - A posting whose page opens a WebSocket to a name the local DNS sinkholes
- *   or does not resolve is refused. That refusal is visible.
+ *   or does not resolve is refused, except by the liveness check, which
+ *   ignores that socket (see `recordLandedUrls`, `perCheck`).
  * - When Playwright fails for a reason other than a refusal, `upskill.mjs`
  *   falls back to fetching the original URL from Node, which refuses any
  *   redirect but connects with Node's own lookup.
@@ -387,18 +388,25 @@ export async function installEgressGuard(context) {
  * and connects by address.
  *
  * @param {string} url - `page.url()` after the navigation.
+ * @param {{ keepDnsCode?: boolean }} [options] - `keepDnsCode` reports a name
+ *   with no usable address under the resolver's own code (`dns_no_addresses`,
+ *   `dns_sinkhole`) instead of `blocked_host`. The liveness check asks for it:
+ *   `scan --verify` keeps `blocked_host` for good, and a DNS outage or the
+ *   user's own filter says nothing lasting about the URL.
  * @returns {Promise<null|{code: string, reason: string}>} null when the page may be read.
  */
-export async function rejectLandedUrl(url) {
+export async function rejectLandedUrl(url, { keepDnsCode = false } = {}) {
   const literal = rejectPrivateOrInvalid(url);
   if (literal) return literal;
   try {
     await validateUrlSecurity(url);
     return null;
   } catch (err) {
-    return { code: 'blocked_host', reason: err.message };
+    return { code: (keepDnsCode && err.livenessCode) || 'blocked_host', reason: err.message };
   }
 }
+
+const NO_USABLE_ADDRESS = new Set(['dns_no_addresses', 'dns_sinkhole']);
 
 // Empty is a frame with nothing committed yet. The rest hold what the parent
 // wrote or Chromium's own error page, never a host's answer.
@@ -469,18 +477,31 @@ export function setDialledAddressJudge(judge) {
  * raises no event for either, so they are denied instead of recorded (see
  * `installEgressGuard`).
  *
+ * `perCheck` is for the liveness check, whose page is reused for the next
+ * posting and whose `blocked_host` verdict `scan --verify` keeps for good. It
+ * changes two things, each of which had refused a healthy public posting:
+ * - A frame, popup or socket URL whose name has no usable address is ignored,
+ *   as the route guard ignores such a subresource (see
+ *   `installLivenessRouteGuard`). The page's own URL is reported under the
+ *   resolver's code, which is transient.
+ * - A page that ended on a hostless URL (`about:blank`) is not refused for
+ *   it. Nothing was served from there.
+ *
  * @param {{ url: () => string, on: (event: string, listener: Function) => unknown, context: () => { on: (event: string, listener: Function) => unknown } }} page - Page to record.
- * @returns {(() => Promise<null|{code: string, reason: string}>) & { stop: () => void }} Call after the
+ * @param {{ perCheck?: boolean }} [options] - See above.
+ * @returns {(() => Promise<null|{code: string, reason: string}>) & { stop: () => void, popups: object[] }} Call after the
  *   last read of the page. It judges every address and URL recorded and the
  *   page's URL now, each once, and returns null only when what was read may be
  *   kept. `stop()` detaches the recorder, for a page that is reused for
- *   another URL and gets a new recorder.
+ *   another URL and gets a new recorder. `popups` holds every popup recorded,
+ *   for that caller to close.
  */
-export function recordLandedUrls(page) {
+export function recordLandedUrls(page, { perCheck = false } = {}) {
   const committed = new Set();
   const dialled = new Map();
   const addressLookups = [];
   const listeners = [];
+  const popups = [];
   const listen = (emitter, event, listener) => {
     emitter.on(event, listener);
     listeners.push(() => emitter.off(event, listener));
@@ -498,6 +519,7 @@ export function recordLandedUrls(page) {
     listen(watched, 'framenavigated', (frame) => record(frame.url()));
     listen(watched, 'websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
     listen(watched, 'popup', (popup) => {
+      popups.push(popup);
       record(popup.url());
       watch(popup);
     });
@@ -510,13 +532,19 @@ export function recordLandedUrls(page) {
         return { code: 'blocked_host', reason: `Access denied: a response came from private target IP ${addr.ipAddress}` };
       }
     }
-    for (const url of new Set([page.url(), ...committed])) {
-      const verdict = await rejectLandedUrl(url);
-      if (verdict) return verdict;
+    const pageUrl = page.url();
+    let noAddressForPage = null;
+    for (const url of new Set([pageUrl, ...committed])) {
+      if (perCheck && HOSTLESS_FRAME_URL.test(url)) continue;
+      const verdict = await rejectLandedUrl(url, { keepDnsCode: perCheck });
+      if (!verdict) continue;
+      if (!NO_USABLE_ADDRESS.has(verdict.code)) return verdict;
+      if (url === pageUrl) noAddressForPage = verdict;
     }
-    return null;
+    return noAddressForPage;
   };
   rejectVisited.stop = () => listeners.splice(0).forEach((off) => off());
+  rejectVisited.popups = popups;
   return rejectVisited;
 }
 
@@ -812,10 +840,18 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
   // The route guard never sees a redirect hop, so what the page landed on and
   // received is judged as every other reader does. A test double with no
   // context has no hops to judge. One recorder per check: the page is reused.
-  const rejectVisited = typeof page?.context === 'function' ? recordLandedUrls(page) : null;
+  const recorded = typeof page?.context === 'function';
+  let rejectVisited = null;
   const refused = ({ code, reason }) => ({ result: 'uncertain', code, reason });
   let landed = false;
   try {
+    // The recorder hears the whole context, so a document already on the page
+    // (rediscovery navigates before the first check) is unloaded first: what
+    // it still has in flight would be counted against this posting. A goto
+    // that differs from the page's URL only in its fragment would also keep
+    // that document, and this check would read it.
+    if (recorded && !HOSTLESS_FRAME_URL.test(page.url())) await page.goto('about:blank');
+    if (recorded) rejectVisited = recordLandedUrls(page, { perCheck: true });
     const response = await gotoWithTimeoutRetry(page, url, timeoutRetry ? {} : { retryTimeoutMs: 0 });
     const status = response?.status() ?? 0;
 
@@ -823,7 +859,10 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     // interstitial needs a moment to clear before the first read.
     if (extraSettleMs > 0) await page.waitForTimeout(extraSettleMs);
 
-    const landedRefusal = rejectVisited && await rejectLandedUrl(page.url());
+    // A page that left for about:blank during the settle wait was served
+    // nothing from there, and the classifier calls it off the posting.
+    const landedUrl = page.url();
+    const landedRefusal = rejectVisited && !HOSTLESS_FRAME_URL.test(landedUrl) && await rejectLandedUrl(landedUrl, { keepDnsCode: true });
     if (landedRefusal) return refused(landedRefusal);
     landed = true;
 
@@ -1030,7 +1069,17 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
       reason: `navigation error: ${err.message.split('\n')[0]}`,
     };
   } finally {
-    rejectVisited?.stop();
+    if (rejectVisited) {
+      // Left open, this posting's document and its popups keep running, and
+      // requesting, through the next posting's check, whose recorder counts
+      // what they receive. Measured in Chromium: once the document is
+      // unloaded, no response to a request it made is reported, a keepalive
+      // fetch and a beacon included. The recorder stops last, so a popup
+      // that a popup opens while they close is closed too.
+      await page.goto('about:blank').catch(() => {});
+      for (const popup of rejectVisited.popups) await popup.close().catch(() => {});
+      rejectVisited.stop();
+    }
   }
 }
 
