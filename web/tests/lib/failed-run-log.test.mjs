@@ -167,3 +167,14 @@ test("a label at the start of a single-line output masks its value before the cu
   assert.ok(!fs.readFileSync(file, "utf8").includes(hex), "the key was saved without its label");
 });
 
+
+
+test("a label split by the output bound takes its value with it", async (t) => {
+  const hex = "0123456789abcdef".repeat(4);
+  const kept = `sword: ${hex} ${"word ".repeat(1600)}`.slice(0, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-split-label", title: "t", status: "done", steps: [], output: `lead pas${kept}` });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(hex), "the value of the split label was saved");
+  assert.match(md, /## Output\nword word/);
+});

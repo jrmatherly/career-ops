@@ -62,13 +62,14 @@ export async function POST(req: Request) {
   // The client keeps the last 8000 characters. At that bound the first line, or in a
   // single-line output the first token, may start mid-key with no prefix or label left
   // to mask, so it is dropped. An unbroken run that long is unreadable and may be a key.
-  // The drop comes after masking, so a label it removes has already masked its value.
+  // The drop comes after masking, so a whole label it removes has already masked its
+  // value. A label the bound split masks nothing, so the token after it goes too.
   const rawOutput = String(b.output ?? "");
   let output = maskSecrets(rawOutput.slice(-OUTPUT_MAX));
   if (rawOutput.length >= OUTPUT_MAX) {
     const nl = output.indexOf("\n");
     if (nl !== -1) output = output.slice(nl + 1);
-    else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
+    else if (/\s/.test(output)) output = output.replace(/^\S*[:=]\s+\S*\s*|^\S*\s*/, "");
     else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
   }
 
