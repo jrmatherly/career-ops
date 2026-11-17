@@ -63,8 +63,9 @@ for (const reason of ["missing file", "incomplete instructions"]) {
       fs.writeFileSync(path.join(root, "modes/_shared.md"), "# Fictional incomplete shared rules\n");
       fs.writeFileSync(path.join(root, "batch/batch-prompt.md"), "# Fictional incomplete schema\n");
     }
+    // On a root the Read denies cannot spell (any Windows path) the route logs that too.
     const errors = [];
-    t.mock.method(console, "error", (...args) => errors.push(args));
+    t.mock.method(console, "error", (...args) => { if (/Failed to load focused evaluation instructions/.test(String(args[0]))) errors.push(args); });
     const response = await POST(new Request("http://fixture.invalid/api/run", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "evaluate", cliId: "claude", input: "https://jobs.example.test/1", evaluationSections: ["summary"] }),

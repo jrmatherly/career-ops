@@ -128,16 +128,17 @@ try {
   r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });
   ok(/WARNING: git core.hooksPath is "\.husky"/.test(r.stdout) && localHooksPath() === '.husky', 'session-start warns on a foreign local hooksPath and does not change it');
 
+  const said = (run) => (run.status === 0 && !/WARNING/.test(run.stdout) ? '' : ` (exit ${run.status}: ${`${run.stdout}${run.stderr}`.trim().slice(0, 300)})`);
   // An absolute spelling of this repository's own .githooks is the fork's path, not a foreign one.
   git('config', '--local', 'core.hooksPath', join(repo, '.githooks'));
   r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });
-  ok(r.status === 0 && !/WARNING/.test(r.stdout), `session-start accepts an absolute path to this repository's .githooks${r.stderr ? `: ${r.stderr}` : ''}`);
+  ok(r.status === 0 && !/WARNING/.test(r.stdout), `session-start accepts an absolute path to this repository's .githooks${said(r)}`);
 
   // A linked worktree shares the local config, so it sees the main checkout's absolute path.
   const wt = join(work, 'wt');
   git('worktree', 'add', '-q', wt, '-b', 'wt-branch');
   r = spawnSync(NODE, [SESSION_START], { cwd: wt, encoding: 'utf-8', env: { ...hookEnv, CLAUDE_PROJECT_DIR: wt } });
-  ok(r.status === 0 && !/WARNING/.test(r.stdout), `session-start in a worktree accepts the main checkout's .githooks${r.stderr ? `: ${r.stderr}` : ''}`);
+  ok(r.status === 0 && !/WARNING/.test(r.stdout), `session-start in a worktree accepts the main checkout's .githooks${said(r)}`);
 
   git('config', '--local', 'core.hooksPath', join(work, 'elsewhere', '.githooks'));
   r = spawnSync(NODE, [SESSION_START], { cwd: repo, encoding: 'utf-8', env: hookEnv });

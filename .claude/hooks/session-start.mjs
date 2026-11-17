@@ -14,7 +14,8 @@ const root = process.env.CLAUDE_PROJECT_DIR || join(dirname(fileURLToPath(import
 
 // This checkout's .githooks, or the main checkout's when root is a linked worktree.
 function isForkHooksPath(root, value) {
-  const real = (p) => { try { return realpathSync(p); } catch { return null; } };
+  // The native call also expands a Windows short name, which git and a temp path spell differently.
+  const real = (p) => { try { return realpathSync.native(p); } catch { return null; } };
   const got = real(resolve(root, value));
   if (!got) return false;
   const commonDir = resolve(root, spawnSync('git', ['rev-parse', '--git-common-dir'], { cwd: root, encoding: 'utf-8' }).stdout.trim());
