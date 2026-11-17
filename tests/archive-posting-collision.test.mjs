@@ -10,7 +10,7 @@ const previousRoot = process.env.CAREER_OPS_ROOT;
 process.env.CAREER_OPS_ROOT = root;
 const { archiveUrl } = await import('../archive-posting.mjs?archive-posting-collision');
 // archiveUrl resolves the landed URL; these fixtures stay off the network.
-(await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
+const restoreResolver = (await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
 function browser() {
   return { async newContext() {
     let url;
@@ -94,6 +94,7 @@ try {
     }
   }
 } finally {
+  restoreResolver();
   if (previousRoot === undefined) delete process.env.CAREER_OPS_ROOT;
   else process.env.CAREER_OPS_ROOT = previousRoot;
   rmSync(root, { recursive: true, force: true, maxRetries: 10 });

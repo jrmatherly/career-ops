@@ -21,7 +21,7 @@
 //
 // Run:  node --test tests/archive-posting-non-content.test.mjs
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,7 +32,7 @@ process.env.CAREER_OPS_ROOT = tmp;
 
 const { archiveUrl } = await import('../archive-posting.mjs');
 // archiveUrl resolves the landed URL; these fixtures stay off the network.
-(await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']);
+after((await import('../liveness-browser.mjs')).setHostResolver(async () => ['93.184.216.34']));
 
 function makeFakeBrowser({ bodyText, title = 'Backend Engineer | Acme', h1 = 'Backend Engineer', httpStatus = 200, evaluateRejects = false }) {
   let pdfCalled = false;

@@ -13,7 +13,7 @@ import {
 } from '../batch-evaluate-gemini.mjs';
 import { setHostResolver } from '../liveness-browser.mjs';
 // scrapeUrl resolves the landed URL; keep that lookup off the network.
-setHostResolver(async () => ['93.184.216.34']);
+const restoreResolver = setHostResolver(async () => ['93.184.216.34']);
 
 console.log('\nbatch-single-pass-mode.test.mjs — Single-Pass CV-Match Evaluation Mode');
 
@@ -447,3 +447,5 @@ try {
     rmSync(base, { recursive: true, force: true });
   }
 }
+
+restoreResolver();

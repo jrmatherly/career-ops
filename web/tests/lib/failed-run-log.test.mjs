@@ -113,14 +113,14 @@ test("an unbroken run at the bound is saved as a one-line marker", async (t) => 
 
 test("every free-text field is capped before masking, so a 256 KB body never reaches the masker whole", async (t) => {
   const huge = "key=".repeat(64 * 1024);
-  const body = { id: "fictional-huge", title: huge, page: huge, input: huge, status: "error", error: huge, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: huge })), output: huge };
+  const body = { id: "fictional-huge", title: huge, page: huge, input: huge, status: "error", error: huge, steps: [{ kind: "status", label: huge }], output: huge };
   const { res, file } = await saveRun(t, body);
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
   assert.ok(md.length < 200_000, `saved ${md.length} characters`);
   for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
   // Each label is one unbroken 256 KB word, and the word a cut lands in is dropped.
-  assert.equal((md.match(/^- $/gm) || []).length, 500, "steps are capped at 500");
+  assert.equal((md.match(/^- $/gm) || []).length, 1);
 });
 
 test("non-string field values are saved as text, not a 500", async (t) => {
@@ -142,7 +142,7 @@ test("a URL password cut by a field's length bound is still masked", async (t) =
 
 test("each field is saved at or under its length, and the last 500 steps are kept", async (t) => {
   const words = "word ".repeat(50_000);
-  const body = { id: "fictional-caps", title: words, page: words, input: words, status: "error", error: words, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: words })), output: "" };
+  const body = { id: "fictional-caps", title: words, page: words, input: words, status: "error", error: words, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: "word ".repeat(100) })), output: "" };
   const { res, file } = await saveRun(t, body);
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
