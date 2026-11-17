@@ -69,7 +69,7 @@ export async function POST(req: Request) {
   if (rawOutput.length >= OUTPUT_MAX) {
     const nl = output.indexOf("\n");
     if (nl !== -1) output = output.slice(nl + 1);
-    else if (/\s/.test(output)) output = output.replace(/^\S*[:=]\s*\S*\s*|^\S*\s+[:=]\s*\S*\s*|^\S*\s*/, "");
+    else if (/\s/.test(output)) output = output.replace(/^\S*[:=]\s*(?:(?:basic|bearer)\s+)?\S*\s*|^\S*\s+[:=]\s*(?:(?:basic|bearer)\s+)?\S*\s*|^\S*\s*/i, "");
     else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
   }
 

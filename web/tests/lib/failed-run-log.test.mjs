@@ -197,3 +197,12 @@ test("a failed run's error does not save an assigned password with no digit", as
   assert.match(md, /password=\[masked\]/);
 });
 
+test("a split Authorization label takes its scheme and value with it", async (t) => {
+  const kept = `ization: Bearer shortvalue ${"word ".repeat(1600)}`.slice(0, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-split-bearer", title: "t", status: "done", steps: [], output: `lead Author${kept}` });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes("shortvalue"), "the value after the split label was saved");
+  assert.match(md, /## Output\nword word/);
+});
+
