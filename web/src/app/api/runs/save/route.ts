@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
+import { parseEnv } from "node:util";
 import { careerOpsRoot } from "@/lib/career-ops";
 import { readJsonObject } from "@/lib/json-body";
 import { EVALUATION_GATE_REASONS } from "@/lib/evaluation-gate.mjs";
-import { maskSecrets } from "@/lib/mask-secrets.mjs";
+import { CUT_SLACK, SAVED_OUTPUT_MAX, knownSecrets, maskSecrets } from "@/lib/mask-secrets.mjs";
+import { CAREER_OPS_SECRET_ENV } from "@/lib/spawn-cli.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const OUTPUT_MAX = 8000;
 const STEPS_MAX = 500;
+
+/** The data root .env the scripts a run starts load their keys from. */
+function readDotenv(): Record<string, string> {
+  try {
+    // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
+    return parseEnv(`${fs.readFileSync(path.join(careerOpsRoot(), ".env"), "utf8")}\n`) as Record<string, string>;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") console.error(`/api/runs/save: .env not read (${code ?? "unknown error"}), so its keys are masked by pattern only`);
+    return {};
+  }
+}
 
 type Body = {
   id?: string;
@@ -41,15 +54,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid evaluation stop" }, { status: 400 });
   }
 
-  // Every free-text field is cut to its length before masking, so a large body
-  // cannot stall the event loop, then masked: a key can surface in any of them,
-  // on any status. A credential the cut splits has lost the part its pattern
-  // needs, so the word the cut lands in is dropped.
+  // A key can surface in any free-text field, on any status. Each field is masked
+  // with CUT_SLACK characters of context past its length, then cut, so a label and
+  // its value are never separated before masking. Capping first keeps a large body
+  // from stalling the event loop. The word a cut lands in is dropped.
+  const known = knownSecrets([process.env, readDotenv()], CAREER_OPS_SECRET_ENV);
   const text = (v: unknown, max: number) => {
     const raw = String(v ?? "").trim();
-    const masked = maskSecrets(raw.slice(0, max));
-    if (raw.length <= max || /\s/.test(raw[max])) return masked.trimEnd();
-    let end = masked.length;
+    const masked = maskSecrets(raw.slice(0, max + CUT_SLACK), known);
+    if (raw.length <= max + CUT_SLACK && masked.length <= max) return masked.trimEnd();
+    if (/\s/.test(masked[max] ?? "")) return masked.slice(0, max).trimEnd();
+    let end = Math.min(max, masked.length);
     while (end > 0 && !/\s/.test(masked[end - 1])) end--;
     return masked.slice(0, end).trimEnd();
   };
@@ -58,19 +73,20 @@ export async function POST(req: Request) {
   const input = text(b.input, 2000);
   const gateMessage = gate ? text(gate.message, 1200) : "";
   const summary = text(b.result?.summary, 1200);
-  const error = b.status === "error" ? text(b.error, 2000).slice(0, 1200) : "";
-  // The client keeps the last 8000 characters. At that bound the first line, or in a
-  // single-line output the first token, may start mid-key with no prefix or label left
-  // to mask, so it is dropped. An unbroken run that long is unreadable and may be a key.
-  // The drop comes after masking, so a whole label it removes has already masked its
-  // value. A label the bound split masks nothing, so the token after it goes too.
+  const error = b.status === "error" ? text(b.error, 1200) : "";
+  // The client sends the last SAVED_OUTPUT_MAX + CUT_SLACK characters. The whole of
+  // that is masked, then the last SAVED_OUTPUT_MAX kept. Where anything was cut, the
+  // first line, or in a single-line output the first token, may be the tail of a
+  // value the masker did not know, so it is dropped. An unbroken run that long is
+  // unreadable and may be a key.
   const rawOutput = String(b.output ?? "");
-  let output = maskSecrets(rawOutput.slice(-OUTPUT_MAX));
-  if (rawOutput.length >= OUTPUT_MAX) {
+  let output = maskSecrets(rawOutput.slice(-(SAVED_OUTPUT_MAX + CUT_SLACK)), known);
+  if (rawOutput.length > SAVED_OUTPUT_MAX) {
+    output = output.slice(-SAVED_OUTPUT_MAX);
     const nl = output.indexOf("\n");
     if (nl !== -1) output = output.slice(nl + 1);
-    else if (/\s/.test(output)) output = output.replace(/^\S*[:=]\s*(?:(?:basic|bearer)\s+)?\S*\s*|^\S*\s+[:=]\s*(?:(?:basic|bearer)\s+)?\S*\s*|^\S*\s*/i, "");
-    else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
+    else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
+    else output = `[output omitted: one unbroken ${SAVED_OUTPUT_MAX}-character run]`;
   }
 
   const dir = path.join(careerOpsRoot(), ".career-ops-web", "runs");

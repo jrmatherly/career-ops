@@ -5,6 +5,7 @@ import { scoreTone } from "@/lib/format";
 import { resolveCliId } from "@/lib/saved-cli";
 import { createWorkerFeedback } from "@/lib/worker-feedback.mjs";
 import { readJobStream } from "@/lib/job-stream.mjs";
+import { CUT_SLACK, SAVED_OUTPUT_MAX } from "@/lib/mask-secrets.mjs";
 import { createJobsPersister, restoreStoredJobs, saveJobsAfterOpen } from "@/lib/jobs-persist.mjs";
 import type { EVALUATION_GATE_REASONS } from "@/lib/evaluation-gate.mjs";
 
@@ -176,7 +177,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         let text = "";
-        let verdictLine = ""; // latched separately so the 8000-char tail can't drop it
+        let verdictLine = ""; // latched separately so the kept output tail can't drop it
         let doneTokens = 0; // per-run token cost, forwarded on the done event (#6)
         let doneCostUsd: number | null = null;
         let doneReportN: number | null = null;
@@ -239,7 +240,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
               const full = text + ev.text;
               const vm = full.match(/VERDICT:[^\n]*/i);
               if (vm) verdictLine = vm[0];
-              text = full.slice(-8000);
+              text = full.slice(-(SAVED_OUTPUT_MAX + CUT_SLACK));
               patch(id, (j) => ({ ...j, text }));
             }
           });
