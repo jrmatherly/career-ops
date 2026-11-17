@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { maskSecrets } from "../../src/lib/mask-secrets.mjs";
+import * as masker from "../../src/lib/mask-secrets.mjs";
+
+const { maskSecrets } = masker;
 
 test("ordinary prose and error messages come through unchanged", () => {
   for (const s of [
@@ -136,3 +138,179 @@ test("a short value after an Authorization scheme is masked", () => {
   assert.equal(maskSecrets("Proxy-Authorization: Bearer abc1"), "Proxy-Authorization: Bearer [masked]");
 });
 
+test("a quoted password is masked to its closing quote", () => {
+  assert.equal(maskSecrets('password: "fake pass phrase"'), 'password: "[masked]"');
+  assert.equal(maskSecrets("password='fake pass phrase' next"), "password='[masked]' next");
+  assert.equal(maskSecrets('{"password": "fake pass phrase", "user": "u"}'), '{"password": "[masked]", "user": "u"}');
+  assert.equal(maskSecrets('password: "fake pass phrase cut by the end'), 'password: "[masked]');
+});
+
+test("a credential passed as a command-line flag is masked", () => {
+  for (const [s, out] of [
+    ["--password fakepass0", "--password [masked]"],
+    ["--token FAKEtokenvalue", "--token [masked]"],
+    ["run --api-key=FAKEkeyvalue --verbose", "run --api-key=[masked] --verbose"],
+    ['--github-token "fake token"', '--github-token "[masked]"'],
+  ]) assert.equal(maskSecrets(s), out);
+  for (const s of ["--max-tokens 4096", "--token-limit 4096", "--password --verbose"]) assert.equal(maskSecrets(s), s);
+});
+
+test("a URL password holding an @ or a # is masked up to the host", () => {
+  assert.equal(maskSecrets("fetch https://fakeuser:fake@pass@example.invalid/x failed"), "fetch https://fakeuser:[masked]@example.invalid/x failed");
+  assert.equal(maskSecrets("redis://user:fake#pass@host.invalid/db"), "redis://user:[masked]@host.invalid/db");
+});
+
+test("a path assigned to PWD is not taken for a password", () => {
+  for (const s of ["PWD=/srv/app", "PWD=/srv/career-ops", 'PWD="/home/me/work"']) assert.equal(maskSecrets(s), s);
+});
+
+test("GitLab and Hugging Face token prefixes are masked", () => {
+  assert.equal(maskSecrets("glpat-" + "FAKE0000fake1111FAKE"), "glpat-[masked]");
+  assert.equal(maskSecrets("hf_" + "FAKE0000fake1111FAKE2222"), "hf_[masked]");
+});
+
+test("a secret the server holds is masked by value, with no label or shape", () => {
+  const known = masker.knownSecrets([{ FAKE_SERVICE_API_KEY: "FAKEnodigitsatallHERE", HOME: "/home/fake", SHORT_TOKEN: "abc" }]);
+  assert.deepEqual(known, [{ name: "FAKE_SERVICE_API_KEY", value: "FAKEnodigitsatallHERE" }]);
+  assert.equal(maskSecrets("upstream rejected FAKEnodigitsatallHERE twice", known), "upstream rejected [masked:FAKE_SERVICE_API_KEY] twice");
+});
+
+test("the tail of a known secret at the start of the text is masked", () => {
+  const known = masker.knownSecrets([{ FAKE_TOKEN: "FAKEnodigitsatallHERE" }]);
+  assert.equal(maskSecrets("digitsatallHERE and more", known), "[masked:FAKE_TOKEN] and more");
+  assert.equal(maskSecrets("HERE and more", known), "HERE and more");
+});
+
+test("a variable named outside the name rule is secret when listed", () => {
+  const env = { FAKE_CLIENT_ID: "FAKEclientidvalue" };
+  assert.deepEqual(masker.knownSecrets([env]), []);
+  assert.deepEqual(masker.knownSecrets([env], ["FAKE_CLIENT_ID"]), [{ name: "FAKE_CLIENT_ID", value: "FAKEclientidvalue" }]);
+});
+
+test("every secret in the settings registry is masked by value", async () => {
+  const { SETTINGS } = await import("../../../lib/settings-registry.mjs");
+  const { CAREER_OPS_SECRET_ENV } = await import("../../src/lib/spawn-cli.mjs");
+  const ids = SETTINGS.filter((s) => s.kind === "secret").map((s) => s.id);
+  assert.ok(ids.length > 0);
+  for (const id of [...ids, ...CAREER_OPS_SECRET_ENV]) assert.ok(masker.isSecretName(id, CAREER_OPS_SECRET_ENV), id);
+});
+
+test("pathological inputs of 128,000 characters are masked in linear time (under 2 s)", () => {
+  const known = masker.knownSecrets?.([{ FAKE_API_KEY: "FAKEknownvalue00" }]) ?? [];
+  for (const unit of ["key=", "password=", 'password: "', "'", '"', "@", "https://u:", "a://b:@", "--password ", "--", "-", "sk-", "eyJ", "Authorization: Bearer ", "FAKEknown"]) {
+    const s = unit.repeat(Math.ceil(128_000 / unit.length)).slice(0, 128_000);
+    const t0 = performance.now();
+    maskSecrets(s, known);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 2000, `${JSON.stringify(unit)} took ${ms.toFixed(1)} ms`);
+  }
+});
+
+
+test("a known secret with surrounding whitespace or a trailing newline is masked", () => {
+  const known = masker.knownSecrets([{ FAKE_MOUNTED_TOKEN: "FAKEmountedTokenValueAbCd\n", FAKE_PADDED_API_KEY: "  FAKEpaddedKeyValueXyZw  " }]);
+  assert.equal(maskSecrets("upstream said FAKEmountedTokenValueAbCd and FAKEpaddedKeyValueXyZw", known), "upstream said [masked:FAKE_MOUNTED_TOKEN] and [masked:FAKE_PADDED_API_KEY]");
+});
+
+test("a known secret is masked in its JSON-escaped and URL-encoded forms", () => {
+  const value = 'Fk"ZqLm\\Wt+Rb/Xy=Hn pQ';
+  const known = masker.knownSecrets([{ FAKE_ODD_API_KEY: value }]);
+  assert.equal(maskSecrets(`body ${JSON.stringify({ k: value })} end`, known), 'body {"k":"[masked:FAKE_ODD_API_KEY]"} end');
+  assert.equal(maskSecrets(`GET /x?k=${encodeURIComponent(value)} end`, known), "GET /x?k=[masked:FAKE_ODD_API_KEY] end");
+});
+
+test("two known secrets that overlap in the text are masked whole", () => {
+  const known = masker.knownSecrets([{ A_KEY: "abcdefghIJKLMNOP", B_KEY: "IJKLMNOPqrstuvwx" }]);
+  assert.equal(maskSecrets("x abcdefghIJKLMNOPqrstuvwx y IJKLMNOPqrstuvwx", known), "x [masked:A_KEY] y [masked:B_KEY]");
+  const nested = masker.knownSecrets([{ A_KEY: "abcdefghIJKLMNOP", C_TOKEN: "abcdefghIJKLMNOPqrstuvwxYZ" }]);
+  assert.equal(maskSecrets("x abcdefghIJKLMNOPqrstuvwxYZ y abcdefghIJKLMNOP", nested), "x [masked:C_TOKEN] y [masked:A_KEY]");
+});
+
+test("a quoted password holding an escaped quote is masked to its closing quote", () => {
+  assert.equal(maskSecrets('password="he said \\"hi\\" twice" next'), 'password="[masked]" next');
+  assert.equal(maskSecrets("password='it\\'s mine now' next"), "password='[masked]' next");
+  assert.equal(maskSecrets('{"password":"abc\\"def ghi","user":"x"}'), '{"password":"[masked]","user":"x"}');
+  assert.equal(maskSecrets("{'password': 'abc\\'def ghi', 'user': 'x'}"), "{'password': '[masked]', 'user': 'x'}");
+  assert.equal(maskSecrets('--password "two \\"quoted\\" words" --user bob'), '--password "[masked]" --user bob');
+});
+
+test("a URL password with an empty user name is masked", () => {
+  assert.equal(maskSecrets("redis://:onlypass@host.invalid:6379"), "redis://:[masked]@host.invalid:6379");
+  assert.equal(maskSecrets("see http://a.invalid:8080/x and mail me@b.invalid"), "see http://a.invalid:8080/x and mail me@b.invalid");
+});
+
+test("a password keeps nothing after the mark an earlier rule left in it", () => {
+  // The labelled-token rule masks the run of token characters and stops at the "!".
+  assert.equal(maskSecrets("password=passwordValue000000!RemainingPrivateMaterial"), "password=[masked]");
+  assert.equal(maskSecrets('password="passwordValue000000!Remaining Private" next'), 'password="[masked]" next');
+  assert.equal(maskSecrets("--password passwordValue000000!Remaining --user bob"), "--password [masked] --user bob");
+  const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
+  assert.equal(maskSecrets("password=correcthorsebattery", known), "password=[masked:DB_PASSWORD]", "a known value keeps its name");
+  assert.equal(maskSecrets("password=correcthorsebattery!tail", known), "password=[masked:DB_PASSWORD]");
+  // A URL password that starts with a known value keeps the name and loses the rest.
+  assert.equal(maskSecrets("redis://:correcthorsebatteryPrivateSuffix99@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
+  assert.equal(maskSecrets("redis://:correcthorsebattery@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
+  assert.equal(maskSecrets("redis://user:correcthorsebattery!Private@host.invalid/db", known), "redis://user:[masked:DB_PASSWORD]@host.invalid/db", "a rest that starts with no credential character");
+  // A known value that is assigned to in turn still labels what follows it.
+  assert.equal(maskSecrets("PASSWORD: correcthorsebattery: realsecret99", known), "PASSWORD: [masked:DB_PASSWORD]: [masked]");
+  assert.equal(maskSecrets("PASSWORD= correcthorsebattery = other", known), "PASSWORD= [masked:DB_PASSWORD] = [masked]");
+});
+
+test("a credential that starts with a known value is masked whole, and what a separator sets apart stays", () => {
+  const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
+  assert.equal(maskSecrets("Authorization: Bearer correcthorsebatteryPrivateSuffix99", known), "Authorization: Bearer [masked:DB_PASSWORD]");
+  assert.equal(maskSecrets("token correcthorsebatteryPrivateSuffix99 done", known), "token [masked:DB_PASSWORD] done");
+  // Every character a credential can hold, not letters and digits alone.
+  assert.equal(maskSecrets("Authorization: Bearer correcthorsebattery-Private.Suffix_9/9+x=", known), "Authorization: Bearer [masked:DB_PASSWORD]");
+  assert.equal(maskSecrets("got correcthorsebattery-Private.Suffix_9/9+x= back", known), "got [masked:DB_PASSWORD] back");
+  // A mark with = straight after it is left as a label for the password rule.
+  assert.equal(maskSecrets("correcthorsebattery=Tr0ub4dor&3 ok", known), "[masked:DB_PASSWORD]=[masked] ok");
+  assert.equal(maskSecrets('{"p":"correcthorsebattery","user":"bob"}', known), '{"p":"[masked:DB_PASSWORD]","user":"bob"}');
+  assert.equal(maskSecrets("a correcthorsebattery b, correcthorsebattery, c", known), "a [masked:DB_PASSWORD] b, [masked:DB_PASSWORD], c");
+});
+
+test("a variable the name rule matches is secret whatever its value looks like, a path or a URL included", () => {
+  const env = {
+    LOCAL_BIN_KEY: "/usr/local/bin", SSH_KEY_PATH: "~/.ssh/id_ed25519", API_KEY_FILE: "./run/secrets/key", KEYCLOAK_URL: "https://sso.example.invalid/realms/main",
+    TOKEN_ENDPOINT: "https://example.invalid/oauth/token", PARTITION_KEY: "location", CACHE_KEY: "evaluate", I18N_FALLBACK_KEY: "evaluation.fallback", TOKEN_TYPE_TOKEN: "access-token",
+    MAX_TOKENS: "12000000", DB_PASSWORD: "correcthorsebattery", TOKEN_BUDGET_MODE: "standard", SORT_KEY: "createdAt", FAKE_TOKEN: "FAKEnodigitsatallHERE",
+    PROXY_URL_SECRET: "https://fakeuser:FakePass000@proxy.invalid", JWT_SECRET: "/x9/FAKEbase64ish+00", GMAIL_CLIENT_ID: "/usr/local/bin/listed",
+    // A base64 key can start with "/", and a webhook URL is a secret.
+    FAKE_SECRET_ACCESS_KEY: "/FAKEbase64ishABCDEFGHijklmnopqrstuvwxyz", FAKE_WEBHOOK_TOKEN: "https://hooks.example.invalid/services/FAKE/FAKE",
+    // A name that says location exempts nothing: the secret of a capability URL is its short path.
+    FAKE_HOOK_SECRET_URL: "https://hooks.example.invalid/Ab3dEf5gHi7jKl9m", FAKE_KEY_FILE: "/run/FAKEtokenFAKEtokenFAKEtoken",
+  };
+  const names = [...new Set(masker.knownSecrets([env], ["GMAIL_CLIENT_ID"]).map((k) => k.name))].sort();
+  assert.deepEqual(names, ["API_KEY_FILE", "CACHE_KEY", "DB_PASSWORD", "FAKE_HOOK_SECRET_URL", "FAKE_KEY_FILE", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "I18N_FALLBACK_KEY", "JWT_SECRET", "KEYCLOAK_URL", "LOCAL_BIN_KEY", "MAX_TOKENS", "PARTITION_KEY", "PROXY_URL_SECRET", "SORT_KEY", "SSH_KEY_PATH", "TOKEN_BUDGET_MODE", "TOKEN_ENDPOINT", "TOKEN_TYPE_TOKEN"]);
+});
+
+test("200 known secrets mask a 128,000-character text in linear time (under 2 s)", () => {
+  const env = Object.fromEntries(Array.from({ length: 200 }, (_, i) => [`FAKE_${i}_API_KEY`, `FAKEvalue${String(i).padStart(4, "0")}${"abcdefgh".repeat(1 + (i % 6))}`]));
+  const known = masker.knownSecrets([env]);
+  for (const s of [Object.values(env).join(" ").repeat(30).slice(0, 128_000), "lorem ipsum ".repeat(11_000).slice(0, 128_000), "a".repeat(128_000)]) {
+    const t0 = performance.now();
+    maskSecrets(s, known);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 2000, `took ${ms.toFixed(1)} ms`);
+  }
+});
+
+test("a known value that is itself a label word is not masked by value, so the label still reads", () => {
+  const known = masker.knownSecrets([{ FAKE_FIELD_PASSWORD_REF: "password", FAKE_AUTH_SECRET: "Authorization" }]);
+  assert.deepEqual(known, []);
+  assert.equal(maskSecrets('login password: "plum vexed 47" ok', known), 'login password: "[masked]" ok');
+  assert.equal(maskSecrets("run --password hunter2 now", known), "run --password [masked] now");
+  assert.equal(maskSecrets("password Tr0ub4dorAbcdefgh123456", known), "password [masked]");
+});
+
+test("a password that looks like a path is masked, and the shell's PWD is not", () => {
+  assert.equal(maskSecrets("password=/a/b/c next"), "password=[masked] next");
+  assert.equal(maskSecrets('password: "/x9/abc/def"'), 'password: "[masked]"');
+  assert.equal(maskSecrets("PWD=/srv/app/x OLDPWD=/srv/app/y"), "PWD=/srv/app/x OLDPWD=/srv/app/y");
+  assert.equal(maskSecrets("db_pwd=/a/b/c pwd: /a/b/c dbPwd=/a/b/c"), "db_pwd=[masked] pwd: [masked] dbPwd=[masked]");
+});
+
+test("a known secret that overlaps its own next occurrence is masked whole", () => {
+  const known = masker.knownSecrets([{ FAKE_PERIODIC_KEY: "FAKEwordFAKEword" }]);
+  assert.equal(maskSecrets("x FAKEwordFAKEwordFAKEword y", known), "x [masked:FAKE_PERIODIC_KEY] y");
+});

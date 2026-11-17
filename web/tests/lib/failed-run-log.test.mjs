@@ -16,11 +16,15 @@ register(`data:text/javascript,${encodeURIComponent(`
   }
 `)}`, import.meta.url);
 const { POST } = await import("../../src/app/api/runs/save/route.ts");
+const masker = await import("../../src/lib/mask-secrets.mjs");
+// What the client sends: the saved length plus the context the server masks with.
+const SENT = (masker.SAVED_OUTPUT_MAX ?? 8000) + (masker.CUT_SLACK ?? 256);
 
-function saveRun(t, body) {
+function saveRun(t, body, setup = (_root) => {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "co-failed-run-log-"));
   const previousRoot = process.env.CAREER_OPS_ROOT;
   process.env.CAREER_OPS_ROOT = root;
+  setup(root);
   t.after(() => { if (previousRoot === undefined) delete process.env.CAREER_OPS_ROOT; else process.env.CAREER_OPS_ROOT = previousRoot; fs.rmSync(root, { recursive: true, force: true }); });
   return POST(new Request("http://fixture.invalid/api/runs/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }))
     .then((res) => ({ res, file: path.join(root, `.career-ops-web/runs/${body.id}.md`) }));
@@ -72,11 +76,11 @@ for (const [status, extra] of [["done", { result: { score: 4.2, summary: "Fictio
   });
 }
 
-test("output cut at the 8000-character bound loses its first line, so a key cut there is not saved", async (t) => {
+test("output cut at the saved length loses its first line, so a key cut there is not saved", async (t) => {
   const tail = "FAKE0000fake1111FAKE2222tail";
   const rest = "\nsecond line\n";
-  const output = tail + rest + "x".repeat(8000 - tail.length - rest.length);
-  assert.equal(output.length, 8000);
+  const output = ("lead ".repeat(60) + "FAKE0000fa").slice(-(SENT - 8000 + 5)) + tail + rest + "x".repeat(8000 - 5 - tail.length - rest.length);
+  assert.equal(output.length, SENT);
   const { res, file } = await saveRun(t, { id: "fictional-cut", status: "done", steps: [], output });
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
@@ -169,24 +173,61 @@ test("a label at the start of a single-line output masks its value before the cu
 
 
 
-test("a label split by the output bound takes its value with it", async (t) => {
+test("a label the output bound would split is masked with its value first", async (t) => {
   const hex = "0123456789abcdef".repeat(4);
   const kept = `sword: ${hex} ${"word ".repeat(1600)}`.slice(0, 8000);
   const { res, file } = await saveRun(t, { id: "fictional-split-label", title: "t", status: "done", steps: [], output: `lead pas${kept}` });
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
   assert.ok(!md.includes(hex), "the value of the split label was saved");
-  assert.match(md, /## Output\nword word/);
+  assert.match(md, /\[masked\] word word/);
 });
 
-test("a label split by the output bound takes its value with it when a space precedes the colon", async (t) => {
+test("a label the output bound would split is masked with its value first when a space precedes the colon", async (t) => {
   const value = "FAKE0000fake1111FAKE";
   const kept = `sword : ${value} ${"word ".repeat(1600)}`.slice(0, 8000);
   const { res, file } = await saveRun(t, { id: "fictional-split-spaced", title: "t", status: "done", steps: [], output: `lead pas${kept}` });
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
   assert.ok(!md.includes(value), "the value of the split label was saved");
-  assert.match(md, /## Output\nword word/);
+  assert.match(md, /\[masked\] word word/);
+});
+
+test("a value the bound separates from its label is masked, because masking comes before the cut", async (t) => {
+  const value = "FAKE0000fake1111FAKE2222";
+  const after = ` ${value} ${"word ".repeat(1700)}`.slice(0, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-cut-order", status: "error", error: "failed", steps: [], output: `lead api_key:${after}`.slice(-SENT) });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(value.slice(-12)), "the value was saved without its label");
+});
+
+test("a secret in the server's environment is masked by value wherever it appears", async (t) => {
+  const value = "FAKEnodigitsRUNLOGvalue";
+  process.env.FAKE_RUNLOG_API_KEY = value;
+  t.after(() => { delete process.env.FAKE_RUNLOG_API_KEY; });
+  const { res, file } = await saveRun(t, { id: "fictional-env-value", title: `t ${value}`, status: "error", error: `rejected ${value}`, steps: [{ kind: "status", label: value }], output: `upstream said ${value} is invalid` });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(value), md);
+  assert.equal(md.match(/\[masked:FAKE_RUNLOG_API_KEY\]/g)?.length, 4);
+});
+
+test("a secret in the data root .env is masked by value", async (t) => {
+  const value = "FAKEdotenvNODIGITvalue";
+  const { res, file } = await saveRun(t, { id: "fictional-dotenv-value", status: "error", error: "failed", steps: [], output: `the script printed ${value}` }, (root) => fs.writeFileSync(path.join(root, ".env"), `FAKE_DOTENV_TOKEN=${value}`));
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes(value), md);
+  assert.match(md, /the script printed \[masked:FAKE_DOTENV_TOKEN\]/);
+});
+
+test("a path assigned to PWD is saved as it was", async (t) => {
+  const { res, file } = await saveRun(t, { id: "fictional-pwd", status: "error", error: "failed in PWD=/srv/app", steps: [], output: "PWD=/srv/app" });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.match(md, /## Error\n+failed in PWD=\/srv\/app/);
+  assert.match(md, /## Output\nPWD=\/srv\/app/);
 });
 
 test("a failed run's error does not save an assigned password with no digit", async (t) => {
@@ -197,12 +238,41 @@ test("a failed run's error does not save an assigned password with no digit", as
   assert.match(md, /password=\[masked\]/);
 });
 
-test("a split Authorization label takes its scheme and value with it", async (t) => {
+test("an Authorization label the output bound would split is masked with its value first", async (t) => {
   const kept = `ization: Bearer shortvalue ${"word ".repeat(1600)}`.slice(0, 8000);
   const { res, file } = await saveRun(t, { id: "fictional-split-bearer", title: "t", status: "done", steps: [], output: `lead Author${kept}` });
   assert.equal(res.status, 200);
   const md = fs.readFileSync(file, "utf8");
   assert.ok(!md.includes("shortvalue"), "the value after the split label was saved");
-  assert.match(md, /## Output\nword word/);
+  assert.match(md, /Bearer \[masked\] word word/);
 });
 
+
+test("an 8000-character output from a client that cut it there loses its first line", async (t) => {
+  const output = ("m2Xv9Rk4Tw8Np3HsFAKE' https://example.invalid\n" + "lorem ipsum dolor\n".repeat(500)).slice(0, 8000);
+  assert.equal(output.length, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-old-client", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  const md = fs.readFileSync(file, "utf8");
+  assert.ok(!md.includes("m2Xv9Rk4Tw8Np3Hs"), "the key stub before the first newline was saved");
+  assert.match(md, /## Output\nlorem ipsum dolor\n/);
+});
+
+test("a variable listed as secret outside the name rule is masked by value", async (t) => {
+  const previous = process.env.GMAIL_CLIENT_ID;
+  process.env.GMAIL_CLIENT_ID = "FAKEclientIdentifierValue";
+  t.after(() => { if (previous === undefined) delete process.env.GMAIL_CLIENT_ID; else process.env.GMAIL_CLIENT_ID = previous; });
+  const { res, file } = await saveRun(t, { id: "fictional-listed", status: "error", error: "failed", steps: [], output: "client FAKEclientIdentifierValue rejected" });
+  assert.equal(res.status, 200);
+  assert.match(fs.readFileSync(file, "utf8"), /client \[masked:GMAIL_CLIENT_ID\] rejected/);
+});
+
+test("a known secret longer than the cut slack is masked whole in a short field", async (t) => {
+  const pem = "-----BEGIN FAKE PRIVATE KEY-----\n" + Array.from({ length: 12 }, (_, i) => `FAKEpemLine${String(i).padStart(2, "0")}`.padEnd(64, "Zq")).join("\n") + "\n-----END FAKE PRIVATE KEY-----";
+  assert.ok(pem.length > 256);
+  process.env.FAKE_APP_PRIVATE_KEY = pem;
+  t.after(() => { delete process.env.FAKE_APP_PRIVATE_KEY; });
+  const { res, file } = await saveRun(t, { id: "fictional-long-known", status: "error", error: `${"lorem ipsum ".repeat(80).slice(0, 950)} key rejected: ${pem} (exit 1)`, steps: [], output: "" });
+  assert.equal(res.status, 200);
+  assert.ok(!fs.readFileSync(file, "utf8").includes("FAKEpemLine"), "a line of the known key was saved");
+});

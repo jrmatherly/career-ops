@@ -465,8 +465,13 @@ export async function processOffer(browser, line, idx, _evaluate = evaluateWithR
     try {
       jdText = await scrapeUrl(browser, url);
     } catch (err) {
-      if (err.refused) console.warn(`⚠️  ${url}: refused by the egress guard (${err.refused.code}), not evaluated.`);
-      else console.warn(`⚠️  ${url}: could not be read (${String(err.message).split('\n')[0]}).`);
+      // A refused posting is left as it is: visiting it again to judge
+      // closure would read the page the guard just refused.
+      if (err.refused) {
+        console.warn(`⚠️  ${url}: refused by the egress guard (${err.refused.code}: ${err.refused.reason}), not evaluated.`);
+        return { line, processed: false, outcome: 'refused' };
+      }
+      console.warn(`⚠️  ${url}: could not be read (${String(err.message).split('\n')[0]}).`);
       return await resolveDeadPosting();
     }
     if (!jdText || jdText.length < 100) {
@@ -557,6 +562,13 @@ ${withJdArchiveSection(evaluationText.replace(/---SCORE_SUMMARY---[\s\S]*?---END
   }
 }
 
+// A refused posting stays pending and is refused again on every run, so the
+// run says how many there were. Null when there were none.
+export function refusedSummary(results) {
+  const refused = [...results.values()].filter((res) => res.outcome === 'refused').length;
+  return refused ? `${refused} refused by the egress guard, left pending` : null;
+}
+
 // Applies the processed results to the CURRENT text of pipeline.md. A run takes
 // minutes and scan.mjs, plugins.mjs or agent-inbox.mjs may append to the file
 // meanwhile, so each result replaces the first line that still equals the
@@ -630,6 +642,8 @@ async function main() {
 
   // Rewrite pipeline.md inline
   await finishPipelineBatch(PATHS.pipeline, pipelineLines, results);
+  const refused = refusedSummary(results);
+  if (refused) console.warn(`⚠️  ${refused}`);
 
   console.log(`\n🎉 Batch processing complete! Merging tracker additions...`);
   try {

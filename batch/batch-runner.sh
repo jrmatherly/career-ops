@@ -2116,10 +2116,14 @@ check_evidence_freshness() {
 merge_tracker() {
   echo ""
   echo "=== Merging tracker additions ==="
-  node "$PROJECT_DIR/merge-tracker.mjs"
+  # A merge that refused or failed still gets the reconcile and the checks below,
+  # and the caller its summary: the exit status goes back after them.
+  local merge_rc=0
+  node "$PROJECT_DIR/merge-tracker.mjs" || merge_rc=$?
   # A dealbreaker SKIP row holds its report number until it is merged. The
   # tracker row now holds it for reserve-report-num.mjs, so drop the sentinel.
-  if [[ -f "$STATE_FILE" ]]; then
+  # After a merge that did not finish the row may not be there, so the sentinel stays.
+  if (( merge_rc == 0 )) && [[ -f "$STATE_FILE" ]]; then
     local mid mstatus mnum merror
     while IFS=$'\t' read -r mid _ mstatus _ _ mnum _ merror _; do
       if [[ "$mid" != "id" && "$mstatus" == "skipped" && "$merror" == dealbreaker:* ]]; then
@@ -2133,6 +2137,7 @@ merge_tracker() {
   echo ""
   echo "=== Verifying pipeline integrity ==="
   node "$PROJECT_DIR/verify-pipeline.mjs" || echo "⚠️  Verification found issues (see above)"
+  return "$merge_rc"
 }
 
 report_progress() {
@@ -2593,12 +2598,13 @@ main() {
   fi
 
   # Merge tracker additions
-  merge_tracker
+  local merge_rc=0
+  merge_tracker || merge_rc=$?
 
   # Print summary
   print_summary
 
-  exit 0
+  exit "$merge_rc"
 }
 
 main "$@"

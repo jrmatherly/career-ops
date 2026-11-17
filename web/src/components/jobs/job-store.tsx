@@ -5,6 +5,7 @@ import { scoreTone } from "@/lib/format";
 import { resolveCliId } from "@/lib/saved-cli";
 import { createWorkerFeedback } from "@/lib/worker-feedback.mjs";
 import { readJobStream } from "@/lib/job-stream.mjs";
+import { CUT_SLACK, SAVED_OUTPUT_MAX } from "@/lib/mask-secrets.mjs";
 import { createJobsPersister, restoreStoredJobs, saveJobsAfterOpen } from "@/lib/jobs-persist.mjs";
 import type { EVALUATION_GATE_REASONS } from "@/lib/evaluation-gate.mjs";
 
@@ -176,7 +177,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         let text = "";
-        let verdictLine = ""; // latched separately so the 8000-char tail can't drop it
+        let verdictLine = ""; // latched separately so the kept output tail can't drop it
         let doneTokens = 0; // per-run token cost, forwarded on the done event (#6)
         let doneCostUsd: number | null = null;
         let doneReportN: number | null = null;
@@ -198,6 +199,11 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
             endedAt: Date.now(),
             steps: lastLabel ? [...j.steps, { kind: "status", label: lastLabel, ts: Date.now() }] : j.steps,
           }));
+          // A log that was not saved is gone after a reload, so the run says so where the person is looking.
+          const notSaved = (why: string) => {
+            console.error(`Run ${id}: ${why}`);
+            patch(id, (j) => ({ ...j, steps: [...j.steps, { kind: "status", label: why[0].toUpperCase() + why.slice(1), ts: Date.now() }] }));
+          };
           // persist a readable log file so the CLI/assistant can read past runs
           if (status === "done" || status === "gated" || status === "error") {
             fetch("/api/runs/save", {
@@ -205,8 +211,8 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ id, title: opts.title, subtitle: opts.subtitle, page: opts.page, input: opts.input, status, gate, result, cost, steps, output: text, error: status === "error" ? lastLabel : undefined }),
             }).then(
-              (r) => { if (!r.ok) console.error(`The run log for ${id} was not saved: HTTP ${r.status}`); },
-              (err) => console.error(`The run log for ${id} was not saved:`, err),
+              async (r) => { if (!r.ok) notSaved((await r.json().catch(() => null))?.error ?? `the run log was not saved: HTTP ${r.status}`); },
+              (err) => notSaved(`the run log was not saved: ${err instanceof Error ? err.message : String(err)}`),
             );
             // Tell server-snapshot surfaces (Today, pipeline) to refetch — the
             // worker just wrote a real tracker row / report they don't yet see.
@@ -239,7 +245,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
               const full = text + ev.text;
               const vm = full.match(/VERDICT:[^\n]*/i);
               if (vm) verdictLine = vm[0];
-              text = full.slice(-8000);
+              text = full.slice(-(SAVED_OUTPUT_MAX + CUT_SLACK));
               patch(id, (j) => ({ ...j, text }));
             }
           });

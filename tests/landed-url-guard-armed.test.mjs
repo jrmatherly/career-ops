@@ -158,18 +158,30 @@ const batchBrowser = (env) => ({ newPage: async (options) => {
   return page;
 } });
 
-for (const [what, path] of [['received a private response', '/fetch-then-armed'], ['threw text it took from a private host', '/throws']]) {
-  test(`real Chromium: the batch path never calls the model for a page that ${what}, and says why`, { timeout: 60_000 }, async (t) => {
+// The liveness check is the real one: a refused posting must not be visited
+// again, so the private host sees only the hop the scrape made before refusing.
+// The redirected page is refused before any read, so it needs no /armed wait.
+for (const [what, path, scrapeHop, armed] of [
+  ['received a private response', '/fetch-then-armed', '/cors', true],
+  ['threw text it took from a private host', '/throws', '/cors', true],
+  ['was redirected to a private host', '/to-private/payroll', '/payroll', false],
+]) {
+  test(`real Chromium: the batch path never calls the model for a page that ${what}, leaves its line alone, and says why`, { timeout: 60_000 }, async (t) => {
     const env = await chromiumAndServer(t);
     if (!env) return;
-    const { processOffer } = await import('../batch-evaluate-gemini.mjs');
+    const { processOffer, refusedSummary } = await import('../batch-evaluate-gemini.mjs');
     const url = env.publicUrl(path);
+    const line = `- [ ] ${url} | Acme | Engineer`;
     let modelCalls = 0;
-    const result = await processOffer(batchBrowser(env), `- [ ] ${url} | Acme | Engineer`, 1, async () => { modelCalls++; return ''; }, async () => ({ result: 'uncertain' }));
+    const result = await processOffer(armed ? batchBrowser(env) : env.browser, line, 1, async () => { modelCalls++; return ''; });
     assert.equal(modelCalls, 0);
     assert.equal(result.processed, false);
+    assert.equal(result.line, line);
+    assert.deepEqual(env.privateHits, [scrapeHop]);
     const warnings = env.warned.mock.calls.map((call) => call.arguments.join(' '));
-    assert.ok(warnings.some((line) => line.includes(url) && line.includes('blocked_host')), warnings.join('\n'));
+    assert.ok(warnings.some((line) => line.includes(url) && /blocked_host: .*private target IP/.test(line)), warnings.join('\n'));
+    assert.equal(refusedSummary(new Map([[0, result], [1, { processed: true }]])), '1 refused by the egress guard, left pending');
+    assert.equal(refusedSummary(new Map([[1, { processed: true }]])), null);
     assert.doesNotMatch(warnings.join('\n'), new RegExp(INTERNAL));
   });
 }
