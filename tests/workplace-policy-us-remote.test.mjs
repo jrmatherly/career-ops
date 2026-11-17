@@ -23,6 +23,10 @@ const stateRemote = [
   // Between states "and" is the word, not Andorra's three-letter code.
   'Remote (California, Washington, and Oregon Only)', 'Remote (Texas And Florida Only)', 'Remote - TEXAS AND OHIO',
   'Remote - San Francisco, CA, USA', 'Remote - U.S',
+  // A list of states: the code beside CA or CO is a state, not a country.
+  'Remote (CA, CO, NY, WA)', 'Remote - NY, CA', 'Remote - CO, UT, AZ', 'Remote - New York, NY, CA', 'Remote - TX-CO',
+  // A spaced slash separates places, so the US place stands beside the foreign one.
+  'Remote - Austin, TX / Toronto, Canada',
 ];
 for (const location of stateRemote) {
   test(`${location} is remote in the United States`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
@@ -56,6 +60,18 @@ for (const location of ['Home based - Spain', 'Work at Home - Spain', 'Spain (Vi
     assert.deepEqual(es(location, 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
   });
 }
+test('remote countries turn the state rule on, whatever the onsite country', () => {
+  const toronto = buildWorkplacePolicy({ onsite_locations: ['Toronto'], onsite_countries: ['Canada'], remote_countries: ['United States'] });
+  assert.deepEqual(toronto('Remote, TN', 'Platform Lead'), REMOTE_OK);
+});
+test('"Home" inside a place name is not home working', () => {
+  assert.deepEqual(us('Nursing Home - Dallas, TX', 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
+});
+test('a negated telework marker does not make an office posting remote', () => {
+  const atlanta = buildWorkplacePolicy({ onsite_locations: ['Atlanta'], remote_countries: ['United States'] });
+  assert.deepEqual(atlanta('Austin, Texas (No telework)', 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
+  assert.deepEqual(atlanta('Austin, Texas (Telework)', 'Platform Lead'), REMOTE_OK);
+});
 for (const location of ['Home based - EMEA', 'Home, United Kingdom, HOME BASED', 'Virtual - Germany', 'Work at Home', 'Homewood, AL']) {
   test(`${location} is not home working in the United States`, () => assert.equal(us(location, 'Platform Lead').eligible, false));
 }
@@ -112,8 +128,10 @@ const stillRefused = [
   'Remote, BR', 'Remote PH', 'Poland · Georgia · Bulgaria · Remote', 'Remote', 'Nationwide Remote',
   'Remote-Friendly (Travel Required) | San Francisco, CA', 'Remote | Toronto, CA | Vancouver, BC', 'Chicago, IL; Remote', 'Remote / Bogota, CO',
   'Remote - CA: Toronto', 'Remote - Perth, WA, Australia | Remote', 'Remote - Berlin, DE | Remote - Paris, FR', 'Remote - U.S.A.F. Academy', 'Remote - Texas and Mexico', 'Remote, AND',
-  // Next to another capital code, CA and CO are the country.
-  'Remote - CO-DC-Bogota', 'Remote - Bogota, DC, CO', 'Remote - Delaware, ON, CA',
+  // Next to a capital code that is no state, CA and CO are the country.
+  'Remote - CO-DC-Bogota', 'Remote - Bogota, DC, CO', 'Remote - Delaware, ON, CA', 'Remote - Bogota-DC-CO', 'Remote - CO, DC, Bogota',
+  // A timezone is not a state, and a country in square brackets is still a country.
+  'Remote - MT working hours', 'Remote - CT hours', 'Remote - Texas [IE]',
 ];
 for (const location of stillRefused) {
   test(`${location} is still not confirmed as remote in the United States`, () => assert.equal(us(location, 'Platform Lead').eligible, false));

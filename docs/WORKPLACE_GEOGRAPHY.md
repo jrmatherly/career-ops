@@ -63,7 +63,8 @@ as its default; a supplied nonempty country list must name a recognized country.
   IE` stays Ireland). A state anywhere else is not read: `Vancouver, BC, CA`
   and `CA-BC-Richmond` stay Canada. Without a state beside the name, the
   whole location decides, as before. There, a state code in capitals
-  (`Detroit, 1515 Main Avenue, MS`) and the two-letter words of a street
+  other than `CA`, `CO`, `DE`, `IL` and `IN` (`Detroit, 1515 Main Avenue,
+  MS`) and the two-letter words of a street
   address (`999 18th St`, `200 Main Parkway SE Suite 900`) are not read as
   countries. A posting marked remote that names an allowed onsite location
   (`Atlanta or Remote`, or `Atlanta` under a title ending in `(Remote)`) is
@@ -75,10 +76,12 @@ as its default; a supplied nonempty country list must name a recognized country.
   Columbia counts as a state does (`Remote, District of Columbia`, `Remote,
   DC`). Five codes do not count alone, because boards write them for the
   country too: `CA`, `CO`, `DE`, `IL` and `IN` (`Remote, CA` is Canada as
-  often as California). They count in a place that names another state
-  (`Remote; Colorado Springs, CO`), unless another capital code stands next
-  to them, where they are the country (`Remote - Bogota, DC, CO`, Workday's
-  `CO-DC-Bogota`). `Georgia` alone is the country; it is the
+  often as California). They count only in a place that also names a state another
+  way, by a full state name or by one of the other codes (`Remote; Colorado
+  Springs, CO`, where `Colorado` is the name, and `Remote (CA, NY, TX)`;
+  `Remote - Denver, CO` is refused). Next to a capital code that is no state
+  they are the country (`Remote - Bogota, DC, CO`, Workday's `CO-DC-Bogota`,
+  `Remote - Delaware, ON, CA`). `Georgia` alone is the country; it is the
   state where its code stands in the same place (`GEORGIA - VIRTUAL - GA01`).
   A foreign country in the same place wins (`Remote - Chennai, TN, India`).
   For this check a bar or a spaced slash separates places as a middle dot and
@@ -98,7 +101,7 @@ as its default; a supplied nonempty country list must name a recognized country.
 - Under the same policy these location words mark a remote role as `Remote`
   does: `Virtual`, `Telework`, `Work at Home`, `Working at Home`, `Home
   based`, `Home Office`, `Home Worker`, `Home Teleworkers`, and a place that
-  opens with `Home` (`Home-United States`). The role still has to show the
+  opens with `Home` and a dash or comma (`Home-United States`). The role still has to show the
   United States or a state.
 - Which list turns on which rule: the two bullets above read
   `remote_countries` alone. The bullet before them reads the onsite

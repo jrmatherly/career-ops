@@ -135,7 +135,7 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
 // Home-working words in a location. Read only under a policy that allows the United States.
 const HOME_WORKING = /\b(?:virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?))\b|(?:^|[·;] ?)home ?[-,]/;
-const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*remote\b/;
+const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*(?:remote|telework\w*)\b/;
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
 // A location lists its places between middle dots and semicolons.
@@ -202,8 +202,8 @@ export function buildWorkplacePolicy(policy) {
   const supportsHomeProse = (text) => [...countries(text)].some(c => homeCodes.has(c));
   const timezoneCodes = ['et', 'pt', 'mt', 'ct', 'est', 'pst', 'cst', 'mst', 'edt', 'pdt', 'cdt', 'mdt', 'cet', 'cest', 'gmt', 'utc'];
   const timezoneNames = [...new Set([...regions, ...COUNTRY_NAMES.flatMap(c => [c.name, c.code.toLowerCase()]), ...COUNTRY_ALIASES.map(c => c.name), ...timezoneCodes])].sort((a, b) => b.length - a.length);
-  const timezonePhrase = new RegExp(`(?<![\\p{L}\\p{N}])(?:${timezoneNames.map(escape).join('|')})(?:[- ]compatible)? (?:working hours|time[ -]?zones?|hours|overlap)\\b`, 'gu');
-  const overlapPhrase = new RegExp(`\\b(?:overlap(?: (?:until|with))?|hours(?: (?:in|until))?) +(?:\\d{1,2}(?::\\d{2})? *(?:am|pm)? *)?(?:${timezoneCodes.join('|')})\\b`, 'gu');
+  const timezonePhrase = new RegExp(`(?<![\\p{L}\\p{N}])(?:${timezoneNames.map(escape).join('|')})(?:[- ]compatible)? (?:working hours|time[ -]?zones?|hours|overlap)\\b`, 'giu');
+  const overlapPhrase = new RegExp(`\\b(?:overlap(?: (?:until|with))?|hours(?: (?:in|until))?) +(?:\\d{1,2}(?::\\d{2})? *(?:am|pm)? *)?(?:${timezoneCodes.join('|')})\\b`, 'giu');
   const geographyText = text => text.replace(timezonePhrase, ' ').replace(overlapPhrase, ' ');
   const geographyNames = [...new Set([...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat(regions, onsite))].sort((a, b) => b.length - a.length);
   const geographyAtom = new RegExp(`^(?:the +)?(${geographyNames.map(escape).join('|')}|[a-z]{2,3})(?![\\p{L}\\p{N}])`, 'u');
@@ -302,8 +302,10 @@ export function buildWorkplacePolicy(policy) {
     const geoLoc = geographyText(usHome ? places(raw.replace(/:/g, ' ').replace(US_DOTTED, 'usa')).flatMap(place => {
       const codes = /\p{Ll}/u.test(place);
       return place.split(/\||\s\/\s/).map(part => {
-        const rest = withoutUsStates(part, codes);
-        return rest !== null && [...countries(rest, true)].every(c => homeCodes.has(c)) ? `${rest} united states` : fold(part);
+        // A timezone goes first, so the "MT" of "MT working hours" is not Montana. Brackets are read as the
+        // country reader writes them, so "Texas [IE]" keeps its country.
+        const rest = withoutUsStates(geographyText(part), codes);
+        return rest !== null && [...countries(brackets(rest), true)].every(c => homeCodes.has(c)) ? `${rest} united states` : brackets(fold(part));
       });
     }).join(' · ') : loc);
     const locationCountries = countries(geoLoc, true);
@@ -402,22 +404,25 @@ function compileHomeState(home) {
 
 // CA, CO, DE, IL and IN are also Canada, Colombia, Germany, Israel and India, and boards write "Remote, CA" for both.
 const AMBIGUOUS_STATE_CODES = ['ca', 'co', 'de', 'il', 'in'];
-// HI, ME, OH, OK and OR are also words in capitals ("Remote (OK to work anywhere)"), so a word after one makes it a word.
+// HI, ME, OH, OK and OR are also words in capitals ("Remote (OK to work anywhere)"), so a lower-case word after one makes it a word.
 // The District of Columbia counts here as a state does.
 const US_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:HI|ME|OH|OK|OR)(?!\\s+\\p{Ll})|DC|${USPS_STATES.map(([, abbr]) => abbr).filter(abbr => ![...AMBIGUOUS_STATE_CODES, 'hi', 'me', 'oh', 'ok', 'or'].includes(abbr)).join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
 // Georgia is left out: alone it is the country.
 const US_STATE_NAME = new RegExp(`(?<![\\p{L}\\p{N}])(?:district of columbia|${USPS_STATES.map(([name]) => name).filter(name => name !== 'georgia').join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 const GEORGIA_CODE = /(?<![\p{L}\p{N}])GA(?!\p{L})/u;
 const AMBIGUOUS_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:${AMBIGUOUS_STATE_CODES.join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
-// A capital two-letter code on either side, as in "Chennai, TN, IN" and Workday's "CO-DC-Bogota".
-const CODE_BEFORE = /(?<![\p{L}\p{N}])[A-Z]{2}\s*[,-]\s*$/u;
-const CODE_AFTER = /^\s*[,-]\s*[A-Z]{2}(?![\p{L}\p{N}])/u;
+// A capital two-letter code on either side that is not one of the fifty states, as in "Bogota, DC, CO",
+// "Delaware, ON, CA" and Workday's "CO-DC-Bogota". A state beside it is a list of states ("CA, NY, TX").
+const CODE_BEFORE = /(?<![\p{L}\p{N}])([A-Z]{2})\s*[,-]\s*$/u;
+const CODE_AFTER = /^\s*[,-]\s*([A-Z]{2})(?![\p{L}\p{N}])/u;
+const STATE_ABBRS = new Set(USPS_STATES.map(([, abbr]) => abbr.toUpperCase()));
+const foreignCode = (pattern, text) => { const code = pattern.exec(text)?.[1]; return code !== undefined && !STATE_ABBRS.has(code); };
 // "U.S" and "U.S.A" without the last dot, which the aliases "u.s." and "u.s.a." do not match.
 const US_DOTTED = /(?<![\p{L}\p{N}.])u\.s(?:\.a)?(?![\p{L}\p{N}.])/giu;
 // A street number, then the words up to the next comma, slash, bar, bracket or spaced dash.
 const ADDRESS_RUN = /(?<![\p{L}\p{N}])\d[\p{L}\p{N}]*\s.*?(?=\s-\s|[,/|()[\]·;]|$)/gu;
 
-/** A raw location with its capital US state codes taken out, folded. A place written all in capitals keeps
+/** A raw location with its capital US state codes other than CA, CO, DE, IL and IN taken out, folded. A place written all in capitals keeps
  * them, because nothing there tells "OR" the state from "or" the word.
  * @param {string} location
  */
@@ -427,8 +432,8 @@ function withoutStateCodes(location) {
 
 /** A raw place with its US states taken out, folded, or null when it names none. Georgia counts where its
  * code GA stands in the same place ("GEORGIA - VIRTUAL - GA01"). CA, CO, DE, IL and IN count only in a place
- * that names another state ("Colorado Springs, CO"), and not next to another capital code, where they are
- * the country ("Chennai, TN, IN").
+ * that also names a state by its full name or by another code ("Colorado Springs, CO", "CA, NY, TX"), and not
+ * next to a capital code that is no state, where they are the country ("Bogota, DC, CO").
  * @param {string} place
  * @param {boolean} codes whether capital state codes are read; false where the place is written all in capitals
  */
@@ -436,7 +441,7 @@ function withoutUsStates(place, codes) {
   const named = (GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place).replace(US_STATE_NAME, ' ');
   if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === place) return null;
   // Judged before the other codes go, so the code next to an ambiguous one is still there to see.
-  const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (CODE_BEFORE.test(named.slice(0, at)) || CODE_AFTER.test(named.slice(at + 2)) ? code : ' '));
+  const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (foreignCode(CODE_BEFORE, named.slice(0, at)) || foreignCode(CODE_AFTER, named.slice(at + 2)) ? code : ' '));
   // Between states "and" is the word, not Andorra's three-letter code.
   return fold((codes ? sure.replace(US_STATE_CODE, ' ') : sure).replace(/\band\b/gi, ' '));
 }

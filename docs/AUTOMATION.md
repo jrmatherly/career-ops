@@ -311,7 +311,9 @@ and leave both empty to evaluate every location.
   from** includes the United States, a remote posting that names a US state
   is admitted (`Remote, TN`, `Remote - Texas`). Five state codes that boards
   also write for a country are the exception (`CA`, `CO`, `DE`, `IL` and
-  `IN`): `Remote - CO` needs the country or another state beside it. So does
+  `IN`): `Remote - CO` needs the country written out, a full state name or
+  another state's code in the same place (`Remote - Colorado, CO`,
+  `Remote - CO, UT`). So does
   `Remote, Georgia`, which is read as the country unless `GA` is written
   with it. Other codes that a country shares (`TN`, `AR`, `PA`, `GA`) are
   read as the state.

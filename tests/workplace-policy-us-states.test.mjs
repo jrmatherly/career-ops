@@ -10,7 +10,7 @@ const verdict = (gate, location) => gate(location, 'Platform Lead');
 for (const location of ['Springfield, IL', 'Springfield, MA 01103', 'GA-SPRINGFIELD, 1 MAIN ST', 'Springfield, Georgia', 'Springfield, DE', 'USA - Georgia - Springfield - 30005']) {
   test(`${location} is the home place, not a foreign country`, () => assert.deepEqual(verdict(us, location), { eligible: true, reason: 'onsite_location_allowed' }));
 }
-// CA, CO, DE, IL and IN, and Georgia alone, never confirm a remote posting: "Berlin, DE" and "Remote, CA" read the same as a US place.
+// CA, CO, DE, IL and IN alone, and Georgia alone, do not confirm a remote posting: "Berlin, DE" and "Remote, CA" read the same as a US place.
 // The states that do are in workplace-policy-us-remote.test.mjs.
 for (const location of ['Remote - CO', 'Remote, CA', 'Remote, DE', 'Remote (IN)', 'Remote | DE', 'Remote, Georgia', 'Remote - Tel Aviv, IL', 'Remote - Berlin, DE', 'Remote - Toronto, CA', 'Remote - Bengaluru, IN', 'Remote / Bogota, CO', 'Remote - Tbilisi, Georgia', 'Remote - Munich, DE · Remote - Paris, FR']) {
   test(`${location} is not confirmed as remote in the United States`, () => assert.equal(verdict(us, location).eligible, false));
