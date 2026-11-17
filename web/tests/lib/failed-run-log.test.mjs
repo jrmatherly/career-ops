@@ -119,7 +119,8 @@ test("every free-text field is capped before masking, so a 256 KB body never rea
   const md = fs.readFileSync(file, "utf8");
   assert.ok(md.length < 200_000, `saved ${md.length} characters`);
   for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
-  assert.equal((md.match(/^- key=/gm) || []).length, 500, "steps are capped at 500");
+  // Each label is one unbroken 256 KB word, which the masker's bound drops whole.
+  assert.equal((md.match(/^- $/gm) || []).length, 500, "steps are capped at 500");
 });
 
 test("non-string field values are saved as text, not a 500", async (t) => {
@@ -138,3 +139,11 @@ test("a URL password cut by a field's length bound is still masked", async (t) =
   assert.equal(res.status, 200);
   assert.ok(!fs.readFileSync(file, "utf8").includes(password.slice(0, 12)), "the start of the password was saved");
 });
+
+test("a masked token longer than the masker's slack cannot pull a cut credential into the saved text", async (t) => {
+  const title = `sk-${"A".repeat(4370)} https://u:p4ssSECRETword99@example.invalid/x`;
+  const { res, file } = await saveRun(t, { id: "fictional-long-token", title, status: "done", steps: [], output: "" });
+  assert.equal(res.status, 200);
+  assert.ok(!fs.readFileSync(file, "utf8").includes("p4ssSECRET"), "part of the password was saved");
+});
+
