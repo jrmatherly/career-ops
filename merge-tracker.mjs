@@ -1771,7 +1771,7 @@ export async function mergeTracker(options = {}) {
     // that. Stop before any addition is read. A dry run writes nothing, so it
     // only warns.
     for (const num of shortRows) {
-      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} Row #${num} is short of the header, so an addition for it would be appended as a duplicate. Add the missing cell to that row in applications.md (or run --backfill-urls if only the URL cell is missing), then re-run.`);
+      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} Row #${num} is short of the header, so an addition for it would be appended as a duplicate. Add the missing cell to that row in applications.md (or run --backfill-urls if only the URL cell is missing), then re-run.${DRY_RUN ? ' A real run stops here and merges nothing.' : ''}`);
     }
     if (shortRows.length && !DRY_RUN) {
       console.error(`❌ Nothing merged: ${shortRows.length} tracker row(s) are short of the header. The additions are still pending.`);
