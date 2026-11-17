@@ -254,6 +254,14 @@ test("a password keeps nothing after the mark an earlier rule left in it", () =>
   assert.equal(maskSecrets("PASSWORD= correcthorsebattery = other", known), "PASSWORD= [masked:DB_PASSWORD] = [masked]");
 });
 
+test("a credential that starts with a known value is masked whole, and what a separator sets apart stays", () => {
+  const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
+  assert.equal(maskSecrets("Authorization: Bearer correcthorsebatteryPrivateSuffix99", known), "Authorization: Bearer [masked:DB_PASSWORD]");
+  assert.equal(maskSecrets("token correcthorsebatteryPrivateSuffix99 done", known), "token [masked:DB_PASSWORD] done");
+  assert.equal(maskSecrets('{"p":"correcthorsebattery","user":"bob"}', known), '{"p":"[masked:DB_PASSWORD]","user":"bob"}');
+  assert.equal(maskSecrets("a correcthorsebattery b, correcthorsebattery, c", known), "a [masked:DB_PASSWORD] b, [masked:DB_PASSWORD], c");
+});
+
 test("a variable the name rule matches is secret whatever its value looks like, a path or a URL included", () => {
   const env = {
     LOCAL_BIN_KEY: "/usr/local/bin", SSH_KEY_PATH: "~/.ssh/id_ed25519", API_KEY_FILE: "./run/secrets/key", KEYCLOAK_URL: "https://sso.example.invalid/realms/main",

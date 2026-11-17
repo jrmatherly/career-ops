@@ -382,7 +382,7 @@ const UNNUMBERED_RE = /^(?:n\/a|—|–|-)$/i;
 // and only a dash with a digit after it starts a date.
 const NUM_CELL_RE = /^\d+(?![\d.,/]|-\d)/;
 // `[12]`, `[12](…)`, or a link to a Markdown file. A link to a web address is a posting URL, not a report, whatever its text or ending.
-const REPORT_LINK_RE = /^\[\d+\](?:\((?!<?https?:).+\))?$|^\[[^\]]+\]\((?!<?https?:).+\.md>?\)$/i;
+const REPORT_LINK_RE = /^\[\d+\](?:\((?!\s*<?https?:).+\))?$|^\[[^\]]+\]\((?!\s*<?https?:).+\.md>?\)$/i;
 // A markdown link whose target never closes: a `|` cut the cell in two.
 const CUT_LINK_RE = /\]\([^)]*$/;
 // A bare or `<bracketed>` URL (a hand-pasted one may hold a space), a

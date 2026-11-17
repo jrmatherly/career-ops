@@ -108,6 +108,7 @@ test('a link to a web address in the URL cell is a posting URL, whatever its tex
   const row = (url) => `| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | note | ${url} |`;
   assert.equal(trackerRowFault(row('[1](https://jobs.acme.com/1)'), colmap, { cellCount: 10 }), null);
   assert.equal(trackerRowFault(row('[github.com](https://github.com/acme/jobs/blob/main/data-engineer.md)'), colmap, { cellCount: 10 }), null);
+  assert.equal(trackerRowFault(row('[1]( https://jobs.acme.com/1)'), colmap, { cellCount: 10 }), null, 'a space before the address');
   assert.equal(trackerRowFault(row('[2](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
   assert.equal(trackerRowFault(row('[report](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
 });

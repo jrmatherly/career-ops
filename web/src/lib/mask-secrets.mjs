@@ -5,7 +5,8 @@
 // a variable that is listed or whose name says secret, is replaced wherever it
 // occurs with [masked:NAME], whatever it looks like. A path or a URL is no
 // exception: a webhook URL carries its secret in its path, and no rule on the
-// value's shape told the two apart.
+// value's shape told the two apart. Credential characters that run on from a
+// value go with it, since the value may be the start of a longer secret.
 //
 // Then by pattern, for secrets the server does not hold, keeping the label or
 // prefix so a reader can still tell what kind of credential was there. A value
@@ -98,6 +99,12 @@ function maskKnown(s, known) {
   return out + s.slice(from);
 }
 
+// A known value can be the start of a longer credential (a token that begins with a
+// password the server holds). The characters a credential can hold, run on from the mark
+// with nothing between, are part of that credential: no later rule matches a value that
+// starts with "[", so they go with the mark.
+const GLUED = /(\[masked:\w+\])[A-Za-z0-9._~+/=-]+/g;
+
 const PREFIXED = /\b(sk-ant-|sk-|gh[pousr]_|github_pat_|glpat-|hf_|AIza|xox[abprs]-)([A-Za-z0-9_-]{12,})/g;
 
 const AWS_KEY_ID = /\b(AKIA|ASIA)[A-Z0-9]{16}\b/g;
@@ -161,6 +168,7 @@ const hasDigit = (s) => /\d/.test(s);
  */
 export function maskSecrets(s, known = []) {
   return maskKnown(s || "", known)
+    .replace(GLUED, "$1")
     .replace(URL_PASSWORD, (m, head, password) => `${head}${password.match(MARKED)?.[1] ?? MARK}@`)
     .replace(JWT_RUN, (run) => {
       const jwt = run.match(JWT);
