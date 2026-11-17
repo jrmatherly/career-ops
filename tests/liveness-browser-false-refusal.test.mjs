@@ -42,7 +42,9 @@ async function setup(t) {
     hits.push(pathname);
     const port = start.address().port;
     const page = searchParams.get('page');
-    if (pathname === '/to') res.writeHead(302, { location: `http://${searchParams.get('host')}.example.test:${port}/jobs/3141592653` }).end();
+    // Only the three names the tests use, so nothing from the request reaches a redirect or a script.
+    const host = ['dead', 'sink', 'private'].find((name) => name === searchParams.get('host'));
+    if (pathname === '/to' && host) res.writeHead(302, { location: `http://${host}.example.test:${port}/jobs/3141592653` }).end();
     else if (pathname === '/late') {
       await delay(Number(searchParams.get('ms')));
       res.writeHead(302, { location: privateUrl('/late') }).end();
@@ -55,7 +57,7 @@ async function setup(t) {
     else if (page === 'swap') html(res, `${POSTING}<script>fetch('/late?ms=500').then((r) => r.text()).then((text) => { document.body.innerHTML = text; })</script>`);
     else if (page === 'popup') html(res, `${POSTING}<script>window.open('/poploop')</script>`);
     else if (page === 'latepopup') html(res, `${POSTING}<script>setTimeout(() => window.open('/poploop'), 500)</script>`);
-    else if (page === 'socket') html(res, `${POSTING}<script>new WebSocket('ws://${searchParams.get('host')}.example.test:${port}/ws')</script>`);
+    else if (page === 'socket' && host) html(res, `${POSTING}<script>new WebSocket('ws://${host}.example.test:${port}/ws')</script>`);
     else if (page === 'blank') html(res, `Loading<script>setTimeout(() => location.replace('about:blank'), 300)</script>`);
     else html(res, POSTING);
   });

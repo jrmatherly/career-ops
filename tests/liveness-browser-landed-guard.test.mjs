@@ -38,7 +38,7 @@ async function setup(t) {
     else if (req.url === '/jobs/2718281828') res.writeHead(302, { location: `${otherOrigin}${req.url}` }).end();
     else if (req.url === '/hop') res.writeHead(302, { location: `${privateOrigin}/cors` }).end();
     // The posting renders only once the private response is in, so the read cannot finish before it.
-    else if (req.url === '/jobs/1414213562') html(res, `<script>fetch('/hop', { mode: 'no-cors' }).finally(() => { document.body.innerHTML = ${JSON.stringify(POSTING)}; })</script>`);
+    else if (req.url === '/jobs/1414213562') html(res, `<template id="posting">${POSTING}</template><script>fetch('/hop', { mode: 'no-cors' }).finally(() => { document.body.innerHTML = document.getElementById('posting').innerHTML; })</script>`);
     else html(res, POSTING);
   });
   await listen(start);
