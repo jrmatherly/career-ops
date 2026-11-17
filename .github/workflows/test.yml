@@ -40,8 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # A PR's test merge with its parents, the first being the PR's base. In
-          # the merge queue, the entry's squash commit with its parent, the base.
+          # A PR's test merge with its parents, the first being the PR's base.
           fetch-depth: 2
           persist-credentials: false
       - id: classify
@@ -152,7 +151,7 @@ jobs:
     # always(), because a failed job would otherwise skip this one, and a
     # skipped job counts as passing. `changes` is needed for its output only:
     # its failure is tolerated by design. dependency-audit is left out: it is
-    # informative. A job added to this file gates a merge only once it is in
+    # informative. A job added to this file is counted only once it is in
     # `needs` and GATED here.
     needs: [changes, test, cv-visual, tool-suites, upgrade-gate, publish]
     if: ${{ always() }}
@@ -185,7 +184,7 @@ jobs:
 
   cv-visual:
     name: "🖼️ CV visual regression"
-    # Gates a merge through the test-result job, not as a check of its own. It
+    # Counted by the test-result job, the check to require on main. It
     # runs on every PR and every push to main (#5723).
     needs: changes
     # Skipped for a docs-only PR too: nothing this job checks depends on what a
@@ -245,8 +244,8 @@ jobs:
     # fetches its TeX bundle on the first compile. `--needs` selects the suites
     # that declare those tools (tests/required-tools.mjs) and turns a missing
     # tool into a failure instead of a skip. A job of its own rather than a
-    # step in cv-visual, so its result has its own check. Gates a merge
-    # through the test-result job.
+    # step in cv-visual, so its result has its own check. Counted by
+    # the test-result job.
     needs: changes
     # Skipped on a docs-only PR for the reason given on cv-visual.
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
@@ -355,7 +354,7 @@ jobs:
     # own node:test suite; nothing under the root tests/ imports it, so the
     # test job never exercises it. Runs on the service's own floor, 22.16:
     # Better Auth's node:sqlite dialect calls StatementSync.columns(), which
-    # 22.13 (the root floor, lib/node-floor.mjs) lacks. Gates a merge through the test-result job.
+    # 22.13 (the root floor, lib/node-floor.mjs) lacks. Counted by the test-result job.
     needs: changes
     # Skipped on a docs-only PR for the reason given on cv-visual.
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}

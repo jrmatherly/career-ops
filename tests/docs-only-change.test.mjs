@@ -252,9 +252,11 @@ test('--help prints usage and decides nothing', () => {
 
 // ── The workflow's use of the answer ────────────────────────────────────────
 
+let workflow;
 let jobs;
 before(() => {
-  jobs = load(readFileSync(join(ROOT, '.github', 'workflows', 'test.yml'), 'utf8')).jobs;
+  workflow = load(readFileSync(join(ROOT, '.github', 'workflows', 'test.yml'), 'utf8'));
+  jobs = workflow.jobs;
 });
 
 test('the legs keep stable names', () => {
@@ -285,6 +287,19 @@ test('one stably named job needs every gating job and runs whatever they did', (
 });
 
 // The step runs under bash on ubuntu-latest; Windows has no dependable bash on PATH.
+test('every job is judged by the gate or left out on purpose, and none tolerates its own failure', () => {
+  assert.deepEqual(Object.keys(jobs).sort(), ['changes', 'test', 'test-result', 'dependency-audit', ...GATING_JOBS].sort(), 'a new job gates nothing until test-result needs it');
+  assert.equal(workflow.defaults, undefined, 'the gate step relies on the default bash -e');
+  assert.equal(jobs['test-result'].defaults, undefined);
+  for (const name of ['test', ...GATING_JOBS]) {
+    assert.equal(jobs[name]['continue-on-error'], undefined, name);
+    for (const step of jobs[name].steps) {
+      assert.equal(step['continue-on-error'], undefined, `${name}: ${step.name}`);
+      assert.doesNotMatch(String(step.run ?? ''), /\|\|\s*(?:true|:)/, `${name}: ${step.name}`);
+    }
+  }
+});
+
 test('the gate passes only when the legs passed and each other job passed or was skipped as docs-only', { skip: process.platform === 'win32' }, () => {
   const ok = 'success success success success';
   const skips = 'skipped skipped skipped skipped';
