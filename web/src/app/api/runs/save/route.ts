@@ -13,15 +13,20 @@ export const dynamic = "force-dynamic";
 
 const STEPS_MAX = 500;
 
-/** The data root .env the scripts a run starts load their keys from. */
-function readDotenv(): Record<string, string> {
+/**
+ * The data root .env the scripts a run starts load their keys from. Empty when
+ * there is no such file, and null when it is there but cannot be read: its keys
+ * are then unknown, so nothing can be saved.
+ */
+function readDotenv(): Record<string, string> | null {
   try {
     // Node 22.13's parseEnv keeps an inline comment on a last line with no newline.
     return parseEnv(`${fs.readFileSync(path.join(careerOpsRoot(), ".env"), "utf8")}\n`) as Record<string, string>;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code !== "ENOENT") console.error(`/api/runs/save: .env not read (${code ?? "unknown error"}), so its keys are masked by pattern only`);
-    return {};
+    if (code === "ENOENT") return {};
+    console.error(`/api/runs/save: .env not read (${code ?? "unknown error"}), so the run log was not saved`);
+    return null;
   }
 }
 
@@ -59,7 +64,9 @@ export async function POST(req: Request) {
   // known secret, are never separated before masking. The context is CUT_SLACK, or
   // the longest known secret when that is longer. Capping first keeps a large body
   // from stalling the event loop. The word a cut lands in is dropped.
-  const known = knownSecrets([process.env, readDotenv()], CAREER_OPS_SECRET_ENV);
+  const dotenv = readDotenv();
+  if (!dotenv) return NextResponse.json({ error: "the run log was not saved: the data root's .env could not be read, so its keys could not be masked" }, { status: 500 });
+  const known = knownSecrets([process.env, dotenv], CAREER_OPS_SECRET_ENV);
   const slack = Math.max(CUT_SLACK, known[0]?.value.length ?? 0);
   const text = (v: unknown, max: number) => {
     const raw = String(v ?? "").trim();
