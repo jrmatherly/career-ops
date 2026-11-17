@@ -70,7 +70,7 @@ The `./cops` wrapper forwards any command into the container.
 | Dedup tracker | `./cops dedup` |
 | Normalize statuses | `./cops normalize` |
 | Update check | `./cops update:check` |
-| Apply update | `./cops update` |
+| Apply update | `./cops update` (not supported on this fork, see [Updating](#updating)) |
 | Rollback | `./cops rollback` |
 | Interactive shell | `./cops shell` |
 | Raw node script | `./cops node check-liveness.mjs <url>` |

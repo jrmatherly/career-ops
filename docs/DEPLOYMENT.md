@@ -152,5 +152,7 @@ the image under that version). On a Mac checkout the default
 `--channel main` against an unreleased `main`. `node update-system.mjs apply`
 is not supported on this fork. Shipped scripts import fork-local modules that
 `apply` does not deliver, so an install updated that way fails with
-`ERR_MODULE_NOT_FOUND`. Update a checkout with `git pull`. User CV template copies live at `/data/data/templates/`, on the
-volume, never in the image.
+`ERR_MODULE_NOT_FOUND`. Update a checkout with `git pull`.
+
+User CV template copies live at `/data/data/templates/`, on the volume, never
+in the image.
