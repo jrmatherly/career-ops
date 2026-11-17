@@ -130,3 +130,10 @@ test('a complete row under a header with an unmapped column is still matched and
   assert.equal(r.text.split('\n').filter((l) => /^\| \d/.test(l)).length, 1);
 });
 
+test('a tracker with no header is not stopped by a numbered row in a later table', (t) => {
+  const row = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note |';
+  const r = mergeOver(t, [row, '', '| # | Metric |', '|---|---|', '| 1 | 2 |'], [], ['# Applications Tracker', '']);
+  assert.doesNotMatch(r.out, /short of the header/);
+  assert.equal(r.pending, false, 'the addition was left pending');
+});
+
