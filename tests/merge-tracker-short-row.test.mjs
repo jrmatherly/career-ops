@@ -1,4 +1,4 @@
-// tests/merge-tracker-short-row.test.mjs: a tracker row short of the header stops the merge before any addition is applied.
+// tests/merge-tracker-short-row.test.mjs: a tracker row that cannot be read stops the merge before any addition is applied.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -47,7 +47,7 @@ test('a row missing an interior cell stops the merge and leaves the tracker and 
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
   assert.equal(r.text, r.before, 'the tracker was written');
   assert.ok(r.pending, 'the addition was moved out of the pending directory');
-  assert.match(r.out, /Row #1 is short of the header/);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row/);
 });
 
 test('a tracker whose rows all lack the URL cell is refused the same way', (t) => {
@@ -55,8 +55,8 @@ test('a tracker whose rows all lack the URL cell is refused the same way', (t) =
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
   assert.equal(r.text, r.before, 'the tracker was written');
   assert.ok(r.pending, 'the addition was moved out of the pending directory');
-  assert.match(r.out, /Row #1 is short of the header/);
-  assert.match(r.out, /Row #3 is short of the header/);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row/);
+  assert.match(r.out, /Row #3 \(line \d+\) cannot be read as a tracker row/);
 });
 
 test('--backfill-urls still repairs a row short only by its URL cell', (t) => {
@@ -69,7 +69,7 @@ test('--backfill-urls still repairs a row short only by its URL cell', (t) => {
 test('a complete row with no trailing pipe is still matched and updated', (t) => {
   const r = mergeOver(t, [NO_PIPE]);
   assert.equal(r.status, 0, r.out);
-  assert.doesNotMatch(r.out, /short of the header/);
+  assert.doesNotMatch(r.out, /cannot be read/);
   const rows = r.text.split('\n').filter((l) => /^\| \d/.test(l));
   assert.equal(rows.length, 1, `expected one row, got:\n${rows.join('\n')}`);
   assert.match(rows[0], /^\| 1 \|.*\| 4\.5\/5 \|.*\[2\]\(/, `row #1 was not updated: ${rows[0]}`);
@@ -79,7 +79,7 @@ test('a numbered row in another table further down the file does not stop the me
   const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
   const r = mergeOver(t, [FULL, '', '## Totals', '', '| # | Metric |', '|---|---|', '| 1 | Applied |']);
   assert.equal(r.status, 0, describeSpawn(r.spawn, 'expected the merge to run'));
-  assert.doesNotMatch(r.out, /short of the header/);
+  assert.doesNotMatch(r.out, /cannot be read/);
   assert.equal(r.pending, false, 'the addition was left pending');
 });
 
@@ -87,7 +87,7 @@ test('a short row after a blank line inside the tracker is still refused', (t) =
   const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
   const r = mergeOver(t, [FULL, '', SHORT.replace('| 1 |', '| 3 |')]);
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
-  assert.match(r.out, /Row #3 is short of the header/);
+  assert.match(r.out, /Row #3 \(line \d+\) cannot be read as a tracker row/);
   assert.ok(r.pending, 'the addition was moved out of the pending directory');
 });
 
@@ -95,14 +95,14 @@ test('a dry run warns, writes nothing, and says a real run would stop', (t) => {
   const r = mergeOver(t, [SHORT], ['--dry-run']);
   assert.equal(r.status, 0, r.out);
   assert.equal(r.text, r.before, 'the tracker was written');
-  assert.match(r.out, /Row #1 is short of the header.*A real run stops here and merges nothing\./);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row.*A real run stops here and changes nothing\./);
 });
 
 test('a block that starts with an unnumbered tracker row is still the tracker', (t) => {
   const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
   const r = mergeOver(t, [FULL, '', FULL.replace('| 1 |', '| N/A |'), SHORT.replace('| 1 |', '| 3 |')]);
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
-  assert.match(r.out, /Row #3 is short of the header/);
+  assert.match(r.out, /Row #3 \(line \d+\) cannot be read as a tracker row/);
 });
 
 test('a short row under a header the parser does not recognise is still refused', (t) => {
@@ -111,7 +111,7 @@ test('a short row under a header the parser does not recognise is still refused'
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
   assert.equal(r.text, r.before, 'the tracker was written');
   assert.ok(r.pending, 'the addition was moved out of the pending directory');
-  assert.match(r.out, /Row #1 is short of the header/);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row/);
 });
 
 test('a row missing an interior cell is refused when an unmapped column follows the mapped ones', (t) => {
@@ -119,21 +119,21 @@ test('a row missing an interior cell is refused when an unmapped column follows 
   const r = mergeOver(t, [`${SHORT} fine |`], [], header);
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
   assert.equal(r.text, r.before, 'the tracker was written');
-  assert.match(r.out, /Row #1 is short of the header/);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row/);
 });
 
 test('a complete row under a header with an unmapped column is still matched and updated', (t) => {
   const header = ['# Applications Tracker', '', '| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL | Mood |', '|---|---|---|---|---|---|---|---|---|---|---|'];
   const r = mergeOver(t, ['| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 | fine |'], [], header);
   assert.equal(r.status, 0, r.out);
-  assert.doesNotMatch(r.out, /short of the header/);
+  assert.doesNotMatch(r.out, /cannot be read/);
   assert.equal(r.text.split('\n').filter((l) => /^\| \d/.test(l)).length, 1);
 });
 
 test('a tracker with no header is not stopped by a numbered row in a later table', (t) => {
   const row = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note |';
   const r = mergeOver(t, [row, '', '| # | Metric |', '|---|---|', '| 1 | 2 |'], [], ['# Applications Tracker', '']);
-  assert.doesNotMatch(r.out, /short of the header/);
+  assert.doesNotMatch(r.out, /cannot be read/);
   assert.equal(r.pending, false, 'the addition was left pending');
 });
 
