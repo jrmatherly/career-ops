@@ -326,6 +326,8 @@ export async function validateUrlSecurity(urlString) {
  * nor the recorder sees it. Both are denied instead. The guard removes the
  * `SharedWorker` constructor from every document before the page's scripts
  * run, and the caller creates the context with `serviceWorkers: 'block'`.
+ * Seven ways of getting the constructor back were tried in real Chromium, and
+ * all seven failed.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void>, addInitScript: (script: Function) => Promise<unknown> }} context - Context to guard.
  */
@@ -359,19 +361,21 @@ export async function installEgressGuard(context) {
  * by `recordLandedUrls`.
  *
  * Still open after both:
- * - The request to a redirect hop is SENT before any check sees it, a blind GET
- *   to an internal address whose answer is discarded.
- * - A WebSocket is judged by its name, not by the address dialled, so a name
- *   that answers this module's lookup one way and Chromium's another (DNS
- *   rebinding) is not caught for a socket.
+ * - The request to a redirect hop is sent before any check sees it. It is a
+ *   blind GET to an internal address, and its answer is discarded.
  * - A lookup has no timeout.
+ * - A WebSocket is judged by its name, not by the address dialled. A name that
+ *   answers this module's lookup one way and Chromium's another (DNS
+ *   rebinding) is not caught for a socket.
+ * - A posting whose page opens a WebSocket to a name the local DNS sinkholes
+ *   or does not resolve is refused. That refusal is visible. None of 18 real
+ *   postings opened a socket.
  * - `upskill.mjs` answers a refusal by fetching the original URL from Node,
- *   with its own lookup and `redirect: 'error'`.
- * - WebTransport, WebRTC and prerendering were never attempted.
- * - Anything else Playwright reports no `response` or WebSocket frame for is
- *   not seen. Shared and service workers are such paths and are denied (see
- *   `installEgressGuard`); the denial was measured against a page that takes
- *   the constructor from a new iframe or a popup, and nothing wider.
+ *   with its own lookup.
+ * - `openrouter-runner.mjs` reads postings in a browser with none of these
+ *   guards.
+ * - WebTransport, WebRTC and prerendering were never tested.
+ * - Anything Playwright reports no event for is not seen.
  * The structural fix is a filtering proxy in front of Chromium that resolves
  * and connects by address.
  *
@@ -434,19 +438,26 @@ export function setDialledAddressJudge(judge) {
  * Record what a page received, from now until its context closes: the address
  * Chromium dialled for every response in the page's context (redirect hops,
  * subresources, fetches, dedicated workers and popups included), every URL a
- * frame of the page or of a popup committed to, and every WebSocket of theirs
- * that received a frame. Call it on a new page, before its first navigation.
- * Where a frame is at one moment proves nothing: a page can point its iframe at
- * a private name while it is read and point it back before the next look.
+ * frame of the page or of a popup committed to, and every WebSocket they
+ * opened. Call it on a new page, before its first navigation. Where a frame is
+ * at one moment proves nothing: a page can point its iframe at a private name
+ * while it is read and point it back before the next look.
  *
  * A response is judged by the address it came from, which is Chromium's own
  * connection, so a name that answers this module's lookup one way and
  * Chromium's another is still caught. A response Playwright gives no address
  * for is judged by its URL, as frames and sockets are. A request the route
- * guard aborted, a host that never answered and a socket that never received a
- * frame delivered nothing and refuse nothing: Playwright announces a socket
- * when the page creates it, connected or not, and a posting with a socket to a
- * filtered tracker must still be read.
+ * guard aborted or a host that never answered has no response and refuses
+ * nothing.
+ *
+ * A socket is recorded when the page opens it, before it connects. A server
+ * can pass text to the page in its handshake or in a close frame's reason
+ * without sending a message.
+ *
+ * Measured in real Chromium as refused: a response from a private address
+ * (a redirected image, stylesheet, script or fetch, also in a worker, an
+ * iframe or a popup), and a WebSocket, popup or frame that names a private
+ * host, including a frame that goes private and back before the read.
  *
  * Not seen: a shared worker, and a socket a service worker opens. Playwright
  * raises no event for either, so they are denied instead of recorded (see
@@ -473,9 +484,7 @@ export function recordLandedUrls(page) {
   });
   const watch = (watched) => {
     watched.on('framenavigated', (frame) => record(frame.url()));
-    watched.on('websocket', (socket) => {
-      socket.once('framereceived', () => record(socket.url().replace(/^ws/, 'http')));
-    });
+    watched.on('websocket', (socket) => record(socket.url().replace(/^ws/, 'http')));
     watched.on('popup', (popup) => {
       record(popup.url());
       watch(popup);

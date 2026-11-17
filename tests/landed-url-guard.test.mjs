@@ -1,7 +1,7 @@
 // tests/landed-url-guard.test.mjs. A redirect never reaches the route guard, so
 // the landed URL is judged by DNS before any script reads the page, and what
 // the page received (the address behind every response, every URL a frame
-// committed to, every WebSocket that received a frame) is judged after its last
+// committed to, every WebSocket it opened) is judged after its last
 // read. Shared and service workers, which Playwright reports nothing for, are
 // denied, and a read that throws is judged before its error is reported.
 import { test } from 'node:test';
@@ -163,11 +163,10 @@ const openSocket = (page, url) => {
   page.emit('websocket', socket);
   return socket;
 };
-const receiveFrame = (socket) => socket.emit('framereceived', { payload: 'hello' });
 
-test('recordLandedUrls judges a WebSocket that received a frame by its URL, on the page and on a popup', async (t) => {
+test('recordLandedUrls judges a WebSocket by its URL, on the page and on a popup', async (t) => {
   t.after(setHostResolver(stubResolver));
-  const open = (page, url) => receiveFrame(openSocket(page, url));
+  const open = openSocket;
   for (const [url, refused] of [['wss://jobs.example.test/live', false], ['ws://private.example.test:8080/ws', true], ['wss://private.example.test/ws', true], ['ws://127.0.0.1:9229/', true]]) {
     const page = fakePage('https://jobs.example.test/1');
     const rejectVisited = recordLandedUrls(page);
@@ -180,21 +179,6 @@ test('recordLandedUrls judges a WebSocket that received a frame by its URL, on t
     opener.emit('popup', popup);
     open(popup, url);
     assert.equal(Boolean(await rejectOpener()), refused, `popup ${url}`);
-  }
-});
-
-test('recordLandedUrls ignores a WebSocket until its first frame arrives', async (t) => {
-  t.after(setHostResolver(stubResolver));
-  for (const url of ['ws://tracker.example.test:1/t', 'ws://nowhere.example.test/t', 'ws://private.example.test:8080/ws', 'ws://127.0.0.1:9229/']) {
-    const page = fakePage('https://jobs.example.test/1');
-    const rejectVisited = recordLandedUrls(page);
-    const socket = openSocket(page, url);
-    socket.emit('framesent', { payload: 'hello' });
-    socket.emit('socketerror', 'net::ERR_CONNECTION_REFUSED');
-    assert.equal(await rejectVisited(), null, `${url} never answered`);
-    receiveFrame(socket);
-    receiveFrame(socket);
-    assert.ok(await rejectVisited(), `${url} answered after an earlier verdict`);
   }
 });
 
@@ -317,7 +301,7 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
       const [action, from] = req.url.split('?')[1].split('&');
       const constructor = from === 'iframe' ? "document.body.appendChild(document.createElement('iframe')).contentWindow.SharedWorker" : 'globalThis.SharedWorker';
       html(res, `${POSTING}<script>const Shared = ${constructor}; const done = () => fetch('/armed'); if (!Shared) done(); else new Shared('/shared.js?${action}').port.onmessage = (e) => { document.body.append(e.data); done(); };</script>`);
-    } else if (req.url === '/with-dead-socket') html(res, `${POSTING}<script>new WebSocket('ws://tracker.example.test:${deadPort}/t')</script>`);
+    } else if (req.url === '/with-closing-socket') html(res, `${POSTING}<script>new WebSocket('ws://${privateOrigin()}/close').onclose = (e) => document.body.append(e.reason)</script>`);
     else if (req.url === '/throws') html(res, `${POSTING}<script>fetch('/to-private/cors').then((r) => r.text()).then((text) => { const boom = () => { throw new Error('THROWN ' + text); }; for (const key of ['body', 'title', 'documentElement']) Object.defineProperty(document, key, { get: boom }); document.querySelectorAll = boom; document.querySelector = boom; Element.prototype.querySelectorAll = boom; return fetch('/armed'); })</script>`);
     else if (req.url === '/public-assets') html(res, `<img src="/img.png"><img src="http://${privateOrigin()}/img.png">${POSTING}<script src="/script.js"></script><script>fetch('/cors')</script>`);
     else if (req.url === '/self-redirect-to-payroll') html(res, `${POSTING}<script>fetch('/signal').then(() => { location = '/to-private/payroll'; })</script>`);
@@ -340,13 +324,17 @@ async function chromiumAndServer(t, { realAddressRule = false } = {}) {
     const payload = Buffer.from(`${INTERNAL} ws`);
     socket.on('error', () => {});
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    if (req.url === '/close') {
+      const reason = Buffer.from(`${INTERNAL} close`);
+      const code = Buffer.alloc(2);
+      code.writeUInt16BE(4000);
+      socket.write(Buffer.concat([Buffer.from([0x88, 2 + reason.length]), code, reason]));
+      return;
+    }
     socket.write(Buffer.concat([Buffer.from([0x81, payload.length]), payload]));
   });
-  const closed = createServer();
-  for (const listener of [server, privateServer, closed]) await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
+  for (const listener of [server, privateServer]) await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const privatePort = privateServer.address().port;
-  const deadPort = closed.address().port;
-  await new Promise((resolve) => closed.close(resolve));
   t.after(async () => {
     releaseSignal();
     await browser.close().catch(() => {});
@@ -563,12 +551,17 @@ const socketGaveUp = (context, page) => new Promise((resolve) => {
   page.on('websocket', (socket) => { socket.on('socketerror', resolve); socket.on('close', resolve); });
 });
 
-test('real Chromium: archiveUrl archives a posting whose WebSocket to a filtered tracker never connected', { timeout: 60_000 }, async (t) => {
+test('real Chromium: archiveUrl refuses a page whose WebSocket to a private host sent only a close frame with a reason', { timeout: 60_000 }, async (t) => {
   const env = await chromiumAndServer(t);
   if (!env) return;
-  const before = archived().length;
-  await archiveUrl(readsWhen(env, socketGaveUp), env.publicUrl('/with-dead-socket'));
-  assert.equal(archived().length, before + 1);
+  const errors = t.mock.method(console, 'error', () => {});
+  const before = archived();
+  const refusal = await archiveUrl(readsWhen(env, socketGaveUp), env.publicUrl('/with-closing-socket')).then(() => null, (err) => err);
+  assert.match(refusal?.message ?? '', REFUSED);
+  assert.deepEqual(env.privateHits, ['/close'], 'the private host answered the handshake');
+  const printed = [env.logged, env.warned, errors].flatMap((mock) => mock.mock.calls.map((call) => call.arguments.join(' ')));
+  assert.doesNotMatch([refusal.message, refusal.stack, ...printed].join('\n'), new RegExp(INTERNAL));
+  assert.deepEqual(archived(), before);
 });
 
 for (const [what, query] of [
