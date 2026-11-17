@@ -1552,7 +1552,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    const raw = await readLanded(rejectVisited, readDom(page));
+    const raw = await readLanded(rejectVisited, readDom(page), 'dom read');
     const afterRead = await rejectVisited();
     if (afterRead) {
       console.error(JSON.stringify({ error: `blocked final URL: ${afterRead.reason}`, code: afterRead.code }));

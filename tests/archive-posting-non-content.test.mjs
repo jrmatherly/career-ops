@@ -138,7 +138,7 @@ test('a real extraction FAILURE (page.evaluate rejects) fails CLOSED — refuses
   const { browser, pdfCalled } = makeFakeBrowser({ bodyText: 'unused — evaluate() rejects before returning it', evaluateRejects: true });
   await assert.rejects(
     () => archiveUrl(browser, 'https://boards.greenhouse.io/acme/jobs/4', {}),
-    /^Error: a read of the page failed$/,
+    /^Error: a read of the page failed: body text read$/,
   );
   assert.equal(pdfCalled(), false, 'an extraction failure must not reach page.pdf()');
 });

@@ -114,7 +114,7 @@ const LOW_FIT_SCORE = 4.0;
 import { extractSkills } from './skill-extract.mjs';
 import { isMainModule } from './lib/is-main-module.mjs';
 import { browserLaunchOptions } from './lib/browser-launch.mjs';
-import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, validateUrlSecurity, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 export { extractSkills };
 
 // --- Known-skills text assembly ---
@@ -870,14 +870,22 @@ if (isMain) {
           const rejectVisited = recordLandedUrls(page);
 
           await page.goto(secureUrl, { waitUntil: 'networkidle', timeout: 30000 });
+          const refusal = (verdict) => Object.assign(new Error(`blocked URL after redirect: ${verdict.reason}`), { refused: verdict });
           const landed = await rejectLandedUrl(page.url());
-          if (landed) throw new Error(`blocked URL after redirect: ${landed.reason}`);
-          const bodyText = await page.innerText('body');
+          if (landed) throw refusal(landed);
+          const bodyText = await readLanded(rejectVisited, page.innerText('body'), 'body text read');
           const afterRead = await rejectVisited();
-          if (afterRead) throw new Error(`blocked URL after redirect: ${afterRead.reason}`);
+          if (afterRead) throw refusal(afterRead);
           targetText = bodyText;
         } catch (err) {
-          console.warn('Playwright extraction failed or blocked, trying fallback WebFetch...', err.message);
+          // A refused page is not fetched again from Node: that would read the
+          // same posting with a lookup the browser checks never saw.
+          if (err.refused) {
+            console.error(`Fatal: Refused to read the JD from ${inputSource}: ${err.refused.reason}`);
+            process.exitCode = 1;
+            return;
+          }
+          console.warn('Playwright extraction failed, trying fallback WebFetch...', err.message);
           try {
             const guard = rejectPrivateOrInvalid(inputSource);
             if (guard) throw new Error(guard.reason);

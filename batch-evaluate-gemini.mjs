@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 import { chromium } from 'playwright';
 import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard, rejectLandedUrl, recordLandedUrls } from './liveness-browser.mjs';
+import { rejectPrivateOrInvalid, checkUrlLiveness, LIVENESS_CONTEXT_OPTIONS, installEgressGuard, rejectLandedUrl, recordLandedUrls, readLanded } from './liveness-browser.mjs';
 import { isClosureEvidence } from './liveness-core.mjs';
 import { getCareerOpsRoot, getProfilePath } from './path-resolver.mjs';
 import { withPipelineLock } from './pipeline-lock.mjs';
@@ -364,11 +364,11 @@ LEGITIMACY: <High Confidence | Proceed with Caution | Suspicious>
   return systemPromptTemplate;
 }
 
+const refusal = (verdict) => Object.assign(new Error(`Invalid or blocked URL: ${verdict.reason}`), { refused: verdict });
+
 async function scrapeUrl(browser, url) {
   const rejected = rejectPrivateOrInvalid(url);
-  if (rejected) {
-    throw new Error(`Invalid or blocked URL: ${rejected.reason}`);
-  }
+  if (rejected) throw refusal(rejected);
   
   const page = await browser.newPage({ serviceWorkers: 'block' });
   try {
@@ -379,18 +379,14 @@ async function scrapeUrl(browser, url) {
     await page.waitForTimeout(2000); // wait for dynamic content
 
     const finalRejected = await rejectLandedUrl(page.url());
-    if (finalRejected) {
-      throw new Error(`Invalid or blocked URL after redirect: ${finalRejected.reason}`);
-    }
+    if (finalRejected) throw refusal(finalRejected);
 
-    const text = await page.evaluate(() => {
+    const text = await readLanded(rejectVisited, page.evaluate(() => {
       document.querySelectorAll('script, style, noscript, iframe, svg, img').forEach(s => s.remove());
       return document.body.innerText;
-    });
+    }), 'dom read');
     const afterRead = await rejectVisited();
-    if (afterRead) {
-      throw new Error(`Invalid or blocked URL after redirect: ${afterRead.reason}`);
-    }
+    if (afterRead) throw refusal(afterRead);
     return text.trim();
   } finally {
     await page.close();
@@ -468,7 +464,8 @@ export async function processOffer(browser, line, idx, _evaluate = evaluateWithR
     let jdText;
     try {
       jdText = await scrapeUrl(browser, url);
-    } catch {
+    } catch (err) {
+      if (err.refused) console.warn(`⚠️  ${url}: refused by the egress guard (${err.refused.code}), not evaluated.`);
       return await resolveDeadPosting();
     }
     if (!jdText || jdText.length < 100) {

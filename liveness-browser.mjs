@@ -94,8 +94,8 @@ export function sameOrigin(frameUrl, pageUrl) {
 // headlessly (the scan parser scripts/parsers/pracuj-jobs.mjs relies on the same
 // trick), so the common case never needs the slower headed-browser fallback.
 //
-// A service worker's own requests and sockets reach neither the route guard nor
-// the recorder, and no posting needs one to be read once, so registration is
+// A service worker's sockets raise no Playwright event, so the recorder never
+// sees them, and no posting needs one to be read once, so registration is
 // blocked.
 export const LIVENESS_CONTEXT_OPTIONS = {
   userAgent: BROWSER_LIKE_USER_AGENT,
@@ -283,8 +283,8 @@ async function resolveDnsCached(hostname) {
 // Second layer of the egress guard: `rejectPrivateOrInvalid` only sees the
 // literal host, so a public hostname that *resolves* to private space still
 // gets through it. Resolve and re-check every address before the request is
-// allowed out. Exported so other Playwright callers (archive-posting.mjs) wire
-// up the same two-layer guard instead of growing a second implementation.
+// allowed out. Exported for upskill.mjs, lib/jd-page-fetch.mjs and the web
+// app's apply URL guard, so none of them grows a second implementation.
 export async function validateUrlSecurity(urlString) {
   const url = new URL(urlString.endsWith('.') ? urlString.slice(0, -1) : urlString);
   const hostname = url.hostname;
@@ -321,13 +321,13 @@ export async function validateUrlSecurity(urlString) {
  * page, `rejectLandedUrl` before its first read, and the recorder's check after
  * its last.
  *
- * Playwright attaches to no shared worker and to no service worker's sockets:
- * what they request is not routed and raises no event, so neither this guard
- * nor the recorder sees it. Both are denied instead. The guard removes the
+ * Playwright attaches to no shared worker, so what one requests is not routed
+ * and raises no event. A service worker's HTTP requests are routed, but its
+ * sockets raise no event. Both are denied instead. The guard removes the
  * `SharedWorker` constructor from every document before the page's scripts
  * run, and the caller creates the context with `serviceWorkers: 'block'`.
- * Seven ways of getting the constructor back were tried in real Chromium, and
- * all seven failed.
+ * `tests/landed-url-guard.test.mjs` pins that a page, or a new iframe in it,
+ * finds no constructor.
  *
  * @param {{ route: (pattern: string, handler: Function) => Promise<void>, addInitScript: (script: Function) => Promise<unknown> }} context - Context to guard.
  */
@@ -346,10 +346,15 @@ export async function installEgressGuard(context) {
 
     try {
       await validateUrlSecurity(requestUrl);
-      return await route.continue();
     } catch (err) {
       console.warn(`   Blocked request to restricted destination (DNS): ${requestUrl} - ${err.message}`);
       return route.abort('blockedbyclient');
+    }
+    try {
+      return await route.continue();
+    } catch (err) {
+      console.warn(`   Request could not be continued, aborted: ${requestUrl} - ${err.message}`);
+      return route.abort('blockedbyclient').catch(() => {});
     }
   });
 }
@@ -361,17 +366,19 @@ export async function installEgressGuard(context) {
  * by `recordLandedUrls`.
  *
  * Still open after both:
- * - The request to a redirect hop is sent before any check sees it. It is a
- *   blind GET to an internal address, and its answer is discarded.
+ * - The request to a redirect hop is sent before any check sees it, with
+ *   whatever method and body the redirect keeps. Its answer reaches the page's
+ *   scripts until the last read, so a hostile page can relay it to a public
+ *   host. Only this tool's output is refused.
  * - A lookup has no timeout.
  * - A WebSocket is judged by its name, not by the address dialled. A name that
  *   answers this module's lookup one way and Chromium's another (DNS
  *   rebinding) is not caught for a socket.
  * - A posting whose page opens a WebSocket to a name the local DNS sinkholes
- *   or does not resolve is refused. That refusal is visible. None of 18 real
- *   postings opened a socket.
- * - `upskill.mjs` answers a refusal by fetching the original URL from Node,
- *   with its own lookup.
+ *   or does not resolve is refused. That refusal is visible.
+ * - When Playwright fails for a reason other than a refusal, `upskill.mjs`
+ *   falls back to fetching the original URL from Node, which refuses any
+ *   redirect but connects with Node's own lookup.
  * - `openrouter-runner.mjs` reads postings in a browser with none of these
  *   guards.
  * - WebTransport, WebRTC and prerendering were never tested.
@@ -454,10 +461,8 @@ export function setDialledAddressJudge(judge) {
  * can pass text to the page in its handshake or in a close frame's reason
  * without sending a message.
  *
- * Measured in real Chromium as refused: a response from a private address
- * (a redirected image, stylesheet, script or fetch, also in a worker, an
- * iframe or a popup), and a WebSocket, popup or frame that names a private
- * host, including a frame that goes private and back before the read.
+ * `tests/landed-url-guard.test.mjs` pins, in real Chromium, which responses,
+ * frames, popups and sockets are refused.
  *
  * Not seen: a shared worker, and a socket a service worker opens. Playwright
  * raises no event for either, so they are denied instead of recorded (see
@@ -515,16 +520,18 @@ export function recordLandedUrls(page) {
  * @template T
  * @param {() => Promise<null|{code: string, reason: string}>} rejectVisited - The recorder's check for the page.
  * @param {Promise<T>} pending - The read.
+ * @param {string} label - A fixed name for the read (`'pdf render'`, `'dom read'`),
+ *   so a failure says which read failed. Never page-derived text.
  * @returns {Promise<T>} What the read returned.
  * @throws {Error & { refused: null|{code: string, reason: string} }} `refused`
  *   is the recorder's verdict: non-null when the page must be refused.
  */
-export async function readLanded(rejectVisited, pending) {
+export async function readLanded(rejectVisited, pending, label) {
   try {
     return await pending;
   } catch {
     const refused = await rejectVisited();
-    throw Object.assign(new Error(refused ? refused.reason : 'a read of the page failed'), { refused });
+    throw Object.assign(new Error(refused ? refused.reason : `a read of the page failed: ${label}`), { refused });
   }
 }
 

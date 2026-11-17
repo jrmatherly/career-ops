@@ -343,7 +343,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
       throw new Error(`refusing to archive restricted destination after redirect: ${postGuard.reason}`);
     }
 
-    const pageTitle = await readLanded(rejectVisited, page.title());
+    const pageTitle = await readLanded(rejectVisited, page.title(), 'title read');
     const h1Text = await page.$eval('h1', el => el.innerText.trim()).catch(() => '');
     const urlCompany = extractCompanyFromUrl(url);
 
@@ -366,7 +366,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
     // ever having been checked — a capture-time gap in the exact protection
     // this block exists to add. Fail closed: propagate the error, refusing
     // to archive rather than archiving blind.
-    const bodyText = await readLanded(rejectVisited, page.evaluate(() => document.body?.innerText ?? ''));
+    const bodyText = await readLanded(rejectVisited, page.evaluate(() => document.body?.innerText ?? ''), 'body text read');
     if (!bodyText.trim()) {
       throw new Error('refusing to archive: page has no visible text');
     }
@@ -403,7 +403,7 @@ export async function archiveUrl(browser, url, { company: companyHint, role: rol
       printBackground: true,
       margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
       preferCSSPageSize: false,
-    }));
+    }), 'pdf render');
     const afterRender = await rejectVisited();
     if (afterRender) {
       throw new Error(`refusing to archive restricted destination after redirect: ${afterRender.reason}`);
