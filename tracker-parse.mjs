@@ -378,8 +378,9 @@ export function trackerRowIdentity(row) {
 const TRACKER_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UNNUMBERED_RE = /^(?:n\/a|—|–|-)$/i;
 // Digits that are not the start of a date or a score. A numeric prefix counts,
-// as it does for parseInt everywhere else: `12draft` is row 12.
-const NUM_CELL_RE = /^\d+(?![\d.,/-])/;
+// as it does for parseInt everywhere else: `12draft` and `12-draft` are row 12,
+// and only a dash with a digit after it starts a date.
+const NUM_CELL_RE = /^\d+(?![\d.,/]|-\d)/;
 // `[12]`, `[12](…)`, or a link to a Markdown file. A link to a web address is a posting URL, not a report, whatever its text or ending.
 const REPORT_LINK_RE = /^\[\d+\](?:\((?!<?https?:).+\))?$|^\[[^\]]+\]\((?!<?https?:).+\.md>?\)$/i;
 // A markdown link whose target never closes: a `|` cut the cell in two.

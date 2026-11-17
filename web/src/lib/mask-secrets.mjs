@@ -106,7 +106,7 @@ const JWT_RUN = /\beyJ[\w.-]+/g;
 const JWT = /^eyJ[\w-]*\.[\w-]+\.[\w-]+/;
 
 // The host cannot hold an @, so the password runs to the last @ before the path.
-const URL_PASSWORD = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)(?!\[masked)[^\s/?#]*@/gi;
+const URL_PASSWORD = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/[^\s:/@]*:)([^\s/?#]*)@/gi;
 
 // A label is a whole word, the tail of an identifier (OPENROUTER_API_KEY, api_key) or
 // a capitalised camelCase tail (accessToken), never the end of a lowercase word
@@ -161,7 +161,7 @@ const hasDigit = (s) => /\d/.test(s);
  */
 export function maskSecrets(s, known = []) {
   return maskKnown(s || "", known)
-    .replace(URL_PASSWORD, `$1${MARK}@`)
+    .replace(URL_PASSWORD, (m, head, password) => `${head}${password.match(MARKED)?.[1] ?? MARK}@`)
     .replace(JWT_RUN, (run) => {
       const jwt = run.match(JWT);
       return jwt ? `eyJ${MARK}${run.slice(jwt[0].length)}` : run;

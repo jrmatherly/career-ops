@@ -33,7 +33,7 @@ const CELL_EDITS = [
   ...CELLS.map((_, i) => ({ name: `empty${i}`, apply: cells => [...cells.slice(0, i), '', ...cells.slice(i)] })),
   ...CELLS.flatMap((_, i) => CELLS.slice(i + 1).map((__, k) => ({ name: `swap${i}-${i + k + 1}`,
     apply: cells => (i + k + 1 < cells.length ? swapped(cells, i, i + k + 1) : cells) }))),
-  ...['', '0', '—', 'N/A', '-', '12draft', '#'].map(num => ({ name: `num(${num})`, apply: cells => [num, ...cells.slice(1)] })),
+  ...['', '0', '—', 'N/A', '-', '12draft', '12-draft', '#'].map(num => ({ name: `num(${num})`, apply: cells => [num, ...cells.slice(1)] })),
   { name: 'tail', apply: cells => [...cells, ''] },
 ];
 const LINE_EDITS = [{ name: 'plain' }, { name: 'indent2', indent: '  ' }, { name: 'tab', indent: '\t' }, { name: 'open', close: false }];

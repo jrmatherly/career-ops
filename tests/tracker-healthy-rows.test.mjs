@@ -111,3 +111,12 @@ test('a link to a web address in the URL cell is a posting URL, whatever its tex
   assert.equal(trackerRowFault(row('[2](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
   assert.equal(trackerRowFault(row('[report](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
 });
+
+test('a # cell with a numeric prefix is a row number, and a date or a score there is a shifted row', async () => {
+  const { resolveColumns, trackerRowFault } = await import('../tracker-parse.mjs');
+  const head = ['| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |', '|---|---|---|---|---|---|---|---|---|---|'];
+  const colmap = resolveColumns(head);
+  const row = (num) => `| ${num} | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | note | https://jobs.acme.com/1 |`;
+  for (const num of ['12', '12draft', '12-draft']) assert.equal(trackerRowFault(row(num), colmap, { cellCount: 10 }), null, num);
+  for (const num of ['2026-01-01', '3.0/5']) assert.equal(trackerRowFault(row(num), colmap, { cellCount: 10 })?.cell, 'num', num);
+});

@@ -246,6 +246,9 @@ test("a password keeps nothing after the mark an earlier rule left in it", () =>
   const known = masker.knownSecrets([{ DB_PASSWORD: "correcthorsebattery" }]);
   assert.equal(maskSecrets("password=correcthorsebattery", known), "password=[masked:DB_PASSWORD]", "a known value keeps its name");
   assert.equal(maskSecrets("password=correcthorsebattery!tail", known), "password=[masked:DB_PASSWORD]");
+  // A URL password that starts with a known value keeps the name and loses the rest.
+  assert.equal(maskSecrets("redis://:correcthorsebatteryPrivateSuffix99@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
+  assert.equal(maskSecrets("redis://:correcthorsebattery@host.invalid", known), "redis://:[masked:DB_PASSWORD]@host.invalid");
   // A known value that is assigned to in turn still labels what follows it.
   assert.equal(maskSecrets("PASSWORD: correcthorsebattery: realsecret99", known), "PASSWORD: [masked:DB_PASSWORD]: [masked]");
   assert.equal(maskSecrets("PASSWORD= correcthorsebattery = other", known), "PASSWORD= [masked:DB_PASSWORD] = [masked]");
