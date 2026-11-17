@@ -17,7 +17,7 @@
  * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
  * row cannot be read (trackerRowFault in tracker-parse.mjs; a dry run only warns;
  * --backfill-urls repairs a row that lacks only its URL cell). An addition whose
- * own row would not read back is left pending and never written
+ * own row would not read back is left pending and never written, and the run exits 1
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -825,9 +825,13 @@ export async function mergeTracker(options = {}) {
   // so a tracker carrying columns career-ops has no field for (Apply Link,
   // Follow-up, or anything else a user adds) still round-trips: the row keeps the
   // header's shape and the unknown cells are filled with the tracker's own "no
-  // data" marker instead of being dropped. Null until detected; falls back to the
-  // width implied by COLMAP.
+  // data" marker instead of being dropped. Null until detected; falls back to
+  // JUDGED_CELLS, then to the width implied by COLMAP.
   let HEADER_WIDTH = null;
+  // The cell count inspectTrackerRows judged the tracker's rows by. It reads a
+  // header whose names detectColumns does not know, so a row is written at the
+  // width the next merge will hold it to.
+  let JUDGED_CELLS = null;
 
   /**
    * Append one cell to a Markdown table line without reparsing its existing
@@ -911,7 +915,7 @@ export async function mergeTracker(options = {}) {
   // header-derived), so those applications became unaddressable: the status could
   // no longer be changed through the supported path.
   function buildRow(o) {
-    const width = HEADER_WIDTH ?? (Math.max(...Object.values(COLMAP)) + 2);
+    const width = HEADER_WIDTH ?? ((JUDGED_CELLS ?? Math.max(...Object.values(COLMAP))) + 2);
     // index 0 is the empty string left of the leading pipe; index `width - 1` is
     // the one right of the trailing pipe. Data cells live in between.
     const cells = new Array(Math.max(0, width - 2)).fill('—');
@@ -1675,12 +1679,15 @@ export async function mergeTracker(options = {}) {
     const existingApps = [];
     let maxNum = 0;
     // Only a row whose cells sit under their own columns is matched or
-    // rewritten. --backfill-urls exists to repair a row that stops before its
-    // URL cell, so there that one shape is a row and not a fault.
+    // rewritten. --backfill-urls exists to repair a row that lacks its URL
+    // cell, so there a row that closes with a pipe and has every cell before
+    // URL is a row and not a fault, with or without the cells from URL onward.
     const inspected = inspectTrackerRows(appLines, COLMAP, { isStatus: isKnownStatus, urlOptional: BACKFILL_URLS });
+    JUDGED_CELLS = inspected.cellCount;
     for (const { line } of inspected.rows) {
       const app = parseAppLine(line);
-      // --backfill-urls admits a row that stops before its URL cell, which parseAppLine does not read.
+      // parseAppLine reads a row --backfill-urls admits short of its URL cell, unless a
+      // mapped column (Notes, say) sits after URL: that row is not read, and is left out.
       if (!app) continue;
       existingApps.push(app);
       if (app.num > maxNum) maxNum = app.num;
@@ -1718,7 +1725,7 @@ export async function mergeTracker(options = {}) {
       const backfilled = appLines.map((line, at) => {
         if (!soundLines.has(at)) return line;
         const app = parseAppLine(line);
-        // A row with no closing pipe that stops before its URL cell is not read here; it is left as it was.
+        // A row that stops before URL on a layout with a mapped column after URL is not read; it is left as it was.
         if (!app) return line;
         // Rebuilt, not returned verbatim — a row can carry a URL and STILL be short
         // of the header on a layout with user-owned columns after `URL`. Returning
@@ -1897,7 +1904,7 @@ export async function mergeTracker(options = {}) {
      * @returns {boolean} True when the row must not be written.
      */
     function refuseUnreadableRow(file, line) {
-      const fault = trackerRowFault(line, COLMAP, { cellCount: HEADER_WIDTH != null ? HEADER_WIDTH - 2 : null, isStatus: isKnownStatus });
+      const fault = trackerRowFault(line, COLMAP, { cellCount: JUDGED_CELLS, isStatus: isKnownStatus });
       if (!fault) return false;
       console.warn(`⚠️  Skipping ${file}: the row it would add could not be read back from the tracker: ${fault.why} Correct that value in ${file}, then re-run. The addition was left pending.\n     ${line}`);
       return true;
@@ -1942,8 +1949,7 @@ export async function mergeTracker(options = {}) {
 
       // Checked before the dedup and the PDF re-key, so a refusal changes nothing.
       if (refuseUnreadableRow(file, buildRow({ ...addition, via: addition.via || '—', location: addition.location || '—' }))) {
-        skipped++;
-        refusedAdditions.push(file);
+        failedAdditions.push(file);
         continue;
       }
 

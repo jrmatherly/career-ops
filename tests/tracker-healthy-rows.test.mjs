@@ -101,11 +101,13 @@ test('a line below the tracker that is not a row is warned about and does not st
   assert.match(verified.out, /⚠️ {2}Line 7 \("\| Totals \| 1 \|"\) is not a tracker row/);
 });
 
-test('a numbered link to a web address in the URL cell is a posting URL, not a report link', async () => {
+test('a link to a web address in the URL cell is a posting URL, whatever its text or ending, and a local report link there is refused', async () => {
   const { resolveColumns, trackerRowFault } = await import('../tracker-parse.mjs');
   const head = ['| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL |', '|---|---|---|---|---|---|---|---|---|---|'];
   const colmap = resolveColumns(head);
   const row = (url) => `| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | note | ${url} |`;
   assert.equal(trackerRowFault(row('[1](https://jobs.acme.com/1)'), colmap, { cellCount: 10 }), null);
+  assert.equal(trackerRowFault(row('[github.com](https://github.com/acme/jobs/blob/main/data-engineer.md)'), colmap, { cellCount: 10 }), null);
   assert.equal(trackerRowFault(row('[2](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
+  assert.equal(trackerRowFault(row('[report](../reports/002-acme-2026-01-02.md)'), colmap, { cellCount: 10 })?.cell, 'url');
 });

@@ -89,13 +89,13 @@ for (const [field, value, cell] of [
   ['report', 'see notes', 'Report'], ['report', '002', 'Report'], ['url', 'ask the recruiter', 'URL'],
   ['date', '4.0/5', 'Date'], ['pdf', '2026-02-01', 'PDF'], ['company', '2026-02-01', 'Company'],
 ]) {
-  test(`an addition whose ${field} is "${value}" is left pending and never reaches the tracker`, async () => {
-    const r = await mergeOver(FULL, [], { addition: addition({ [field]: value }), again: true });
-    assert.equal(r.status, 0, r.out);
+  test(`an addition whose ${field} is "${value}" fails the run, is left pending and never reaches the tracker`, async () => {
+    const r = await mergeOver(FULL, [], { addition: addition({ [field]: value }) });
+    assert.equal(r.status, 1, r.out);
+    assert.match(r.out, /1 addition\(s\) were NOT merged .*002-acme\.tsv/);
     assert.equal(r.text, r.before, 'the tracker was written');
     assert.ok(r.pending, 'the addition was moved out of the pending directory');
     assert.match(r.out, new RegExp(`Skipping 002-acme\\.tsv: the row it would add could not be read back from the tracker: its ${cell} cell holds`));
     assert.match(r.out, /The addition was left pending\./);
-    assert.equal(r.again.status, 0, r.again.out);
   });
 }

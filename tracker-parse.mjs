@@ -380,8 +380,8 @@ const UNNUMBERED_RE = /^(?:n\/a|—|–|-)$/i;
 // Digits that are not the start of a date or a score. A numeric prefix counts,
 // as it does for parseInt everywhere else: `12draft` is row 12.
 const NUM_CELL_RE = /^\d+(?![\d.,/-])/;
-// `[12]`, `[12](…)`, or a link to a Markdown file. A numbered link to a web address is a posting URL, not a report.
-const REPORT_LINK_RE = /^\[\d+\](?:\((?!<?https?:).+\))?$|^\[[^\]]+\]\(.+\.md>?\)$/i;
+// `[12]`, `[12](…)`, or a link to a Markdown file. A link to a web address is a posting URL, not a report, whatever its text or ending.
+const REPORT_LINK_RE = /^\[\d+\](?:\((?!<?https?:).+\))?$|^\[[^\]]+\]\((?!<?https?:).+\.md>?\)$/i;
 // A markdown link whose target never closes: a `|` cut the cell in two.
 const CUT_LINK_RE = /\]\([^)]*$/;
 // A bare or `<bracketed>` URL (a hand-pasted one may hold a space), a
@@ -468,8 +468,9 @@ function innerCells(line) {
  * @param {{cellCount?: number|null, labels?: string[]|null, isStatus?: ((cell: string) => boolean)|null, urlOptional?: boolean}} [options]
  *   `cellCount` and `labels` are the header's cell count and cells, when
  *   there is a header. `isStatus` recognises a status word, so one under
- *   Score is seen. `urlOptional` accepts a row that stops before its URL
- *   cell, the one shape --backfill-urls repairs.
+ *   Score is seen. `urlOptional` accepts a row that closes with a pipe and
+ *   has every cell before URL, whether or not the URL cell and any columns
+ *   after it are there. --backfill-urls repairs it.
  * @returns {{cell: string, why: string}|null} `why` says what happened and what to do.
  */
 export function trackerRowFault(line, colmap, options = {}) {
@@ -479,11 +480,12 @@ export function trackerRowFault(line, colmap, options = {}) {
   }
   const cells = innerCells(line);
   const need = cellCount ?? Math.max(...Object.values(colmap));
-  // A row may stop before its URL cell wherever that column sits: a layout can keep its own columns after URL.
-  const least = urlOptional && colmap.url != null ? colmap.url - 1 : need;
+  // The backfill reads only a row that closes with a pipe, so only one may stop before its URL cell.
+  // It may stop there wherever that column sits: a layout can keep its own columns after URL.
+  const closed = /\|\s*$/.test(line);
+  const least = urlOptional && closed && colmap.url != null ? colmap.url - 1 : need;
   if (cells.length < least) {
-    // The backfill reads only a row that closes with a pipe, so the hint is given only for one.
-    const onlyUrl = !urlOptional && /\|\s*$/.test(line) && colmap.url === need && cells.length === need - 1
+    const onlyUrl = !urlOptional && closed && colmap.url === need && cells.length === need - 1
       && trackerRowFault(line, colmap, { ...options, urlOptional: true }) === null;
     return { cell: 'short', why: `it has ${cells.length} cells where the header has ${need}, so a cell is missing. ${ADD_A_CELL}`
       + (onlyUrl ? ' Only the URL cell at the end is missing here, and node merge-tracker.mjs --backfill-urls adds it.' : '') };
@@ -549,7 +551,8 @@ export function trackerFaultText({ label, why, line }) {
  * @param {string[]} lines - All lines of applications.md.
  * @param {Object<string,number>} colmap - From resolveColumns().
  * @param {{isStatus?: ((cell: string) => boolean)|null, urlOptional?: boolean}} [options]
- * @returns {{rows: {at: number, line: string}[], faults: {at: number, label: string, line: string, cell: string, why: string}[], strays: {at: number, label: string}[]}}
+ * @returns {{rows: {at: number, line: string}[], faults: {at: number, label: string, line: string, cell: string, why: string}[], strays: {at: number, label: string}[], cellCount: number|null}}
+ *   `cellCount` is the header width the rows were judged by, null when no table header was found.
  */
 export function inspectTrackerRows(lines, colmap, options = {}) {
   const hasTrackerHeader = lines.some(line => isHeaderRow(line));
@@ -589,7 +592,7 @@ export function inspectTrackerRows(lines, colmap, options = {}) {
     const label = /^[1-9]\d*$/.test(num) && fault.cell !== 'num' ? `Row #${num} (line ${at + 1})` : unnamed;
     faults.push({ at, label, line, ...fault });
   }
-  return { rows, faults, strays };
+  return { rows, faults, strays, cellCount };
 }
 
 // Matches the req/job-number labels actually seen in this tracker's free-text
