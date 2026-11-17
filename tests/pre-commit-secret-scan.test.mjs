@@ -2,15 +2,18 @@
 // which GitHub push protection would otherwise refuse only at the push.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ROOT, hermeticGitEnv } from './helpers.mjs';
+import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
+
+// Under a hook or `git rebase -x` an inherited GIT_DIR would point the scratch commits at the real repository.
+sealProcessGitEnv();
 
 const hasGitleaks = spawnSync('gitleaks', ['version']).status === 0;
 
-test('a staged token-shaped value is refused, and the same file without it commits', { skip: hasGitleaks ? false : 'gitleaks is not on PATH' }, (t) => {
+function scratchRepo(t) {
   const repo = realpathSync(mkdtempSync(join(tmpdir(), 'pre-commit-scan-')));
   t.after(() => rmSync(repo, { recursive: true, force: true }));
   const env = hermeticGitEnv(join(repo, 'gitconfig'));
@@ -21,10 +24,28 @@ test('a staged token-shaped value is refused, and the same file without it commi
   mkdirSync(join(repo, 'scripts'));
   writeFileSync(join(repo, 'scripts', 'check-syntax.mjs'), '');
   git('init', '-q', '-b', 'main');
-  const hook = () => spawnSync(process.execPath, [join(repo, '.githooks', 'pre-commit.mjs')], { cwd: repo, env, encoding: 'utf-8' });
+  const hook = (hookEnv = env) => spawnSync(process.execPath, [join(repo, '.githooks', 'pre-commit.mjs')], { cwd: repo, env: hookEnv, encoding: 'utf-8' });
+  return { repo, env, git, hook };
+}
 
-  // Built here so this file holds no token-shaped literal for push protection to refuse.
-  const token = ['gl', 'pat-', 'x'.repeat(4), 'Ab3dE7gH9jK1mN5pQ8r'].join('');
+// Built here so this file holds no token-shaped literal for push protection to refuse.
+const token = ['gl', 'pat-', 'x'.repeat(4), 'Ab3dE7gH9jK1mN5pQ8r'].join('');
+
+test('a machine without gitleaks commits with a warning, not a refusal', { skip: process.platform === 'win32' }, (t) => {
+  const { repo, env, git, hook } = scratchRepo(t);
+  // A PATH that holds git and nothing else, wherever gitleaks is installed.
+  const bin = join(repo, 'bin');
+  mkdirSync(bin);
+  symlinkSync(spawnSync('which', ['git'], { encoding: 'utf-8' }).stdout.trim(), join(bin, 'git'));
+  writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
+  git('add', 'fixture.mjs');
+  const unscanned = hook({ ...env, PATH: bin });
+  assert.equal(unscanned.status, 0, unscanned.stderr);
+  assert.match(unscanned.stderr, /gitleaks is not on PATH, so the staged diff was not scanned/);
+});
+
+test('a staged token-shaped value is refused, and the same file without it commits', { skip: hasGitleaks ? false : 'gitleaks is not on PATH' }, (t) => {
+  const { repo, env, git, hook } = scratchRepo(t);
   writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
   git('add', 'fixture.mjs');
   const refused = hook();
@@ -35,10 +56,18 @@ test('a staged token-shaped value is refused, and the same file without it commi
   assert.ok(!report.includes(token), 'the value is redacted in the report');
 
   // A public search key in a request header is what the provider suites carry.
-  writeFileSync(join(repo, 'fixture.mjs'), `export const headers = { "x-api-key": "${'9f3b1c7a5e2d4068'.repeat(2)}" };\n`);
-  git('add', 'fixture.mjs');
+  const searchKey = `export const headers = { "x-api-key": "${'9f3b1c7a5e2d4068'.repeat(2)}" };\n`;
+  writeFileSync(join(repo, 'fixture.mjs'), 'export const token = process.env.TOKEN;\n');
+  mkdirSync(join(repo, 'tests'));
+  writeFileSync(join(repo, 'tests', 'board.test.mjs'), searchKey);
+  git('add', 'fixture.mjs', 'tests/board.test.mjs');
   const passed = hook();
   assert.equal(passed.status, 0, `${passed.stdout}${passed.stderr}`);
+  writeFileSync(join(repo, 'fixture.mjs'), searchKey);
+  git('add', 'fixture.mjs');
+  assert.equal(hook().status, 1, 'the same value outside the suites, the providers and the docs is refused');
+  writeFileSync(join(repo, 'fixture.mjs'), 'export const token = process.env.TOKEN;\n');
+  git('add', 'fixture.mjs');
 
   // Concluding a merge stages the other side's changes, which are not this commit's to answer for.
   git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-q', '-m', 'base');
@@ -46,7 +75,9 @@ test('a staged token-shaped value is refused, and the same file without it commi
   git('add', 'fixture.mjs');
   const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repo, env, encoding: 'utf-8' }).stdout.trim();
   writeFileSync(join(repo, '.git', 'MERGE_HEAD'), `${head}\n`);
-  assert.equal(hook().status, 0, 'a merge being concluded is not scanned');
+  const merge = hook();
+  assert.equal(merge.status, 0, merge.stderr);
+  assert.match(merge.stderr, /a merge is being concluded, so the staged diff was not scanned/);
   rmSync(join(repo, '.git', 'MERGE_HEAD'));
   assert.equal(hook().status, 1, 'the same index outside a merge is refused');
 

@@ -7,9 +7,10 @@
 //
 // Each completed run leaves a marker for the HEAD commit in the repository's git
 // directory, so a commit made after a review has none and needs its own. Exits 2 when
-// the review has findings at or above GATE, so no caller can take it for a clean run.
-// Findings below GATE are printed and do not block: a gated run reviews the whole diff
-// afresh, so blocking on every severity never converges (docs/superpowers/research/2026-11-17-review-loop).
+// the review has findings at or above GATE, or findings no passed gate placed below it,
+// so no caller can take it for a clean run. Findings below GATE are printed and do not
+// block: a gated run reviews the whole diff afresh, and blocking on every severity did
+// not converge in five passes (docs/superpowers/research/2026-11-17-review-loop).
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -72,7 +73,8 @@ const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--
 
 /**
  * What a finished `coderabbit review --agent --gate <GATE>` run established: {state: "findings",
- * findings} when its closing event says the gate is blocked, or reports findings without saying
+ * findings} when its closing event says the gate is blocked or counts blocking findings, or
+ * reports findings without saying
  * the gate passed (a partial review, a gate with no result), so they are declined and not
  * skipped; {state: "clean"} only when the CLI exited 0, the gate passed with nothing blocking and
  * no file was left unreviewed (`completed_with_warnings` is then still a full review), with
@@ -88,7 +90,7 @@ export function reviewResult(status, stdout) {
   }
   if (!complete || !Number.isInteger(complete.findings)) return null;
   const gate = complete.gate?.status;
-  const blocking = Number.isInteger(complete.gate?.blockingFindings) ? complete.gate.blockingFindings : 0;
+  const blocking = Number(complete.gate?.blockingFindings) || 0;
   if (gate === 'blocked' || blocking > 0) return { state: 'findings', findings: blocking || Math.max(complete.findings, 1) };
   // Without a passed gate nothing says these are below it.
   if (gate !== 'passed' && complete.findings > 0) return { state: 'findings', findings: complete.findings };
@@ -139,7 +141,7 @@ export function main(args, { cwd = process.cwd(), run = runCodeRabbit } = {}) {
   if (result.state === 'clean') {
     return { code: 0, out, ...(result.belowGate && { err: `${result.belowGate} finding(s) below ${GATE} on ${sha} do not block the push. Read them above: fix a regression or a defect in what this branch is for, and list the rest in the pull request.\n` }) };
   }
-  return { code: 2, out, err: `${result.findings} ${GATE} or critical finding(s) on ${sha}. Check each against the code. Fix the confirmed ones, commit and review again; for the rest run this script with --decline "<reason>".\n` };
+  return { code: 2, out, err: `${result.findings} blocking finding(s) on ${sha} (${GATE} or above, or not placed below the gate by a full review). Check each against the code. Fix the confirmed ones, commit and review that commit; for the rest run this script with --decline "<reason>".\n` };
 }
 
 if (isMainModule(import.meta.url)) {

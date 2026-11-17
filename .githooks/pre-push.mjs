@@ -22,7 +22,10 @@ export function pushVerdict(stdin, cwd) {
     if (!remoteRef.startsWith('refs/heads/') || remoteRef === 'refs/heads/main' || /^0+$/.test(sha)) continue;
     const marker = readMarker(cwd, sha);
     const name = `${localRef} (${sha.slice(0, 8)})`;
-    if (marker?.state === 'clean') continue;
+    if (marker?.state === 'clean') {
+      if (marker.belowGate) notes.push(`${name} goes with ${marker.belowGate} finding(s) below the gate left open.`);
+      continue;
+    }
     if (marker?.state === 'skipped') notes.push(`${name} goes with no review: ${marker.reason}`);
     else if (marker?.state === 'declined') notes.push(`${name} goes with ${marker.findings} finding(s) declined: ${marker.reason}`);
     else if (marker?.state === 'findings') refused.push(`${name} has ${marker.findings} open finding(s). Fix them, commit and review again, or run \`${REVIEW} --decline "<reason>"\`.`);

@@ -35,7 +35,7 @@ Each row was measured on this repository or read from the CodeRabbit or GitHub d
 2. `.claude/rules/dev-workflow.md` caps a branch at two local passes and says which findings to fix.
 3. `.coderabbit.yaml`: `profile: chill`, pause after two reviewed commits, and `docs/superpowers/**` left out of review. Each line is marked `Fork:`. `learnings.approval_delay` stays at upstream's 7: on a public repository anyone can ask for a learning in a comment, and the delay is the maintainer's chance to reject it.
 4. The deviations table has a row for `.coderabbit.yaml` and no longer calls it inert.
-5. `.githooks/pre-commit.mjs` scans the staged diff with `gitleaks`, using the default rules without `generic-api-key` (`.githooks/gitleaks.toml`). A merge being concluded is not scanned, because it stages the other side's changes.
+5. `.githooks/pre-commit.mjs` scans the staged diff with `gitleaks`, using the default rules (`.githooks/gitleaks.toml`), with `generic-api-key` off under `tests/`, `web/tests/`, `providers/`, `docs/` and for `test-all.mjs`. A merge being concluded is not scanned and says so, because it stages the other side's changes.
 6. `codeql.yml` reads `.github/codeql/codeql-config.yml`, which leaves `tests/**` and `web/tests/**` out of the JavaScript scan.
 
 ## Tradeoffs
@@ -44,7 +44,8 @@ Each row was measured on this repository or read from the CodeRabbit or GitHub d
 - The JavaScript suites under `tests/` and `web/tests/` are no longer scanned by CodeQL. Go test files, `test-all.mjs` and `publish/tests` still are.
 - `.coderabbit.yaml` now differs from upstream in three settings, so an upstream edit near them needs a hand merge.
 - A machine without `gitleaks` commits unscanned. GitHub push protection is still behind it.
-- The secret scan no longer flags a generic key-shaped value, only the vendor token shapes.
+- Under the suites, the providers and the docs the secret scan flags only the vendor token shapes, not a generic key-shaped value. Disabling that rule everywhere was tried first and stopped catching 8 of 14 generated secret shapes.
+- A secret added while a merge is being concluded is not scanned.
 
 ## Not measured
 
