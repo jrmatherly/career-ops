@@ -479,7 +479,8 @@ export function trackerRowFault(line, colmap, options = {}) {
   }
   const cells = innerCells(line);
   const need = cellCount ?? Math.max(...Object.values(colmap));
-  const least = urlOptional && colmap.url != null ? colmap.url - 1 : need;
+  // Only a URL column at the end can be the one cell a row stops before.
+  const least = urlOptional && colmap.url === need ? need - 1 : need;
   if (cells.length < least) {
     const onlyUrl = !urlOptional && colmap.url === need && cells.length === need - 1
       && trackerRowFault(line, colmap, { ...options, urlOptional: true }) === null;

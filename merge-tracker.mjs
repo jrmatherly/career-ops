@@ -1680,6 +1680,8 @@ export async function mergeTracker(options = {}) {
     const inspected = inspectTrackerRows(appLines, COLMAP, { isStatus: isKnownStatus, urlOptional: BACKFILL_URLS });
     for (const { line } of inspected.rows) {
       const app = parseAppLine(line);
+      // --backfill-urls admits a row that stops before its URL cell, which parseAppLine does not read.
+      if (!app) continue;
       existingApps.push(app);
       if (app.num > maxNum) maxNum = app.num;
     }
@@ -1716,6 +1718,8 @@ export async function mergeTracker(options = {}) {
       const backfilled = appLines.map((line, at) => {
         if (!soundLines.has(at)) return line;
         const app = parseAppLine(line);
+        // A row with no closing pipe that stops before its URL cell is not read here; it is left as it was.
+        if (!app) return line;
         // Rebuilt, not returned verbatim — a row can carry a URL and STILL be short
         // of the header on a layout with user-owned columns after `URL`. Returning
         // `line` there leaves the same unreadable row this fix exists to prevent.

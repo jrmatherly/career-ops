@@ -96,7 +96,7 @@ export async function mergeOver(row, args = [], { header = HEADER, addition = AD
   writeFileSync(join(adds, '002-acme.tsv'), addition);
   const run = () => new Promise((resolve, reject) => {
     const child = spawn(NODE, [join(ROOT, 'merge-tracker.mjs'), ...args], {
-      env: { ...process.env, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: adds, CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv') },
+      env: { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: adds, CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv') },
     });
     let out = '';
     child.stdout.on('data', (chunk) => { out += chunk; });
