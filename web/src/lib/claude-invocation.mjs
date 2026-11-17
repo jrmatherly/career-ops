@@ -193,11 +193,11 @@ export function claudeCliArgs({ kind, prompt, dataRoot, codeRoot }) {
  * 2.1.257 or later.
  *
  * The denies are cwd-relative or under `~`, so no root path is spelled into
- * them. They mirror the data-root files `unattendedReadDenies` names. On
- * Claude Code 2.1.325 `Read(./.env*)` was measured to refuse `.env*` in the
- * added checkout and in its `web/` too, but that matching is not documented,
- * so the absolute denies stay as the documented layer and a root they cannot
- * name is not guaranteed the same cover.
+ * them. They mirror the data-root files `unattendedReadDenies` names. Whether
+ * `Read(./.env*)` also covers `.env*` in the added checkout and its `web/` is
+ * not documented. `/api/run` therefore adds the absolute denies as well; the
+ * assistant and explore AI routes do not, and a root the absolute denies
+ * cannot name has only this layer.
  *
  * @param {string} codeRoot - The code checkout, added as a working directory.
  * @returns {string[]}

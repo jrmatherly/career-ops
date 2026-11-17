@@ -119,7 +119,7 @@ test("every free-text field is capped before masking, so a 256 KB body never rea
   const md = fs.readFileSync(file, "utf8");
   assert.ok(md.length < 200_000, `saved ${md.length} characters`);
   for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
-  // Each label is one unbroken 256 KB word, which the masker's bound drops whole.
+  // Each label is one unbroken 256 KB word, and the word a cut lands in is dropped.
   assert.equal((md.match(/^- $/gm) || []).length, 500, "steps are capped at 500");
 });
 
@@ -140,11 +140,32 @@ test("a URL password cut by a field's length bound is still masked", async (t) =
   assert.ok(!fs.readFileSync(file, "utf8").includes(password.slice(0, 12)), "the start of the password was saved");
 });
 
-test("a masked token longer than the masker's slack cannot pull a cut credential into the saved text", async (t) => {
-  const title = `sk-${"A".repeat(4370)} https://u:p4ssSECRETword99@example.invalid/x`;
-  const { res, file } = await saveRun(t, { id: "fictional-long-token", title, status: "done", steps: [], output: "" });
+test("each field is saved at or under its length, and the last 500 steps are kept", async (t) => {
+  const words = "word ".repeat(50_000);
+  const body = { id: "fictional-caps", title: words, page: words, input: words, status: "error", error: words, steps: Array.from({ length: 600 }, () => ({ kind: "status", label: words })), output: "" };
+  const { res, file } = await saveRun(t, body);
   assert.equal(res.status, 200);
-  assert.ok(!fs.readFileSync(file, "utf8").includes("p4ssSECRET"), "part of the password was saved");
+  const md = fs.readFileSync(file, "utf8");
+  const labels = md.match(/^- word.*$/gm) || [];
+  assert.equal(labels.length, 500);
+  for (const label of labels) assert.ok(label.length <= 302, `step label of ${label.length} characters`);
+  assert.ok((md.match(/^# Web run · (.*)$/m)?.[1].length ?? 0) <= 300, "title over 300 characters");
+  for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
+});
+
+test("500 long labels that end in a cut word are saved without a quadratic scan", async (t) => {
+  const label = `${"A".repeat(250)} ${"B".repeat(100_000)}`;
+  const before = process.cpuUsage();
+  const { res } = await saveRun(t, { id: "fictional-cpu", status: "done", steps: Array.from({ length: 500 }, () => ({ kind: "status", label })), output: "" });
+  const spent = process.cpuUsage(before);
+  assert.equal(res.status, 200);
+  assert.ok((spent.user + spent.system) / 1000 < 2000, `saving took ${Math.round((spent.user + spent.system) / 1000)} ms of CPU`);
+});
+
+test("an unbroken output far past the bound is still saved as the whole marker", async (t) => {
+  const { res, file } = await saveRun(t, { id: "fictional-unbroken-long", status: "done", steps: [], output: "FAKEfake".repeat(2000) });
+  assert.equal(res.status, 200);
+  assert.match(fs.readFileSync(file, "utf8"), /## Output\n\[output omitted: one unbroken 8000-character run\]\n$/);
 });
 
 test("a label at the start of a single-line output masks its value before the cut drops the label", async (t) => {

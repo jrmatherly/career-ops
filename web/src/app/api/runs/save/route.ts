@@ -41,17 +41,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid evaluation stop" }, { status: 400 });
   }
 
-  // Every free-text field is capped before masking, so a large body cannot stall the
-  // event loop, then masked: a key can surface in any of them, on any status. The
-  // masker reads 4096 characters past the saved length, and a word that bound
-  // lands in is dropped: cut there, a credential loses the part its pattern
-  // needs, and masking a long token before it could pull the rest into the save.
-  const WINDOW = 4096;
+  // Every free-text field is cut to its length before masking, so a large body
+  // cannot stall the event loop, then masked: a key can surface in any of them,
+  // on any status. A credential the cut splits has lost the part its pattern
+  // needs, so the word the cut lands in is dropped.
   const text = (v: unknown, max: number) => {
     const raw = String(v ?? "").trim();
-    const end = max + WINDOW;
-    const window = raw.length > end && /\S/.test(raw[end]) ? raw.slice(0, end).replace(/\S+$/, "") : raw.slice(0, end);
-    return maskSecrets(window).slice(0, max);
+    const masked = maskSecrets(raw.slice(0, max));
+    if (raw.length <= max || /\s/.test(raw[max])) return masked.trimEnd();
+    let end = masked.length;
+    while (end > 0 && !/\s/.test(masked[end - 1])) end--;
+    return masked.slice(0, end).trimEnd();
   };
   const title = text(b.title, 300);
   const page = text(b.page, 200);
@@ -62,22 +62,21 @@ export async function POST(req: Request) {
   // The client keeps the last 8000 characters. At that bound the first line, or in a
   // single-line output the first token, may start mid-key with no prefix or label left
   // to mask, so it is dropped. An unbroken run that long is unreadable and may be a key.
-  // Masked before that drop, so a label the drop removes has already masked its value.
+  // The drop comes after masking, so a label it removes has already masked its value.
   const rawOutput = String(b.output ?? "");
-  const dropCutStart = (s: string) => {
-    const nl = s.indexOf("\n");
-    if (nl !== -1) return s.slice(nl + 1);
-    return /\s/.test(s) ? s.replace(/^\S*\s*/, "") : `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
-  };
-  let output = rawOutput.slice(-(OUTPUT_MAX + WINDOW));
-  if (rawOutput.length > output.length) output = dropCutStart(output);
-  output = maskSecrets(output);
-  if (rawOutput.length >= OUTPUT_MAX) output = dropCutStart(output.slice(-OUTPUT_MAX));
+  let output = maskSecrets(rawOutput.slice(-OUTPUT_MAX));
+  if (rawOutput.length >= OUTPUT_MAX) {
+    const nl = output.indexOf("\n");
+    if (nl !== -1) output = output.slice(nl + 1);
+    else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
+    else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
+  }
 
   const dir = path.join(careerOpsRoot(), ".career-ops-web", "runs");
   try {
     fs.mkdirSync(dir, { recursive: true });
-  } catch {
+  } catch (err) {
+    console.error(`/api/runs/save: could not create ${dir}: ${(err as NodeJS.ErrnoException).code ?? err}`);
     return NextResponse.json({ error: "mkdir failed" }, { status: 500 });
   }
   const steps = (Array.isArray(b.steps) ? b.steps : []).slice(-STEPS_MAX).map((s) => `- ${s?.kind === "tool" ? "🔧 " : ""}${text(s?.label, 300)}`).join("\n");
