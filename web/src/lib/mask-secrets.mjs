@@ -29,12 +29,15 @@ export function isSecretName(name, names = []) {
   return SECRET_NAME.test(name) || [...names].includes(name);
 }
 
-// A name the rule matches can hold a setting: a path, a URL with no user info, or
-// for a key or token, lowercase words (PARTITION_KEY=location). Digits stay secret.
+// A name the rule matches can hold a setting. A path or a URL with no user info counts only
+// under a name that says it is a location (API_KEY_FILE, KEYCLOAK_URL): a base64 secret can
+// start with "/" and a webhook URL is a secret. For a key or token, lowercase words count
+// (PARTITION_KEY=location). Digits stay secret.
+const LOCATION_NAME = /(?:PATH|FILE|DIR|URL|URI|ENDPOINT|HOST)$/i;
 const SETTING_PATH = /^[~.]{0,2}\/[\w./-]*$/;
 const SETTING_URL = /^[a-z][a-z0-9+.-]*:\/\/[^\s@]+$/i;
 const SETTING_WORDS = /^[a-z]+(?:[-_.][a-z]+)*$/;
-const isSetting = (name, value) => SETTING_PATH.test(value) || SETTING_URL.test(value) || (/(?:KEY|TOKEN)$/i.test(name) && SETTING_WORDS.test(value));
+const isSetting = (name, value) => (LOCATION_NAME.test(name) && (SETTING_PATH.test(value) || SETTING_URL.test(value))) || (/(?:KEY|TOKEN)$/i.test(name) && SETTING_WORDS.test(value));
 
 /**
  * The secret values in `envs`, as written and JSON-escaped and URL-encoded, longest first.

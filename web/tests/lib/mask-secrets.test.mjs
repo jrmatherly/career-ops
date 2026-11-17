@@ -238,15 +238,17 @@ test("a URL password with an empty user name is masked", () => {
   assert.equal(maskSecrets("see http://a.invalid:8080/x and mail me@b.invalid"), "see http://a.invalid:8080/x and mail me@b.invalid");
 });
 
-test("a variable the name rule matches is not secret when its value is a path, a plain URL or, for a key or token, lowercase words", () => {
+test("a variable the name rule matches is not secret when it is named as a location and holds a path or plain URL, or is a key or token holding lowercase words", () => {
   const env = {
     LOCAL_BIN_KEY: "/usr/local/bin", SSH_KEY_PATH: "~/.ssh/id_ed25519", API_KEY_FILE: "./run/secrets/key", KEYCLOAK_URL: "https://sso.example.invalid/realms/main",
     TOKEN_ENDPOINT: "https://example.invalid/oauth/token", PARTITION_KEY: "location", CACHE_KEY: "evaluate", I18N_FALLBACK_KEY: "evaluation.fallback", TOKEN_TYPE_TOKEN: "access-token",
     MAX_TOKENS: "12000000", DB_PASSWORD: "correcthorsebattery", TOKEN_BUDGET_MODE: "standard", SORT_KEY: "createdAt", FAKE_TOKEN: "FAKEnodigitsatallHERE",
     PROXY_URL_SECRET: "https://fakeuser:FakePass000@proxy.invalid", JWT_SECRET: "/x9/FAKEbase64ish+00", GMAIL_CLIENT_ID: "/usr/local/bin/listed",
+    // A path or URL under a name that is not a location stays secret: a base64 key can start with "/", and a webhook URL is one.
+    FAKE_SECRET_ACCESS_KEY: "/FAKEbase64ishABCDEFGHijklmnopqrstuvwxyz", FAKE_WEBHOOK_TOKEN: "https://hooks.example.invalid/services/FAKE/FAKE",
   };
   const names = [...new Set(masker.knownSecrets([env], ["GMAIL_CLIENT_ID"]).map((k) => k.name))].sort();
-  assert.deepEqual(names, ["DB_PASSWORD", "FAKE_TOKEN", "GMAIL_CLIENT_ID", "JWT_SECRET", "MAX_TOKENS", "PROXY_URL_SECRET", "SORT_KEY", "TOKEN_BUDGET_MODE"]);
+  assert.deepEqual(names, ["DB_PASSWORD", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "JWT_SECRET", "LOCAL_BIN_KEY", "MAX_TOKENS", "PROXY_URL_SECRET", "SORT_KEY", "TOKEN_BUDGET_MODE"]);
 });
 
 test("200 known secrets mask a 128,000-character text in under 200 ms", () => {
