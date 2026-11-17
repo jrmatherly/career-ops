@@ -62,15 +62,17 @@ export async function POST(req: Request) {
   // The client keeps the last 8000 characters. At that bound the first line, or in a
   // single-line output the first token, may start mid-key with no prefix or label left
   // to mask, so it is dropped. An unbroken run that long is unreadable and may be a key.
+  // Masked before that drop, so a label the drop removes has already masked its value.
   const rawOutput = String(b.output ?? "");
-  let output = rawOutput.slice(-OUTPUT_MAX);
-  if (rawOutput.length >= OUTPUT_MAX) {
-    const nl = output.indexOf("\n");
-    if (nl !== -1) output = output.slice(nl + 1);
-    else if (/\s/.test(output)) output = output.replace(/^\S*\s*/, "");
-    else output = `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
-  }
+  const dropCutStart = (s: string) => {
+    const nl = s.indexOf("\n");
+    if (nl !== -1) return s.slice(nl + 1);
+    return /\s/.test(s) ? s.replace(/^\S*\s*/, "") : `[output omitted: one unbroken ${OUTPUT_MAX}-character run]`;
+  };
+  let output = rawOutput.slice(-(OUTPUT_MAX + WINDOW));
+  if (rawOutput.length > output.length) output = dropCutStart(output);
   output = maskSecrets(output);
+  if (rawOutput.length >= OUTPUT_MAX) output = dropCutStart(output.slice(-OUTPUT_MAX));
 
   const dir = path.join(careerOpsRoot(), ".career-ops-web", "runs");
   try {

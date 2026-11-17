@@ -220,6 +220,7 @@ ${snap.text}
 Reply ONE action JSON.`;
 
     const { out, sessionId } = await plannerTurn(resolved.binPath, prompt, resumeId, signal);
+    if (signal?.aborted) return { reached: false, turns: turn, reason: "stopped", steps };
     if (sessionId) resumeId = sessionId;
     const act = parseAction(out);
     if (!act) {

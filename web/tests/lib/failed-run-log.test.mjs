@@ -147,3 +147,11 @@ test("a masked token longer than the masker's slack cannot pull a cut credential
   assert.ok(!fs.readFileSync(file, "utf8").includes("p4ssSECRET"), "part of the password was saved");
 });
 
+test("a label at the start of a single-line output masks its value before the cut drops the label", async (t) => {
+  const hex = "0123456789abcdef".repeat(4);
+  const output = `api_key: ${hex} ${"word ".repeat(1600)}`.slice(0, 8000);
+  const { res, file } = await saveRun(t, { id: "fictional-label-cut", title: "t", status: "done", steps: [], output });
+  assert.equal(res.status, 200);
+  assert.ok(!fs.readFileSync(file, "utf8").includes(hex), "the key was saved without its label");
+});
+
