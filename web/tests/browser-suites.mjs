@@ -155,6 +155,8 @@ async function waitReady(url, server) {
 async function stopPainter(socketPath) {
   let pid;
   try { pid = Number(fs.readFileSync(`${socketPath}.pid`, "utf8")); } catch { return; }
+  // An empty pid file reads as 0, and signalling pid 0 would stop this runner's own group.
+  if (!Number.isInteger(pid) || pid <= 0) return;
   try { process.kill(pid, "SIGTERM"); } catch { return; }
   for (let i = 0; i < 100; i++) {
     try { process.kill(pid, 0); } catch { return; }
