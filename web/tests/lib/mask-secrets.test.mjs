@@ -238,7 +238,7 @@ test("a URL password with an empty user name is masked", () => {
   assert.equal(maskSecrets("see http://a.invalid:8080/x and mail me@b.invalid"), "see http://a.invalid:8080/x and mail me@b.invalid");
 });
 
-test("a variable the name rule matches is not secret when it is named as a location and holds a path or plain URL, or is a key or token holding lowercase words", () => {
+test("a variable the name rule matches is secret unless it is named as a location and holds a plain path or URL", () => {
   const env = {
     LOCAL_BIN_KEY: "/usr/local/bin", SSH_KEY_PATH: "~/.ssh/id_ed25519", API_KEY_FILE: "./run/secrets/key", KEYCLOAK_URL: "https://sso.example.invalid/realms/main",
     TOKEN_ENDPOINT: "https://example.invalid/oauth/token", PARTITION_KEY: "location", CACHE_KEY: "evaluate", I18N_FALLBACK_KEY: "evaluation.fallback", TOKEN_TYPE_TOKEN: "access-token",
@@ -246,9 +246,11 @@ test("a variable the name rule matches is not secret when it is named as a locat
     PROXY_URL_SECRET: "https://fakeuser:FakePass000@proxy.invalid", JWT_SECRET: "/x9/FAKEbase64ish+00", GMAIL_CLIENT_ID: "/usr/local/bin/listed",
     // A path or URL under a name that is not a location stays secret: a base64 key can start with "/", and a webhook URL is one.
     FAKE_SECRET_ACCESS_KEY: "/FAKEbase64ishABCDEFGHijklmnopqrstuvwxyz", FAKE_WEBHOOK_TOKEN: "https://hooks.example.invalid/services/FAKE/FAKE",
+    // A location name does not exempt a URL or path that carries a long token-like run.
+    FAKE_HOOK_SECRET_URL: "https://hooks.example.invalid/services/FAKEtokenFAKEtokenFAKEtoken", FAKE_KEY_FILE: "/run/FAKEtokenFAKEtokenFAKEtoken",
   };
   const names = [...new Set(masker.knownSecrets([env], ["GMAIL_CLIENT_ID"]).map((k) => k.name))].sort();
-  assert.deepEqual(names, ["DB_PASSWORD", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "JWT_SECRET", "LOCAL_BIN_KEY", "MAX_TOKENS", "PROXY_URL_SECRET", "SORT_KEY", "TOKEN_BUDGET_MODE"]);
+  assert.deepEqual(names, ["CACHE_KEY", "DB_PASSWORD", "FAKE_HOOK_SECRET_URL", "FAKE_KEY_FILE", "FAKE_SECRET_ACCESS_KEY", "FAKE_TOKEN", "FAKE_WEBHOOK_TOKEN", "GMAIL_CLIENT_ID", "I18N_FALLBACK_KEY", "JWT_SECRET", "LOCAL_BIN_KEY", "MAX_TOKENS", "PARTITION_KEY", "PROXY_URL_SECRET", "SORT_KEY", "TOKEN_BUDGET_MODE", "TOKEN_TYPE_TOKEN"]);
 });
 
 test("200 known secrets mask a 128,000-character text in under 200 ms", () => {
