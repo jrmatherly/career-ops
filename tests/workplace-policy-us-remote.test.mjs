@@ -67,9 +67,11 @@ test('remote countries turn the state rule on, whatever the onsite country', () 
 test('"Home" inside a place name is not home working', () => {
   assert.deepEqual(us('Nursing Home - Dallas, TX', 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
 });
-test('a negated telework marker does not make an office posting remote', () => {
+test('a negated home-working marker does not make an office posting remote', () => {
   const atlanta = buildWorkplacePolicy({ onsite_locations: ['Atlanta'], remote_countries: ['United States'] });
-  assert.deepEqual(atlanta('Austin, Texas (No telework)', 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
+  for (const marker of ['No telework', 'Non-virtual', 'Not virtual', 'No work from home', 'Not home based']) {
+    assert.deepEqual(atlanta(`Austin, Texas (${marker})`, 'Platform Lead'), { eligible: false, reason: 'onsite_outside_allowed_locations' }, marker);
+  }
   assert.deepEqual(atlanta('Austin, Texas (Telework)', 'Platform Lead'), REMOTE_OK);
 });
 for (const location of ['Home based - EMEA', 'Home, United Kingdom, HOME BASED', 'Virtual - Germany', 'Work at Home', 'Homewood, AL']) {

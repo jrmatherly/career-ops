@@ -135,7 +135,8 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
 // Home-working words in a location. Read only under a policy that allows the United States.
 const HOME_WORKING = /\b(?:virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?))\b|(?:^|[·;] ?)home ?[-,]/;
-const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*(?:remote|telework\w*)\b/;
+// Negates every word that REMOTE or HOME_WORKING reads as remote, so one is not added per marker.
+const NOT_REMOTE = /\b(?:non|not|no)[^a-z]*(?:remote|virtual|telework\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office))\b/;
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
 // A location lists its places between middle dots and semicolons.
