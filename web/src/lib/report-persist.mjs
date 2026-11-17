@@ -19,6 +19,7 @@ import { parseEvaluationOptions } from "./evaluation-options.mjs";
 import { machineSummarySection } from "./machine-summary-section.mjs";
 import { classifyEvaluationGate, evaluationGateConflictsWithReport } from "./evaluation-gate.mjs";
 import { APPLY_LINE } from "./report-sections.mjs";
+import { stoppedBy } from "./pdf-render.mjs";
 
 // Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
 const SCRIPT_TIMEOUT_MS = 120_000;
@@ -225,11 +226,10 @@ function spawnScript({ spawnFn, execPath, root, cwd = root, script, args = [], i
     child.stdout?.on("data", (d) => { stdout += d.toString(); });
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (d) => { stderr += d.toString(); });
-    // Nothing else in the app signals this child, so a signal is its timeout.
     child.on("close", (code, signal) => resolve({
       ok: code === 0,
       stdout: stdout.trim(),
-      stderr: signal ? `${script} was stopped after ${SCRIPT_TIMEOUT_MS / 1000} seconds.` : stderr.trim(),
+      stderr: signal ? stoppedBy(script, SCRIPT_TIMEOUT_MS, signal, stderr) : stderr.trim(),
     }));
     child.on("error", (e) => resolve({ ok: false, stdout: "", stderr: `${script} failed to start: ${e.message}` }));
     if (input != null) {

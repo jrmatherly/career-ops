@@ -52,3 +52,11 @@ test("a step killed by its timer says it was stopped, and after how long", async
   assert.equal(p.ok, false);
   assert.match(p.error, /reserve-report-num\.mjs was stopped after 120 seconds/);
 });
+
+test("a step killed by another signal names the signal, not a timeout", async () => {
+  const killed = (_exec, _args, o) => spawn(process.execPath, ["-e", "setTimeout(() => {}, 30_000)"], { ...o, timeout: 300, killSignal: "SIGKILL" });
+  const r = await spawnGeneratePdf({ ...pdf, coreRoot: process.cwd(), spawnFn: killed });
+  assert.equal(r.ok, false);
+  assert.match(r.stderr, /PDF rendering was killed by SIGKILL/);
+  assert.doesNotMatch(r.stderr, /stopped after/);
+});

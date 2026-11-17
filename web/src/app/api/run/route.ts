@@ -167,7 +167,7 @@ export async function POST(req: Request) {
         console.error(`/api/run: ${kind} realpath of the ${label} failed: ${code}${fenced ? "" : "; the run goes ahead without Read denies"}`);
         // claudeCliArgs throws on one root without the other, so an attended skip clears both.
         if (!fenced) {
-          readDeniesDropped = `Read denies are off for this run: the ${label} path could not be resolved (${code}). The agent can read files there it would otherwise be refused.`;
+          readDeniesDropped = `Some Read denies are off for this run: the ${label} path could not be resolved (${code}). The run is still kept to its working directories, but the files the denies name by full path are no longer refused.`;
           delete denyRoots.dataRoot; delete denyRoots.codeRoot; break;
         }
         return Response.json({ error: `${kind} could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
@@ -176,7 +176,7 @@ export async function POST(req: Request) {
         // A Windows path never matches, and a 400 here would break attended evaluate there.
         if (!fenced) {
           console.error(`/api/run: ${kind} runs without Read denies: the ${label} ${real} is not deny-safe`);
-          readDeniesDropped = `Read denies are off for this run: the ${label} path holds characters the denies cannot spell. The agent can read files there it would otherwise be refused.`;
+          readDeniesDropped = `Some Read denies are off for this run: the ${label} path holds characters the denies cannot spell. The run is still kept to its working directories, but the files the denies name by full path are no longer refused.`;
           delete denyRoots.dataRoot; delete denyRoots.codeRoot; break;
         }
         return Response.json({

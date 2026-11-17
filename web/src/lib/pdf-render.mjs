@@ -21,8 +21,10 @@ import { dataFolderMissingMessage } from "./core/data-root.mjs";
 const RENDER_TIMEOUT_MS = 180_000;
 // Above the CLI's one-minute tracker-lock wait, so a contended lock reports its own exit first.
 const MARK_READY_TIMEOUT_MS = 120_000;
-// Nothing else in the app signals these children, so a signal is their timeout.
-const timedOut = (step, ms) => `${step} was stopped after ${ms / 1000} seconds.`;
+// Node's spawn timeout sends SIGTERM and nothing else in the app signals these children; any other signal came from outside.
+export const stoppedBy = (step, ms, signal, stderr) => (signal === "SIGTERM"
+  ? `${step} was stopped after ${ms / 1000} seconds.`
+  : `${step} was killed by ${signal}. ${stderr.trim()}`.trim());
 
 /**
  * @typedef {Object} PdfRunSignals
@@ -172,7 +174,7 @@ export function spawnGeneratePdf({ spawnFn, execPath, coreRoot, html, finalPdf, 
       const ok = code === 0;
       const after = pdfFingerprint(finalPdf);
       const landed = after !== null && after !== before;
-      resolve({ ok, delivered: ok && landed, stderr: signal ? timedOut("PDF rendering", RENDER_TIMEOUT_MS) : stderr.trim() });
+      resolve({ ok, delivered: ok && landed, stderr: signal ? stoppedBy("PDF rendering", RENDER_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, delivered: false, stderr: `PDF rendering failed to start: ${e.message}` }));
   });
@@ -209,7 +211,7 @@ export function spawnAtsPdf({ spawnFn, execPath, coreRoot, html, finalPdf, forma
       const ok = code === 0;
       const after = pdfFingerprint(finalPdf);
       const landed = after !== null && after !== before;
-      resolve({ ok, delivered: ok && landed, stderr: signal ? timedOut("ATS PDF rendering", RENDER_TIMEOUT_MS) : stderr.trim() });
+      resolve({ ok, delivered: ok && landed, stderr: signal ? stoppedBy("ATS PDF rendering", RENDER_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, delivered: false, stderr: `ATS PDF rendering failed to start: ${e.message}` }));
   });
@@ -276,7 +278,7 @@ export function markTrackerReady({ spawnFn, execPath, coreRoot, reportNum, dataR
     child.on("close", (code, signal) => {
       let data = null;
       try { data = JSON.parse(stdout); } catch { /* not JSON, or exited before printing any */ }
-      resolve({ ok: code === 0, code, data, stderr: signal ? timedOut("mark-pdf-ready.mjs", MARK_READY_TIMEOUT_MS) : stderr.trim() });
+      resolve({ ok: code === 0, code, data, stderr: signal ? stoppedBy("mark-pdf-ready.mjs", MARK_READY_TIMEOUT_MS, signal, stderr) : stderr.trim() });
     });
     child.on("error", (e) => resolve({ ok: false, code: null, data: null, stderr: `mark-pdf-ready.mjs failed to start: ${e.message}` }));
   });
