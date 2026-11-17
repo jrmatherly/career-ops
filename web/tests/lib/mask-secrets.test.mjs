@@ -160,7 +160,7 @@ test("a URL password holding an @ is masked up to the host", () => {
 });
 
 test("a path assigned to PWD is not taken for a password", () => {
-  for (const s of ["PWD=/srv/app", "PWD=/srv/career-ops", 'pwd: "/home/me/work"']) assert.equal(maskSecrets(s), s);
+  for (const s of ["PWD=/srv/app", "PWD=/srv/career-ops", 'PWD="/home/me/work"']) assert.equal(maskSecrets(s), s);
 });
 
 test("GitLab and Hugging Face token prefixes are masked", () => {
@@ -274,6 +274,7 @@ test("a password that looks like a path is masked, and the shell's PWD is not", 
   assert.equal(maskSecrets("password=/a/b/c next"), "password=[masked] next");
   assert.equal(maskSecrets('password: "/x9/abc/def"'), 'password: "[masked]"');
   assert.equal(maskSecrets("PWD=/srv/app/x OLDPWD=/srv/app/y"), "PWD=/srv/app/x OLDPWD=/srv/app/y");
+  assert.equal(maskSecrets("db_pwd=/a/b/c pwd: /a/b/c dbPwd=/a/b/c"), "db_pwd=[masked] pwd: [masked] dbPwd=[masked]");
 });
 
 test("a known secret that overlaps its own next occurrence is masked whole", () => {

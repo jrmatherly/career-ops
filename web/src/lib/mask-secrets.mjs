@@ -164,8 +164,8 @@ export function maskSecrets(s, known = []) {
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
     .replace(LABELLED, (m, label, sep, scheme = "", value) => ((scheme || hasDigit(value)) && !isPath(value) ? label + sep + scheme + MARK : m))
-    // Only the shell's PWD holds a path; a password that looks like one is still a password.
-    .replace(PASSWORD_ASSIGNED, (m, label, value) => (/^pwd/i.test(label) && isPath(value.replace(/^["']|["']$/g, "")) ? m : maskValue(label, value)))
+    // Only the shell's own PWD= holds a path. A password that looks like one, under db_pwd or any other label, is still a password.
+    .replace(PASSWORD_ASSIGNED, (m, label, value, at, all) => (/^PWD=["']?$/.test(label) && !/[A-Za-z0-9_]/.test(all[at - 1] ?? "") && isPath(value.replace(/^["']|["']$/g, "")) ? m : maskValue(label, value)))
     .replace(FLAG, (m, label, value) => maskValue(label, value))
     .replace(AUTH_SCHEME, `$1${MARK}`);
 }
