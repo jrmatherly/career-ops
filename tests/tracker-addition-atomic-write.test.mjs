@@ -1,8 +1,8 @@
-// tests/tracker-addition-atomic-write.test.mjs: gemini-eval never leaves a half-written tracker addition.
+// tests/tracker-addition-atomic-write.test.mjs: gemini-eval, ollama-eval and openai-eval never leave a half-written tracker addition.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -27,36 +27,58 @@ fs.writeFileSync = (file, content, options) => {
 };
 require('node:module').syncBuiltinESMExports();`;
 
-test('gemini-eval never leaves a half-written tracker addition', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'co-gemini-atomic-'));
-  sandboxes.push(dir);
-  mkdirSync(join(dir, 'config'), { recursive: true });
-  mkdirSync(join(dir, 'modes'), { recursive: true });
-  mkdirSync(join(dir, 'data'));
-  writeFileSync(join(dir, 'cv.md'), '# Test Candidate\n\n## Experience\n');
-  writeFileSync(join(dir, 'config', 'profile.yml'), 'candidate:\n  full_name: Test Candidate\n');
-  writeFileSync(join(dir, 'modes', '_profile.md'), '# Profile\n');
-  writeFileSync(join(dir, 'jd.txt'), `Senior Data Analyst at Marrowfield Grocers.\n\n${MARKER}\n`);
-  const hook = join(dir, 'gemini-fetch.mjs');
-  writeFileSync(hook, `
-import { writeFileSync } from 'node:fs';
-globalThis.fetch = async (url, init) => {
-  if (String(url).includes(':countTokens')) return Response.json({ totalTokens: 1 });
-  writeFileSync(process.env.CAPTURE, String(init?.body ?? ''));
+// One stand-in fetch answers all three APIs: Gemini's generateContent, Ollama's
+// streamed /api/chat (after its /api/tags probe), and an OpenAI-compatible
+// streamed /chat/completions.
+const FETCH_HOOK = `
+globalThis.fetch = async (url) => {
+  const u = String(url);
+  const reply = process.env.MODEL_REPLY;
+  if (u.includes(':countTokens')) return Response.json({ totalTokens: 1 });
+  if (u.endsWith('/api/tags')) return Response.json({ models: [] });
+  if (u.endsWith('/api/chat')) {
+    return new Response([{ message: { role: 'assistant', content: reply }, done: false }, { message: { role: 'assistant', content: '' }, done: true, done_reason: 'stop', prompt_eval_count: 1, eval_count: 1 }]
+      .map((c) => JSON.stringify(c)).join('\\n') + '\\n');
+  }
+  if (u.endsWith('/chat/completions')) {
+    return new Response([{ choices: [{ delta: { content: reply } }] }, { choices: [{ delta: {}, finish_reason: 'stop' }] }]
+      .map((c) => 'data: ' + JSON.stringify(c) + '\\n\\n').join('') + 'data: [DONE]\\n\\n');
+  }
   return Response.json({
-    candidates: [{ index: 0, finishReason: 'STOP', content: { role: 'model', parts: [{ text: process.env.MODEL_REPLY }] } }],
+    candidates: [{ index: 0, finishReason: 'STOP', content: { role: 'model', parts: [{ text: reply }] } }],
     usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
   });
 };
-`);
-  writeFileSync(join(dir, 'fail.cjs'), failPreload);
-  const r = spawnSync(process.execPath, ['--require', join(dir, 'fail.cjs'), '--import', pathToFileURL(hook).href,
-    join(ROOT, 'gemini-eval.mjs'), '--file', join(dir, 'jd.txt')], { cwd: dir, encoding: 'utf-8', timeout: 60_000,
-    env: { PATH: process.env.PATH, HOME: dir, CAREER_OPS_ROOT: dir, GEMINI_API_KEY: 'test-key-not-real', MODEL_REPLY: REPLY, CAPTURE: join(dir, 'req.json') } });
-  const adds = join(dir, 'batch', 'tracker-additions');
-  const tsvs = readdirSync(adds).filter((f) => /^\d.*\.tsv$/.test(f));
-  assert.equal(tsvs.length, 1, `${r.stdout}${r.stderr}`.slice(-800));
-  const text = readFileSync(join(adds, tsvs[0]), 'utf-8');
-  assert.ok(text.endsWith('\n') && text.split('\n').length === 3, `partial addition on disk: ${JSON.stringify(text)}`);
-  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`.slice(-800));
-});
+`;
+
+const EVALUATORS = {
+  'gemini-eval.mjs': { args: [], env: { GEMINI_API_KEY: 'test-key-not-real' } },
+  'ollama-eval.mjs': { args: ['--url', 'http://127.0.0.1:11434', '--model', 'synthetic-test'], env: { OLLAMA_TIMEOUT_MS: '10000' } },
+  'openai-eval.mjs': { args: ['--url', 'https://api.openai.com/v1', '--model', 'gpt-4o-mini'], env: { OPENAI_API_KEY: 'test-key-not-real' } },
+};
+
+for (const [script, { args, env }] of Object.entries(EVALUATORS)) {
+  test(`${script} never leaves a half-written tracker addition`, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'co-eval-atomic-'));
+    sandboxes.push(dir);
+    mkdirSync(join(dir, 'config'), { recursive: true });
+    mkdirSync(join(dir, 'modes'), { recursive: true });
+    mkdirSync(join(dir, 'data'));
+    writeFileSync(join(dir, 'cv.md'), '# Test Candidate\n\n## Experience\n');
+    writeFileSync(join(dir, 'config', 'profile.yml'), 'candidate:\n  full_name: Test Candidate\n');
+    writeFileSync(join(dir, 'modes', '_profile.md'), '# Profile\n');
+    writeFileSync(join(dir, 'jd.txt'), `Senior Data Analyst at Marrowfield Grocers.\n\n${MARKER}\n`);
+    const hook = join(dir, 'fetch.mjs');
+    writeFileSync(hook, FETCH_HOOK);
+    writeFileSync(join(dir, 'fail.cjs'), failPreload);
+    const r = spawnSync(process.execPath, ['--require', join(dir, 'fail.cjs'), '--import', pathToFileURL(hook).href,
+      join(ROOT, script), ...args, '--file', join(dir, 'jd.txt')], { cwd: dir, encoding: 'utf-8', timeout: 60_000,
+      env: { PATH: process.env.PATH, HOME: dir, CAREER_OPS_ROOT: dir, DOTENV_CONFIG_QUIET: 'true', MODEL_REPLY: REPLY, ...env } });
+    const adds = join(dir, 'batch', 'tracker-additions');
+    const tsvs = existsSync(adds) ? readdirSync(adds).filter((f) => /^\d.*\.tsv$/.test(f)) : [];
+    assert.equal(tsvs.length, 1, `${r.stdout}${r.stderr}`.slice(-800));
+    const text = readFileSync(join(adds, tsvs[0]), 'utf-8');
+    assert.ok(text.endsWith('\n') && text.split('\n').length === 3, `partial addition on disk: ${JSON.stringify(text)}`);
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`.slice(-800));
+  });
+}
