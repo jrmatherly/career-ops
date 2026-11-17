@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { maskSecrets } from "../../src/lib/mask-secrets.mjs";
+import * as masker from "../../src/lib/mask-secrets.mjs";
+
+const { maskSecrets } = masker;
 
 test("ordinary prose and error messages come through unchanged", () => {
   for (const s of [
@@ -134,5 +136,72 @@ test("a value after an explicit Basic or Bearer scheme is masked even with no di
 test("a short value after an Authorization scheme is masked", () => {
   assert.equal(maskSecrets("Authorization: Basic YTpi"), "Authorization: Basic [masked]");
   assert.equal(maskSecrets("Proxy-Authorization: Bearer abc1"), "Proxy-Authorization: Bearer [masked]");
+});
+
+test("a quoted password is masked to its closing quote", () => {
+  assert.equal(maskSecrets('password: "fake pass phrase"'), 'password: "[masked]"');
+  assert.equal(maskSecrets("password='fake pass phrase' next"), "password='[masked]' next");
+  assert.equal(maskSecrets('{"password": "fake pass phrase", "user": "u"}'), '{"password": "[masked]", "user": "u"}');
+  assert.equal(maskSecrets('password: "fake pass phrase cut by the end'), 'password: "[masked]');
+});
+
+test("a credential passed as a command-line flag is masked", () => {
+  for (const [s, out] of [
+    ["--password fakepass0", "--password [masked]"],
+    ["--token FAKEtokenvalue", "--token [masked]"],
+    ["run --api-key=FAKEkeyvalue --verbose", "run --api-key=[masked] --verbose"],
+    ['--github-token "fake token"', '--github-token "[masked]"'],
+  ]) assert.equal(maskSecrets(s), out);
+  for (const s of ["--max-tokens 4096", "--token-limit 4096", "--password --verbose"]) assert.equal(maskSecrets(s), s);
+});
+
+test("a URL password holding an @ is masked up to the host", () => {
+  assert.equal(maskSecrets("fetch https://fakeuser:fake@pass@example.invalid/x failed"), "fetch https://fakeuser:[masked]@example.invalid/x failed");
+});
+
+test("a path assigned to PWD is not taken for a password", () => {
+  for (const s of ["PWD=/srv/app", "PWD=/srv/career-ops", 'pwd: "/home/me/work"']) assert.equal(maskSecrets(s), s);
+});
+
+test("GitLab and Hugging Face token prefixes are masked", () => {
+  assert.equal(maskSecrets("glpat-" + "FAKE0000fake1111FAKE"), "glpat-[masked]");
+  assert.equal(maskSecrets("hf_" + "FAKE0000fake1111FAKE2222"), "hf_[masked]");
+});
+
+test("a secret the server holds is masked by value, with no label or shape", () => {
+  const known = masker.knownSecrets([{ FAKE_SERVICE_API_KEY: "FAKEnodigitsatallHERE", HOME: "/home/fake", SHORT_TOKEN: "abc" }]);
+  assert.deepEqual(known, [{ name: "FAKE_SERVICE_API_KEY", value: "FAKEnodigitsatallHERE" }]);
+  assert.equal(maskSecrets("upstream rejected FAKEnodigitsatallHERE twice", known), "upstream rejected [masked:FAKE_SERVICE_API_KEY] twice");
+});
+
+test("the tail of a known secret at the start of the text is masked", () => {
+  const known = masker.knownSecrets([{ FAKE_TOKEN: "FAKEnodigitsatallHERE" }]);
+  assert.equal(maskSecrets("digitsatallHERE and more", known), "[masked:FAKE_TOKEN] and more");
+  assert.equal(maskSecrets("HERE and more", known), "HERE and more");
+});
+
+test("a variable named outside the name rule is secret when listed", () => {
+  const env = { FAKE_CLIENT_ID: "FAKEclientidvalue" };
+  assert.deepEqual(masker.knownSecrets([env]), []);
+  assert.deepEqual(masker.knownSecrets([env], ["FAKE_CLIENT_ID"]), [{ name: "FAKE_CLIENT_ID", value: "FAKEclientidvalue" }]);
+});
+
+test("every secret in the settings registry is masked by value", async () => {
+  const { SETTINGS } = await import("../../../lib/settings-registry.mjs");
+  const { CAREER_OPS_SECRET_ENV } = await import("../../src/lib/spawn-cli.mjs");
+  const ids = SETTINGS.filter((s) => s.kind === "secret").map((s) => s.id);
+  assert.ok(ids.length > 0);
+  for (const id of [...ids, ...CAREER_OPS_SECRET_ENV]) assert.ok(masker.isSecretName(id, CAREER_OPS_SECRET_ENV), id);
+});
+
+test("pathological inputs of 128,000 characters are masked in under 200 ms", () => {
+  const known = masker.knownSecrets?.([{ FAKE_API_KEY: "FAKEknownvalue00" }]) ?? [];
+  for (const unit of ["key=", "password=", 'password: "', "'", '"', "@", "https://u:", "a://b:@", "--password ", "--", "-", "sk-", "eyJ", "Authorization: Bearer ", "FAKEknown"]) {
+    const s = unit.repeat(Math.ceil(128_000 / unit.length)).slice(0, 128_000);
+    const t0 = performance.now();
+    maskSecrets(s, known);
+    const ms = performance.now() - t0;
+    assert.ok(ms < 200, `${JSON.stringify(unit)} took ${ms.toFixed(1)} ms`);
+  }
 });
 
