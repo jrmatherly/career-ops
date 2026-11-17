@@ -69,6 +69,8 @@ export async function POST(req: Request) {
           // Snapshot first. Finalizing replaces s.fields and reassigns positional ids.
           const beforeFields = Array.isArray(s.fields) ? s.fields.slice() : [];
           const fin = await finalizeDrivenSession(s.id, cliId);
+          // A cancel that lands after the drive must not go on to attach the résumé.
+          if (abort.signal.aborted) return;
           if (!fin) {
             const unread = { level: "warn" as const, code: "fill-unverified", message: "Couldn't read the form back, so it is not counted as pre-filled." };
             emit({

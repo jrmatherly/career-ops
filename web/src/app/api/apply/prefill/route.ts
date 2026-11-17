@@ -101,6 +101,7 @@ export async function POST(req: Request) {
 
       log(`Form: "${s.title}" · ${s.fields.length} fields · prompt ${prompt.length} chars · memory ${mem.length} chars`);
       log(`CV source: ${cvSource ?? "none found — answers will come from cv.md"}`);
+      if (abort.signal.aborted) return;
       log(`Planner: ${cliId} (${binPath})`);
       const result = await runPlanner({
         cliId,

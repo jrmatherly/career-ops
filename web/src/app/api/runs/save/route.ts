@@ -42,8 +42,10 @@ export async function POST(req: Request) {
   }
 
   // Every free-text field is capped before masking, so a large body cannot stall the
-  // event loop, then masked: a key can surface in any of them, on any status.
-  const text = (v: unknown, max: number) => maskSecrets(String(v ?? "").trim().slice(0, max));
+  // event loop, then masked: a key can surface in any of them, on any status. The
+  // masker sees 4096 characters past the saved length, so the cut cannot fall
+  // inside a credential and strip the part its pattern needs.
+  const text = (v: unknown, max: number) => maskSecrets(String(v ?? "").trim().slice(0, max + 4096)).slice(0, max);
   const title = text(b.title, 300);
   const page = text(b.page, 200);
   const input = text(b.input, 2000);

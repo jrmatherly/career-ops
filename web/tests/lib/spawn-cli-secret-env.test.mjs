@@ -56,3 +56,12 @@ test("a writing worker (fix-portal) keeps every key", async () => {
   const keys = await childEnvKeys("claude", CAPS.workspaceWrite);
   for (const key of Object.keys(MADE_UP_ENV)) assert.equal(keys.includes(key), true, key);
 });
+
+test("a secret spelled in another case is dropped where the platform ignores case", async () => {
+  const child = spawnHeadlessCli(process.execPath, ["-e", PRINT_ENV_KEYS], { env: { ...process.env, Privacy_Bypass_Token: "x" } }, { cliId: "gemini", capabilities: CAPS.networkReadOnly });
+  let out = "";
+  child.stdout.on("data", (c) => { out += c; });
+  await new Promise((resolve) => child.on("close", resolve));
+  const kept = JSON.parse(out).some((key) => key.toUpperCase() === "PRIVACY_BYPASS_TOKEN");
+  assert.equal(kept, process.platform !== "win32");
+});

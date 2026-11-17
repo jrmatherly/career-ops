@@ -99,7 +99,10 @@ export function spawnHeadlessCli(binPath, args, options, fencing) {
   if (!fencing.capabilities.writes) {
     const env = { ...(options?.env ?? process.env) };
     const foreign = Object.hasOwn(FOREIGN_AGENT_ENV, fencing.cliId) ? FOREIGN_AGENT_ENV[fencing.cliId] : [];
-    for (const key of [...CAREER_OPS_SECRET_ENV, ...foreign]) delete env[key];
+    // Windows reads environment names without regard to case, so a mixed-case spelling counts.
+    const fold = (key) => (process.platform === "win32" ? key.toUpperCase() : key);
+    const denied = new Set([...CAREER_OPS_SECRET_ENV, ...foreign].map(fold));
+    for (const key of Object.keys(env)) if (denied.has(fold(key))) delete env[key];
     options = { ...options, env };
   }
   // windowsHide stays in this call. The launch census reads the argument

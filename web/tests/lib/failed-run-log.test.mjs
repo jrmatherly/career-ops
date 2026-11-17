@@ -130,3 +130,11 @@ test("non-string field values are saved as text, not a 500", async (t) => {
   assert.match(md, /## Error\n+42/);
   assert.match(md, /## Output\n123/);
 });
+
+test("a URL password cut by a field's length bound is still masked", async (t) => {
+  const password = "p4ssword1234567890TAILTAILTAIL";
+  const title = `${"a".repeat(271)} https://u:${password}@example.invalid/x`;
+  const { res, file } = await saveRun(t, { id: "fictional-cut-url", title, status: "done", steps: [], output: "" });
+  assert.equal(res.status, 200);
+  assert.ok(!fs.readFileSync(file, "utf8").includes(password.slice(0, 12)), "the start of the password was saved");
+});
