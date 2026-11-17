@@ -98,7 +98,8 @@ ${output}
   try {
     fs.writeFileSync(path.join(dir, `${safeId}.md`), md);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error(`/api/runs/save: could not write the run log ${safeId}.md: ${(err as NodeJS.ErrnoException).code ?? "unknown error"}`);
     return NextResponse.json({ error: "write failed" }, { status: 500 });
   }
 }

@@ -204,7 +204,10 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ id, title: opts.title, subtitle: opts.subtitle, page: opts.page, input: opts.input, status, gate, result, cost, steps, output: text, error: status === "error" ? lastLabel : undefined }),
-            }).catch(() => {});
+            }).then(
+              (r) => { if (!r.ok) console.error(`The run log for ${id} was not saved: HTTP ${r.status}`); },
+              (err) => console.error(`The run log for ${id} was not saved:`, err),
+            );
             // Tell server-snapshot surfaces (Today, pipeline) to refetch — the
             // worker just wrote a real tracker row / report they don't yet see.
             if (status === "done" && typeof window !== "undefined" && (opts.kind === "evaluate" || opts.kind === "pdf")) {

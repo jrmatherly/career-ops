@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { spawn } from "node:child_process";
 import { spawnGeneratePdf, spawnAtsPdf, markTrackerReady } from "../../src/lib/pdf-render.mjs";
 import { persistEvaluation } from "../../src/lib/report-persist.mjs";
 
@@ -34,4 +35,20 @@ test("generate-pdf runs get 180 s, mark-pdf-ready and the persist scripts 120 s"
   assert.equal(m.opts[0].timeout, 120_000);
   const p = recorder(); await persistEvaluation({ spawnFn: p.spawnFn, execPath: "node", root: "/root", markdown: REPORT, url: "https://example.invalid/j", today: "2026-11-16" });
   assert.equal(p.opts[0].timeout, 120_000);
+});
+
+// A real child that outlives a 300 ms kill timer, in place of the script, so the
+// close handler sees the signal Node's timeout sends.
+const outlivesTimer = (_exec, _args, o) => spawn(process.execPath, ["-e", "setTimeout(() => {}, 30_000)"], { ...o, timeout: 300 });
+test("a step killed by its timer says it was stopped, and after how long", async () => {
+  for (const run of [spawnGeneratePdf, spawnAtsPdf]) {
+    const r = await run({ ...pdf, coreRoot: process.cwd(), spawnFn: outlivesTimer });
+    assert.equal(r.ok, false);
+    assert.match(r.stderr, /PDF rendering was stopped after 180 seconds/);
+  }
+  const m = await markTrackerReady({ spawnFn: outlivesTimer, execPath: "node", coreRoot: process.cwd(), reportNum: "001" });
+  assert.match(m.stderr, /mark-pdf-ready\.mjs was stopped after 120 seconds/);
+  const p = await persistEvaluation({ spawnFn: outlivesTimer, execPath: "node", root: process.cwd(), markdown: REPORT, url: "https://example.invalid/j", today: "2026-11-16" });
+  assert.equal(p.ok, false);
+  assert.match(p.error, /reserve-report-num\.mjs was stopped after 120 seconds/);
 });

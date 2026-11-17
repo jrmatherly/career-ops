@@ -225,7 +225,12 @@ function spawnScript({ spawnFn, execPath, root, cwd = root, script, args = [], i
     child.stdout?.on("data", (d) => { stdout += d.toString(); });
     child.stderr?.setEncoding("utf8");
     child.stderr?.on("data", (d) => { stderr += d.toString(); });
-    child.on("close", (code) => resolve({ ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() }));
+    // Nothing else in the app signals this child, so a signal is its timeout.
+    child.on("close", (code, signal) => resolve({
+      ok: code === 0,
+      stdout: stdout.trim(),
+      stderr: signal ? `${script} was stopped after ${SCRIPT_TIMEOUT_MS / 1000} seconds.` : stderr.trim(),
+    }));
     child.on("error", (e) => resolve({ ok: false, stdout: "", stderr: `${script} failed to start: ${e.message}` }));
     if (input != null) {
       child.stdin?.write(input);
