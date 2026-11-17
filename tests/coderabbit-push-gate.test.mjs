@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
-import { main, markerDir, readMarker, reviewResult } from '../.githooks/coderabbit-review.mjs';
+import { GATE, main, markerDir, readMarker, reviewResult } from '../.githooks/coderabbit-review.mjs';
 import { pushVerdict } from '../.githooks/pre-push.mjs';
 
 // The scripts under test run git with the process environment, so seal it: under a hook or
@@ -133,6 +133,37 @@ test('the closing event of a real run is read: clean when the gate passed, findi
   assert.deepEqual(reviewResult(0, event(0, { outcome: 'completed_with_warnings', unreviewedFileCount: 0 })), { state: 'clean', findings: 0 }, 'warnings with every file reviewed are still a full review');
 });
 
+test('findings under the gate leave the review clean and are counted, and only the blocking ones count as findings', (t) => {
+  const { repo, commit } = scratchRepo(t);
+  const sha = commit();
+  const below = { status: 0, stdout: event(3, { gate: { threshold: GATE, status: 'passed', blockingFindings: 0 } }) };
+  const review = main([], { cwd: repo, run: () => below });
+  assert.equal(review.code, 0);
+  assert.match(review.err, /3 finding\(s\) below major .* do not block/);
+  const verdict = pushVerdict(line(sha), repo);
+  assert.deepEqual(verdict.refused, []);
+  assert.match(verdict.notes[0], /goes with 3 finding\(s\) below the gate left open/);
+  const mixed = event(5, { gate: { threshold: GATE, status: 'blocked', blockingFindings: 1 } });
+  assert.deepEqual(reviewResult(2, mixed), { state: 'findings', findings: 1 });
+  assert.deepEqual(reviewResult(0, event(2, { gate: { status: 'passed', blockingFindings: 2 } })), { state: 'findings', findings: 2 }, 'a passed gate that counts blocking findings is not clean');
+  assert.equal(reviewResult(0, event(1, { gate: { status: 'passed', blockingFindings: '1' } })).state, 'findings', 'a count written as text still counts');
+});
+
+test('findings that no passed gate placed below it are findings, so they are declined and not skipped', (t) => {
+  const { repo, commit } = scratchRepo(t);
+  commit();
+  const unplaced = {
+    'a partial review with an incomplete gate': { status: 1, stdout: event(3, { outcome: 'failed', unreviewedFileCount: 2, gate: { status: 'incomplete' } }) },
+    'a closing event with no gate': { status: 0, stdout: event(2, { gate: undefined }) },
+    'a passed gate with a file left unreviewed': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, unreviewedFileCount: 1 }) },
+    'a passed gate on a failed review': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, outcome: 'failed' }) },
+  };
+  for (const [name, result] of Object.entries(unplaced)) {
+    assert.equal(main([], { cwd: repo, run: () => result }).code, 2, name);
+    assert.equal(main(['--skip', 'it only half ran'], { cwd: repo }).code, 1, name);
+  }
+});
+
 test('a review that failed, covered part of the diff or contradicts its exit status records nothing, unless it reports findings', (t) => {
   const { repo, commit } = scratchRepo(t);
   const sha = commit();
@@ -144,6 +175,7 @@ test('a review that failed, covered part of the diff or contradicts its exit sta
     'a clean event behind the gate exit': { status: 2, stdout: event(0) },
     'a scope with nothing to review': { status: 0, stdout: event(0, { status: 'review_skipped', message: 'No changes detected' }) },
     'a gate with no result': { status: 0, stdout: event(0, { gate: { status: 'incomplete' } }) },
+    'findings under the gate behind a failing exit': { status: 1, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 } }) },
     'a missing CLI': { status: null, error: Object.assign(new Error('spawnSync coderabbit ENOENT'), { code: 'ENOENT' }) },
     'a killed review': { status: null, signal: 'SIGTERM', stdout: '' },
   };

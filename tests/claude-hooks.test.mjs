@@ -70,6 +70,7 @@ try {
   mkdirSync(join(repo, '.githooks'));
   // The hook resolves the repo root from its own location, so run a copy from inside the fixture.
   writeFileSync(join(repo, '.githooks', 'pre-commit.mjs'), readFileSync(PRECOMMIT, 'utf-8'));
+  writeFileSync(join(repo, '.githooks', 'gitleaks.toml'), readFileSync(join(ROOT, '.githooks', 'gitleaks.toml'), 'utf-8'));
   const hook = join(repo, '.githooks', 'pre-commit.mjs');
 
   writeFileSync(join(repo, 'README.md'), 'hello\n');
