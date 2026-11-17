@@ -41,10 +41,11 @@ export async function serversFor(t, browser, { realAddressRule = false } = {}) {
   const signal = new Promise((resolve) => { releaseSignal = resolve; });
   const privateHits = [];
   const nodeHits = [];
-  const sharedWorkerActions = new Map([
-    ['fetch', () => `fetch('http://${privateOrigin()}/cors').then((r) => r.text())`],
-    ['socket', () => `new Promise((resolve, reject) => { const socket = new WebSocket('ws://${privateOrigin()}/ws'); socket.onmessage = (e) => resolve(e.data); socket.onerror = reject; })`],
-  ]);
+  const sharedWorkerAction = (name) => {
+    if (name === 'fetch') return `fetch('http://${privateOrigin()}/cors').then((r) => r.text())`;
+    if (name === 'socket') return `new Promise((resolve, reject) => { const socket = new WebSocket('ws://${privateOrigin()}/ws'); socket.onmessage = (e) => resolve(e.data); socket.onerror = reject; })`;
+    return 'Promise.reject()';
+  };
   const html = (res, body, title = 'Engineer | Acme') => res.writeHead(200, { 'content-type': 'text/html' }).end(`<title>${title}</title><body>${body}</body>`);
   const send = (res, type, body) => res.writeHead(200, { 'content-type': type, 'access-control-allow-origin': '*' }).end(body);
   const privateOrigin = () => `private.example.test:${privateServer.address().port}`;
@@ -65,7 +66,7 @@ export async function serversFor(t, browser, { realAddressRule = false } = {}) {
     else if (req.url === '/armed') send(res, 'text/plain', 'ok');
     else if (req.url === '/fetch-then-armed') html(res, `${POSTING}<script>fetch('/to-private/cors').then((r) => r.text()).then((text) => { document.body.append(text); return fetch('/armed'); })</script>`);
     else if (req.url === '/armed-posting') html(res, `${POSTING}<script>fetch('/armed')</script>`);
-    else if (req.url.startsWith('/shared.js?')) send(res, 'text/javascript', `onconnect = (e) => { ${(sharedWorkerActions.get(req.url.split('?')[1]) ?? (() => 'Promise.reject()'))()}.then((text) => e.ports[0].postMessage(text), () => e.ports[0].postMessage('failed')); };`);
+    else if (req.url.startsWith('/shared.js?')) send(res, 'text/javascript', `onconnect = (e) => { ${sharedWorkerAction(req.url.split('?')[1])}.then((text) => e.ports[0].postMessage(text), () => e.ports[0].postMessage('failed')); };`);
     else if (req.url.startsWith('/with-shared-worker?')) {
       const [action, from] = req.url.split('?')[1].split('&');
       const constructor = from === 'iframe' ? "document.body.appendChild(document.createElement('iframe')).contentWindow.SharedWorker" : 'globalThis.SharedWorker';
