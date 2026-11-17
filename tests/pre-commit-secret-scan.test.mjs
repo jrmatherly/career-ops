@@ -2,9 +2,9 @@
 // which GitHub push protection would otherwise refuse only at the push.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
 
@@ -12,6 +12,8 @@ import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
 sealProcessGitEnv();
 
 const hasGitleaks = spawnSync('gitleaks', ['version']).status === 0;
+// The Ubuntu leg of the test job installs gitleaks and sets this, so there a missing gitleaks fails and does not skip.
+const mustScan = process.env.CAREER_OPS_REQUIRE_GITLEAKS === '1';
 
 function scratchRepo(t) {
   const repo = realpathSync(mkdtempSync(join(tmpdir(), 'pre-commit-scan-')));
@@ -36,7 +38,7 @@ test('a machine without gitleaks commits with a warning, not a refusal', { skip:
   // A PATH that holds git and nothing else, wherever gitleaks is installed.
   const bin = join(repo, 'bin');
   mkdirSync(bin);
-  symlinkSync(spawnSync('which', ['git'], { encoding: 'utf-8' }).stdout.trim(), join(bin, 'git'));
+  symlinkSync(process.env.PATH.split(delimiter).map((dir) => join(dir, 'git')).find((file) => existsSync(file)), join(bin, 'git'));
   writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
   git('add', 'fixture.mjs');
   const unscanned = hook({ ...env, PATH: bin });
@@ -44,7 +46,7 @@ test('a machine without gitleaks commits with a warning, not a refusal', { skip:
   assert.match(unscanned.stderr, /gitleaks is not on PATH, so the staged diff was not scanned/);
 });
 
-test('a staged token-shaped value is refused, and the same file without it commits', { skip: hasGitleaks ? false : 'gitleaks is not on PATH' }, (t) => {
+test('a staged token-shaped value is refused, and the same file without it commits', { skip: hasGitleaks || mustScan ? false : 'gitleaks is not on PATH' }, (t) => {
   const { repo, env, git, hook } = scratchRepo(t);
   writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
   git('add', 'fixture.mjs');
