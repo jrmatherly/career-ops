@@ -15,7 +15,8 @@
  * a re-evaluation that replaces the report records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
  * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
- * row is short of the header (a dry run only warns; --backfill-urls repairs rows)
+ * row is short of the header (a dry run only warns; --backfill-urls repairs a row
+ * short only by its URL cell)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -1671,14 +1672,17 @@ export async function mergeTracker(options = {}) {
     const shortRows = [];
     // A numbered row under another table's header is not a tracker row. A block
     // of rows with no header of its own (the tracker after a blank line) still is,
-    // so only a first line that a separator row follows counts as a header.
+    // so only a first line that a separator row follows counts as a header. With
+    // no recognised tracker header the legacy layout is in use and the first
+    // table is the tracker, so nothing is left out.
+    const trackerHeaderFound = appLines.some(line => isHeaderRow(line));
     const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
     let underOtherHeader = false;
     let inBlock = false;
     let maxNum = 0;
 
     for (const [at, line] of appLines.entries()) {
-      if (line.startsWith('|') && !inBlock) underOtherHeader = !isHeaderRow(line) && SEPARATOR_ROW_RE.test(appLines[at + 1] ?? '');
+      if (line.startsWith('|') && !inBlock) underOtherHeader = trackerHeaderFound && !isHeaderRow(line) && SEPARATOR_ROW_RE.test(appLines[at + 1] ?? '');
       inBlock = line.startsWith('|');
       // Skip only on the NaN check inside parseAppLine, which already rejects the
       // header and separator rows because neither has a numeric `#` cell. The old

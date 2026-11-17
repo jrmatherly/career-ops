@@ -14,13 +14,13 @@ const ADDITION = 'num\tdate\tcompany\trole\tstatus\tscore\tpdf\treport\tnotes\tu
   + '2\t2026-02-01\tAcme\tData Engineer\tEvaluated\t4.5/5\t❌\t[2](reports/002-acme-2026-02-01.md)\tre-eval\thttps://jobs.acme.com/1\n';
 
 /** Run merge-tracker over a tracker holding `rows` and one pending re-evaluation of row #1. */
-function mergeOver(t, rows, args = []) {
+function mergeOver(t, rows, args = [], header = HEADER) {
   const work = mkdtempSync(join(tmpdir(), 'cops-short-row-'));
   t.after(() => rmSync(work, { recursive: true, force: true }));
   const adds = join(work, 'adds');
   mkdirSync(adds);
   const tracker = join(work, 'applications.md');
-  const before = [...HEADER, ...rows, ''].join('\n');
+  const before = [...header, ...rows, ''].join('\n');
   writeFileSync(tracker, before);
   writeFileSync(join(adds, '002-acme.tsv'), ADDITION);
   const r = spawnSync(NODE, [join(ROOT, 'merge-tracker.mjs'), ...args], { encoding: 'utf-8', timeout: 30_000,
@@ -103,5 +103,14 @@ test('a block that starts with an unnumbered tracker row is still the tracker', 
   const r = mergeOver(t, [FULL, '', FULL.replace('| 1 |', '| N/A |'), SHORT.replace('| 1 |', '| 3 |')]);
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
   assert.match(r.out, /Row #3 is short of the header/);
+});
+
+test('a short row under a header the parser does not recognise is still refused', (t) => {
+  const header = ['# Applications Tracker', '', '| # | Date | Org | Role | Score | Status | PDF | Report | Notes |', '|---|---|---|---|---|---|---|---|---|'];
+  const r = mergeOver(t, ['| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | [1](../reports/001-acme-2026-01-01.md) | my note |'], [], header);
+  assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
+  assert.equal(r.text, r.before, 'the tracker was written');
+  assert.ok(r.pending, 'the addition was moved out of the pending directory');
+  assert.match(r.out, /Row #1 is short of the header/);
 });
 
