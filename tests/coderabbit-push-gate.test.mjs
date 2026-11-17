@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
-import { main, markerDir, readMarker, reviewResult } from '../.githooks/coderabbit-review.mjs';
+import { GATE, main, markerDir, readMarker, reviewResult } from '../.githooks/coderabbit-review.mjs';
 import { pushVerdict } from '../.githooks/pre-push.mjs';
 
 // The scripts under test run git with the process environment, so seal it: under a hook or
@@ -131,6 +131,18 @@ test('the closing event of a real run is read: clean when the gate passed, findi
   assert.deepEqual(reviewResult(0, `${REAL_CLEAN}\n`), { state: 'clean', findings: 0 });
   assert.deepEqual(reviewResult(2, `${REAL_BLOCKED}\n`), { state: 'findings', findings: 1 });
   assert.deepEqual(reviewResult(0, event(0, { outcome: 'completed_with_warnings', unreviewedFileCount: 0 })), { state: 'clean', findings: 0 }, 'warnings with every file reviewed are still a full review');
+});
+
+test('findings under the gate leave the review clean and are counted, and only the blocking ones are recorded', (t) => {
+  const { repo, commit } = scratchRepo(t);
+  const sha = commit();
+  const below = { status: 0, stdout: event(3, { gate: { threshold: GATE, status: 'passed', blockingFindings: 0 } }) };
+  const review = main([], { cwd: repo, run: () => below });
+  assert.equal(review.code, 0);
+  assert.match(review.err, /3 finding\(s\) below major .* do not block/);
+  assert.deepEqual(pushVerdict(line(sha), repo), { refused: [], notes: [] });
+  const mixed = event(5, { gate: { threshold: GATE, status: 'blocked', blockingFindings: 1 } });
+  assert.deepEqual(reviewResult(2, mixed), { state: 'findings', findings: 1 });
 });
 
 test('a review that failed, covered part of the diff or contradicts its exit status records nothing, unless it reports findings', (t) => {

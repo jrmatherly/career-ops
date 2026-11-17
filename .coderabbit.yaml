@@ -1,11 +1,16 @@
 # CodeRabbit configuration for career-ops (career-ops-hq).
 # Reviewed by the maintainers on 2026-09-03 after the move to the org.
 # Docs: https://docs.coderabbit.ai/reference/configuration
+# Fork (2026-11-17): the CodeRabbit app reviews this fork's PRs and the local CLI reads
+# this file, so four settings are the fork's own, each marked "Fork:" below. The rest is
+# upstream's. Why: docs/superpowers/research/2026-11-17-review-loop/README.md
 language: en-US
 tone_instructions: "Be specific and brief. Cite file:line. Use colons, not dashes. Warm to first-time contributors. Prefer one precise finding over three vague ones."
 
 reviews:
-  profile: assertive
+  # Fork: upstream runs assertive for a community of contributors. One maintainer reads
+  # every comment here, and assertive kept raising new minor points on each pass.
+  profile: chill
   # Humans decide: the review is a signal. Before ever flipping this to true, or
   # adding a CodeRabbit check to the branch protection required checks, give
   # /web/ a second code owner. Its only owner cannot request a reviewer other
@@ -39,11 +44,10 @@ reviews:
     enabled: true
     drafts: false
     auto_incremental_review: true
-    # Default is to pause after 5 reviewed commits. A contributor who pushes six
-    # fixes deserves the sixth review too, so this never pauses. If that starts
-    # hitting the hourly ceiling, the ceiling is the thing to measure, not the
-    # contributor to ration.
-    auto_pause_after_reviewed_commits: 0
+    # Fork: upstream never pauses (0). Here a branch is reviewed locally before its
+    # first push, so automatic reviews stop after two reviewed commits and a later
+    # one is asked for with `@coderabbitai review`.
+    auto_pause_after_reviewed_commits: 2
     base_branches:
       - main
     ignore_usernames:
@@ -62,6 +66,7 @@ reviews:
     - "!docs/hired-wall.svg"
     - "!SIGNATURES.md"
     - "!HIRED.md"
+    - "!docs/superpowers/**"           # Fork: plans and research notes, not shipped code
 
   path_instructions:
     - path: "AGENTS.md"
@@ -212,7 +217,7 @@ chat:
 knowledge_base:
   opt_out: false
   web_search: { enabled: true }
-  learnings: { scope: auto, approval_delay: 7 }   # a week for a maintainer to reject a learning before it sticks
+  learnings: { scope: auto, approval_delay: 0 }   # Fork: upstream waits 7 days; the one maintainer here writes the learning, so it applies at once
   issues: { scope: auto }
   pull_requests: { scope: auto }
   code_guidelines:

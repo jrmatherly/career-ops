@@ -7,7 +7,9 @@
 //
 // Each completed run leaves a marker for the HEAD commit in the repository's git
 // directory, so a commit made after a review has none and needs its own. Exits 2 when
-// the review has findings, so no caller can take it for a clean run.
+// the review has findings at or above GATE, so no caller can take it for a clean run.
+// Findings below GATE are printed and do not block: a gated run reviews the whole diff
+// afresh, so blocking on every severity never converges (docs/superpowers/research/2026-11-17-review-loop).
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -15,7 +17,8 @@ import { isMainModule } from '../lib/is-main-module.mjs';
 
 const USAGE = `Usage: node .githooks/coderabbit-review.mjs [--decline "<reason>" | --skip "<reason>"]
 
-  (no flag)            run the CodeRabbit review of HEAD against main and record it
+  (no flag)            run the CodeRabbit review of HEAD against main and record it;
+                       only major and critical findings block the push
   --decline "<why>"    record why the findings of HEAD's review stay open, so the push goes
   --skip "<why>"       record why a HEAD with no review is pushed anyway
 `;
@@ -63,13 +66,16 @@ export function writeMarker(cwd, sha, marker) {
   renameSync(temp, file);
 }
 
-const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--committed', '--base', 'main', '--gate', 'info'], { cwd, encoding: 'utf-8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 64 * 1024 * 1024 });
+export const GATE = 'major';
+
+const runCodeRabbit = (cwd) => spawnSync('coderabbit', ['review', '--agent', '--committed', '--base', 'main', '--gate', GATE], { cwd, encoding: 'utf-8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 64 * 1024 * 1024 });
 
 /**
- * What a finished `coderabbit review --agent --gate info` run established: {state: "findings",
- * findings} whenever its closing event reports any, even from a partial review, so they are
- * declined and not skipped; {state: "clean"} only when the CLI exited 0, the gate passed and no
- * file was left unreviewed (`completed_with_warnings` is then still a full review); else null.
+ * What a finished `coderabbit review --agent --gate <GATE>` run established: {state: "findings",
+ * findings} whenever its closing event says the gate is blocked, even from a partial review, so
+ * they are declined and not skipped; {state: "clean"} only when the CLI exited 0, the gate passed
+ * and no file was left unreviewed (`completed_with_warnings` is then still a full review), with
+ * `belowGate` counting the findings under the gate; else null.
  */
 export function reviewResult(status, stdout) {
   let complete = null;
@@ -80,10 +86,14 @@ export function reviewResult(status, stdout) {
     } catch { /* not an event line */ }
   }
   if (!complete || !Number.isInteger(complete.findings)) return null;
-  if (complete.findings > 0) return { state: 'findings', findings: complete.findings };
+  if (complete.gate?.status === 'blocked') {
+    const blocking = complete.gate.blockingFindings;
+    return { state: 'findings', findings: Number.isInteger(blocking) && blocking > 0 ? blocking : Math.max(complete.findings, 1) };
+  }
   // `review_skipped` is the CLI finding nothing to review, which is not a review.
   const full = complete.status === 'review_completed' && complete.outcome !== 'failed' && !(complete.unreviewedFileCount > 0);
-  return status === 0 && full && complete.gate?.status === 'passed' ? { state: 'clean', findings: 0 } : null;
+  if (status !== 0 || !full || complete.gate?.status !== 'passed') return null;
+  return { state: 'clean', findings: 0, ...(complete.findings > 0 && { belowGate: complete.findings }) };
 }
 
 function failureOf(review) {
@@ -124,8 +134,10 @@ export function main(args, { cwd = process.cwd(), run = runCodeRabbit } = {}) {
     return { code: 1, out, err: `Nothing is recorded for ${sha}: ${failureOf(review)}. Run it again (\`coderabbit review --usage\` shows the quota), or record why the push goes without it: --skip "<reason>".\n` };
   }
   writeMarker(cwd, sha, result);
-  if (result.state === 'clean') return { code: 0, out };
-  return { code: 2, out, err: `${result.findings} finding(s) on ${sha}. Check each against the code. Fix the confirmed ones, commit and review again; for the rest run this script with --decline "<reason>".\n` };
+  if (result.state === 'clean') {
+    return { code: 0, out, ...(result.belowGate && { err: `${result.belowGate} finding(s) below ${GATE} on ${sha} do not block the push. Read them above: fix a regression or a defect in what this branch is for, and list the rest in the pull request.\n` }) };
+  }
+  return { code: 2, out, err: `${result.findings} ${GATE} or critical finding(s) on ${sha}. Check each against the code. Fix the confirmed ones, commit and review again; for the rest run this script with --decline "<reason>".\n` };
 }
 
 if (isMainModule(import.meta.url)) {
