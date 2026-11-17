@@ -269,3 +269,14 @@ test("a known value that is a label word still lets the value it labels be maske
   assert.equal(maskSecrets('login password: "plum vexed 47" ok', known), 'login [masked:FAKE_FIELD_PASSWORD_REF]: "[masked]" ok');
   assert.equal(maskSecrets("run --password hunter2 now", known), "run --[masked:FAKE_FIELD_PASSWORD_REF] [masked] now");
 });
+
+test("a password that looks like a path is masked, and the shell's PWD is not", () => {
+  assert.equal(maskSecrets("password=/a/b/c next"), "password=[masked] next");
+  assert.equal(maskSecrets('password: "/x9/abc/def"'), 'password: "[masked]"');
+  assert.equal(maskSecrets("PWD=/srv/app/x OLDPWD=/srv/app/y"), "PWD=/srv/app/x OLDPWD=/srv/app/y");
+});
+
+test("a known secret that overlaps its own next occurrence is masked whole", () => {
+  const known = masker.knownSecrets([{ FAKE_PERIODIC_KEY: "FAKEwordFAKEword" }]);
+  assert.equal(maskSecrets("x FAKEwordFAKEwordFAKEword y", known), "x [masked:FAKE_PERIODIC_KEY] y");
+});

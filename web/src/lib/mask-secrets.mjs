@@ -78,7 +78,7 @@ function maskKnown(s, known) {
   };
   const head = s.slice(0, MIN_SECRET);
   for (const { name, value } of known) {
-    for (let i = s.indexOf(value); i !== -1; i = s.indexOf(value, i + value.length)) found(i, i + value.length, name);
+    for (let i = s.indexOf(value); i !== -1; i = s.indexOf(value, i + 1)) found(i, i + value.length, name);
     // A cut through a secret leaves its tail at the start of the text.
     for (let i = value.indexOf(head, 1); head.length === MIN_SECRET && i !== -1; i = value.indexOf(head, i + 1)) {
       if (s.startsWith(value.slice(i))) {
@@ -164,7 +164,8 @@ export function maskSecrets(s, known = []) {
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
     .replace(LABELLED, (m, label, sep, scheme = "", value) => ((scheme || hasDigit(value)) && !isPath(value) ? label + sep + scheme + MARK : m))
-    .replace(PASSWORD_ASSIGNED, (m, label, value) => (isPath(value.replace(/^["']|["']$/g, "")) ? m : maskValue(label, value)))
+    // Only the shell's PWD holds a path; a password that looks like one is still a password.
+    .replace(PASSWORD_ASSIGNED, (m, label, value) => (/^pwd/i.test(label) && isPath(value.replace(/^["']|["']$/g, "")) ? m : maskValue(label, value)))
     .replace(FLAG, (m, label, value) => maskValue(label, value))
     .replace(AUTH_SCHEME, `$1${MARK}`);
 }
