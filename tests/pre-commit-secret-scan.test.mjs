@@ -2,7 +2,7 @@
 // which GitHub push protection would otherwise refuse only at the push.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSync, constants, cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -12,20 +12,19 @@ import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
 sealProcessGitEnv();
 
 const hasGitleaks = spawnSync('gitleaks', ['version']).status === 0;
-
-// The git a spawn would run: the first regular, executable file of that name on PATH.
-function gitOnPath() {
-  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
-    const file = join(dir, 'git');
-    try {
-      accessSync(file, constants.X_OK);
-      if (statSync(file).isFile()) return file;
-    } catch { /* not this one */ }
-  }
-  throw new Error('git is not on PATH');
-}
 // The Ubuntu leg of the test job installs gitleaks and sets this, so there a missing gitleaks fails and does not skip.
 const mustScan = process.env.CAREER_OPS_REQUIRE_GITLEAKS === '1';
+
+// The system directories alone: git is there, and gitleaks is not unless it was installed into one.
+// tests/batch-runner-dry-run-without-cli.test.mjs takes an agent CLI off PATH the same way.
+const SYSTEM_PATH = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(delimiter);
+const onSystemPath = (tool, arg) => spawnSync(tool, [arg], { env: { PATH: SYSTEM_PATH } }).status === 0;
+function noGitleaksSkip() {
+  if (process.platform === 'win32') return 'Windows has no such directories';
+  if (onSystemPath('gitleaks', 'version')) return 'gitleaks is installed in a system directory';
+  // On the leg that must scan, a git missing from the system directories fails the test and does not skip it.
+  return !mustScan && !onSystemPath('git', '--version') && 'git is not in a system directory';
+}
 
 function scratchRepo(t) {
   const repo = realpathSync(mkdtempSync(join(tmpdir(), 'pre-commit-scan-')));
@@ -45,15 +44,11 @@ function scratchRepo(t) {
 // Built here so this file holds no token-shaped literal for push protection to refuse.
 const token = ['gl', 'pat-', 'x'.repeat(4), 'Ab3dE7gH9jK1mN5pQ8r'].join('');
 
-test('a machine without gitleaks commits with a warning, not a refusal', { skip: process.platform === 'win32' }, (t) => {
+test('a machine without gitleaks commits with a warning, not a refusal', { skip: noGitleaksSkip() }, (t) => {
   const { repo, env, git, hook } = scratchRepo(t);
-  // A PATH that holds git and nothing else, wherever gitleaks is installed.
-  const bin = join(repo, 'bin');
-  mkdirSync(bin);
-  symlinkSync(gitOnPath(), join(bin, 'git'));
   writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
   git('add', 'fixture.mjs');
-  const unscanned = hook({ ...env, PATH: bin });
+  const unscanned = hook({ ...env, PATH: SYSTEM_PATH });
   assert.equal(unscanned.status, 0, unscanned.stderr);
   assert.match(unscanned.stderr, /gitleaks is not on PATH, so the staged diff was not scanned/);
 });
