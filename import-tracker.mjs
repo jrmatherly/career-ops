@@ -363,9 +363,9 @@ async function writeImport(entries, { colmap }) {
       stdio: 'inherit',
       env: { ...process.env, CAREER_OPS_ADDITIONS: additionsDir },
     });
-    // merge-tracker leaves a TSV it refused (or could not apply) where it was,
-    // and a refusal alone still exits 0. Those rows are not in the tracker, so
-    // their files and numbers stay for a re-run instead of being deleted here.
+    // merge-tracker leaves a TSV it refused (or could not apply) where it was.
+    // Those rows are not in the tracker, so their files and numbers stay for a
+    // re-run instead of being deleted here.
     const left = readdirSync(additionsDir).filter((f) => f.endsWith('.tsv'));
     if (left.length) {
       leftNums = new Set(left.map((f) => Number(/^(\d+)-/.exec(f)?.[1])));
