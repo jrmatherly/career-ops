@@ -409,8 +409,11 @@ const US_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:HI|ME|OH|OK|OR)(?!\\s
 const US_STATE_NAME = new RegExp(`(?<![\\p{L}\\p{N}])(?:district of columbia|${USPS_STATES.map(([name]) => name).filter(name => name !== 'georgia').join('|')})(?![\\p{L}\\p{N}])`, 'giu');
 const GEORGIA_CODE = /(?<![\p{L}\p{N}])GA(?!\p{L})/u;
 const AMBIGUOUS_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:${AMBIGUOUS_STATE_CODES.join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
-// "U.S.A" without its last dot, which the alias "u.s.a." does not match.
-const US_DOTTED = /(?<![\p{L}\p{N}.])u\.s\.a(?![\p{L}\p{N}.])/giu;
+// A capital two-letter code on either side, as in "Chennai, TN, IN" and Workday's "CO-DC-Bogota".
+const CODE_BEFORE = /(?<![\p{L}\p{N}])[A-Z]{2}\s*[,-]\s*$/u;
+const CODE_AFTER = /^\s*[,-]\s*[A-Z]{2}(?![\p{L}\p{N}])/u;
+// "U.S" and "U.S.A" without the last dot, which the aliases "u.s." and "u.s.a." do not match.
+const US_DOTTED = /(?<![\p{L}\p{N}.])u\.s(?:\.a)?(?![\p{L}\p{N}.])/giu;
 // A street number, then the words up to the next comma, slash, bar, bracket or spaced dash.
 const ADDRESS_RUN = /(?<![\p{L}\p{N}])\d[\p{L}\p{N}]*\s.*?(?=\s-\s|[,/|()[\]·;]|$)/gu;
 
@@ -423,16 +426,19 @@ function withoutStateCodes(location) {
 }
 
 /** A raw place with its US states taken out, folded, or null when it names none. Georgia counts where its
- * code GA stands in the same place ("GEORGIA - VIRTUAL - GA01"). CA, CO, DE, IL and IN count only beside
- * another state ("Colorado Springs, CO").
+ * code GA stands in the same place ("GEORGIA - VIRTUAL - GA01"). CA, CO, DE, IL and IN count only in a place
+ * that names another state ("Colorado Springs, CO"), and not next to another capital code, where they are
+ * the country ("Chennai, TN, IN").
  * @param {string} place
  * @param {boolean} codes whether capital state codes are read; false where the place is written all in capitals
  */
 function withoutUsStates(place, codes) {
   const named = (GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place).replace(US_STATE_NAME, ' ');
-  const rest = codes ? named.replace(US_STATE_CODE, ' ') : named;
+  if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === place) return null;
+  // Judged before the other codes go, so the code next to an ambiguous one is still there to see.
+  const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (CODE_BEFORE.test(named.slice(0, at)) || CODE_AFTER.test(named.slice(at + 2)) ? code : ' '));
   // Between states "and" is the word, not Andorra's three-letter code.
-  return rest === place ? null : fold(rest.replace(AMBIGUOUS_STATE_CODE, ' ').replace(/\band\b/g, ' '));
+  return fold((codes ? sure.replace(US_STATE_CODE, ' ') : sure).replace(/\band\b/gi, ' '));
 }
 
 /** A folded place without the two-letter words of its street addresses: the "St" of "999 18th St" and the

@@ -21,7 +21,8 @@ const stateRemote = [
   // CA, CO, DE, IL and IN are states in a place that names another state.
   'Remote; Colorado Springs, CO', 'Remote - Kansas City, MO or Denver, CO',
   // Between states "and" is the word, not Andorra's three-letter code.
-  'Remote (California, Washington, and Oregon Only)',
+  'Remote (California, Washington, and Oregon Only)', 'Remote (Texas And Florida Only)', 'Remote - TEXAS AND OHIO',
+  'Remote - San Francisco, CA, USA', 'Remote - U.S',
 ];
 for (const location of stateRemote) {
   test(`${location} is remote in the United States`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
@@ -94,7 +95,7 @@ test('Remote - Austin, TX is read as a US state', () => assert.deepEqual(us('Rem
 // (Western Australia, Milano, Tunisia, Morocco, Indonesia, Gabon, Tamil Nadu, Albania, Bogota's Distrito Capital).
 // A wrong drop is never reconsidered and a wrong admit is only evaluated, so the gate admits. A fix that refuses
 // any of these without dropping a US posting is an improvement: move it to stillRefused.
-for (const location of ['Remote - Perth, WA', 'Remote - Milano, MI', 'Remote - Tunis, TN', 'Remote - Rabat, MA', 'Remote - Jakarta, ID', 'Remote - Libreville, GA', 'Remote - Lagos, LA', 'Remote - Chennai, TN', 'Remote, AL', 'Remote - Bogota, DC', 'Remote | Perth, WA | Sydney, Australia']) {
+for (const location of ['Remote - Perth, WA', 'Remote - Milano, MI', 'Remote - Tunis, TN', 'Remote - Rabat, MA', 'Remote - Jakarta, ID', 'Remote - Libreville, GA', 'Remote - Lagos, LA', 'Remote - Chennai, TN', 'Remote, AL', 'Remote - Bogota, DC', 'Remote | Perth, WA | Sydney, Australia', 'Remote - Chennai, TN, IN']) {
   test(`accepted limit: ${location} is foreign and is admitted as a US state`, () => assert.deepEqual(us(location, 'Platform Lead'), REMOTE_OK));
 }
 test('a capital state code anywhere in an office posting is not a country', () => {
@@ -111,6 +112,8 @@ const stillRefused = [
   'Remote, BR', 'Remote PH', 'Poland · Georgia · Bulgaria · Remote', 'Remote', 'Nationwide Remote',
   'Remote-Friendly (Travel Required) | San Francisco, CA', 'Remote | Toronto, CA | Vancouver, BC', 'Chicago, IL; Remote', 'Remote / Bogota, CO',
   'Remote - CA: Toronto', 'Remote - Perth, WA, Australia | Remote', 'Remote - Berlin, DE | Remote - Paris, FR', 'Remote - U.S.A.F. Academy', 'Remote - Texas and Mexico', 'Remote, AND',
+  // Next to another capital code, CA and CO are the country.
+  'Remote - CO-DC-Bogota', 'Remote - Bogota, DC, CO', 'Remote - Delaware, ON, CA',
 ];
 for (const location of stillRefused) {
   test(`${location} is still not confirmed as remote in the United States`, () => assert.equal(us(location, 'Platform Lead').eligible, false));

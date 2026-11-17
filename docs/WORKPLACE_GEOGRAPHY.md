@@ -76,17 +76,21 @@ as its default; a supplied nonempty country list must name a recognized country.
   DC`). Five codes do not count alone, because boards write them for the
   country too: `CA`, `CO`, `DE`, `IL` and `IN` (`Remote, CA` is Canada as
   often as California). They count in a place that names another state
-  (`Remote; Colorado Springs, CO`). `Georgia` alone is the country; it is the
+  (`Remote; Colorado Springs, CO`), unless another capital code stands next
+  to them, where they are the country (`Remote - Bogota, DC, CO`, Workday's
+  `CO-DC-Bogota`). `Georgia` alone is the country; it is the
   state where its code stands in the same place (`GEORGIA - VIRTUAL - GA01`).
   A foreign country in the same place wins (`Remote - Chennai, TN, India`).
   For this check a bar or a spaced slash separates places as a middle dot and
   a semicolon do, so in `Remote | San Francisco, CA | Seattle, WA` the `CA`
-  does not refuse the place beside it. `US:` and `U.S.A` are read as the
-  United States, and `and` between states is the word, not Andorra's code.
+  does not refuse the place beside it. `US:`, `U.S` and `U.S.A` are read as the
+  United States, and `and` between states, in any case, is the word, not
+  Andorra's code.
   The cost is three kinds of foreign posting, admitted when no country is
-  written in the same place: a foreign city followed by a code that is also a
-  state code (`Remote - Perth, WA`, `Remote - Tunis, TN`, `Remote - Chennai,
-  TN`, `Remote - Bogota, DC`), a bare code of a country that shares a state's
+  written out in the same place: a foreign city followed by a code that is
+  also a state code (`Remote - Perth, WA`, `Remote - Tunis, TN`, `Remote -
+  Chennai, TN`, `Remote - Bogota, DC`, and `Remote - Chennai, TN, IN`,
+  because `IN` is never read as India), a bare code of a country that shares a state's
   letters (`Remote, AR` for Argentina, `Remote, AL` for Albania), and such a
   place beside a foreign one behind a bar or slash (`Remote | Perth, WA |
   Sydney, Australia`). The gate knows no city names, so it cannot tell these
