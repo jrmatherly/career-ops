@@ -466,6 +466,7 @@ export async function processOffer(browser, line, idx, _evaluate = evaluateWithR
       jdText = await scrapeUrl(browser, url);
     } catch (err) {
       if (err.refused) console.warn(`⚠️  ${url}: refused by the egress guard (${err.refused.code}), not evaluated.`);
+      else console.warn(`⚠️  ${url}: could not be read (${String(err.message).split('\n')[0]}).`);
       return await resolveDeadPosting();
     }
     if (!jdText || jdText.length < 100) {
@@ -636,6 +637,7 @@ async function main() {
     console.log(mergeOutput.trim());
   } catch (err) {
     console.error(`⚠️ Failed to merge tracker: ${err.message}`);
+    process.exitCode = 1;
   }
 }
 
