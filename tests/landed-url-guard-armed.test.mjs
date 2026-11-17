@@ -169,7 +169,7 @@ for (const [what, path, scrapeHop, armed] of [
   test(`real Chromium: the batch path never calls the model for a page that ${what}, leaves its line alone, and says why`, { timeout: 60_000 }, async (t) => {
     const env = await chromiumAndServer(t);
     if (!env) return;
-    const { processOffer } = await import('../batch-evaluate-gemini.mjs');
+    const { processOffer, refusedSummary } = await import('../batch-evaluate-gemini.mjs');
     const url = env.publicUrl(path);
     const line = `- [ ] ${url} | Acme | Engineer`;
     let modelCalls = 0;
@@ -179,7 +179,9 @@ for (const [what, path, scrapeHop, armed] of [
     assert.equal(result.line, line);
     assert.deepEqual(env.privateHits, [scrapeHop]);
     const warnings = env.warned.mock.calls.map((call) => call.arguments.join(' '));
-    assert.ok(warnings.some((line) => line.includes(url) && line.includes('blocked_host')), warnings.join('\n'));
+    assert.ok(warnings.some((line) => line.includes(url) && /blocked_host: .*private target IP/.test(line)), warnings.join('\n'));
+    assert.equal(refusedSummary(new Map([[0, result], [1, { processed: true }]])), '1 refused by the egress guard, left pending');
+    assert.equal(refusedSummary(new Map([[1, { processed: true }]])), null);
     assert.doesNotMatch(warnings.join('\n'), new RegExp(INTERNAL));
   });
 }
