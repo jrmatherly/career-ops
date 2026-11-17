@@ -1669,14 +1669,16 @@ export async function mergeTracker(options = {}) {
     }
     const existingApps = [];
     const shortRows = [];
-    // Only the tracker's own table can hold a short tracker row; a numbered row
-    // in another table further down the file is not one.
-    const headerAt = appLines.findIndex(line => line.startsWith('|') && isHeaderRow(line));
-    let tableEnd = headerAt < 0 ? appLines.length : headerAt + 1;
-    while (headerAt >= 0 && tableEnd < appLines.length && appLines[tableEnd].startsWith('|')) tableEnd++;
+    // A numbered row under another table's header is not a tracker row. A block
+    // of rows with no header of its own (the tracker after a blank line) still is.
+    const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
+    let underOtherHeader = false;
+    let inBlock = false;
     let maxNum = 0;
 
-    for (const [at, line] of appLines.entries()) {
+    for (const line of appLines) {
+      if (line.startsWith('|') && !inBlock) underOtherHeader = !isHeaderRow(line) && isNaN(rowNum(line));
+      inBlock = line.startsWith('|');
       // Skip only on the NaN check inside parseAppLine, which already rejects the
       // header and separator rows because neither has a numeric `#` cell. The old
       // `.includes('---') / .includes('Empresa')` heuristic was redundant for those
@@ -1695,8 +1697,8 @@ export async function mergeTracker(options = {}) {
         continue;
       }
       // A numbered row too short for parseAppLine is just as unmatchable.
-      const num = parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
-      if (!isNaN(num) && num !== 0 && at > headerAt && at < tableEnd) shortRows.push(num);
+      const num = rowNum(line);
+      if (!isNaN(num) && num !== 0 && !underOtherHeader) shortRows.push(num);
     }
 
     // One-time backfill populating the URL column on existing

@@ -82,3 +82,19 @@ test('a numbered row in another table further down the file does not stop the me
   assert.doesNotMatch(r.out, /short of the header/);
   assert.equal(r.pending, false, 'the addition was left pending');
 });
+
+test('a short row after a blank line inside the tracker is still refused', (t) => {
+  const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
+  const r = mergeOver(t, [FULL, '', SHORT.replace('| 1 |', '| 3 |')]);
+  assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
+  assert.match(r.out, /Row #3 is short of the header/);
+  assert.ok(r.pending, 'the addition was moved out of the pending directory');
+});
+
+test('a dry run warns, writes nothing, and says a real run would stop', (t) => {
+  const r = mergeOver(t, [SHORT], ['--dry-run']);
+  assert.equal(r.status, 0, r.out);
+  assert.equal(r.text, r.before, 'the tracker was written');
+  assert.match(r.out, /Row #1 is short of the header.*A real run stops here and merges nothing\./);
+});
+
