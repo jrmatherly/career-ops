@@ -51,3 +51,8 @@ test("a CLI that can be pointed at any provider keeps every agent key", async ()
   }
   assert.equal(keys.includes("PUBLISH_API_KEY"), false);
 });
+
+test("a writing worker (fix-portal) keeps every key", async () => {
+  const keys = await childEnvKeys("claude", CAPS.workspaceWrite);
+  for (const key of Object.keys(MADE_UP_ENV)) assert.equal(keys.includes(key), true, key);
+});

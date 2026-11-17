@@ -136,7 +136,8 @@ test("spawnHeadlessCli never lets a child inherit the server's console (windowsH
   try {
     // When: a caller spawns through the shared spawner, once with no opinion
     // and once explicitly asking for the console back.
-    const base = { cwd: process.cwd(), env: process.env };
+    // Made-up secrets, so the strip is checked whether or not the runner's env sets them.
+    const base = { cwd: process.cwd(), env: { ...process.env, ...Object.fromEntries(CAREER_OPS_SECRET_ENV.map((key) => [key, "made-up"])) } };
     spawnHeadlessCli(process.execPath, ["-e", ""], base, PASSTHROUGH);
     spawnHeadlessCli(process.execPath, ["-e", ""], { ...base, windowsHide: false }, PASSTHROUGH);
   } finally {
@@ -147,12 +148,13 @@ test("spawnHeadlessCli never lets a child inherit the server's console (windowsH
   // Then: both children are started hidden, and the caller's other options
   // still reach spawn() untouched.
   assert.equal(calls.length, 2);
+  const callerEnv = { ...process.env, ...Object.fromEntries(CAREER_OPS_SECRET_ENV.map((key) => [key, "made-up"])) };
   for (const { options } of calls) {
     assert.equal(options.windowsHide, true);
     assert.equal(options.detached, process.platform !== "win32");
     assert.equal(options.cwd, process.cwd());
     // A read-only worker gets a copy of the caller's env with keys removed, never changed.
-    assert.deepEqual(options.env, Object.fromEntries(Object.entries(process.env).filter(([key]) => key in options.env)));
+    assert.deepEqual(options.env, Object.fromEntries(Object.entries(callerEnv).filter(([key]) => key in options.env)));
     for (const key of CAREER_OPS_SECRET_ENV) assert.equal(key in options.env, false, key);
     // Windows spells PATH as Path and sets USERPROFILE instead of HOME.
     const kept = Object.keys(process.env).filter((key) => /^(path|home|userprofile)$/i.test(key));

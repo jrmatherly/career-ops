@@ -186,12 +186,18 @@ export function claudeCliArgs({ kind, prompt, dataRoot, codeRoot }) {
 }
 
 /**
- * Flags for an attended Claude run that can read a posting from the network:
- * the file tools refuse reads outside the cwd (the data root) and the code
- * checkout, and the data root's env files. Needs Claude Code 2.1.257 or later.
+ * Flags for an attended Claude run with network access (`evaluate`,
+ * `research`, `cover`, `fix-portal`) and for the assistant and explore AI
+ * routes: the file tools refuse reads outside the cwd (the data root) and the
+ * code checkout, and the data root's env and contact files. Needs Claude Code
+ * 2.1.257 or later.
  *
  * The denies are cwd-relative or under `~`, so no root path is spelled into
- * them, and they hold for a root the absolute denies cannot name.
+ * them. They mirror the data-root files `unattendedReadDenies` names. On
+ * Claude Code 2.1.325 `Read(./.env*)` was measured to refuse `.env*` in the
+ * added checkout and in its `web/` too, but that matching is not documented,
+ * so the absolute denies stay as the documented layer and a root they cannot
+ * name is not guaranteed the same cover.
  *
  * @param {string} codeRoot - The code checkout, added as a working directory.
  * @returns {string[]}
@@ -200,7 +206,7 @@ export function readFenceArgs(codeRoot) {
   const settings = {
     permissions: {
       blockReadsOutsideWorkingDirectories: true,
-      deny: ["Read(./.env*)", "Read(~/.claude/**)", "Read(~/.claude.json)"],
+      deny: ["Read(./.env*)", "Read(./data/contacts.tsv)", "Read(./data/Connections.csv)", "Read(~/.claude/**)", "Read(~/.claude.json)"],
     },
   };
   // --add-dir takes several values, so it stays last.

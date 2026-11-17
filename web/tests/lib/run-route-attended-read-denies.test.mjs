@@ -107,8 +107,46 @@ test("an attended URL evaluate on Claude carries the Read denies", POSIX_ROOT, a
   assert.ok(denied.includes(`Read(/${root}/.env)`), denied);
   const settings = JSON.parse(argValue(args, "--settings"));
   assert.equal(settings.permissions.blockReadsOutsideWorkingDirectories, true);
-  assert.ok(settings.permissions.deny.includes("Read(./.env*)"), settings.permissions.deny);
+  for (const deny of ["Read(./.env*)", "Read(./data/contacts.tsv)", "Read(./data/Connections.csv)"]) {
+    assert.ok(settings.permissions.deny.includes(deny), `${deny} in ${settings.permissions.deny}`);
+  }
   assert.equal(argValue(args, "--add-dir"), root);
+});
+
+const READ_DENIES_DROPPED = /Read denies/;
+const statusLabels = (evts) => evts.filter((e) => e.type === "status").map((e) => e.label);
+
+test("an attended run that keeps its Read denies sends no notice that they were dropped", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
+  globalThis.__onSpawn = () => {};
+  const labels = statusLabels(await events(await run({ kind: "evaluate", input: "https://jobs.example.test/1", jdText: undefined })));
+  assert.equal(labels.some((label) => READ_DENIES_DROPPED.test(label)), false, labels.join("\n"));
+});
+
+test("a Claude run with no network tool carries no read fence", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
+  let args;
+  globalThis.__onSpawn = (a) => { args = a; };
+  await events(await run({ kind: "evaluate-text", jdText: "Fictional posting text. ".repeat(20) }));
+  assert.equal(args.includes("--settings"), false, args.join(" "));
+  assert.equal(args.includes("--add-dir"), false, args.join(" "));
+});
+
+test("an attended run whose code checkout cannot be resolved still runs, and says it lost its Read denies", POSIX_ROOT, async (t) => {
+  fixtureRoot(t);
+  const realpathSync = fs.realpathSync;
+  // Only the route's own lookup of the checkout fails; everything else resolves it.
+  t.mock.method(fs, "realpathSync", (p, ...rest) => {
+    if (p === process.env.CAREER_OPS_CODE_ROOT && new Error().stack.includes("api/run/route")) throw Object.assign(new Error("fixture"), { code: "EACCES" });
+    return realpathSync(p, ...rest);
+  });
+  let args;
+  globalThis.__onSpawn = (a) => { args = a; };
+  const errors = t.mock.method(console, "error", () => {});
+  const labels = statusLabels(await events(await run({ kind: "evaluate", input: "https://jobs.example.test/1", jdText: undefined })));
+  assert.equal(argValue(args, "--disallowedTools").includes("Read("), false);
+  assert.ok(labels.some((label) => READ_DENIES_DROPPED.test(label)), labels.join("\n"));
+  assert.ok(errors.mock.calls.some((call) => /without Read denies/.test(call.arguments.join(" "))), "the server log says the denies were dropped");
 });
 
 test("an attended evaluate whose data root is not deny-safe still runs, with the read block and no absolute denies", POSIX_ROOT, async (t) => {
@@ -119,6 +157,14 @@ test("an attended evaluate whose data root is not deny-safe still runs, with the
   assert.equal(argValue(args, "--disallowedTools").includes("Read("), false);
   assert.equal(JSON.parse(argValue(args, "--settings")).permissions.blockReadsOutsideWorkingDirectories, true);
   assert.equal(argValue(args, "--add-dir"), root);
+});
+
+test("an attended evaluate whose data root is not deny-safe says it lost its Read denies", POSIX_ROOT, async (t) => {
+  fixtureRoot(t, "co run route spaced notice ");
+  globalThis.__onSpawn = () => {};
+  t.mock.method(console, "error", () => {});
+  const labels = statusLabels(await events(await run({ kind: "evaluate", input: "https://jobs.example.test/1", jdText: undefined })));
+  assert.ok(labels.some((label) => READ_DENIES_DROPPED.test(label)), labels.join("\n"));
 });
 
 test("an attended fix-portal on Claude keeps Bash and carries the read block and the Read denies", POSIX_ROOT, async (t) => {

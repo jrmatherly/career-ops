@@ -149,9 +149,10 @@ export async function POST(req: Request) {
   // install is not the data root (cv.md, reports/ and output stay under that).
   const codeRoot = resolveCodeRoot(process.cwd(), process.env);
   const capabilities = capabilitiesFor(kind);
-  // An attended run that fetches a posting reads untrusted text, so it gets the denies too.
+  // An attended run with network access reads untrusted text (a posting, a board), so it gets the denies too.
   const readFence = cliId === "claude" && Boolean(capabilities.network);
   const denyRoots: { dataRoot?: string; codeRoot?: string } = {};
+  let readDeniesDropped: string | null = null;
   if (fenced || readFence) {
     // The denies name the real paths, so a symlinked root still covers the files.
     for (const [key, label, root, envName] of [
@@ -163,15 +164,19 @@ export async function POST(req: Request) {
         real = fs.realpathSync(root);
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code ?? "unknown error";
-        console.error(`/api/run: ${kind} realpath of the ${label} failed: ${code}`);
+        console.error(`/api/run: ${kind} realpath of the ${label} failed: ${code}${fenced ? "" : "; the run goes ahead without Read denies"}`);
         // claudeCliArgs throws on one root without the other, so an attended skip clears both.
-        if (!fenced) { delete denyRoots.dataRoot; delete denyRoots.codeRoot; break; }
+        if (!fenced) {
+          readDeniesDropped = `Read denies are off for this run: the ${label} path could not be resolved (${code}). The agent can read files there it would otherwise be refused.`;
+          delete denyRoots.dataRoot; delete denyRoots.codeRoot; break;
+        }
         return Response.json({ error: `${kind} could not resolve the ${label} ${root} (${code}).` }, { status: 400 });
       }
       if (!DENY_SAFE_ROOT.test(real)) {
         // A Windows path never matches, and a 400 here would break attended evaluate there.
         if (!fenced) {
           console.error(`/api/run: ${kind} runs without Read denies: the ${label} ${real} is not deny-safe`);
+          readDeniesDropped = `Read denies are off for this run: the ${label} path holds characters the denies cannot spell. The agent can read files there it would otherwise be refused.`;
           delete denyRoots.dataRoot; delete denyRoots.codeRoot; break;
         }
         return Response.json({
@@ -544,6 +549,7 @@ export async function POST(req: Request) {
       // isFencingNotice() rather than a literal spelled in two files.
       const fencing = fencingReport({ cliId, cliName: spec.name, capabilities: capabilitiesFor(kind) });
       if (fencing.notice) send({ type: "status", label: fencing.notice });
+      if (readDeniesDropped) send({ type: "status", label: readDeniesDropped });
       if (substitution) send({ type: "status", label: substitution });
       // Time-based keepalive. The stream is silent whenever the agent is thinking
       // or inside a long tool call, and in pdf mode it is silent for the whole
