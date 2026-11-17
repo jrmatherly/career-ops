@@ -1,0 +1,12 @@
+# Rules for the pre-commit secret scan (.githooks/pre-commit.mjs): gitleaks' defaults.
+# generic-api-key matches any long random-looking value beside a word like "key". In the
+# suites, the providers and the docs that is the public search keys the job boards publish,
+# so the rule is off for those paths and on everywhere else. The vendor-specific rules
+# apply to every path.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+paths = ['''^tests/''', '''^web/tests/''', '''^providers/''', '''^docs/''', '''^test-all\.mjs$''']

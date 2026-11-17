@@ -129,6 +129,24 @@ jobs:
       - name: "📦 Install dependencies"
         if: env.SKIP_LEG != 'true'
         run: npm install --ignore-scripts
+      # .githooks/pre-commit.mjs scans the staged diff with gitleaks, and the scan
+      # test in tests/pre-commit-secret-scan.test.mjs skips where gitleaks is missing. One
+      # leg installs it and turns that skip into a failure, so a gitleaks flag or
+      # a rule in .githooks/gitleaks.toml that stops working fails the job.
+      # Nothing on this fork bumps the version: a new one is set by hand, with the
+      # SHA-256 of its linux_x64 tarball from the release's checksums file.
+      - name: "🔑 Install gitleaks for the pre-commit hook suite"
+        if: runner.os == 'Linux' && env.SKIP_LEG != 'true'
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+          echo "CAREER_OPS_REQUIRE_GITLEAKS=1" >> "$GITHUB_ENV"
       - name: "🧪 Run the test suite"
         if: env.SKIP_LEG != 'true'
         run: node test-all.mjs --quick ${{ matrix.shard && format('--shard {0}', matrix.shard) || '' }}

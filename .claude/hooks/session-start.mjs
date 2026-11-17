@@ -31,7 +31,7 @@ try {
     const [scope, shadowed] = git('--show-scope', '--get', 'core.hooksPath').stdout.trim().split('\t');
     if (git('core.hooksPath', '.githooks').status === 0) {
       const note = shadowed ? ` (this clone now uses .githooks instead of the ${scope} core.hooksPath "${shadowed}")` : '';
-      console.log(`Set git core.hooksPath to .githooks for this clone: the pre-commit hook now blocks newly added user-layer files and syntax errors.${note}`);
+      console.log(`Set git core.hooksPath to .githooks for this clone: the pre-commit hook now blocks newly added user-layer files, token-shaped text and syntax errors.${note}`);
     }
   } else if (!isForkHooksPath(root, local)) {
     console.log(`WARNING: git core.hooksPath is "${local}" in this clone's local config, so the fork's pre-commit guard in .githooks is not active here.`);
