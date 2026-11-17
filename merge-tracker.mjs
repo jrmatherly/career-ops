@@ -1677,6 +1677,10 @@ export async function mergeTracker(options = {}) {
     // table is the tracker, so nothing is left out.
     const trackerHeaderFound = appLines.some(line => isHeaderRow(line));
     const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
+    // parseTrackerRow sizes a row by the last mapped column, so with an unmapped
+    // column after it a row missing an interior cell still passes, shifted.
+    const narrowerThanHeader = line => HEADER_WIDTH != null
+      && line.split('|').length + (line.trimEnd().endsWith('|') ? 0 : 1) < HEADER_WIDTH;
     let underOtherHeader = false;
     let inBlock = false;
     let maxNum = 0;
@@ -1696,7 +1700,7 @@ export async function mergeTracker(options = {}) {
       // below; this is the dedup half (#2265).
       if (!line.startsWith('|')) continue;
       const app = parseAppLine(line);
-      if (app && parseTrackerRow(line, COLMAP)) {
+      if (app && parseTrackerRow(line, COLMAP) && !narrowerThanHeader(line)) {
         existingApps.push(app);
         if (app.num > maxNum) maxNum = app.num;
         continue;

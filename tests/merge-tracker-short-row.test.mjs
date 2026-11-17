@@ -114,3 +114,19 @@ test('a short row under a header the parser does not recognise is still refused'
   assert.match(r.out, /Row #1 is short of the header/);
 });
 
+test('a row missing an interior cell is refused when an unmapped column follows the mapped ones', (t) => {
+  const header = ['# Applications Tracker', '', '| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL | Mood |', '|---|---|---|---|---|---|---|---|---|---|---|'];
+  const r = mergeOver(t, [`${SHORT} fine |`], [], header);
+  assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
+  assert.equal(r.text, r.before, 'the tracker was written');
+  assert.match(r.out, /Row #1 is short of the header/);
+});
+
+test('a complete row under a header with an unmapped column is still matched and updated', (t) => {
+  const header = ['# Applications Tracker', '', '| # | Date | Company | Role | Score | Status | PDF | Report | Notes | URL | Mood |', '|---|---|---|---|---|---|---|---|---|---|---|'];
+  const r = mergeOver(t, ['| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 | fine |'], [], header);
+  assert.equal(r.status, 0, r.out);
+  assert.doesNotMatch(r.out, /short of the header/);
+  assert.equal(r.text.split('\n').filter((l) => /^\| \d/.test(l)).length, 1);
+});
+
