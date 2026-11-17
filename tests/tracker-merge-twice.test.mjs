@@ -24,7 +24,7 @@ function withTracker(table, additions, check) {
     const tracker = join(work, 'applications.md');
     writeFileSync(tracker, ['# Applications Tracker', '', ...table, ''].join('\n'));
     for (const [name, text] of Object.entries(additions)) writeFileSync(join(adds, name), text);
-    const env = { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: adds, CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv') };
+    const env = { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: adds, CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv'), CAREER_OPS_PDF_INDEX: join(work, 'pdf-index.tsv') };
     check({
       run: (script = 'merge-tracker.mjs') => {
         const r = spawnSync(NODE, [join(ROOT, script)], { encoding: 'utf-8', cwd: work, env, timeout: 60_000 });
