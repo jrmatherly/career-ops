@@ -263,14 +263,47 @@ test('the legs keep stable names', () => {
   assert.equal(jobs.test.name, undefined, 'a job name would change the required check names');
 });
 
-test('one stably named job fails unless every test leg passed', () => {
+const GATING_JOBS = ['cv-visual', 'tool-suites', 'upgrade-gate', 'publish'];
+
+function runGate(env) {
+  const [step] = jobs['test-result'].steps;
+  return spawnSync('bash', ['-e', '-c', step.run], { env: { PATH: process.env.PATH, ...env } }).status;
+}
+
+test('one stably named job needs every gating job and runs whatever they did', () => {
   const job = jobs['test-result'];
-  assert.equal(job.name, '✅ Test legs passed');
-  assert.deepEqual(job.needs, ['test'], 'the classifier is left out: its failure is tolerated');
-  assert.equal(job.if, '${{ always() }}', 'without always() a failed leg skips this job, and skipped counts as passing');
-  const [step] = job.steps;
-  assert.equal(step.env.TEST_RESULT, '${{ needs.test.result }}');
-  assert.match(step.run, /\[ "\$TEST_RESULT" = success \]/);
+  assert.equal(job.name, '✅ Required checks passed');
+  assert.deepEqual(job.needs, ['changes', 'test', ...GATING_JOBS], 'dependency-audit is informative and left out');
+  assert.equal(job.if, '${{ always() }}', 'without always() a failed job skips this one, and skipped counts as passing');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.steps.length, 1);
+  assert.deepEqual(Object.keys(job.steps[0]), ['name', 'env', 'run'], 'a step-level if or continue-on-error would let the job pass whatever the step did');
+  const { env } = job.steps[0];
+  assert.equal(env.DOCS_ONLY, '${{ needs.changes.outputs.docs_only }}');
+  assert.equal(env.TEST_RESULT, '${{ needs.test.result }}');
+  assert.deepEqual(env.GATED.trim().split(/\s+(?=\$)/), GATING_JOBS.map((name) => `\${{ needs.${name}.result }}`));
+});
+
+// The step runs under bash on ubuntu-latest; Windows has no dependable bash on PATH.
+test('the gate passes only when the legs passed and each other job passed or was skipped as docs-only', { skip: process.platform === 'win32' }, () => {
+  const ok = 'success success success success';
+  const skips = 'skipped skipped skipped skipped';
+  assert.equal(runGate({ DOCS_ONLY: 'false', TEST_RESULT: 'success', GATED: ok }), 0);
+  assert.equal(runGate({ DOCS_ONLY: 'true', TEST_RESULT: 'success', GATED: skips }), 0);
+  for (const [why, env] of [
+    ['a skip without a docs-only answer', { DOCS_ONLY: 'false', TEST_RESULT: 'success', GATED: skips }],
+    ['a skip when the classifier gave no answer', { DOCS_ONLY: '', TEST_RESULT: 'success', GATED: 'success skipped success success' }],
+    ['a missing result', { DOCS_ONLY: 'false', TEST_RESULT: 'success', GATED: 'success success success' }],
+    ['no results at all', { DOCS_ONLY: 'true', TEST_RESULT: 'success', GATED: '' }],
+    ['a failed job', { DOCS_ONLY: 'false', TEST_RESULT: 'success', GATED: 'success failure success success' }],
+    ['a failed job on a docs-only change', { DOCS_ONLY: 'true', TEST_RESULT: 'success', GATED: 'skipped skipped skipped failure' }],
+    ['a cancelled job', { DOCS_ONLY: 'false', TEST_RESULT: 'success', GATED: 'success success cancelled success' }],
+    ['a failed leg', { DOCS_ONLY: 'false', TEST_RESULT: 'failure', GATED: ok }],
+    ['cancelled legs', { DOCS_ONLY: 'false', TEST_RESULT: 'cancelled', GATED: ok }],
+    ['skipped legs', { DOCS_ONLY: 'true', TEST_RESULT: 'skipped', GATED: skips }],
+  ]) {
+    assert.notEqual(runGate(env), 0, why);
+  }
 });
 
 test('a failed or skipped classifier cannot stop the required legs', () => {
@@ -292,7 +325,7 @@ test('every step of a skipped leg is skipped, apart from the one saying why', ()
   assert.ok(rest.some((step) => /^node test-all\.mjs --quick\b/.test(step.run)), 'the suite is still a step of this job');
 });
 
-test('the optional jobs skip on a docs-only PR, and a failed classifier runs them', () => {
+test('the jobs outside the test matrix skip on a docs-only PR, and a failed classifier runs them', () => {
   // Fork: 'publish' is the publish service's job (PR-12).
   for (const name of ['cv-visual', 'tool-suites', 'upgrade-gate', 'dependency-audit', 'publish']) {
     const job = jobs[name];
