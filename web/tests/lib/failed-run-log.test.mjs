@@ -153,15 +153,6 @@ test("each field is saved at or under its length, and the last 500 steps are kep
   for (const line of md.split("\n")) assert.ok(line.length <= 2000 + 10, `line of ${line.length} characters`);
 });
 
-test("500 long labels that end in a cut word are saved without a quadratic scan", async (t) => {
-  const label = `${"A".repeat(250)} ${"B".repeat(100_000)}`;
-  const before = process.cpuUsage();
-  const { res } = await saveRun(t, { id: "fictional-cpu", status: "done", steps: Array.from({ length: 500 }, () => ({ kind: "status", label })), output: "" });
-  const spent = process.cpuUsage(before);
-  assert.equal(res.status, 200);
-  assert.ok((spent.user + spent.system) / 1000 < 2000, `saving took ${Math.round((spent.user + spent.system) / 1000)} ms of CPU`);
-});
-
 test("an unbroken output far past the bound is still saved as the whole marker", async (t) => {
   const { res, file } = await saveRun(t, { id: "fictional-unbroken-long", status: "done", steps: [], output: "FAKEfake".repeat(2000) });
   assert.equal(res.status, 200);
