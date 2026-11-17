@@ -155,6 +155,8 @@ test('findings that no passed gate placed below it are findings, so they are dec
   const unplaced = {
     'a partial review with an incomplete gate': { status: 1, stdout: event(3, { outcome: 'failed', unreviewedFileCount: 2, gate: { status: 'incomplete' } }) },
     'a closing event with no gate': { status: 0, stdout: event(2, { gate: undefined }) },
+    'a passed gate with a file left unreviewed': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, unreviewedFileCount: 1 }) },
+    'a passed gate on a failed review': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, outcome: 'failed' }) },
   };
   for (const [name, result] of Object.entries(unplaced)) {
     assert.equal(main([], { cwd: repo, run: () => result }).code, 2, name);
@@ -173,8 +175,6 @@ test('a review that failed, covered part of the diff or contradicts its exit sta
     'a clean event behind the gate exit': { status: 2, stdout: event(0) },
     'a scope with nothing to review': { status: 0, stdout: event(0, { status: 'review_skipped', message: 'No changes detected' }) },
     'a gate with no result': { status: 0, stdout: event(0, { gate: { status: 'incomplete' } }) },
-    'findings under the gate with a file left unreviewed': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, unreviewedFileCount: 1 }) },
-    'findings under the gate from a failed review': { status: 0, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 }, outcome: 'failed' }) },
     'findings under the gate behind a failing exit': { status: 1, stdout: event(2, { gate: { status: 'passed', blockingFindings: 0 } }) },
     'a missing CLI': { status: null, error: Object.assign(new Error('spawnSync coderabbit ENOENT'), { code: 'ENOENT' }) },
     'a killed review': { status: null, signal: 'SIGTERM', stdout: '' },
