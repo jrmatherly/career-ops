@@ -14,7 +14,7 @@ const SHORT = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | [1](.
 const NO_PDF_PIPE_IN_NOTE = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | [1](../reports/001-acme-2026-01-01.md) | call back a | b | https://jobs.acme.com/1 |';
 
 function assertRefused(r, pattern) {
-  assert.notEqual(r.status, 0, `expected the merge to refuse:\n${r.out}`);
+  assert.equal(r.status, 1, `expected the merge to refuse:\n${r.out}`);
   assert.equal(r.text, r.before, 'the tracker was written');
   assert.ok(r.pending, 'the addition was moved out of the pending directory');
   assert.equal(r.backup, false, 'a backup was written, so something tried to write the tracker');
@@ -47,7 +47,7 @@ test('a row missing its # cell is named by line, not by the year in its date', a
 
 test('--backfill-urls refuses a row whose fault is not a missing URL cell', async () => {
   const r = await mergeOver(SHORT, ['--backfill-urls']);
-  assert.notEqual(r.status, 0, r.out);
+  assert.equal(r.status, 1, r.out);
   assert.equal(r.text, r.before, 'the tracker was written');
   assert.match(r.out, /its PDF cell holds/);
   assert.match(r.out, /Nothing backfilled/);
@@ -95,7 +95,7 @@ test('verify-pipeline reports the row the merge refuses', async (t) => {
   for (const row of [SHORT, NO_PDF_PIPE_IN_NOTE, `  ${FULL}`]) {
     const merged = await mergeOver(row);
     const verified = verifyOver(t, row);
-    assert.notEqual(merged.status, 0, merged.out);
+    assert.equal(merged.status, 1, merged.out);
     assert.equal(verified.status, 1, verified.out);
     assert.doesNotMatch(verified.out, /All rows properly formatted|Pipeline is clean/);
     assert.match(verified.out, /Row (?:with too few columns|cannot be read): Row #1 \(line 5\)/);

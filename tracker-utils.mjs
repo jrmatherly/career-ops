@@ -1130,6 +1130,24 @@ export function resolveCanonicalStateId(input, states) {
 }
 
 /**
+ * Whether a Status cell holds something a tracker writer accepts as a status: a
+ * state or alias from states.yml, the dash that stands for Discarded, or a
+ * legacy duplicate marker. This is wider than "canonical" on purpose. It asks
+ * whether the cell is a status at all, so a row whose cells have shifted (a ✅
+ * or a score under Status) is told apart from one that only needs
+ * normalize-statuses.mjs. With no state list loaded any text passes.
+ *
+ * @param {*} cell - Raw status cell from applications.md.
+ * @param {{id:string,label:string,aliases:string[]}[]} states - From loadCanonicalStates().
+ * @returns {boolean}
+ */
+export function isTrackerStatusCell(cell, states) {
+  const clean = stripStatusDecoration(cell);
+  if (!states.length) return clean !== '';
+  return resolveCanonicalState(clean, states) !== null || /^(?:[—–-]$|duplicado|dup|repost)/i.test(clean);
+}
+
+/**
  * Canonical process-exit codes shared by every locked, single-purpose
  * tracker-writer CLI (set-status.mjs, mark-pdf-ready.mjs, ...) — one source
  * so a new script can't drift from the numbering an existing one already

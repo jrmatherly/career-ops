@@ -119,6 +119,7 @@ export function mergeOver(row, args = []) {
  */
 export function mergeViolation(line, r) {
   if (r.status !== 0) {
+    if (r.status !== 1) return `the merge did not run to an exit code (status ${r.status})`;
     if (r.text !== r.before) return 'refused, but the tracker was written';
     if (!r.pending) return 'refused, but the addition was archived';
     return null;

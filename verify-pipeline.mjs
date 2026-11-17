@@ -33,7 +33,7 @@ import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { getCareerOpsRoot, resolveTrackerPath } from './path-resolver.mjs';
 import {
-  looksLikeScoreCell, isSeparatorRow, isHeaderRow, resolveColumns,
+  looksLikeScoreCell, inspectTrackerRows, resolveColumns,
   normalizeTextKey, normalizeVia, unwrapReportUrlToken, parseMarkdownLinks,
   extractReqNumber,
 } from './tracker-parse.mjs';
@@ -42,7 +42,7 @@ import { normalizeUrl } from './url-key.mjs';
 import { checkTrackerSync } from './tracker-sync-check.mjs';
 import { normalizeStatus } from './followup-cadence.mjs';
 import { checkFollowupsSchema } from './stats.mjs';
-import { loadCanonicalStates, stripStatusDecoration } from './tracker-utils.mjs';
+import { loadCanonicalStates, stripStatusDecoration, isTrackerStatusCell } from './tracker-utils.mjs';
 import { checkJdArchive } from './check-jd-archive.mjs';
 import { machineSummarySection } from './lib/machine-summary-section.mjs';
 
@@ -319,18 +319,16 @@ for (const e of entries) {
 if (badScores === 0) ok('All scores valid');
 
 // --- Check 5: Row format ---
-let badRows = 0;
-for (const line of lines) {
-  if (!line.startsWith('|')) continue;
-  if (isSeparatorRow(line) || isHeaderRow(line)) continue;
-  const parts = line.split('|');
-  if (parts.length <= MAX_IDX) {
-    error(`Row with too few columns (need ${MAX_IDX} data cols): ${line.substring(0, 80)}...`,
-      "open applications.md and add the missing cells or remove the stray line; a literal | inside a cell splits it, so replace it with / or -");
-    badRows++;
-  }
+// The same rule merge-tracker.mjs stops on, so a merge that refuses a row never
+// meets a health check that calls the tracker clean.
+const badRows = inspectTrackerRows(lines, COLMAP, {
+  isStatus: cell => isTrackerStatusCell(cell, _canonicalStates),
+}).faults;
+for (const { label, why, cell } of badRows) {
+  error(`${cell === 'short' ? 'Row with too few columns' : 'Row cannot be read'}: ${label}: ${why}`,
+    "open applications.md and correct that line: add the missing cell, or remove the stray line; a literal | inside a cell splits it, so replace it with / or -. merge-tracker.mjs merges nothing until it is fixed");
 }
-if (badRows === 0) ok('All rows properly formatted');
+if (badRows.length === 0) ok('All rows properly formatted');
 
 // --- Check 6: Pending TSVs ---
 let pendingTsvs = 0;

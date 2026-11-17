@@ -15,8 +15,8 @@
  * a re-evaluation that replaces the report records the superseded report number in notes (#2411)
  * Validates status against states.yml (rejects non-canonical, logs warning)
  * Refuses to merge, exiting non-zero with every TSV left pending, while any tracker
- * row is short of the header (a dry run only warns; --backfill-urls repairs a row
- * short only by its URL cell)
+ * row cannot be read (trackerRowFault in tracker-parse.mjs; a dry run only warns;
+ * --backfill-urls repairs a row that lacks only its URL cell)
  *
  * Run: node merge-tracker.mjs [--dry-run] [--verify]
  *
@@ -35,11 +35,11 @@ import { normalizeReportLink as normalizeLink } from './tracker-links.mjs';
 import { getCareerOpsRoot, resolveBatchStatePaths } from './path-resolver.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 import { parsePdfIndex, livePdfIndex, normNum } from './find.mjs';
-import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, parseTrackerRow, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
+import { LEGACY_COLMAP, TSV_REQUIRED_FIELDS, inspectTrackerRows, detectColumns, isHeaderRow, isUnsetUrlCell, resolveScoreStatus, looksLikeTsvHeaderRow, resolveTsvColumns, looksLikeScoreCell, parseScore, normalizeVia, normalizeTextKey, SEPARATOR_ROW_RE, extractReqNumber, extractCellUrl, parseMarkdownLinks } from './tracker-parse.mjs';
 // The ATS vendor table shared with analyze-patterns.mjs and the scanners, so
 // the URL cell's label and the per-vendor analysis name a board identically.
 import { atsVendorOf } from './ats-vendor.mjs';
-import { resolveTrackerPath, resolveWorkspaceRoot, resolvePdfIndexPath, trackerLockDirFor, acquireTrackerLock, writeFileAtomic, backupFileAtomically, normalizeCompany, companiesMatchIgnoringCorporateForm, cell, loadCanonicalStates, findDeadReportLink, rebuildRow, trackerLinkDirsFor, containedReportTarget, containedReportFile, reportUrlToken, resolveCanonicalStateId, stripStatusDecoration } from './tracker-utils.mjs';
+import { resolveTrackerPath, resolveWorkspaceRoot, resolvePdfIndexPath, trackerLockDirFor, acquireTrackerLock, writeFileAtomic, backupFileAtomically, normalizeCompany, companiesMatchIgnoringCorporateForm, cell, loadCanonicalStates, findDeadReportLink, rebuildRow, trackerLinkDirsFor, containedReportTarget, containedReportFile, reportUrlToken, resolveCanonicalStateId, stripStatusDecoration, isTrackerStatusCell } from './tracker-utils.mjs';
 // Canonical posting-URL key and URL comparison, shared with the other tracker
 // scripts and scan.mjs so the definitions cannot drift apart.
 import { normalizeUrl, isAggregatorUrl, aggregatorPostingId, postingUrlRelation } from './url-key.mjs';
@@ -1669,50 +1669,33 @@ export async function mergeTracker(options = {}) {
       );
     }
     const existingApps = [];
-    const shortRows = [];
-    // A numbered row under another table's header is not a tracker row. A block
-    // of rows with no header of its own (the tracker after a blank line) still is,
-    // so only a first line that a separator row follows counts as a header. With
-    // no recognised tracker header the legacy layout is in use, and the first
-    // block is the tracker whatever its first line says.
-    const trackerHeaderFound = appLines.some(line => isHeaderRow(line));
-    const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
-    // parseTrackerRow sizes a row by the last mapped column, so with an unmapped
-    // column after it a row missing an interior cell still passes, shifted.
-    const narrowerThanHeader = line => HEADER_WIDTH != null
-      && line.split('|').length + (line.trimEnd().endsWith('|') ? 0 : 1) < HEADER_WIDTH;
-    let underOtherHeader = false;
-    let inBlock = false;
-    let blocksSeen = 0;
     let maxNum = 0;
-
-    for (const [at, line] of appLines.entries()) {
-      if (line.startsWith('|') && !inBlock) {
-        underOtherHeader = (trackerHeaderFound || blocksSeen > 0) && !isHeaderRow(line) && SEPARATOR_ROW_RE.test(appLines[at + 1] ?? '');
-        blocksSeen++;
-      }
-      inBlock = line.startsWith('|');
-      // Skip only on the NaN check inside parseAppLine, which already rejects the
-      // header and separator rows because neither has a numeric `#` cell. The old
-      // `.includes('---') / .includes('Empresa')` heuristic was redundant for those
-      // two rows and wrong for data rows: any row whose free text contained three
-      // hyphens (a URL slug such as `Senior-Engineer---Platform-Team`, an em
-      // dash typed as `---`) or the word "Empresa" (a Spanish-market company name)
-      // never reached existingApps, so duplicate detection could not see it and a
-      // re-evaluation of that role appended a second row instead of updating it in
-      // place. #1704 fixed the numbering half of this with the usedNumbers pass
-      // below; this is the dedup half (#2265).
-      if (!line.startsWith('|')) continue;
+    // Only a row whose cells hold what their columns are for is matched or
+    // rewritten. --backfill-urls exists to repair a row that stops before its
+    // URL cell, so there that one shape is a row and not a fault.
+    const inspected = inspectTrackerRows(appLines, COLMAP, {
+      isStatus: status => isTrackerStatusCell(status, _canonicalStates),
+      urlOptional: BACKFILL_URLS,
+    });
+    for (const { line } of inspected.rows) {
       const app = parseAppLine(line);
-      if (app && parseTrackerRow(line, COLMAP) && !narrowerThanHeader(line)) {
-        existingApps.push(app);
-        if (app.num > maxNum) maxNum = app.num;
-        continue;
-      }
-      // A numbered row too short for parseAppLine is just as unmatchable.
-      const num = rowNum(line);
-      if (!isNaN(num) && num !== 0 && !underOtherHeader) shortRows.push(num);
+      existingApps.push(app);
+      if (app.num > maxNum) maxNum = app.num;
     }
+    // A row that cannot be read cannot be matched, so a re-evaluation of it
+    // would be appended as a second row and its TSV archived, and rewriting it
+    // would move its cells under the wrong columns. A later fix to the row
+    // cannot undo either. Stop before anything is read or written. A dry run
+    // writes nothing, so it only warns.
+    for (const { label, why } of inspected.faults) {
+      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} ${label} cannot be read as a tracker row: ${why}. Correct that line in ${basename(APPS_FILE)} (--backfill-urls adds a URL cell to a row that only lacks one), then re-run.${DRY_RUN ? ' A real run stops here and changes nothing.' : ''}`);
+    }
+    if (inspected.faults.length && !DRY_RUN) {
+      console.error(`❌ Nothing ${BACKFILL_URLS ? 'backfilled' : 'merged'}: ${inspected.faults.length} tracker row(s) cannot be read.${BACKFILL_URLS ? '' : ' The additions are still pending.'}`);
+      trackerLock.release();
+      return 1;
+    }
+    const soundLines = new Set(inspected.rows.map(row => row.at));
 
     // One-time backfill populating the URL column on existing
     // rows from each row's linked report (`**URL:**` header). This is the EXPAND
@@ -1726,14 +1709,9 @@ export async function mergeTracker(options = {}) {
         return 1;
       }
       let filled = 0, noReport = 0, noUrl = 0, already = 0;
-      const backfilled = appLines.map(line => {
-        // parseAppLine's NaN check below already rejects the header and separator
-        // rows (neither has a numeric `#` cell), so no `---` substring test here —
-        // that heuristic skipped data rows whose URL contains `---` (Workday slugs
-        // like `Product-Strategy---Operations`), which is the #2265 bug class.
-        if (!line.startsWith('|')) return line;
+      const backfilled = appLines.map((line, at) => {
+        if (!soundLines.has(at)) return line;
         const app = parseAppLine(line);
-        if (!app) return line;
         // Rebuilt, not returned verbatim — a row can carry a URL and STILL be short
         // of the header on a layout with user-owned columns after `URL`. Returning
         // `line` there leaves the same unreadable row this fix exists to prevent.
@@ -1759,10 +1737,6 @@ export async function mergeTracker(options = {}) {
         // it correctly refuses. Every reader built on tracker-parse.mjs then skips
         // the row for good — set-status.mjs reports "No tracker row with #N".
         //
-        // parseAppLine's guard is `parts.length <= maxIdx`, one cell looser than
-        // parseTrackerRow's `parts.length < width`, which is why the backfill can
-        // still see and repair precisely the rows the readers cannot.
-        //
         // The DELIMITER is added, never a value: buildRow writes `put('url', '')`,
         // and an empty URL falls back to the report-number and fuzzy company+role
         // dedup tiers exactly as it does today. Nothing is fabricated.
@@ -1785,18 +1759,6 @@ export async function mergeTracker(options = {}) {
       }
       trackerLock.release();
       return 0;
-    }
-    // A short row cannot be matched, so a re-evaluation of it would be appended
-    // as a second row and its TSV archived; a later fix to the row cannot undo
-    // that. Stop before any addition is read. A dry run writes nothing, so it
-    // only warns.
-    for (const num of shortRows) {
-      console[DRY_RUN ? 'warn' : 'error'](`${DRY_RUN ? '⚠️ ' : '❌'} Row #${num} is short of the header, so an addition for it would be appended as a duplicate. Add the missing cell to that row in applications.md (or run --backfill-urls if only the URL cell is missing), then re-run.${DRY_RUN ? ' A real run stops here and merges nothing.' : ''}`);
-    }
-    if (shortRows.length && !DRY_RUN) {
-      console.error(`❌ Nothing merged: ${shortRows.length} tracker row(s) are short of the header. The additions are still pending.`);
-      trackerLock.release();
-      return 1;
     }
     // Full set of numbers already on the tracker (#1704). Deliberately broader than
     // the existingApps loop above: it reserves the number from any row with a
