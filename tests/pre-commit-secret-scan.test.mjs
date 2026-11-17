@@ -2,7 +2,7 @@
 // which GitHub push protection would otherwise refuse only at the push.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -12,6 +12,18 @@ import { ROOT, hermeticGitEnv, sealProcessGitEnv } from './helpers.mjs';
 sealProcessGitEnv();
 
 const hasGitleaks = spawnSync('gitleaks', ['version']).status === 0;
+
+// The git a spawn would run: the first regular, executable file of that name on PATH.
+function gitOnPath() {
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    const file = join(dir, 'git');
+    try {
+      accessSync(file, constants.X_OK);
+      if (statSync(file).isFile()) return file;
+    } catch { /* not this one */ }
+  }
+  throw new Error('git is not on PATH');
+}
 // The Ubuntu leg of the test job installs gitleaks and sets this, so there a missing gitleaks fails and does not skip.
 const mustScan = process.env.CAREER_OPS_REQUIRE_GITLEAKS === '1';
 
@@ -38,7 +50,7 @@ test('a machine without gitleaks commits with a warning, not a refusal', { skip:
   // A PATH that holds git and nothing else, wherever gitleaks is installed.
   const bin = join(repo, 'bin');
   mkdirSync(bin);
-  symlinkSync(process.env.PATH.split(delimiter).map((dir) => join(dir, 'git')).find((file) => existsSync(file)), join(bin, 'git'));
+  symlinkSync(gitOnPath(), join(bin, 'git'));
   writeFileSync(join(repo, 'fixture.mjs'), `export const token = "${token}";\n`);
   git('add', 'fixture.mjs');
   const unscanned = hook({ ...env, PATH: bin });

@@ -129,10 +129,12 @@ jobs:
       - name: "📦 Install dependencies"
         if: env.SKIP_LEG != 'true'
         run: npm install --ignore-scripts
-      # .githooks/pre-commit.mjs scans the staged diff with gitleaks, and
-      # tests/pre-commit-secret-scan.test.mjs skips where gitleaks is missing. One
+      # .githooks/pre-commit.mjs scans the staged diff with gitleaks, and the scan
+      # test in tests/pre-commit-secret-scan.test.mjs skips where gitleaks is missing. One
       # leg installs it and turns that skip into a failure, so a gitleaks flag or
       # a rule in .githooks/gitleaks.toml that stops working fails the job.
+      # Nothing on this fork bumps the version: a new one is set by hand, with the
+      # SHA-256 of its linux_x64 tarball from the release's checksums file.
       - name: "🔑 Install gitleaks for the pre-commit hook suite"
         if: runner.os == 'Linux' && env.SKIP_LEG != 'true'
         env:
