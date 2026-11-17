@@ -66,6 +66,7 @@ export async function POST(req: Request) {
             cvPath = null;
             cvResolveError = error instanceof Error ? error.message.slice(0, 160) : "Could not resolve the résumé.";
           }
+          if (abort.signal.aborted) return;
           // Snapshot first. Finalizing replaces s.fields and reassigns positional ids.
           const beforeFields = Array.isArray(s.fields) ? s.fields.slice() : [];
           const fin = await finalizeDrivenSession(s.id, cliId);

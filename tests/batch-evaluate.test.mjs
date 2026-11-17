@@ -2,7 +2,7 @@ import { pass, fail, rmSync, ROOT } from './helpers.mjs';
 import { processPipelineBatch, processOffer, PATHS } from '../batch-evaluate-gemini.mjs';
 import { setHostResolver } from '../liveness-browser.mjs';
 // scrapeUrl resolves the landed URL; keep that lookup off the network.
-setHostResolver(async () => ['93.184.216.34']);
+const restoreResolver = setHostResolver(async () => ['93.184.216.34']);
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -282,4 +282,4 @@ async function run() {
 // valid repo path got compared against this fixture's root. The finally below
 // does restore it, but only once the work finishes. Awaiting here means the
 // import does not resolve until the environment is clean again.
-await run();
+try { await run(); } finally { restoreResolver(); }

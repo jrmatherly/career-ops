@@ -7,7 +7,11 @@ import { join } from 'node:path';
 import { NODE, ROOT } from './helpers.mjs';
 
 const script = readFileSync(join(ROOT, 'batch', 'batch-runner.sh'), 'utf-8').match(/be_code=\$\(node -e '([\s\S]*?)' < "\$be_err"/)?.[1];
-const codeOf = (stderr) => spawnSync(NODE, ['-e', script], { input: stderr, encoding: 'utf-8' }).stdout;
+const codeOf = (stderr) => {
+  const r = spawnSync(NODE, ['-e', script], { input: stderr, encoding: 'utf-8' });
+  assert.equal(r.status, 0, r.stderr || String(r.error));
+  return r.stdout;
+};
 
 test('the error-code reader is still where batch-runner.sh keeps it', () => {
   assert.ok(script, 'be_code=$(node -e ...) was not found in batch/batch-runner.sh');

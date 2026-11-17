@@ -27,6 +27,7 @@ test("both apply streams abort on cancel and pass the signal down", () => {
 
 test("a cancel stops the planner before it starts, the résumé upload after a drive, and a turn that was cancelled mid-plan", () => {
   assert.match(read("prefill"), /if \(abort\.signal\.aborted\) return;\s+log\(`Planner: /);
+  assert.match(read("drive"), /if \(abort\.signal\.aborted\) return;\s+\/\/ Snapshot first\./);
   assert.match(read("drive"), /await finalizeDrivenSession\(s\.id, cliId\);\s+\/\/[^\n]*\n\s+if \(abort\.signal\.aborted\) return;/);
   const drive = readFileSync(new URL("../../src/lib/apply/drive.ts", import.meta.url), "utf8");
   assert.match(drive, /await plannerTurn\([^\n]*\n\s+if \(signal\?\.aborted\) return \{ reached: false, turns: turn, reason: "stopped", steps \};/);
