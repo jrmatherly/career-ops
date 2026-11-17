@@ -33,3 +33,9 @@ test("a cancel stops the planner before it starts, the résumé upload after a d
   assert.match(drive, /await plannerTurn\([^\n]*\n\s+if \(signal\?\.aborted\) return \{ reached: false, turns: turn, reason: "stopped", steps \};/);
 });
 
+test("leaving mid-prefill aborts the prefill request, so the server sees the cancel", () => {
+  const provider = readFileSync(new URL("../../src/components/apply/apply-provider.tsx", import.meta.url), "utf8");
+  assert.match(provider, /fetch\("\/api\/apply\/prefill",[^\n]*signal: controller\.signal \}\)/);
+  assert.match(provider, /const dropFill = \(\) => \{[^}]*prefillAbort\.current\?\.abort\(\);/);
+});
+

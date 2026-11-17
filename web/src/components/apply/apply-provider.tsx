@@ -105,9 +105,14 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
   // not unblock it, so the controller is aborted in the same places the
   // generation moves.
   const fillAbort = useRef<AbortController | null>(null);
+  // Leaving mid-prefill must end the request too, or the server never sees a
+  // cancel and its planner runs to the end.
+  const prefillAbort = useRef<AbortController | null>(null);
   const dropFill = () => {
     fillAbort.current?.abort();
     fillAbort.current = null;
+    prefillAbort.current?.abort();
+    prefillAbort.current = null;
   };
   // When a session opens with {prefill:true}, auto-fire prefill once fields are
   // ready — driven by an effect (not a fragile setTimeout) so it can't race the
@@ -272,7 +277,10 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     try {
       // company + application travel with the pre-fill for the same reason they
       // travel with the fill: both halves resolve the one tailored CV from them.
-      const r = await fetch("/api/apply/prefill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sessionId.current, cliId: cliId(), company: companyRef.current, application: nRef.current }) });
+      prefillAbort.current?.abort();
+      const controller = new AbortController();
+      prefillAbort.current = controller;
+      const r = await fetch("/api/apply/prefill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sessionId.current, cliId: cliId(), company: companyRef.current, application: nRef.current }), signal: controller.signal });
       if (generation.current !== gen) return; // left mid-prefill
       if (!r.body) {
         setError("Couldn't pre-fill — no response stream.");
