@@ -29,9 +29,12 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loader = useRef(createPipelineLoader());
+  const latest = useRef(0);
   const refetch = useCallback(() => {
+    const mine = ++latest.current;
     setLoading(true);
-    loader.current().then((d) => { if (d) { setInbox(d.inbox as InboxJob[]); setApplications(d.applications as Application[]); } }).finally(() => setLoading(false));
+    // An older load that finishes while a newer one is pending must not end the loading state.
+    loader.current().then((d) => { if (d) { setInbox(d.inbox as InboxJob[]); setApplications(d.applications as Application[]); } }).finally(() => { if (mine === latest.current) setLoading(false); });
   }, []);
 
   useEffect(() => {
