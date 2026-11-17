@@ -1,7 +1,7 @@
 // tests/verify-portals-entry-pacing.test.mjs — the portal health check and the
 // audit pace every request they send to an entry's own board, not only the
 // first, and never wait longer than a check under a time limit can afford.
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { verifyCompanies } from '../verify-portals.mjs';
 import { auditCompanies } from '../audit-portals.mjs';
@@ -30,30 +30,46 @@ test('the provider-layer check and the audit wait between requests, no longer th
 });
 
 const DELAY = 200;
-// A timer may fire a few ms early; 20 ms of slack still tells a real wait from none.
-const FLOOR = DELAY - 20;
+// The pacer rounds a wait up to whole ms, so on this clock a paced request starts exactly DELAY after the one before.
+const FLOOR = DELAY - 1;
+const CLOCK_LIMIT_MS = 10_000;
 
-/** Run the check for one entry against a stubbed fetch; returns each request's URL and start time. */
+/**
+ * Run the check for one entry against a stubbed fetch, on a clock the test owns: `performance.now`
+ * and `setTimeout` are faked, and time moves 1 ms at a time only once the check is idle. Work between
+ * a request's turn at the pacer and the fetch call takes no time on that clock, so a stall there on a
+ * loaded machine cannot shorten the gap. Returns each request's URL and start time.
+ */
 async function requestsFor(company, respond) {
   const realFetch = globalThis.fetch;
+  const realNow = performance.now;
+  let clock = 0;
   const seen = [];
   globalThis.fetch = async (url) => {
-    seen.push({ url: String(url), at: performance.now() });
+    seen.push({ url: String(url), at: clock });
     return respond(String(url));
   };
+  performance.now = () => clock;
+  mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    await verifyCompanies([company]);
+    let done = false;
+    const check = verifyCompanies([company]).finally(() => { done = true; });
+    while (!done && clock < CLOCK_LIMIT_MS) {
+      await new Promise((resolve) => setImmediate(resolve));
+      clock += 1;
+      mock.timers.tick(1);
+    }
+    assert.ok(done, `the check did not finish within ${CLOCK_LIMIT_MS} ms of test clock`);
+    await check;
   } finally {
+    mock.timers.reset();
+    performance.now = realNow;
     globalThis.fetch = realFetch;
   }
   return seen;
 }
 
 const json = (body) => new Response(body, { status: 200, headers: { 'content-type': 'application/json' } });
-
-// The first request a process sends pays one-off setup between the gate and the socket,
-// which would shorten the gap these tests measure at the socket.
-await requestsFor({ name: 'Warm', careers_url: 'https://boards.greenhouse.io/warm' }, () => json('{"jobs":[{"id":1}]}'));
 
 test('a redirect hop waits its turn like any other request', async () => {
   const moved = 'https://boards-api.greenhouse.io/v1/boards/acme-new/jobs';
