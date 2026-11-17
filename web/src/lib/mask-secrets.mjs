@@ -23,6 +23,12 @@ const LABEL_WORDS = ["api[_-]?key", "key", "token", "secret", "password", "passw
 const LABEL = `(?<![A-Za-z0-9])(?:${LABEL_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${LABEL_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
 const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?:${ci("bearer")}|${ci("basic")})[ \\t]+)?([A-Za-z0-9._~+/=-]{16,})`, "g");
 
+// A password is short and often has no digit, so one assigned with : or = is masked
+// whatever it holds. Prose after the bare word ("password required") stays.
+const PASSWORD_WORDS = ["password", "passwd", "pwd"];
+const PASSWORD_LABEL = `(?<![A-Za-z0-9])(?:${PASSWORD_WORDS.map(ci).join("|")})|(?<=[a-z0-9])(?:${PASSWORD_WORDS.map((w) => w[0].toUpperCase() + ci(w.slice(1))).join("|")})`;
+const PASSWORD_ASSIGNED = new RegExp(`((?:${PASSWORD_LABEL})["']?[ \\t]*[:=][ \\t]*["']?)([^\\s"']{4,})`, "g");
+
 // "/home/me/.cache/…" is a path; "/9j4AAQ…" with no second slash is base64.
 const isPath = (s) => /^\/[^/]+\//.test(s);
 
@@ -38,5 +44,6 @@ export function maskSecrets(s) {
     })
     .replace(AWS_KEY_ID, `$1${MARK}`)
     .replace(PREFIXED, (m, prefix, value) => (hasDigit(value) ? prefix + MARK : m))
-    .replace(LABELLED, (m, label, sep, scheme = "", value) => (hasDigit(value) && !isPath(value) ? label + sep + scheme + MARK : m));
+    .replace(LABELLED, (m, label, sep, scheme = "", value) => (hasDigit(value) && !isPath(value) ? label + sep + scheme + MARK : m))
+    .replace(PASSWORD_ASSIGNED, `$1${MARK}`);
 }

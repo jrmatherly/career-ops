@@ -113,3 +113,15 @@ test("a labelled value starting with a slash is masked unless it is a path", () 
   assert.equal(maskSecrets("token=/9j4AAQSkZJRgABAQ0000FAKE"), "token=[masked]");
   assert.equal(maskSecrets("cache key: /home/me/.cache/claude/v2/abc123def456ghi"), "cache key: /home/me/.cache/claude/v2/abc123def456ghi");
 });
+
+test("a password assigned with : or = is masked whatever its length or characters", () => {
+  assert.equal(maskSecrets("login failed: password=example123 for u"), "login failed: password=[masked] for u");
+  assert.equal(maskSecrets("password=fictionalAlphabeticPassword"), "password=[masked]");
+  assert.equal(maskSecrets('{"dbPassword": "hunter"}'), '{"dbPassword": "[masked]"}');
+  assert.equal(maskSecrets("PWD: abcd"), "PWD: [masked]");
+});
+
+test("the bare word password in prose is left alone", () => {
+  for (const line of ["password required for this portal", "Enter your password to continue", "the password is wrong"]) assert.equal(maskSecrets(line), line);
+});
+
