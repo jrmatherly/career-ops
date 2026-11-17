@@ -1,12 +1,7 @@
 // tests/tracker-row-shape.test.mjs: merge, backfill and verify-pipeline refuse the same damaged tracker rows, judged by what each cell holds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { NODE, ROOT } from './helpers.mjs';
-import { HEADER, mergeOver } from './helpers/tracker-damage.mjs';
+import { mergeOver, verifyOver } from './helpers/tracker-damage.mjs';
 
 const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
 // The PDF cell is missing, so every later cell sits one column left.
@@ -22,13 +17,13 @@ function assertRefused(r, pattern) {
 }
 
 const REFUSED = [
-  ['a missing PDF cell hidden by a | in the note', NO_PDF_PIPE_IN_NOTE, /Row #1 \(line 5\) cannot be read as a tracker row: its PDF cell holds "\[1\]/],
+  ['a missing PDF cell hidden by a | in the note', NO_PDF_PIPE_IN_NOTE, /Row #1 \(line 5\) cannot be read as a tracker row: its PDF cell holds a report link \("\[1\]/],
   ['the same row with the note pipe escaped', NO_PDF_PIPE_IN_NOTE.replace('a | b', 'a \\| b'), /its PDF cell holds/],
   ['a missing PDF cell hidden by an extra trailing cell', `${SHORT} |`, /its PDF cell holds/],
   ['a complete row whose note holds a |', FULL.replace('my note', 'call a | b'), /it has 11 cells where the header has 10/],
-  ['a missing Report cell hidden by a | in the note', FULL.replace(' [1](../reports/001-acme-2026-01-01.md) |', '').replace('my note', 'my | note'), /its Report cell holds "my"/],
-  ['a complete row indented by two spaces', `  ${FULL}`, /Row #1 \(line 5\) cannot be read as a tracker row: the line is indented/],
-  ['a short row indented by two spaces', `  ${SHORT}`, /the line is indented/],
+  ['a missing Report cell hidden by a | in the note', FULL.replace(' [1](../reports/001-acme-2026-01-01.md) |', '').replace('my note', 'my | note'), /its Report cell holds "my", which is not a report link/],
+  ['a complete row indented by two spaces', `  ${FULL}`, /Row #1 \(line 5\) cannot be read as a tracker row: the line starts with a space or a tab/],
+  ['a short row indented by two spaces', `  ${SHORT}`, /the merge cannot match an indented row/],
   ['a short row numbered 0', SHORT.replace('| 1 |', '| 0 |'), /Line 5 \("\| 0 \| 2026-01-01 \| Acme \| Data Engineer \| 3\.0\/5 \| Applied \| "\) cannot be read/],
   ['a short row numbered —', SHORT.replace('| 1 |', '| — |'), /Line 5 \("\| — \| 2026-01-01/],
   ['a short row with a blank #', SHORT.replace('| 1 |', '|  |'), /Line 5 \("\|  \| 2026-01-01/],
@@ -77,20 +72,6 @@ for (const [name, row] of [
   });
 }
 
-/** Run verify-pipeline over a tracker holding one row. */
-function verifyOver(t, row) {
-  const work = mkdtempSync(join(tmpdir(), 'cops-row-shape-verify-'));
-  t.after(() => rmSync(work, { recursive: true, force: true }));
-  mkdirSync(join(work, 'reports'));
-  writeFileSync(join(work, 'reports', '001-acme-2026-01-01.md'), '# Acme\n\n**URL:** https://jobs.acme.com/1\n');
-  const tracker = join(work, 'data', 'applications.md');
-  mkdirSync(join(work, 'data'));
-  writeFileSync(tracker, [...HEADER, row, ''].join('\n'));
-  const r = spawnSync(NODE, [join(ROOT, 'verify-pipeline.mjs')], { encoding: 'utf-8', timeout: 30_000, cwd: work,
-    env: { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_REPORTS: join(work, 'reports') } });
-  return { status: r.status, out: `${r.stdout}${r.stderr}` };
-}
-
 test('verify-pipeline reports the row the merge refuses', async (t) => {
   for (const row of [SHORT, NO_PDF_PIPE_IN_NOTE, `  ${FULL}`]) {
     const merged = await mergeOver(row);
@@ -98,7 +79,7 @@ test('verify-pipeline reports the row the merge refuses', async (t) => {
     assert.equal(merged.status, 1, merged.out);
     assert.equal(verified.status, 1, verified.out);
     assert.doesNotMatch(verified.out, /All rows properly formatted|Pipeline is clean/);
-    assert.match(verified.out, /Row (?:with too few columns|cannot be read): Row #1 \(line 5\)/);
+    assert.match(verified.out, /Row #1 \(line 5\) cannot be read as a tracker row/);
   }
 });
 

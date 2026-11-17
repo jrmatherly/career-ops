@@ -1,5 +1,5 @@
 // tests/helpers/tracker-damage.mjs: damaged variants of one valid tracker row, and a merge run over each.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -65,6 +65,10 @@ export function damagedRows({ pairs = false } = {}) {
 /** Whether the shared rule calls this line a tracker row a writer may touch. */
 export const isSound = line => trackerParse.trackerRowFault(line, COLMAP, { cellCount: CELLS.length, isStatus: cell => cell === 'Applied' }) === null;
 
+// Date, Score, PDF, Report and URL: the cells of the valid row that only their own column holds.
+const TYPED = [1, 4, 6, 7, 9];
+const NOTES = 8;
+
 /** Cells of a pipe row, read the way a Markdown table renders them. */
 export const cellsOf = (line) => {
   const cells = line.trim().split('|').map(s => s.trim());
@@ -74,20 +78,23 @@ export const cellsOf = (line) => {
 };
 
 /**
- * Run the real merge over a tracker holding one row and one pending re-evaluation of it.
- * @param {string} row - The tracker's only data line.
+ * Run the real merge over a tracker holding `row` and one pending addition.
+ * @param {string} row - The tracker's data lines (one row unless it holds a newline).
  * @param {string[]} [args] - Extra merge-tracker flags.
- * @returns {Promise<{status: number|null, out: string, before: string, text: string, pending: boolean, backup: boolean}>}
+ * @param {{header?: string[], addition?: string, again?: boolean}} [options]
+ *   `addition` defaults to a re-evaluation of the valid row. `again` runs the
+ *   merge a second time over the tracker a clean first run left.
+ * @returns {Promise<{status: number|null, out: string, before: string, text: string, pending: boolean, backup: boolean, again?: {status: number|null, out: string}}>}
  */
-export function mergeOver(row, args = []) {
+export async function mergeOver(row, args = [], { header = HEADER, addition = ADDITION, again = false } = {}) {
   const work = mkdtempSync(join(tmpdir(), 'cops-row-damage-'));
   const adds = join(work, 'adds');
   mkdirSync(adds);
   const tracker = join(work, 'applications.md');
-  const before = [...HEADER, row, ''].join('\n');
+  const before = [...header, row, ''].join('\n');
   writeFileSync(tracker, before);
-  writeFileSync(join(adds, '002-acme.tsv'), ADDITION);
-  return new Promise((resolve, reject) => {
+  writeFileSync(join(adds, '002-acme.tsv'), addition);
+  const run = () => new Promise((resolve, reject) => {
     const child = spawn(NODE, [join(ROOT, 'merge-tracker.mjs'), ...args], {
       env: { ...process.env, CAREER_OPS_TRACKER: tracker, CAREER_OPS_ADDITIONS: adds, CAREER_OPS_BATCH_STATE: join(work, 'batch-state.tsv') },
     });
@@ -95,23 +102,51 @@ export function mergeOver(row, args = []) {
     child.stdout.on('data', (chunk) => { out += chunk; });
     child.stderr.on('data', (chunk) => { out += chunk; });
     child.on('error', reject);
-    child.on('close', (status) => {
-      const result = { status, out, before, text: readFileSync(tracker, 'utf-8'),
-        pending: existsSync(join(adds, '002-acme.tsv')), backup: readdirSync(work).some(name => name.endsWith('.bak')) };
-      rmSync(work, { recursive: true, force: true });
-      resolve(result);
-    });
+    child.on('close', status => resolve({ status, out }));
   });
+  try {
+    const first = await run();
+    const result = { ...first, before, text: readFileSync(tracker, 'utf-8'),
+      pending: existsSync(join(adds, '002-acme.tsv')), backup: readdirSync(work).some(name => name.endsWith('.bak')) };
+    if (again && first.status === 0) result.again = await run();
+    return result;
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+/** The tracker's data rows after a merge: every pipe line below the header and separator. */
+export const dataRows = text => text.split('\n').filter(l => l.trim().startsWith('|')).slice(2);
+
+/**
+ * Run verify-pipeline over a tracker holding `row`, with row #1's report on disk.
+ * @param {import('node:test').TestContext} t
+ * @param {string} row
+ * @returns {{status: number|null, out: string}}
+ */
+export function verifyOver(t, row) {
+  const work = mkdtempSync(join(tmpdir(), 'cops-row-shape-verify-'));
+  t.after(() => rmSync(work, { recursive: true, force: true }));
+  mkdirSync(join(work, 'reports'));
+  writeFileSync(join(work, 'reports', '001-acme-2026-01-01.md'), '# Acme\n\n**URL:** https://jobs.acme.com/1\n');
+  const tracker = join(work, 'data', 'applications.md');
+  mkdirSync(join(work, 'data'));
+  writeFileSync(tracker, [...HEADER, row, ''].join('\n'));
+  const r = spawnSync(NODE, [join(ROOT, 'verify-pipeline.mjs')], { encoding: 'utf-8', timeout: 30_000, cwd: work,
+    env: { ...process.env, CAREER_OPS_ROOT: work, CAREER_OPS_TRACKER: tracker, CAREER_OPS_REPORTS: join(work, 'reports') } });
+  return { status: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
 /**
  * What a merge did wrong with one damaged row, or null.
  *
  * The first two checks are the owner's rule. The last does not use the shared
- * rule at all: a row the merge rewrote had its date, score, status, PDF, report
- * and URL where the valid row has them (or blank), and nothing more or less
- * than its ten cells. Company, role and note are free text, so no check can
- * place them.
+ * rule at all: a row the merge rewrote had its ten cells, its report and URL
+ * where the valid row has them (or blank), and no date, score, PDF mark,
+ * report link or URL under another column. Notes is exempt, because a note
+ * may be any of those. Company, role, status and note are free text, so no
+ * check can place them, and one of them exchanged with a date, a score or a
+ * PDF mark puts free text where the rule accepts free text.
  *
  * @param {string} line - The tracker's only data line before the merge.
  * @param {Awaited<ReturnType<typeof mergeOver>>} r
@@ -124,7 +159,8 @@ export function mergeViolation(line, r) {
     if (!r.pending) return 'refused, but the addition was archived';
     return null;
   }
-  const rows = r.text.split('\n').filter(l => l.trim().startsWith('|')).slice(2);
+  if (r.again && r.again.status !== 0) return 'the merge refused the tracker it had just written';
+  const rows = dataRows(r.text);
   const kept = rows.includes(line);
   if (!kept && !isSound(line)) return 'rewrote a row the shared rule calls unreadable';
   const samePosting = rows.filter((l) => { const c = cellsOf(l); return c[2] === 'Acme' && c[3] === 'Data Engineer'; });
@@ -133,7 +169,11 @@ export function mergeViolation(line, r) {
   const unnumbered = /^(?:n\/a|—|-)$/i.test(cellsOf(line)[0]) && isSound(line.replace(cellsOf(line)[0], '1'));
   if (samePosting.length > 1 && !unnumbered) return 'appended a second row for the same company and role';
   const was = cellsOf(line);
-  const moved = [1, 4, 5, 6, 7, 9].filter(at => was[at] !== CELLS[at] && was[at] !== '');
+  const moved = was.flatMap((value, at) => {
+    const emptied = [7, 9].includes(at) && value !== CELLS[at] && value !== '';
+    const strayed = at !== NOTES && TYPED.some(home => home !== at && CELLS[home] === value);
+    return emptied || strayed ? [at] : [];
+  });
   if (!kept && (moved.length || was.length !== CELLS.length)) {
     return `rewrote a row whose cells had moved (${was.length} cells, columns ${moved.join(',') || 'none'} changed)`;
   }

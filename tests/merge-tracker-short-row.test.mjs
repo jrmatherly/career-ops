@@ -95,7 +95,7 @@ test('a dry run warns, writes nothing, and says a real run would stop', (t) => {
   const r = mergeOver(t, [SHORT], ['--dry-run']);
   assert.equal(r.status, 0, r.out);
   assert.equal(r.text, r.before, 'the tracker was written');
-  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row.*A real run stops here and changes nothing\./);
+  assert.match(r.out, /Row #1 \(line \d+\) cannot be read as a tracker row[\s\S]*A real run stops here and changes nothing\./);
 });
 
 test('a block that starts with an unnumbered tracker row is still the tracker', (t) => {
