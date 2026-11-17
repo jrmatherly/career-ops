@@ -307,8 +307,16 @@ and leave both empty to evaluate every location.
   hold does not admit. The test is the workplace policy in
   [WORKPLACE_GEOGRAPHY.md](WORKPLACE_GEOGRAPHY.md), given the location and
   title from the row's scan history. A posting that says only "Remote", one
-  with no location, and one in another city are all held. So is a remote
-  posting that names only a state (`Remote - CO`): it needs the country.
+  with no location, and one in another city are all held. When **Remote
+  from** includes the United States, a remote posting that names a US state
+  is admitted (`Remote, TN`, `Remote - Texas`). Five state codes that boards
+  also write for a country are the exception (`CA`, `CO`, `DE`, `IL` and
+  `IN`): `Remote - CO` needs the country written out, a full state name or
+  another state's code in the same place (`Remote - Colorado, CO`,
+  `Remote - CO, UT`). So does
+  `Remote, Georgia`, which is read as the country unless `GA` is written
+  with it. Other codes that a country shares (`TN`, `AR`, `PA`, `GA`) are
+  read as the state.
 - **A held row is not dropped.** It stays in the Inbox with its rank and a
   **Held: location** badge, and the ledger records it as `skipped` with the
   reason `held-location`. Evaluate it from the Inbox when you want it.

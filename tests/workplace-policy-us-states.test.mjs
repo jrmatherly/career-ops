@@ -10,8 +10,9 @@ const verdict = (gate, location) => gate(location, 'Platform Lead');
 for (const location of ['Springfield, IL', 'Springfield, MA 01103', 'GA-SPRINGFIELD, 1 MAIN ST', 'Springfield, Georgia', 'Springfield, DE', 'USA - Georgia - Springfield - 30005']) {
   test(`${location} is the home place, not a foreign country`, () => assert.deepEqual(verdict(us, location), { eligible: true, reason: 'onsite_location_allowed' }));
 }
-// A state never confirms a remote posting: "Berlin, DE", "Perth, WA" and "Remote, CA" read the same as a US place.
-for (const location of ['Remote - CO', 'Remote, CA', 'Remote, DE', 'Remote (IN)', 'Remote | DE', 'Remote, Georgia', 'Remote - Austin, TX', 'Remote - Tel Aviv, IL', 'Remote - Berlin, DE', 'Remote - Toronto, CA', 'Remote - Bengaluru, IN', 'Remote / Bogota, CO', 'Remote - Tbilisi, Georgia', 'Remote - Perth, WA', 'Remote - Milano, MI', 'Remote - Munich, DE · Remote - Paris, FR']) {
+// CA, CO, DE, IL and IN alone, and Georgia alone, do not confirm a remote posting: "Berlin, DE" and "Remote, CA" read the same as a US place.
+// The states that do are in workplace-policy-us-remote.test.mjs.
+for (const location of ['Remote - CO', 'Remote, CA', 'Remote, DE', 'Remote (IN)', 'Remote | DE', 'Remote, Georgia', 'Remote - Tel Aviv, IL', 'Remote - Berlin, DE', 'Remote - Toronto, CA', 'Remote - Bengaluru, IN', 'Remote / Bogota, CO', 'Remote - Tbilisi, Georgia', 'Remote - Munich, DE · Remote - Paris, FR']) {
   test(`${location} is not confirmed as remote in the United States`, () => assert.equal(verdict(us, location).eligible, false));
 }
 test('a country code that opens a place is not a state', () => {
@@ -64,7 +65,7 @@ test('one home place in the United States is enough when another is abroad', () 
 test('places joined by a slash are read as one place', () => {
   assert.equal(verdict(us, 'Springfield, IL / Tel Aviv, IL').eligible, false);
 });
-for (const location of ['Remote in Europe', 'Springfield or Remote', 'Remote (OK to work anywhere)', 'Remote - Toronto, ON, CA', 'Remote, Bengaluru, Karnataka, IN', 'Remote - UK or DE']) {
+for (const location of ['Remote in Europe', 'Remote (OK to work anywhere)', 'Remote - Toronto, ON, CA', 'Remote, Bengaluru, Karnataka, IN', 'Remote - UK or DE']) {
   test(`${location} is not confirmed as the United States`, () => assert.equal(verdict(us, location).eligible, false));
 }
 test('an onsite location that folds to nothing is refused, not matched against every posting', () => {
@@ -126,7 +127,6 @@ for (const [home, location] of [
   ['Dublin', 'Dublin, OH | Ireland'],
   ['Dublin', 'Dublin, GA | London, UK'],
   ['Dublin', 'Georgia-Dublin, 1 Main St'],
-  ['Dublin', 'Office: GA-Dublin, 1 Main St'],
 ]) {
   test(`${location} is not the home place ${home} in the United States`, () => assert.equal(verdict(policyFor(home), location).eligible, false));
 }
