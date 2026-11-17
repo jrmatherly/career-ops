@@ -1,13 +1,17 @@
 // Masks secrets in text a saved run writes, in two layers.
 //
-// First by value: the server holds the secrets a run could print (its own env
-// and the data root .env the scripts load), so every occurrence of one is
-// replaced with [masked:NAME]. This needs no idea of what a secret looks like.
+// First by value: the server holds secrets a run could print (its own env and
+// the data root .env the scripts load). A value of 8 or more characters, under
+// a variable that is listed or whose name says secret, is replaced wherever it
+// occurs with [masked:NAME], whatever it looks like. A location-style setting
+// (a path or URL under a name ending in PATH, FILE, URL and the like) is skipped.
 //
 // Then by pattern, for secrets the server does not hold, keeping the label or
 // prefix so a reader can still tell what kind of credential was there. A value
 // must hold a digit, so prose after "key" or "token" ("API key missing") stays,
-// unless a Bearer or Basic scheme names it as a credential.
+// unless a Bearer or Basic scheme names it as a credential. A password assigned
+// with : or =, and the value after a command-line flag (--token x), are masked
+// whatever they hold.
 // The digit is checked in the replacer, not in a lookahead: a lookahead re-scans
 // the rest of the run at every candidate start, which is quadratic on "key=key=…".
 const MARK = "[masked]";
@@ -21,7 +25,8 @@ const MIN_SECRET = 8;
 const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|PASSWD/i;
 
 /**
- * Whether an env variable holds a secret: its name says so, or `names` lists it.
+ * The name half of the rule, used by the tests: the variable's name says secret, or
+ * `names` lists it. knownSecrets also skips a location-style setting and a value under 8 characters.
  * @param {string} name
  * @param {Iterable<string>} [names]
  */
@@ -123,7 +128,9 @@ const LABELLED = new RegExp(`(${LABEL})(["']?[ \\t]*[:=][ \\t]*["']?|[ \\t]+)((?
 
 // A password is short and often has no digit, so one assigned with : or = is masked
 // whatever it holds, a quoted one to its closing quote. Prose after the bare word
-// ("password required") stays, and so does a path (PWD=/srv/app is a directory).
+// ("password required") stays. So does a path after the shell's own upper-case PWD=
+// (PWD=/srv/app is a directory); a path after any other label or separator
+// (password=/srv/app/data, pwd=/srv/app, PWD: /srv/app, db_pwd=/srv/app) is masked.
 // A known value can be a label word (a variable holding "password"), so its mark
 // labels what is assigned to it too. A quoted value runs past escaped quotes.
 const PASSWORD_WORDS = ["password", "passwd", "pwd"];
