@@ -1670,14 +1670,15 @@ export async function mergeTracker(options = {}) {
     const existingApps = [];
     const shortRows = [];
     // A numbered row under another table's header is not a tracker row. A block
-    // of rows with no header of its own (the tracker after a blank line) still is.
+    // of rows with no header of its own (the tracker after a blank line) still is,
+    // so only a first line that a separator row follows counts as a header.
     const rowNum = line => parseInt((line.split('|')[COLMAP.num] ?? '').trim(), 10);
     let underOtherHeader = false;
     let inBlock = false;
     let maxNum = 0;
 
-    for (const line of appLines) {
-      if (line.startsWith('|') && !inBlock) underOtherHeader = !isHeaderRow(line) && isNaN(rowNum(line));
+    for (const [at, line] of appLines.entries()) {
+      if (line.startsWith('|') && !inBlock) underOtherHeader = !isHeaderRow(line) && SEPARATOR_ROW_RE.test(appLines[at + 1] ?? '');
       inBlock = line.startsWith('|');
       // Skip only on the NaN check inside parseAppLine, which already rejects the
       // header and separator rows because neither has a numeric `#` cell. The old

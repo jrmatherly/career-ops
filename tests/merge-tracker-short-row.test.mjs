@@ -98,3 +98,10 @@ test('a dry run warns, writes nothing, and says a real run would stop', (t) => {
   assert.match(r.out, /Row #1 is short of the header.*A real run stops here and merges nothing\./);
 });
 
+test('a block that starts with an unnumbered tracker row is still the tracker', (t) => {
+  const FULL = '| 1 | 2026-01-01 | Acme | Data Engineer | 3.0/5 | Applied | ✅ | [1](../reports/001-acme-2026-01-01.md) | my note | https://jobs.acme.com/1 |';
+  const r = mergeOver(t, [FULL, '', FULL.replace('| 1 |', '| N/A |'), SHORT.replace('| 1 |', '| 3 |')]);
+  assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'expected the merge to refuse'));
+  assert.match(r.out, /Row #3 is short of the header/);
+});
+
