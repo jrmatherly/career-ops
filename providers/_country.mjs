@@ -650,8 +650,8 @@ function withoutAddressWords(text) {
 
 // Best to worst for the owner.
 export const LOCATION_TIERS = Object.freeze(['fit', 'review', 'elsewhere']);
-// Words a location uses without naming a place: "Multiple Locations", "Hybrid in the United States".
-const NO_PLACE_WORDS = /\b(?:locations?|multiple|various|cities|any|nationwide|tbd|hybrid|on[ -]?site|in[ -]?office|in|the|and|or)\b/g;
+// Words a location uses without naming a place: "Multiple Locations", "Hybrid in the United States", "N/A".
+const NO_PLACE_WORDS = /\bn\/a\b|\b(?:na|not specified|unspecified|flexible|see (?:job )?description|to be determined|locations?|multiple|various|cities|any|nationwide|tbd|hybrid|on[ -]?site|in[ -]?office|in|the|and|or)\b/g;
 
 // A capital code with the home country beside it is a state in any letter case: "Remote, CA, USA", "Remote - US, CA",
 // "UNITED STATES (CT)". A slash keeps them two countries ("Remote - US/CA").
@@ -715,7 +715,9 @@ const namesHomeState = (parts, homeStates) => parts.some(({ part }) => STATES_AN
  * in a home state outside the listed towns; a remote role scoped to a state that is not home; a Georgia that
  * may be the state or the country; a state code in a place written in capitals ("REMOTE, TN"); a remote role the
  * gate refuses as another country in which one place reads as a US one ("Remote - Denver, CO"); a home town
- * the gate rejects for what stands beside it ("Atlanta, GA or London, UK").
+ * the gate rejects for what stands beside it ("Atlanta, GA or London, UK"); a placeholder ("N/A"); a remote role whose
+ * only place is a bare CA, CO, DE, IL or IN or a bare US timezone ("Remote, CA", "Remote - EST"); a remote option
+ * beside an office word in a location that names the home country.
  * @param {Function & { homeStates?: readonly string[], homeCountryNames?: readonly string[], geographyText?: (part: string) => string, homePlaces?: readonly string[] }} gate from buildWorkplacePolicy
  * @param {unknown} location the posting's location as the board wrote it; anything but a string is no location
  * @param {string} [title] the posting's title, which the gate reads for "Remote"
@@ -754,5 +756,16 @@ export function locationVerdict(gate, location, title = '', offer = {}) {
   // gate read as a country is the owner's to judge, whatever foreign office stands beside it ("Remote - Denver, CO").
   if (reason === 'remote_country_restricted' && usHome
     && parts.some(one => one.georgia !== 'country' && !namesNoOtherPlace(fold(one.part)) && placeSide(one, countryNames, homePlaces) === 'us')) return verdict('review', 'remote_scoped_to_other_state');
+  if (reason === 'remote_country_restricted' && usHome) {
+    // What each part names once its timezone and its remote words are gone. A part whose Georgia is the country names a foreign place.
+    const named = parts.filter(one => one.georgia !== 'country').map(one => fold(one.place).replace(HOME_WORKING_WORDS, ' ').replace(/[^a-z]+/g, ' ').trim()).filter(Boolean);
+    // A bare CA, CO, DE, IL or IN is a state or a country, and a bare EST or PT a US timezone or one: the part's own
+    // letters decide, since placeSide's 'maybe' also covers "Remote - Toronto, ON, CA".
+    if (named.length && named.every(text => AMBIGUOUS_STATE_CODES.includes(text))) return verdict('review', 'remote_scoped_to_other_state');
+    if (!named.length && parts.some(one => one.place !== one.part)) return verdict('review', 'remote_eligibility_unconfirmed');
+  }
+  // The gate reads an office word anywhere in a location as an office role, so a remote option in a place of its own is lost.
+  if (reason === 'onsite_outside_allowed_locations' && usHome && has(fold(raw), countryNames)
+    && places(fold(raw)).some(place => REMOTE.test(place) && !NOT_REMOTE.test(place))) return verdict('review', 'remote_eligibility_unconfirmed');
   return verdict('elsewhere');
 }
