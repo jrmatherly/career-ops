@@ -43,3 +43,9 @@ test("a posting whose Inbox URL carries tracking or a trailing slash is still ma
     { url: "https://Example.com/a/?utm_source=scan", noText: true, noTextReason: "no-api-text" },
   ]);
 });
+test("a posting with a second ledger entry that moved on is not marked", () => {
+  // The ledger folds by URL, so one posting can hold two entries under one identity.
+  const two = (state) => [skipped("https://example.com/a?ref=one", "no-api-text"), { url: "https://example.com/a?ref=two", state, reason: "" }];
+  for (const state of ["queued", "running", "evaluated", "gated"]) assert.equal(markNoText(jobs, two(state)), jobs, state);
+  assert.equal(markNoText(jobs, [skipped("https://example.com/a?ref=one", "no-api-text"), skipped("https://example.com/a?ref=two", "held-location")])[0].noText, true);
+});

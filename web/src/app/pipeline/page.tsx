@@ -17,18 +17,22 @@ import { applyInboxFit, loadFitTargets } from "@/lib/inbox-fit-profile.mjs";
 
 export const dynamic = "force-dynamic"; // always read fresh local files
 
+type LedgerEntry = { url?: string; state?: string; reason?: string };
+
 // The auto-mode ledger, read the way /api/evaluate-queue reads it. A ledger that
-// cannot be read marks no row: the inbox still lists every posting.
-async function ledgerEntries(): Promise<{ url?: string; state?: string; reason?: string }[]> {
+// cannot be read marks no row: the inbox still lists every posting, and `problem`
+// says on the page why the marks are missing.
+async function ledgerEntries(): Promise<{ entries: LedgerEntry[]; problem: string | null }> {
   try {
-    if (!fs.existsSync(rootScript("evaluate-queue"))) return [];
+    if (!fs.existsSync(rootScript("evaluate-queue"))) return { entries: [], problem: null };
     const r = await runCoreCli("evaluate-queue", ["dump", "--json"]);
     if (r.code !== 0 || r.timedOut || r.overflow || r.spawnFailed) throw new Error(r.stderr.trim() || "evaluate-queue.mjs did not finish");
     const entries: unknown = JSON.parse(r.stdout);
-    return Array.isArray(entries) ? entries : [];
+    return { entries: Array.isArray(entries) ? entries : [], problem: null };
   } catch (cause) {
-    console.error(`/pipeline: gated and no-text rows are not marked: ${cause instanceof Error ? cause.message : String(cause)}`);
-    return [];
+    const message = cause instanceof Error ? cause.message : String(cause);
+    console.error(`/pipeline: gated and no-text rows are not marked: ${message}`);
+    return { entries: [], problem: `The evaluation queue could not be read, so gated rows and rows that need a manual score are not marked: ${message}` };
   }
 }
 
@@ -53,7 +57,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const applications = await withCloseDates(summary.applications);
   const { inbox, scanDates } = summary;
   const unmarked = pendingInbox(inbox);
-  const ledger = onInbox ? await ledgerEntries() : [];
+  const { entries: ledger, problem: ledgerProblem } = onInbox ? await ledgerEntries() : { entries: [], problem: null };
   const { verdicts, problems } = onInbox ? await holdVerdicts() : { verdicts: [], problems: [] };
   const pending = markNoText(markVerdicts(markGated(unmarked, ledger), verdicts), ledger);
   const holdProblem = holdProblemNote(problems, verdicts.length > 0);
@@ -81,7 +85,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         applications={applications}
         inbox={fitted ? fitted.jobs : null}
         inboxCount={pending.length}
-        inboxFitError={[fitted?.error, holdProblem].filter(Boolean).join("\n") || null}
+        inboxFitError={[fitted?.error, holdProblem, ledgerProblem].filter(Boolean).join("\n") || null}
         scanDates={onInbox ? scanDates : []}
         trackerShape={trackerShape}
         cvRows={cvRows}

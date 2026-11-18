@@ -12,7 +12,9 @@ const NO_TEXT_TITLE = "Not scored automatically. The job board returned no posti
 
 /**
  * Marks each posting a scheduled scan ranked and the drain skipped for missing
- * posting text, by posting identity (the key markGated uses).
+ * posting text, by posting identity (the key markGated uses). The ledger folds
+ * rows by URL, so one posting can have two entries. A posting with an entry that
+ * is not skipped (queued again, running, evaluated) is not marked.
  *
  * @template {{ url: string }} T
  * @param {T[]} jobs
@@ -21,10 +23,14 @@ const NO_TEXT_TITLE = "Not scored automatically. The job board returned no posti
  */
 export function markNoText(jobs, ledgerEntries) {
   const reasons = new Map();
+  const movedOn = new Set();
   for (const entry of ledgerEntries) {
-    const key = entry?.state === "skipped" && NO_TEXT_REASONS.includes(entry.reason) && canonicalJobKey(entry.url);
-    if (key) reasons.set(key, entry.reason);
+    const key = canonicalJobKey(entry?.url);
+    if (!key) continue;
+    if (entry.state !== "skipped") movedOn.add(key);
+    else if (NO_TEXT_REASONS.includes(entry.reason)) reasons.set(key, entry.reason);
   }
+  for (const key of movedOn) reasons.delete(key);
   if (!reasons.size) return jobs;
   let marked = false;
   const out = jobs.map((job) => {
