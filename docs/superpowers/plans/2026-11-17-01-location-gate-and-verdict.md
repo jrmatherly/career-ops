@@ -50,7 +50,7 @@ What did not run:
 
 Every rule in `.claude/rules/dev-workflow.md` applies. These are the ones a task here can break, and the ones this plan adds.
 
-- Work in a sibling worktree, never in the main checkout. Create it once with `git worktree add ../career-ops-location-gate -b fix/location-gate-and-verdict main`, then run `npm ci` there. Commands run from the worktree root.
+- Work in a sibling worktree, never in the main checkout. Create it once with `git worktree add ../career-ops-location-gate -b fix/location-gate-and-verdict main`, then run `npm install --ignore-scripts` there, the command CI uses (`.github/workflows/test.yml`). `npm ci` fails, because the root lockfile is gitignored. Commands run from the worktree root.
 - One branch, one commit per task, one PR. Tasks 1 to 3 are `fix(scan)`. Tasks 4 and 5 are `feat(scan)`, so the merge releases a career-ops minor version.
 - A new test is its own file under `tests/*.test.mjs` and uses `node:test`.
 - The gate returns exactly `{ eligible, reason }`. Existing tests compare it with `assert.deepEqual`, so no task adds a key to that object.
@@ -350,7 +350,7 @@ test('Georgia is the state under a policy whose home states include it', () => {
 
 - [ ] **Step 5: Commit.** Run: `git add providers/_country.mjs validate-portals.mjs tests/workplace-policy-home-states.test.mjs && git commit -m "feat(scan): let a workplace policy name its home states"`
 
-**Regression risk.** None without the key, apart from the validator now reporting a `home_states` entry that is not text. With Georgia as a home state, a remote posting in the country Georgia (`Remote - Tbilisi, Georgia`) reads as US remote. An on-site one stays out of the gate (pinned), and Task 5 makes it `review`.
+**Regression risk.** None without the key, apart from the validator now reporting a `home_states` entry that is not text. With Georgia as a home state, this task alone read a remote posting in the country Georgia (`Remote - Tbilisi, Georgia`) as US remote. The owner rejected that, and Task 5b removed it: at the end of the branch that posting is not eligible and its verdict is `elsewhere`. `Tbilisi, Georgia` on-site stays out of the gate (pinned) and is `elsewhere` too. A Georgia the location does not settle is not eligible at the gate and `review` in the verdict.
 
 ### Task 5: `locationVerdict` and `LOCATION_TIERS`
 
@@ -501,6 +501,10 @@ test('a gate with no properties does not throw', () =>
 
 **What this leaves as it is.** The gate and the verdict disagree on purpose for one case. The gate says `Remote, TN` is eligible and the verdict says `review`. Until plan 2 lands, the automatic-evaluation hold in `web/src/lib/core/evaluate-candidates.mjs` reads the gate and still evaluates that row. Plan 2 moves the hold onto the verdict (spec, owner decisions).
 
+### Task 5b (added during implementation)
+
+The coordinator added this task after Task 5. It is one commit to `providers/_country.mjs` with two new test files, `tests/location-verdict-georgia.test.mjs` and `tests/location-verdict-gate-agreement.test.mjs`. It has two causes: the owner rejected Task 4's reading of the country Georgia as US remote, and the Task 5 review found the verdict and the gate reading the same place differently (`Remote | TN` was `fit` and `REMOTE, TN` was `elsewhere`). The task gives each Georgia one of three readings (state, country or unsure), makes the verdict read a place through the gate's own split, case rule and timezone stripper, and adds country spellings, US territories and US timezone abbreviations. The spec records the owner's decision and the defaults that followed in "Owner decisions", the evidence in "Finding 7", and the two gate properties the task added in "Names shared across the plans".
+
 ### Task 6: Document the changes and add the deviations row
 
 **Files:**
@@ -582,8 +586,8 @@ Each of these was reproduced or tested and deliberately gets no change here.
 - **Four probe sentences that still miss.** "For candidates based in Canada only, the pay range is ..." (a comma, not a colon), "Hiring in India? Visit our India careers page.", "We sponsor visas only in the UK." and "Hybrid work applies only to employees near an office." Each would need its own rule, none appeared in the 64 corpus rejects, and loosening the "only" test for them risks real restrictions.
 - **"Open to Canadian residents only."** The gate admits this today because it knows country names and not demonyms. It is a miss in the other direction and is not in the spec.
 - **The exemption for a home country beside a foreign one, on the three old nouns.** `United States and Canada candidates only.` and `We hire in the US and Canada only.` are rejected today and stay rejected. Applying the exemption to the whole rule broke the existing assertion on `Remote Spain / UK only`. The four new nouns have it, so this plan adds no reject of that kind.
-- **`Remote - CA` and `Remote, CO` with no country beside them.** The gate reads them as Canada and Colombia, as it does today, and they are `elsewhere`. `Remote, Canada` is `elsewhere` too. Only the form `<code>, <home country>` is read as the state.
-- **A state code in a remote location written all in capitals.** The gate reads no state code there, so `REMOTE, TN` is `remote_country_restricted` today and `elsewhere` here. `REMOTE - TENNESSEE` is `review`. Rule 5 does read a home-state code in capitals.
+- **`Remote - CA` and `Remote, CO` with no country beside them.** The gate reads them as Canada and Colombia, as it does today, and they are `elsewhere`. `Remote, Canada` is `elsewhere` too. A code with the home country beside it is read as the state, on either side: `Remote, CA, USA`, `Remote - US, CA` and `REMOTE - UNITED STATES (CT)` are `review`. Task 5b added the forms with the country first. A slash keeps two countries: `Remote - US/CA` is `fit`.
+- **A state code in a remote location written all in capitals.** The gate reads no state code there, so `REMOTE, TN` is `remote_country_restricted` at the gate, today and after this plan. Task 5b changed its verdict from `elsewhere` to `review`: the verdict asks the gate again with the place in mixed case. A home-state code gets the same answer, so `REMOTE, GA` is `review` and not `fit` with Georgia as a home state. `REMOTE - TENNESSEE` is `review`. Rule 5 does read a home-state code in capitals (`KENNESAW, GA` is `review`).
 
 ## What this plan does not change on the pod
 
