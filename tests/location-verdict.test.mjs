@@ -12,7 +12,7 @@ test('LOCATION_TIERS', () => {
 });
 
 const TABLE = [
-  // A country, a count or nothing, and the two fits.
+  // A country, a count or nothing, then one row for each of the other answers.
   ['United States', 'review', 'location_names_no_place'],
   ['USA', 'review', 'location_names_no_place'],
   ['United States, Multiple Locations, Multiple Locations', 'review', 'location_names_no_place'],
@@ -26,7 +26,7 @@ const TABLE = [
   ['Remote, TN', 'review', 'remote_scoped_to_other_state'],
   ['Atlanta, GA', 'fit', 'onsite_location_allowed'],
   ['London, UK', 'elsewhere', 'onsite_outside_allowed_locations'],
-  // No specific place.
+  // No specific place, then on-site places outside the home area.
   ['United States of America', 'review', 'location_names_no_place'],
   ['Hybrid - United States', 'review', 'location_names_no_place'],
   ['Hybrid in the United States', 'review', 'location_names_no_place'],
@@ -79,7 +79,7 @@ const TABLE = [
   ['Remote - Wilmington, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote-Friendly (Travel Required) | San Francisco, CA', 'review', 'remote_scoped_to_other_state'],
   ['Remote - New York, NY', 'review', 'remote_scoped_to_other_state'],
-  // The same codes beside a foreign city cannot be told apart, so these are review too.
+  // The same codes beside a foreign city cannot be told apart, so the first two are review too. With no city, or with the country written out, they are elsewhere.
   ['Remote - Berlin, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote - Tel Aviv, IL', 'review', 'remote_scoped_to_other_state'],
   ['Remote, CA', 'elsewhere', 'remote_country_restricted'],

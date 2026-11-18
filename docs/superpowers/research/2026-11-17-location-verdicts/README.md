@@ -200,6 +200,8 @@ Tiers of the 417 rows under the hold of Finding 1 with Georgia added as a home s
 |---|---|---|---|---|
 | `fd734bfa`, before Task 5b | 400 | 17 | 0 | Not `elsewhere` |
 | `9eb9952b`, Task 5b after its third fix round | 386 | 18 | 13 | 13 `elsewhere`, 1 `review`, none `fit` |
+| `7ff76523`, the pull request as first reviewed | 386 | 18 | 13 | The same |
+| `718d1d9a`, after the review fixes | 386 | 18 | 13 | The same. No row changed tier |
 
 Nobody re-ran the count at `cd1be822`, the last commit of Task 5b.
 
@@ -276,7 +278,7 @@ Not checked while plan 1 was implemented, as of `cd1be822`:
 - The Georgia tiers on the pod's 417 rows at `cd1be822`. The last count is from `9eb9952b`, one fix round earlier.
 - The public-board corpus against the finished gate. Task 5b added country spellings that apply under every policy and in description text. Plan 1's Task 7 runs the corpus and had not run.
 - The differentials the Task 5b implementers reported: 126 gate changes from `fd734bfa` to `9eb9952b`, and 35 from `9eb9952b` to `cd1be822`. The reports give counts and tables. No reviewer re-ran the scripts.
-- A Georgian city other than Tbilisi, Batumi, Kutaisi and Rustavi. The gate has no list of cities, so `Remote - Georgia · Remote - Warsaw` is `fit`.
+- A Georgian city other than Tbilisi, Batumi, Kutaisi and Rustavi. The gate has no list of cities, so `Remote - Georgia · Remote - Warsaw` is `fit`. (The review fixes at `718d1d9a` added Zugdidi, Poti and Gori, and the spellings `T'bilisi` and `Tiflis`.)
 - The country Georgia outside a list of foreign countries. All 14 real rows have that shape.
 - A scan with `workplace_policy` on and `home_states` set, end to end. No shipped code calls `locationVerdict` yet, and the gate drops an unsure Georgia that the verdict would keep.
 - The removed-guard mutants of plan 1's Task 2, which the reviewer did not re-run.

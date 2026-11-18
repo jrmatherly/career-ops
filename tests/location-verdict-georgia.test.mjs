@@ -92,7 +92,7 @@ const TABLE = [
   ['Remote - Georgia · Remote - Austin', REMOTE_FIT, OTHER_STATE],
   ['Remote - Georgia · Remote - Austin · Remote - Chicago', REMOTE_FIT, OTHER_STATE],
   ['Remote - Georgia · Remote - Warsaw', REMOTE_FIT, OTHER_STATE],
-  // A place that cannot be told US from foreign, beside a foreign one, leaves Georgia unsure.
+  // A place that cannot be told US from foreign, beside a foreign one, leaves Georgia unsure. A US state in the list makes it the state.
   ['Remote - Georgia · Remote - Austin · Remote - Canada', OTHER_STATE, OTHER_STATE],
   ['Remote - Georgia · Remote - Warsaw · Remote - Canada', OTHER_STATE, OTHER_STATE],
   ['Poland · Georgia · Bulgaria · Isle of Man · Douglas · Isle Of Man · Romania · Remote', OTHER_STATE, OTHER_STATE],
@@ -118,7 +118,7 @@ const TABLE = [
   ['Remote - EMEA · Remote - Georgia', ABROAD, ABROAD],
   ['Tbilisi · Georgia · Remote', ABROAD, ABROAD],
   ['Remote - Georgia | Remote - Armenia', ABROAD, ABROAD],
-  // Beside the country Georgia another state is not home.
+  // Beside the country Georgia another state is not home, and the home country still decides.
   ['Remote - Tbilisi, Georgia · Remote - Texas', OTHER_STATE, OTHER_STATE],
   ['Remote - Tbilisi, Georgia or Texas, USA', OTHER_STATE, OTHER_STATE],
   ['Remote - Tbilisi, Georgia or USA', REMOTE_FIT, REMOTE_FIT],
@@ -186,7 +186,7 @@ test('a US town that shares a country name stays a US place', () => {
   assert.deepEqual(gate('Remote - England'), { eligible: false, reason: 'remote_country_restricted' });
 });
 
-test('the gate answers for a US territory alone as it did', () => {
+test('a US territory alone is remote_country_restricted at the gate', () => {
   for (const l of ['Remote - Puerto Rico', 'Remote - Guam']) assert.deepEqual(gate(l), { eligible: false, reason: 'remote_country_restricted' }, l);
 });
 

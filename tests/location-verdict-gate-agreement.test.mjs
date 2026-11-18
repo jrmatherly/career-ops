@@ -30,10 +30,10 @@ rows('a US timezone abbreviation beside a US place is not a country', FIT,
 rows('a state with its timezone is still another state', OTHER_STATE, ['Remote - Florida (EST)', 'Remote - Texas, CDT', 'Remote - United States (CT)', 'Remote - Arizona (MST)', 'Remote - Oregon - PT', 'Remote - Florida, ET', 'Remote - Georgia (EST) · Remote - Estonia']);
 rows('a timezone abbreviation with no US place beside it is the country code', ABROAD,
   ['Remote - Estonia', 'Remote - EST', 'Remote - Ethiopia', 'Remote (Estonia)', 'Remote - PT', 'Remote (EST)', 'Remote - Tallinn, EST', 'Remote - Lisbon (PT)']);
-test('an on-site place with a timezone code is as it was', () =>
+test('an on-site Estonian code is Estonia', () =>
   assert.deepEqual(locationVerdict(gate, 'Tallinn, EST'), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }));
 
-test('the gate verdicts of these rows are what they were', () => {
+test('the gate alone admits a state code after a bar and rejects one in a place written in capitals', () => {
   for (const l of ['Remote | TN', 'Remote / TX', 'Remote - US (CT hours)', 'Remote - US, CA', 'REMOTE - CA, USA', 'REMOTE - UNITED STATES (CT)'])
     assert.deepEqual(gate(l), { eligible: true, reason: 'remote_region_allowed' }, l);
   for (const l of ['REMOTE, TN', 'Remote; TN', 'Remote · TN', 'Remote - CA'])
