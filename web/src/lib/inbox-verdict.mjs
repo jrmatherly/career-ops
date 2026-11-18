@@ -96,3 +96,32 @@ export function tierEmptyState(tier, counts) {
   if (!others.length) return null;
   return { title: EMPTY_TITLES[tier], hint: `${others.map(({ id, label }) => `${counts[id]} under ${label}`).join(", ")}.` };
 }
+
+/**
+ * What the Score confirm says about the shortlisted rows that are not a location fit, or null when none is.
+ * An item with no verdict counts in the total and not as unfit.
+ *
+ * @param {{ url: string }[]} items
+ * @param {Map<string, Verdict>} verdictByUrl
+ * @returns {{ summary: string, reasons: string[] } | null}
+ */
+export function scoreLocationNote(items, verdictByUrl) {
+  const lines = new Map();
+  let unfit = 0;
+  for (const item of items) {
+    const badge = verdictBadge(verdictByUrl.get(item.url));
+    if (!badge) continue;
+    unfit += 1;
+    const line = `${badge.label}: ${badge.reason}`;
+    lines.set(line, (lines.get(line) ?? 0) + 1);
+  }
+  if (!unfit) return null;
+  const total = items.length;
+  const summary = total === 1 ? "This role is not a location fit. You can still score it."
+    : unfit === 1 ? `1 of ${total} is not a location fit. You can still score it.`
+    : `${unfit} of ${total} are not a location fit. You can still score them.`;
+  const order = Object.values(REASONS);
+  const rank = (line) => { const at = order.findIndex((sentence) => line.endsWith(`: ${sentence}`)); return at < 0 ? order.length : at; };
+  const reasons = [...lines].sort(([a, countA], [b, countB]) => countB - countA || rank(a) - rank(b)).map(([line, count]) => `${count} · ${line}`);
+  return { summary, reasons };
+}

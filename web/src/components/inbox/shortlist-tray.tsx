@@ -23,6 +23,7 @@ export function ShortlistTray({
   onRemove,
   onClear,
   onScore,
+  locationNote,
 }: {
   items: ShortItem[];
   sections: string[];
@@ -32,6 +33,8 @@ export function ShortlistTray({
   onRemove: (url: string) => void;
   onClear: () => void;
   onScore: () => void;
+  /** Which shortlisted rows are not a location fit, shown with the confirm. Scoring them is never blocked. */
+  locationNote: { summary: string; reasons: string[] } | null;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -46,6 +49,14 @@ export function ShortlistTray({
         <div className="border-t border-border bg-surface shadow-lg shadow-black/10 sm:rounded-2xl sm:border">
           {confirming && (
             <div className="max-h-[55vh] overflow-y-auto border-b border-border px-3 py-3 sm:px-4">
+              {locationNote && (
+                <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
+                  <p className="font-medium text-foreground">{locationNote.summary}</p>
+                  <ul className="mt-1 space-y-0.5 text-muted">
+                    {locationNote.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                  </ul>
+                </div>
+              )}
               <EvaluationOptions sections={sections} onChange={onSectionsChange} />
             </div>
           )}

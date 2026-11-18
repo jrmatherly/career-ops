@@ -13,7 +13,7 @@ import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selecti
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
 import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips, type TierFilter } from "./facet-chips";
-import { inTier, tierCounts, tierEmptyState } from "@/lib/inbox-verdict.mjs";
+import { inTier, scoreLocationNote, tierCounts, tierEmptyState } from "@/lib/inbox-verdict.mjs";
 import { TriageRow, type RowScore } from "./triage-row";
 import { ShortlistTray, type ShortItem } from "./shortlist-tray";
 import { cn } from "@/lib/cn";
@@ -190,6 +190,10 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         return true;
       }),
     [enriched, hidden, added, within, sources, seniorities, locQ, kw],
+  );
+  const locationNote = useMemo(
+    () => scoreLocationNote(shortlist, new Map(inbox.flatMap((job) => (job.verdict ? [[job.url, job.verdict]] : [])))),
+    [shortlist, inbox],
   );
   // Counted before the tier filter, so each segment button says what its tier holds.
   const counts = useMemo(() => tierCounts(matched.map((e) => e.job)), [matched]);
@@ -553,6 +557,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         onRemove={(url) => setShortlist((s) => s.filter((x) => x.url !== url))}
         onClear={() => setShortlist([])}
         onScore={scoreShortlist}
+        locationNote={locationNote}
       />
     </div>
   );

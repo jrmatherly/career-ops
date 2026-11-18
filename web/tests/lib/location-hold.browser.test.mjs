@@ -92,6 +92,26 @@ test("the job form shows the hold and the source groups", options, async (t) => 
   assert.deepEqual(errors, []);
 });
 
+test("the Score confirm says which rows are not a location fit and still scores", options, async (t) => {
+  const { page, errors } = await open(t);
+  await page.addInitScript(() => {
+    localStorage.setItem("career-ops:config", JSON.stringify({ cliId: "fixture-cli" }));
+    localStorage.setItem("career-ops:first-score-seen", "1");
+  });
+  await settled(page, () => page.goto(`${url}/pipeline`));
+  await tierButton(page, "All 4").click();
+  for (const company of ["Fixture Alpha", "Fixture Beta", "Fixture Gamma"]) await row(page, company).getByTitle("Save to shortlist").click();
+  await page.getByRole("button", { name: /^Score 3/ }).click();
+  await page.getByText("2 of 3 are not a location fit. You can still score them.", { exact: true }).waitFor();
+  await page.getByText("1 · Review location: Remote, and the posting does not say from where.", { exact: true }).waitFor();
+  await page.getByText("1 · Elsewhere: On-site or hybrid outside your home area.", { exact: true }).waitFor();
+  // Never pressed: this suite must not start a run.
+  assert.equal(await page.getByRole("button", { name: "Score 3 now", exact: true }).isEnabled(), true);
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  assert.equal(await page.getByText(/not a location fit/).count(), 0, "the note leaves with the confirm");
+  assert.deepEqual(errors, []);
+});
+
 // Last in the file, because it writes to the fixture's pipeline.
 test("Select all and Skip selected act on the tier in view", options, async (t) => {
   const relative = path.relative(os.tmpdir(), fs.realpathSync(root));

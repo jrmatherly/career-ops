@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
+import { TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, scoreLocationNote, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
 import { markVerdicts } from "../../src/lib/inbox-pending.mjs";
 import { storedHolds } from "../../src/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "../../src/lib/core/workplace-policy.mjs";
@@ -138,4 +138,20 @@ test("tierEmptyState names the tiers that hold the rows", () => {
 
 test("the tier labels never say hidden", () => {
   assert.deepEqual(TIER_FILTERS.map((tier) => tier.label), ["Fit", "Review location", "Elsewhere", "All"]);
+});
+
+test("scoreLocationNote counts only rows judged not fit", () => {
+  const byUrl = new Map([["a", fit], ["b", review], ["c", elsewhere], ["d", elsewhere]]);
+  const items = (...urls) => urls.map((url) => ({ url }));
+  assert.equal(scoreLocationNote(items("a"), byUrl), null);
+  assert.equal(scoreLocationNote(items("a", "gone"), byUrl), null);
+  assert.deepEqual(scoreLocationNote(items("b"), byUrl), {
+    summary: "This role is not a location fit. You can still score it.",
+    reasons: ["1 · Review location: The posting gives no location."],
+  });
+  assert.equal(scoreLocationNote(items("a", "b", "gone"), byUrl).summary, "1 of 3 is not a location fit. You can still score it.");
+  assert.deepEqual(scoreLocationNote(items("a", "b", "c", "d"), byUrl), {
+    summary: "3 of 4 are not a location fit. You can still score them.",
+    reasons: ["2 · Elsewhere: On-site or hybrid outside your home area.", "1 · Review location: The posting gives no location."],
+  });
 });
