@@ -20,10 +20,10 @@ const AUTO = { mode: "auto", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPer
 const ROWS = { remote: "Remote, United States", home: "Springfield, IL", elsewhere: "Metropolis, NY", blank: "" };
 const urlOf = (name) => `https://boards.test/fixture/${name}`;
 
-async function withRoot(evaluate, fn, extra = []) {
+async function withRoot(evaluate, fn, extra = [], named = ROWS) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-location-hold-"));
   const storePath = path.join(root, "data", "scheduled-jobs.json");
-  const rows = [...Object.entries(ROWS).map(([name, location]) => [urlOf(name), location]), ...extra.map((name) => [urlOf(name), "Metropolis, NY"])];
+  const rows = [...Object.entries(named).map(([name, location]) => [urlOf(name), location]), ...extra.map((name) => [urlOf(name), "Metropolis, NY"])];
   fs.mkdirSync(path.join(root, "data"));
   fs.writeFileSync(path.join(root, "data", "pipeline.md"), ["## Pending", ...rows.map(([url]) => `- [ ] ${url} | Fixture Alpha | Platform Lead`), ""].join("\n"));
   fs.writeFileSync(path.join(root, "data", "scan-history.tsv"), [
@@ -134,4 +134,11 @@ test("review mode with a hold writes no ledger row and no message", async () => 
     assert.deepEqual(ledgerStates(root), {});
     assert.equal(run.evalMessage, undefined);
   });
+});
+
+test("a remote role in another state, a country-only row and worldwide remote are held", async () => {
+  await withRoot({ ...AUTO, hold: HOLD }, ({ root, run }) => {
+    assert.deepEqual(ledgerStates(root), { state: "skipped:held-location", country: "skipped:held-location", global: "skipped:held-location", remote: "queued" });
+    assert.equal(run.autoQueued, 1);
+  }, [], { state: "Remote, TN", country: "United States", global: "Remote, Global", remote: "Remote, United States" });
 });

@@ -867,6 +867,14 @@ test("each job's hold is its own: a job with none evaluates what another job's h
   assert.deepEqual([state(url(1)).state, state(url(2)).state, state(url(2)).reason], ["evaluated", "skipped", "held-location"]);
 });
 
+test("a queued remote role scoped to another state or open worldwide is held at the drain", async (t) => {
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2), url(3)], evaluate: { ...AUTO, hold: HOLD } });
+  historyOf(root, [[url(1), "Remote, TN"], [url(2), "Remote, United States"], [url(3), "Remote, Global"]]);
+  await drain();
+  assert.deepEqual(posts.map((post) => post.body.input), [url(2)]);
+  assert.deepEqual([state(url(1)).reason, state(url(2)).state, state(url(3)).reason], ["held-location", "evaluated", "held-location"]);
+});
+
 test("a missing scan history holds nothing: the drain says why and leaves the rows queued", async (t) => {
   const { drain, state, posts, storePath, stderr } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: HOLD } });
   await drain();

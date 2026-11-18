@@ -13,7 +13,7 @@ import path from "node:path";
 import { readScheduledStore } from "../src/lib/scheduled-jobs-store.mjs";
 import { getProfilePath } from "../src/lib/core/profile-path.mjs";
 import { addedHistory, heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
-import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
+import { holdVerdict } from "../src/lib/scheduled-job-input.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
@@ -25,7 +25,7 @@ import { parseTrackerRow, resolveColumns } from "../../tracker-parse.mjs";
 import { reportUrlToken } from "../../tracker-utils.mjs";
 import { tsvCell } from "../../lib/application-meta.mjs";
 import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
-import { buildWorkplacePolicy } from "../../providers/_country.mjs";
+import { buildWorkplacePolicy, locationVerdict } from "../../providers/_country.mjs";
 
 const LOCAL_OPT_IN = "CAREER_OPS_AUTO_EVALUATE_LOCAL";
 // A wall-clock deadline on one run. For an evaluation: the route's 740 s kill,
@@ -91,12 +91,12 @@ function skipReason(root, key, persisted) {
 function locationHold(root, job) {
   if (job.evaluate.hold === undefined) return null;
   try {
-    const gate = buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {}));
+    const verdict = holdVerdict({ buildWorkplacePolicy, locationVerdict }, job.evaluate.hold);
     const history = path.join(root, "data", "scan-history.tsv");
     // Read as empty, a missing file would hold every queued row for good.
     if (!fs.existsSync(history)) throw new Error("data/scan-history.tsv is missing, so no location can be checked");
     const added = addedHistory(scanHistoryDataLines(readText(history)).filter((line) => line.trim()).map(parseScanHistoryLine));
-    return { holds: (url) => heldForLocation({ rows: [{ url }], added, gate }).size > 0 };
+    return { holds: (url) => heldForLocation({ rows: [{ url }], added, verdict }).size > 0 };
   } catch (error) {
     return { problem: `Location hold: ${error instanceof Error ? error.message : String(error)}. Nothing was evaluated.` };
   }

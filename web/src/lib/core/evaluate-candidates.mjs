@@ -92,17 +92,17 @@ export function addedHistory(scanHistoryRows) {
 
 /**
  * The URLs of the rows a job's location hold keeps back: those whose last
- * `added` scan-history row has a location the gate rejects. A row with no
- * history row has no confirmed place, so the gate sees it as blank.
+ * `added` scan-history row has a location whose verdict is not `fit`. A row with no
+ * history row has no confirmed place, so the verdict reads it as blank.
  *
  * `added` takes a prebuilt addedHistory index, for a caller that asks about one row at a time.
  *
- * @param {{ rows: Array<{ url: string }>, scanHistoryRows?: Array<{ url: string, status?: string, location?: string, title?: string }>, added?: Map<string, { location?: string, title?: string }>, gate: (location: string, title: string) => { eligible: boolean } }} input
+ * @param {{ rows: Array<{ url: string }>, scanHistoryRows?: Array<{ url: string, status?: string, location?: string, title?: string }>, added?: Map<string, { location?: string, title?: string }>, verdict: (location: string, title: string) => { tier: string } }} input
  * @returns {Set<string>}
  */
-export function heldForLocation({ rows, scanHistoryRows, added = addedHistory(scanHistoryRows), gate }) {
+export function heldForLocation({ rows, scanHistoryRows, added = addedHistory(scanHistoryRows), verdict }) {
   return new Set(rows.filter((row) => {
     const seen = added.get(normalizeUrl(row.url));
-    return !gate(seen?.location || "", seen?.title || "").eligible;
+    return verdict(seen?.location || "", seen?.title || "").tier !== "fit";
   }).map((row) => row.url));
 }
