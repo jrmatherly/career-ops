@@ -201,7 +201,7 @@ export function workplacePolicyFromConfig(config) {
 export function buildWorkplacePolicy(policy) {
   if (policy === undefined) return () => ({ eligible: true, reason: 'policy_absent' });
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) throw new Error('location_filter.workplace_policy must be an object');
-  for (const key of ['onsite_locations', 'onsite_countries', 'remote_countries', 'remote_regions']) {
+  for (const key of ['onsite_locations', 'onsite_countries', 'remote_countries', 'remote_regions', 'home_states']) {
     if (policy[key] != null && !Array.isArray(policy[key])) throw new Error(`workplace_policy.${key} must be a list`);
   }
   const onsite = list(policy.onsite_locations), home = list(policy.remote_countries), regions = list(policy.remote_regions);
@@ -209,6 +209,11 @@ export function buildWorkplacePolicy(policy) {
   const homeCodes = new Set(home.flatMap(v => [...countries(countryValue(v), true)]));
   if (!homeCodes.size) throw new Error('workplace_policy.remote_countries must name a country or ISO country code');
   const homeStates = onsite.map(compileHomeState);
+  const homeStateCodes = Object.freeze([...new Set(list(policy.home_states).map(entry => {
+    const state = STATES_AND_DC.find(pair => pair.includes(entry));
+    if (!state) throw new Error(`workplace_policy.home_states: "${entry}" is not a US state name or code`);
+    return state[1];
+  }))]);
   const usHome = homeCodes.has('US');
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
@@ -262,7 +267,7 @@ export function buildWorkplacePolicy(policy) {
     const name = escape(country.name);
     return new RegExp(`(?<![\\p{L}\\p{N}])(?:${name}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?|${afterHome}${name}(?:[ -]based)?\\s+(?:roles|positions|employees|hires))\\s*[- ]?only\\b`, 'u');
   });
-  return (location, title = '', offer = {}) => {
+  const gate = (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
     const raw = typeof location === 'string' ? location : '';
     const loc = fold(location), heading = fold(title), prose = plain(withoutScopeLabels(offer.description)),
@@ -323,7 +328,7 @@ export function buildWorkplacePolicy(policy) {
       return place.split(/\||\s\/\s/).map(part => {
         // A timezone goes first, so the "MT" of "MT working hours" is not Montana. Brackets are read as the
         // country reader writes them, so "Texas [IE]" keeps its country.
-        const rest = withoutUsStates(geographyText(part), codes);
+        const rest = withoutUsStates(geographyText(part), codes, homeStateCodes.includes('ga'));
         return rest !== null && [...countries(brackets(rest), true)].every(c => homeCodes.has(c)) ? `${rest} united states` : brackets(fold(part));
       });
     }).join(' · ') : loc);
@@ -336,6 +341,7 @@ export function buildWorkplacePolicy(policy) {
     if (supportsHome(geoLoc) || has(geoLoc, regions) || (meta && (supportsHome(meta) || has(meta, regions))) || remoteDescription) return { eligible: true, reason: 'remote_region_allowed' };
     return fail(loc ? 'remote_eligibility_unconfirmed' : 'location_unknown');
   };
+  return Object.assign(gate, { homeStates: homeStateCodes, homeCountryNames: Object.freeze([...new Set(homeAliases)].sort((a, b) => b.length - a.length)) });
 }
 
 // USPS state names and codes. scan.mjs builds its always_allow matchers from the same table.
@@ -392,6 +398,7 @@ export const USPS_STATES = Object.freeze([
   Object.freeze(['wyoming', 'wy']),
 ]);
 
+const STATES_AND_DC = [...USPS_STATES, ['district of columbia', 'dc']];
 const US_STATE_PATTERN = USPS_STATES.flat().map(escape).join('|');
 const US_STATE_CODE_PATTERN = USPS_STATES.map(([, abbr]) => abbr).join('|');
 // A street address ends at a slash, bar, bracket or spaced dash; what follows may name the country.
@@ -458,9 +465,10 @@ function withoutStateCodes(location) {
  * next to a capital code that is no state, where they are the country ("Delaware, ON, CA", "Bogota, DC, CO").
  * @param {string} place
  * @param {boolean} codes whether capital state codes are read; false where the place is written all in capitals
+ * @param {boolean} georgia whether Georgia is a home state, so its name is the state wherever it stands
  */
-function withoutUsStates(place, codes) {
-  const named = (GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place).replace(US_STATE_NAME, ' ');
+function withoutUsStates(place, codes, georgia = false) {
+  const named = (georgia || GEORGIA_CODE.test(place) ? place.replace(/georgia/gi, ' ') : place).replace(US_STATE_NAME, ' ');
   if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === place) return null;
   // Judged before the other codes go, so the code next to an ambiguous one is still there to see.
   const sure = named.replace(AMBIGUOUS_STATE_CODE, (code, at) => (foreignCode(CODE_BEFORE, named.slice(0, at), code) || foreignCode(CODE_AFTER, named.slice(at + 2), code) ? code : ' '));

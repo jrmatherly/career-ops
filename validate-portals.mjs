@@ -419,7 +419,7 @@ export async function validatePortalsConfig(config, { providerIds = new Set() } 
         const policy = config.location_filter.workplace_policy;
         if (!isObject(policy)) add(errors, 'location_filter.workplace_policy', 'must be an object');
         else {
-          for (const key of ['onsite_locations', 'onsite_countries', 'remote_countries', 'remote_regions']) {
+          for (const key of ['onsite_locations', 'onsite_countries', 'remote_countries', 'remote_regions', 'home_states']) {
             validateKeywordList(policy[key], 'location_filter.workplace_policy.' + key, errors);
           }
           try { buildWorkplacePolicy(policy); } catch (error) { add(errors, 'location_filter.workplace_policy', error.message); }
