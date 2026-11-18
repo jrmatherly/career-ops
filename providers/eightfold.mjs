@@ -48,8 +48,9 @@
 //   under "0 days / week in-office – remote"). The search rows do not carry
 //   the fact themselves, so after the main walk the provider walks the search
 //   once more for each value that says remote and appends " · Remote" to those
-//   postings (a posting with no location reads "Remote"). workLocationOption and work_location_option are not read: they
-//   said `onsite` on remote rows at Microsoft and NetApp.
+//   postings. A posting with no location reads "Remote". workLocationOption and
+//   work_location_option are not read: they said `onsite` on remote rows at
+//   Microsoft and NetApp.
 //
 // PAGE SIZE IS SERVER-CAPPED AT 10. Requesting num=25/50/100/200 all return
 // exactly 10 rows (measured against a 616-posting tenant). So a large board
@@ -90,6 +91,9 @@ const RETRY_POLICY = { retries: 3, baseDelayMs: 500, maxDelayMs: 8_000 };
 // 0.5s-to-8s backoff stalls partway.
 const PCSX_INTER_PAGE_DELAY_MS = 400;
 const PCSX_RETRY_POLICY = { retries: 5, baseDelayMs: 2_000, maxDelayMs: 32_000 };
+// One work-site value that returns this share of the board is read as a filter
+// the tenant ignored. Microsoft's remote value returned 15% (361 of 2,355).
+const IGNORED_FILTER_SHARE = 0.9;
 
 /**
  * The entry's opt-in branded API host (`eightfold_host`), lowercased, or null
@@ -301,7 +305,7 @@ export function remoteWorkSiteValues(json) {
   if (!Array.isArray(options)) return [];
   return options
     .map((o) => o?.value)
-    .filter((v) => typeof v === 'string' && /\bremote\b/i.test(v) && !/hybrid|partial|on-?site|\bno[nt]?\b|%/i.test(v));
+    .filter((v) => typeof v === 'string' && /\bremote\b/i.test(v) && !/hybrid|partial|on[\s-]?site|\bno[nt]?\b|%/i.test(v));
 }
 
 /**
@@ -572,7 +576,7 @@ export default {
     // after a rate-limited walk. It is all or nothing, because a partial walk
     // would mark some remote postings and leave others reading as on-site with
     // nothing to tell them apart.
-    // Its page budget is a second maxPages, counted across all values.
+    // The pass has its own budget of the same maxPages, counted across all values.
     const remoteValues = api === 'pcsx' && !rateLimited && !(Number(ctx?.maxPages) > 0)
       ? remoteWorkSiteValues(firstPcsxPage)
       : [];
@@ -601,8 +605,11 @@ export default {
             if (page.positions.length < PAGE_SIZE) break;
           }
           // A tenant that ignores the filter parameter answers with the whole
-          // board, and marking that would call every posting remote.
-          if (identified.length > 0 && identified.every((job) => valueIds.has(job.externalId))) throw new Error('the filter returned every posting');
+          // board, and marking that would call every posting remote. The two
+          // walks are minutes apart on a large board and a posting can close
+          // between them, so nearly the whole board counts as the whole board.
+          const covered = identified.filter((job) => valueIds.has(job.externalId)).length;
+          if (covered > 0 && covered >= identified.length * IGNORED_FILTER_SHARE) throw new Error(`the filter returned ${covered} of the board's ${identified.length} postings`);
           for (const id of valueIds) remoteIds.add(id);
         }
         const marked = markRemote(all, remoteIds);

@@ -235,7 +235,7 @@ export function bamboohrListingIdentity(tenant, id) {
  *   is 1. BambooHR's `isRemote` is `1`/`true` when set and `null` otherwise.
  *   `locationType` is "0" on-site, "1" remote, "2" hybrid, read from the list
  *   API and from BambooHR's own posting pages on 2026-11-17. Hybrid adds no
- *   word, because the office city is already in the string.
+ *   word.
  * - listingIdentity: `bamboohr` / tenant / payload `id`, when the id has a
  *   canonical decimal form (see bamboohrListingIdentity); absent otherwise.
  *

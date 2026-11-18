@@ -437,7 +437,7 @@ try {
       : fail(`remote pass unusable body: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
   }
 
-  ['Non-remote', 'Not remote', 'No remote work', 'On-site (not remote)', 'remote/onsite', 'Up to 50% remote']
+  ['Non-remote', 'Not remote', 'No remote work', 'On-site (not remote)', 'remote/onsite', 'Remote or On Site', 'Up to 50% remote']
     .every((value) => remoteWorkSiteValues({ data: { filterDef: { smartFilters: [{ filterName: 'work_site', options: [{ value }] }] } } }).length === 0)
     ? pass('remoteWorkSiteValues leaves out a value that negates or dilutes remote')
     : fail('remoteWorkSiteValues read a negated or diluted value as remote');
@@ -446,7 +446,7 @@ try {
     // A tenant that ignores filter_work_site answers with the whole board.
     const { ctx } = remoteTenant(() => pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2));
     const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
-    result.every((j) => j.location === 'Redmond, WA') && errors.filter((line) => /remote work-site pass stopped.*returned every posting/.test(String(line))).length === 1
+    result.every((j) => j.location === 'Redmond, WA') && errors.filter((line) => /remote work-site pass stopped.*returned 2 of the board's 2 postings/.test(String(line))).length === 1
       ? pass('eightfold changes no location and warns once when the filtered search returns the whole board')
       : fail(`ignored filter: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
   }
@@ -460,9 +460,37 @@ try {
       return filterOf(c) !== null ? board() : withFilters(board());
     });
     const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
-    result.length === 3 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned every posting/.test(String(line)))
+    result.length === 3 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned 2 of the board's 2 postings/.test(String(line)))
       ? pass('eightfold still refuses an ignored filter when one posting has no id')
       : fail(`ignored filter with an id-less posting: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // The remote pass collects ids the way externalId does: position_id when id is absent.
+    const byPositionId = (pid, name) => ({ position_id: pid, name, locations: ['Redmond, WA'] });
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      if (filterOf(c) !== null) return pcsxPage([byPositionId('2', 'Remote Role')], 1);
+      return withFilters(pcsxPage([byPositionId('1', 'Office Role'), byPositionId('2', 'Remote Role')], 2));
+    });
+    const jobs = await ef.fetch(TENANT, ctx);
+    JSON.stringify(jobs.map((j) => j.location)) === JSON.stringify(['Redmond, WA', 'Redmond, WA · Remote'])
+      ? pass('eightfold marks a remote posting that carries only position_id')
+      : fail(`position_id remote pass: ${JSON.stringify(jobs.map((j) => j.location))}`);
+  }
+
+  {
+    // An ignored filter on a board that lost one posting between the two walks: 19 of 20 come back.
+    const rows = Array.from({ length: 20 }, (_, i) => position(String(i), `Role ${i}`));
+    const pageOf = (list, c) => pcsxPage(list.slice(Number(new URL(c.url).searchParams.get('start') || 0)).slice(0, 10), list.length);
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      return filterOf(c) !== null ? pageOf(rows.slice(1), c) : withFilters(pageOf(rows, c));
+    });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 20 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned 19 of the board's 20 postings/.test(String(line)))
+      ? pass('eightfold refuses a filtered search that returns nearly the whole board')
+      : fail(`near-whole board: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
   }
 
   const tenRemote = (count) => pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 2), `Remote ${i}`)), count);
@@ -480,7 +508,7 @@ try {
   }
 
   {
-    // max_pages: 1 is the pass's budget too, and the filter has three pages.
+    // max_pages: 1 is the pass's budget too. The filtered search answers a full page at every start, so only the budget stops it.
     const { ctx, calls } = remoteTenant(() => tenRemote(30));
     const { result, errors } = await captureConsoleErrors(() => ef.fetch({ ...TENANT, max_pages: 1 }, ctx));
     const filtered = calls.filter((c) => filterOf(c) !== null).length;
