@@ -163,7 +163,7 @@ const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLO
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
 const US_CAPITAL = /(?<![\p{L}\p{N}.])US(?![\p{L}\p{N}])/gu;
-const withCapitalUs = (text) => typeof text === 'string' ? text.replace(/[^.!?\n]+/g, s => /\p{Ll}/u.test(s.replace(/<[^>]*>|&#?\w+;/g, '')) ? s.replace(US_CAPITAL, 'USA') : s) : text;
+const withCapitalUs = (text) => typeof text === 'string' ? text.replace(/[^.!?\n]+/g, s => s.split(/<[^>]*>|&#?\w+;/).some(t => /\p{Ll}/u.test(t)) ? s.replace(US_CAPITAL, 'USA') : s) : text;
 
 function excludedHome(text, homes) {
   return homes.some(h => [
