@@ -36,6 +36,16 @@ export function holdVerdict(core, hold) {
   return (location, title) => core.locationVerdict(gate, location, title);
 }
 
+/**
+ * The hold of every job that is not deleted, with the job's name. A null hold is kept, so its reader can report it.
+ *
+ * @param {Array<{ name: string, status: string, evaluate?: { hold?: unknown } }>} jobs
+ * @returns {{ name: string, hold: unknown }[]}
+ */
+export function storedHolds(jobs) {
+  return jobs.filter((job) => job.status !== "deleted" && job.evaluate?.hold !== undefined).map((job) => ({ name: job.name, hold: job.evaluate.hold }));
+}
+
 // Null or two empty lists with no home states remove the hold.
 function scheduledHold(value) {
   if (value === undefined || value === null) return undefined;

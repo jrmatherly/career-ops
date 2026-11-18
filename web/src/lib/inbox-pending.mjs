@@ -1,5 +1,6 @@
 import { canonicalJobKey } from "./core/url-key.mjs";
 import { readTrackerUrl } from "./posting-url.mjs";
+import { bestVerdict } from "./inbox-verdict.mjs";
 
 /**
  * A saved tracker row completes its inbox discovery even when the evaluator
@@ -63,6 +64,20 @@ export function markGated(jobs, ledgerEntries) {
     const reason = gated.get(canonicalJobKey(job.url));
     return reason ? { ...job, gated: reason } : job;
   });
+}
+
+/**
+ * Gives each posting the best verdict the scheduled scans' holds give its own location and role.
+ * With no hold nothing is marked.
+ *
+ * @template {{ location?: string, role?: string }} T
+ * @param {T[]} jobs
+ * @param {Array<(location: string, title: string) => { tier: "fit" | "review" | "elsewhere", reason: string }>} verdicts
+ * @returns {(T & { verdict?: { tier: "fit" | "review" | "elsewhere", reason: string } })[]}
+ */
+export function markVerdicts(jobs, verdicts) {
+  if (!verdicts.length) return jobs;
+  return jobs.map((job) => ({ ...job, verdict: bestVerdict(verdicts.map((verdict) => verdict(job.location ?? "", job.role ?? ""))) }));
 }
 
 /** The ledger reason of a row a job's location hold kept back: HELD_LOCATION in lib/evaluate-queue.mjs. */
