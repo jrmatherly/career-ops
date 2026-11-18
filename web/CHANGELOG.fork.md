@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.8.0](https://github.com/jrmatherly/career-ops/compare/web-v1.7.1...web-v1.8.0) (2026-11-18)
+
+
+### Features
+
+* **drain:** queue a no-api-text row again once its board has a text reader ([5358edf](https://github.com/jrmatherly/career-ops/commit/5358edf80ce4aadd836007e5a42cb5f3a941c59b))
+* **inbox:** filter the Inbox by location fit ([7cdcb1b](https://github.com/jrmatherly/career-ops/commit/7cdcb1b2807f87749c3331d9cf8d24d3f1c83a7f))
+* **inbox:** judge every pending row against the scheduled scans' holds ([c733dc1](https://github.com/jrmatherly/career-ops/commit/c733dc11d2ab957b81cd499fb9039a4b52f81e25))
+* **inbox:** mark and filter postings that need a manual score ([42756c5](https://github.com/jrmatherly/career-ops/commit/42756c590509d3f40f3d4d0235285ea90267862d))
+* **inbox:** read Google posting text, queue skipped rows again, and mark rows that need a manual score ([e45197d](https://github.com/jrmatherly/career-ops/commit/e45197de81403b5a251087137980e2740573cbae))
+* **inbox:** say in the Score confirm which rows are not a location fit ([c87e185](https://github.com/jrmatherly/career-ops/commit/c87e1858a572894103ff4649fe1fbc75ad9a4b93))
+* **inbox:** show a location verdict on every pending row and hold automatic evaluation on it ([4a34aa4](https://github.com/jrmatherly/career-ops/commit/4a34aa4e1893570eba8efbc717cf479ba81c2f1d))
+* **inbox:** show the location verdict on every pending row ([09a68f3](https://github.com/jrmatherly/career-ops/commit/09a68f35726ff1ed959dd76625990a2a220fee4a))
+* **scheduled-scans:** add home states to the location hold ([233df9e](https://github.com/jrmatherly/career-ops/commit/233df9e352d14448edecf45d090324f4bad48ad2))
+* **scheduled-scans:** hold automatic evaluation on the location verdict ([57e2813](https://github.com/jrmatherly/career-ops/commit/57e2813cb615826e26454d4c85a72cc766352b3a))
+* **scheduled-scans:** keep a comma inside a location chip ([359b8f3](https://github.com/jrmatherly/career-ops/commit/359b8f3e3925a364709dabd673ba79568310015f))
+
+
+### Bug Fixes
+
+* **drain:** keep a failed re-queue write from stopping the drain, and close the review findings ([afe86a9](https://github.com/jrmatherly/career-ops/commit/afe86a98e4930021bc1f1184ebeb642a806a00c1))
+* **inbox:** close the review findings on PR 110 ([967af83](https://github.com/jrmatherly/career-ops/commit/967af836a58798e11ffc8a932fc980ab6693df5e))
+* **inbox:** drop a saved verdict the Inbox no longer gives, and refuse a null home-states list ([5630c61](https://github.com/jrmatherly/career-ops/commit/5630c61f366bf773c381e9f4feec4ae0e0f3e75c))
+* **inbox:** drop the manual-score badge from a row that has a score ([6e76b2b](https://github.com/jrmatherly/career-ops/commit/6e76b2b43d6a4df9f43830e0b615a91eb2a4b9cb))
+* **inbox:** keep a typed entry whole on paste and on Enter, and say when no hold was judged ([3c056f0](https://github.com/jrmatherly/career-ops/commit/3c056f02b9eac8d7c38be04ccf2ac8d0e5e8ad14))
+* **inbox:** keep the manual-score mark when the other ledger entry is queued or failed, and close the review findings ([8e123fd](https://github.com/jrmatherly/career-ops/commit/8e123fd47b6287cc5be2aa97dca4222a6f2e8244))
+* **inbox:** say on the page when the evaluation queue cannot be read, and leave a posting that moved on unmarked ([fa72c70](https://github.com/jrmatherly/career-ops/commit/fa72c7078b6f9636b735d6051dda632403f9a599))
+
 ## [1.7.1](https://github.com/jrmatherly/career-ops/compare/web-v1.7.0...web-v1.7.1) (2026-11-17)
 
 

@@ -1,5 +1,67 @@
 # Changelog
 
+## [2.7.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.6.1...career-ops-v2.7.0) (2026-11-18)
+
+
+### Features
+
+* **drain:** queue a no-api-text row again once its board has a text reader ([5358edf](https://github.com/jrmatherly/career-ops/commit/5358edf80ce4aadd836007e5a42cb5f3a941c59b))
+* **inbox:** filter the Inbox by location fit ([7cdcb1b](https://github.com/jrmatherly/career-ops/commit/7cdcb1b2807f87749c3331d9cf8d24d3f1c83a7f))
+* **inbox:** judge every pending row against the scheduled scans' holds ([c733dc1](https://github.com/jrmatherly/career-ops/commit/c733dc11d2ab957b81cd499fb9039a4b52f81e25))
+* **inbox:** mark and filter postings that need a manual score ([42756c5](https://github.com/jrmatherly/career-ops/commit/42756c590509d3f40f3d4d0235285ea90267862d))
+* **inbox:** read Google posting text, queue skipped rows again, and mark rows that need a manual score ([e45197d](https://github.com/jrmatherly/career-ops/commit/e45197de81403b5a251087137980e2740573cbae))
+* **inbox:** say in the Score confirm which rows are not a location fit ([c87e185](https://github.com/jrmatherly/career-ops/commit/c87e1858a572894103ff4649fe1fbc75ad9a4b93))
+* **inbox:** show a location verdict on every pending row and hold automatic evaluation on it ([4a34aa4](https://github.com/jrmatherly/career-ops/commit/4a34aa4e1893570eba8efbc717cf479ba81c2f1d))
+* **inbox:** show the location verdict on every pending row ([09a68f3](https://github.com/jrmatherly/career-ops/commit/09a68f35726ff1ed959dd76625990a2a220fee4a))
+* **jd:** read Google Careers posting text from the detail page's record ([0aa2e11](https://github.com/jrmatherly/career-ops/commit/0aa2e11b8864321c417f96d5454537c1dfc09e60))
+* **scan:** add locationVerdict, a fit, review or elsewhere tier for every location ([fd734bf](https://github.com/jrmatherly/career-ops/commit/fd734bfae98fa2762c3c858f1a10b8469f5260c9))
+* **scan:** add the location verdict and home_states, and fix what the workplace gate misreads ([f9627ba](https://github.com/jrmatherly/career-ops/commit/f9627bacbf13cc09824c7535e82156f93cc2480b))
+* **scan:** let a workplace policy name its home states ([077c9b7](https://github.com/jrmatherly/career-ops/commit/077c9b795c9a693047feca50365207d5f4859dc5))
+* **scheduled-scans:** add home states to the location hold ([233df9e](https://github.com/jrmatherly/career-ops/commit/233df9e352d14448edecf45d090324f4bad48ad2))
+* **scheduled-scans:** hold automatic evaluation on the location verdict ([57e2813](https://github.com/jrmatherly/career-ops/commit/57e2813cb615826e26454d4c85a72cc766352b3a))
+* **scheduled-scans:** keep a comma inside a location chip ([359b8f3](https://github.com/jrmatherly/career-ops/commit/359b8f3e3925a364709dabd673ba79568310015f))
+
+
+### Bug Fixes
+
+* **bamboohr:** read atsLocation and locationType into the location string ([f8f5c47](https://github.com/jrmatherly/career-ops/commit/f8f5c4716b2143e5dca9002797737d84b0e3bdc7))
+* **drain:** keep a failed re-queue write from stopping the drain, and close the review findings ([afe86a9](https://github.com/jrmatherly/career-ops/commit/afe86a98e4930021bc1f1184ebeb642a806a00c1))
+* **eightfold:** judge an ignored filter per value and end a walk only on a short page ([63616e9](https://github.com/jrmatherly/career-ops/commit/63616e99f8a15d84fde00430c3f5413a217a7e20))
+* **eightfold:** leave postings with no id out of the ignored-filter check ([e500b0b](https://github.com/jrmatherly/career-ops/commit/e500b0b82c2dd568907d8ea5d537d5b38f1a83e9))
+* **eightfold:** mark postings the tenant's work-site filter calls remote ([eb64c8d](https://github.com/jrmatherly/career-ops/commit/eb64c8d2253747b8331519cbb76fbc7a5f5fec6d))
+* **eightfold:** read a filter value that returns nearly the whole board as ignored ([8827c8c](https://github.com/jrmatherly/career-ops/commit/8827c8cd7b1dadd6071fa91fe19e6cb8e50bdb76))
+* **eightfold:** refuse a work-site filter the tenant ignores, and close the review findings ([d87daaa](https://github.com/jrmatherly/career-ops/commit/d87daaaba235e67029a850d0d6e715092145f0d3))
+* **inbox:** close the review findings on PR 110 ([967af83](https://github.com/jrmatherly/career-ops/commit/967af836a58798e11ffc8a932fc980ab6693df5e))
+* **inbox:** keep a typed entry whole on paste and on Enter, and say when no hold was judged ([3c056f0](https://github.com/jrmatherly/career-ops/commit/3c056f02b9eac8d7c38be04ccf2ac8d0e5e8ad14))
+* **inbox:** keep the manual-score mark when the other ledger entry is queued or failed, and close the review findings ([8e123fd](https://github.com/jrmatherly/career-ops/commit/8e123fd47b6287cc5be2aa97dca4222a6f2e8244))
+* **scan:** close the location gate follow-ups PR 107 left open ([9f8d280](https://github.com/jrmatherly/career-ops/commit/9f8d280942bb204d36980a35ef8e7bb9a46c9b78))
+* **scan:** close the review findings on PR 107 ([718d1d9](https://github.com/jrmatherly/career-ops/commit/718d1d9a34f239f2977ddcd09918ca0e16922898))
+* **scan:** close three review findings on the follow-up rules ([1c70d13](https://github.com/jrmatherly/career-ops/commit/1c70d1330998a31edd9e23aafbe6bd95d07e4fd8))
+* **scan:** do not read a pay-band or privacy-notice label as a hiring restriction ([ef2cacc](https://github.com/jrmatherly/career-ops/commit/ef2cacc32efda8d07b9d4732418d346af4dbdf90))
+* **scan:** find a home label that has a tag inside it ([a784ccf](https://github.com/jrmatherly/career-ops/commit/a784ccf513acfdc03a411c17406ef43cd96acc79))
+* **scan:** keep a home town or a US city out of elsewhere, read Georgia as home in descriptions, drop two misfiring aliases ([3901dda](https://github.com/jrmatherly/career-ops/commit/3901dda1bb10bb0090e595ba55623ef9ddfe48c2))
+* **scan:** keep the follow-up rules from hiding a home posting ([03e0576](https://github.com/jrmatherly/career-ops/commit/03e0576813ab05b3504f1c0935dea52ee37d8b47))
+* **scan:** keep three answers main gave that the review fixes lost ([b56fdb1](https://github.com/jrmatherly/career-ops/commit/b56fdb1d1d179dc750a9a505c3a42f91d9aeea78))
+* **scan:** narrow the Georgia description reading, admit a country list that names home, keep one state's name out of another's ([0b88fcc](https://github.com/jrmatherly/career-ops/commit/0b88fcc2ebc1819ceabe1e9f7abbd763c58828f7))
+* **scan:** pass the title decision to providers in scan-ats-full ([cda2170](https://github.com/jrmatherly/career-ops/commit/cda21701c4c07ac1fcf0c417dd04401331d77958))
+* **scan:** read a capital US as the country when a description clause restricts ([854093f](https://github.com/jrmatherly/career-ops/commit/854093ffa101933e1dbf17e05b311f54c03e1735))
+* **scan:** read a country label as a heading only beside a home-country label ([7f796bc](https://github.com/jrmatherly/career-ops/commit/7f796bcca483dca38898acc330a4e003ddb166b9))
+* **scan:** read a country list that names home as home with any noun before "only" ([f11178a](https://github.com/jrmatherly/career-ops/commit/f11178ac6c753c61d8f042faf0a31ccb9ab049ab))
+* **scan:** read a scope label that has a tag between its words ([f7d17d8](https://github.com/jrmatherly/career-ops/commit/f7d17d894d2aae770d01710824136a7724aa518a))
+* **scan:** read telecommute, anywhere and a spaced state code in a US location ([64a1629](https://github.com/jrmatherly/career-ops/commit/64a16295ce9e0dc8778425172fa8b7ca37baca69))
+* **scan:** read the District of Columbia after a home state, and no home line after a negation ([e481b09](https://github.com/jrmatherly/career-ops/commit/e481b09eb85acbce1ddd3e19c6fd847b64d2375b))
+* **scan:** refuse a posting whose description shuts a home state out ([86c03c7](https://github.com/jrmatherly/career-ops/commit/86c03c7b5af7cb316f01115359f5cc4a0246e770))
+* **scan:** send a shut-out home state to review and close the PR review findings ([58cf367](https://github.com/jrmatherly/career-ops/commit/58cf367b1e0d66b0f019e60faabf3a40bb403b3b))
+* **scan:** send placeholders, bare state-or-country codes and a remote option beside an office word to review ([6e55565](https://github.com/jrmatherly/career-ops/commit/6e55565da50a04b546bcbb2753ba2b5833703569))
+* **scan:** tell the state Georgia from the country and read a place the way the gate does ([cd1be82](https://github.com/jrmatherly/career-ops/commit/cd1be822e052aadedb13315710dcbe8f79a69c6a))
+* **scan:** test for a lower-case letter between tags without stripping them ([7ff7652](https://github.com/jrmatherly/career-ops/commit/7ff76523bcb6230c61184abed02ac7657de873ed))
+* **scan:** write provider location facts into the location string (BambooHR, Eightfold, Workday) ([42c9d15](https://github.com/jrmatherly/career-ops/commit/42c9d15f607ffa477b9d6d0e0c8cb2206f5b4c76))
+
+
+### Performance Improvements
+
+* **scan:** build the Georgia-home text once per posting ([c41f90d](https://github.com/jrmatherly/career-ops/commit/c41f90dbcbce2d141938733485549a7b68166a7d))
+
 ## [2.6.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.6.0...career-ops-v2.6.1) (2026-11-17)
 
 
