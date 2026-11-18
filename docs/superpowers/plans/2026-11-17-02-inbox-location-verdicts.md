@@ -313,6 +313,7 @@ Run: `git add web/src/lib/core/evaluate-candidates.mjs web/scripts web/tests/lib
 | `remote_country_restricted` | Remote, from a country you did not list. |
 | `exclusive_foreign_country` | Open only to people in another country. |
 | `candidate_country_excluded` | The posting excludes your country. |
+| `home_state_excluded` | The posting text says it is not open in your home state. |
 | `metadata_country_restricted` | The posting's own fields limit it to another country. |
 | `description_country_restricted` | The posting text limits it to another country. |
 | `description_location_restricted` | The posting text requires living somewhere else. |
@@ -320,6 +321,8 @@ Run: `git add web/src/lib/core/evaluate-candidates.mjs web/scripts web/tests/lib
 | `description_onsite_restricted` | The posting text requires office days somewhere else. |
 
 Since plan 1's review fixes, `onsite_country_restricted` is tier `review`, not `elsewhere`, and its sentence must also cover a home area listed beside another place (`Atlanta, GA or London, UK`).
+
+Since the gate follow-ups, `remote_scoped_to_other_state` also covers a bare `CA`, `CO`, `DE`, `IL` or `IN`, which may be a state or a country.
 
 `VERDICT_FALLBACK` is "Your scheduled scans' location hold does not admit this location." `VERDICT_SOURCE` is "Judged from the row's location and title, not the posting text."
 

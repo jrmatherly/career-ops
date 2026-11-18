@@ -118,7 +118,7 @@ Each still reproduces on `main` (measured) and stays in `docs/WORKPLACE_GEOGRAPH
 
 - Boards outside the 39. The label finding rests on one employer's template.
 - Descriptions on the pod. Scan history stores none, so Findings 2 to 4 were measured on the corpus only.
-- The sketch is not the implementation. `repro/prototype-patch.mjs` writes it. In a scratch worktree it turned over 23 pinned test rows, all in the five test files the plan edits, and nothing else in `node test-all.mjs --quick`. The plan's last task re-runs `repro/delta.mjs` against the real change.
+- Measured on the real change, 2026-11-18, `repro/delta.mjs` with `main` at `7fb91d47` against the branch, on a fresh corpus (39 boards, 3,348 postings) and the pod's 27,902 scan-history rows (5,784 distinct locations). Under both policies the corpus gate changes are 0 eligible to not and 0 not to eligible. Every tier change is `elsewhere` to `review`: 10 corpus postings, and on the pod 27 placeholder rows, 7 remote-beside-office rows and 3 bare-code rows.
 - The live postings behind the 37 pod rows. Their tiers were judged from the location string.
 
 ## Scripts

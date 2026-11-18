@@ -77,28 +77,32 @@ list`.
   national remote role.` it stays `remote_eligibility_unconfirmed`.
 - After `must be based in` and the like, `the contiguous United States`, `the
   continental United States` and `the lower 48 states` are the United States.
-- A scope label is not a restriction. A sentence can open with a country, one
-  of `roles`, `positions`, `candidates`, `applicants`, `employees` or `hires`,
-  and `only:`, or with `pay ranges for <country> only:`. When an amount of pay
-  or a privacy notice follows within 80 characters, the gate takes the label
-  out before it looks for restrictions. `Canada-based roles only: $140,000
-  CAD` passes under a US policy, and so does `<strong>Canada-based roles
-  only</strong>: $140,000 CAD`, with a tag between `only` and the colon.
-  `Canada-based candidates only: we cannot hire in the US.` still fails,
-  because no pay follows and the sentence has a negation. The label also
-  stays when the rest of its sentence says `limited to` or `restricted to`:
-  `Canada-based candidates only: hiring is limited to Canada; salary is
-  $140,000 CAD.` fails. `Canada only: relocation assistance of $10,000
-  provided.` still fails, because the label has none of the six nouns.
+- A scope label is a heading only beside a home-country label. A label opens
+  a sentence with a country, one of `roles`, `positions`, `candidates`,
+  `applicants`, `employees` or `hires`, and `only:`, with an optional `For`
+  in front, or reads `pay ranges for <country> only:`. A posting written for
+  several countries labels each one. When one label in the description names
+  a home country, the gate takes every label out before it looks for
+  restrictions: `USA-based roles only: $133,000 USD. Canada-based roles only:
+  $125,000 CAD.` passes under a US policy, with or without tags around the
+  labels. A lone foreign label is a restriction, whatever follows it:
+  `Canada-based roles only: $140,000 CAD` fails,
+  `exclusive_foreign_country`. A restriction elsewhere in a labelled posting
+  still counts: `USA-based roles only: $133,000 USD. Canada-based roles only:
+  $125,000 CAD. You must be based in Canada.` fails. `Canada only: relocation
+  assistance of $10,000 provided.` fails, because the label has none of the
+  six nouns.
 - A foreign country followed by `only` is exclusive and fails the posting
   (`UK only`). The country may carry `-based` and one of `candidates`,
   `applicants`, `residents`, `roles`, `positions`, `employees` or `hires`
   (`Canada hires only`). For `roles`, `positions`, `employees` and `hires`, a
   foreign country joined to a home-country name is not exclusive: `USA and
-  Canada roles only` passes under a US policy. In a description this covers a
-  list of any length that names a home country, so `USA, Canada and Mexico
-  roles only` passes too. For the other forms it is
-  still exclusive (`USA and Canada candidates only` fails). The home-country
+  Canada roles only` passes under a US policy. In a description a list of any
+  length that names a home country is the home country before `only`, with
+  any of the seven nouns or none: `USA, Canada and Mexico roles only`,
+  `United States and Canada residents only` and `This position is open to
+  candidates in the US and Canada only` pass. A list that names no home
+  country stays exclusive (`Canada and Mexico only` fails). The home-country
   name must stand whole: `Belarus and Canada roles only` fails, because the
   `us` that ends `Belarus` is not the United States. `New England` and `New
   Mexico` before `only` are not England and Mexico.
@@ -306,6 +310,26 @@ The word also stays the country in two more cases:
 The reading does not confirm a remote role. `Remote` with `Must be based in
 Georgia` is `review`, `remote_eligibility_unconfirmed`.
 
+### A description that shuts a home state out
+
+With `home_states` set, a description sentence that shuts a home state out
+of hiring fails the posting, `home_state_excluded`. The verdict makes it
+`elsewhere`. Two shapes are read, by the state's full name only:
+
+- A hiring negation before the state: `Not available in Georgia.`, `We cannot
+  hire in Alabama, Georgia or Hawaii.`, `Open to all US states except
+  Georgia.` Other states may stand in the list. The state must end its
+  phrase, so `Georgia Power` and `New York City` are not it.
+- The state's residents before `not eligible`, `ineligible` or `excluded`:
+  `Georgia residents are not eligible to apply.`
+
+Only a sentence about hiring counts, because a wrong match hides a home
+posting. `Our headquarters is not in Georgia.` and `Applicants from Georgia
+are not eligible for relocation.` pass. A Georgia that is the country is not
+the home state: `Not available in Georgia, Armenia or Azerbaijan.` passes,
+and under `Remote - Tbilisi, Georgia` the location decides. Without
+`home_states` no sentence is read this way.
+
 ## Country spellings, US territories and timezone abbreviations
 
 The gate takes its country names from `Intl.DisplayNames`. It adds the
@@ -368,8 +392,21 @@ The gate's `location_unknown` and `remote_eligibility_unconfirmed` are
 `review` too. So is `onsite_country_restricted`. The gate gives that reason
 only after it found a home place in the location, so the posting names the
 owner's town beside something that reads as another country: `Atlanta, GA or
-London, UK`, `San Francisco, CA / Atlanta, GA`. Every other reason the gate
-gives for refusing is `elsewhere`.
+London, UK`, `San Francisco, CA / Atlanta, GA`.
+
+Three more shapes are `review`, because each reads two ways. The last two
+apply only under a US policy.
+
+| Shape | Reason | Example |
+| --- | --- | --- |
+| A placeholder | `location_names_no_place` | `N/A`, `Not specified`, `Flexible`, `See description` |
+| A remote location whose only place is a bare `CA`, `CO`, `DE`, `IL` or `IN`, a state or a country | `remote_scoped_to_other_state` | `Remote, CA` |
+| A remote location whose only place is a bare US timezone abbreviation, which is also a country code | `remote_eligibility_unconfirmed` | `Remote - EST` |
+| A location the gate reads as an office role, which names the home country and has a remote place of its own | `remote_eligibility_unconfirmed` | `United States - Remote; Preferred: Denver, CO - Hybrid, Hybrid` |
+
+A foreign place written with such a code stays `elsewhere`: `Remote -
+Toronto, ON, CA`, `Remote - Tallinn, EST`. Every other reason the gate gives
+for refusing is `elsewhere`.
 
 `home_states` changes three answers:
 
@@ -428,8 +465,10 @@ Places the gate cannot tell apart. The gate has no list of cities.
   States or not. `Remote - Denver, CO`, `Remote - Berlin, DE` and `Remote -
   Tel Aviv, IL` are all `review`. So is `Remote Europe - DE`, because
   `Europe` is no country and no state, so the verdict reads it as a city.
-- One of the five codes with no city is the country. `Remote, CA`, `Remote,
-  DE` and `Remote - IL` are `elsewhere`.
+- A remote option beside an office word is `review` only where the location
+  names the home country. `Remote/Hybrid - Denver, CO` is `elsewhere`.
+- A list of foreign remote places stays `elsewhere`, whatever joins them:
+  `Poland - Remote OR Romania - Remote`, `Remote - Toronto, ON, CA`.
 - `Remote - Tbilisi, GA` is `fit`. Without the word `Georgia` the Georgian
   towns are not looked for, and `GA` is the state's code.
 - Holland, Wales, Scotland and Palestine are not read as countries, because
@@ -469,9 +508,11 @@ Georgia.
 - A location with no Georgia of its own does not make a description's Georgia
   the country. `Remote - Europe` with `Must be based in Georgia` is `review`,
   not `elsewhere`.
-- A description that shuts Georgia out still passes. `Georgia residents are
-  not eligible`, `Not available in Georgia` and `Open to all US states except
-  Georgia` are `fit`.
+- A shut-out the rule does not know still passes. `Georgia is excluded.`,
+  `Residents of Georgia are not eligible.` and `Not eligible in: CA, CO, GA,
+  NY.` are `fit`.
+- A list of states hired in that omits the home state is not read. `We hire
+  in the following states only: Arizona, Florida, Texas.` is `fit`.
 - Any exclusion word in a sentence keeps its Georgia the country, even when
   the word is about something else. `Must be based in Georgia; relocation
   assistance is not provided.` is `elsewhere`,
@@ -492,10 +533,8 @@ Georgia.
 
 Timezones, letter case and placeholders.
 
-- A timezone abbreviation with no US place is a country code. `Remote - EST`
-  and `Remote - ET` are `elsewhere`, as Estonia and Ethiopia. Beside a bare
-  Georgia in another place it tells nothing: `Remote - Georgia · Remote
-  (EST)` is `fit`.
+- A timezone abbreviation beside a bare Georgia in another place tells
+  nothing: `Remote - Georgia · Remote (EST)` is `fit`.
 - A bracket that joins `CT` or `MT` to another abbreviation is not stripped,
   and neither is a timezone in square brackets. `Remote - Georgia (ET/CT)`
   and `Remote - Georgia [EST]` are `elsewhere`.
@@ -504,19 +543,19 @@ Timezones, letter case and placeholders.
   A state's full name does not depend on letter case: `GEORGIA - REMOTE` is
   `fit`. A foreign city beside a code that is also a state code is `review`
   too (`REMOTE - VALLETTA, MT`).
-- A placeholder is an on-site place outside the home area. `N/A`, `Not
-  specified`, `Flexible` and `See description` are `elsewhere`. A region with
-  no country is too: `East Coast` is `elsewhere`, while `US East` is `review`.
+- A region with no country is an on-site place outside the home area. `East
+  Coast` is `elsewhere`, while `US East` is `review`.
 - With no `workplace_policy`, every posting is `fit`, `policy_absent`.
   `locationVerdict(buildWorkplacePolicy(undefined), 'Berlin, Germany')` is
   `fit`. A caller that acts on `fit` must check for that reason.
 
 Restrictions in a description.
 
-- A plain `only` list with the home country first is exclusive. `This
-  position is open to candidates in the US and Canada only.` and `United
-  States and Canada residents only.` fail, `exclusive_foreign_country`.
-  `Canada and US only.` passes.
+- A lone foreign label before pay is a restriction. `Canada-based roles
+  only: $140,000 CAD` and `Pay ranges for Mexico only: MXN 900,000 -
+  1,200,000.` fail, `exclusive_foreign_country`.
+- `We cannot hire in the US.` is not read as shutting the home country out.
+  It is `fit`.
 - A timezone requirement is a location the gate does not know. `Must be
   located in the Eastern Time Zone.` is `elsewhere`,
   `description_location_restricted`.
@@ -532,8 +571,9 @@ Restrictions in a description.
 - A capital `US` after a heading word other than `ABOUT`, `JOIN`, `WHY`,
   `CONTACT` and `WITH` is still the country. `MEET US: we only hire in
   Canada.` passes.
-- A scope label with an accented country name is not stripped.
-  `México-based roles only: $40,000 MXN` fails under a US policy.
+- A scope label with an accented country name is not read as a label.
+  `México-based roles only: $40,000 MXN` fails under a US policy, beside a
+  home label too.
 - `Excluding US holidays` and `not US-based` in a description fail the posting
   as `candidate_country_excluded`.
 
