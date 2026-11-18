@@ -99,7 +99,7 @@ export function TriageRow({
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
           {verdict && <Badge tone={verdict.tone} title={verdict.title}>{verdict.label}<span className="sr-only">: {verdict.reason}</span></Badge>}
-          {noText && <Badge tone={noText.tone} title={noText.title}>{noText.label}</Badge>}
+          {noText && !evaluated && <Badge tone={noText.tone} title={noText.title}>{noText.label}</Badge>}
           {job.gated ? (
             <Badge tone="bad">Gated: {job.gated}</Badge>
           ) : rankLabel && (
