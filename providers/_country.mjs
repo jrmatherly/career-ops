@@ -483,3 +483,62 @@ function withoutUsStates(place, codes, georgia = false) {
 function withoutAddressWords(text) {
   return brackets(text).replace(ADDRESS_RUN, run => run.trim().split(/\s+/).length > 2 ? run.replace(TWO_LETTER_WORD, ' ') : run);
 }
+
+export const LOCATION_TIERS = Object.freeze(['fit', 'review', 'elsewhere']);
+const NO_PLACE_WORDS = /\b(?:locations?|multiple|various|cities|any|nationwide|tbd|hybrid|on[ -]?site|in[ -]?office|in|the|and|or)\b/g;
+const GEORGIA_WORD = /(?<![\p{L}\p{N}])georgia(?![\p{L}\p{N}])/giu;
+
+// "Remote, CA, USA" is California; "Remote - US/CA" is still the two countries.
+const codeBeforeCountry = (part, countryNames) => [...part.matchAll(AMBIGUOUS_STATE_CODE)].some(({ index }) => part[index + 2] === ','
+  && countryNames.some(name => new RegExp(`^${escape(name)}(?![\\p{L}\\p{N}])`, 'u').test(fold(part.slice(index + 3)))));
+
+function scopedToOtherState(location, homeStates, countryNames) {
+  let named = false, countryWide = false, home = false;
+  for (const part of places(location.replace(US_DOTTED, 'usa')).flatMap(place => place.split(/\||\s\/\s/))) {
+    const lower = /\p{Ll}/u.test(part), folded = fold(part);
+    if (withoutUsStates(part, lower, homeStates.includes('ga')) === null && !(lower && codeBeforeCountry(part, countryNames))) {
+      countryWide ||= has(folded, countryNames);
+      continue;
+    }
+    named = true;
+    home ||= STATES_AND_DC.some(([name, code]) => homeStates.includes(code) && (word(name).test(folded) || (lower && word(code.toUpperCase()).test(part))));
+  }
+  return named && !countryWide && !home;
+}
+
+function namesNoPlace(location, homeStates, countryNames) {
+  const single = new Set(STATES_AND_DC.filter(([, code]) => !homeStates.length || homeStates.includes(code)).flatMap(([name, code]) => [name.replace(/ /g, ''), code]));
+  return fold(location).split(/[·;|]/).every(part => {
+    for (const name of countryNames) part = part.replace(new RegExp(word(name).source, 'gu'), ' ');
+    part = part.replace(/\s+/g, ' ').replace(NO_PLACE_WORDS, '').replace(/[^a-z]/g, '');
+    return !part || single.has(part);
+  });
+}
+
+const namesHomeState = (location, homeStates) => STATES_AND_DC.some(([name, code]) => homeStates.includes(code)
+  && (word(code.toUpperCase()).test(location) || word(name).test(fold(location))));
+
+/** Where a posting's location sits for the owner, read from the workplace gate.
+ * `fit` is a place the policy allows. `review` is a place the owner may still want, which the gate cannot settle
+ * (no place named, a remote role scoped to a state that is not home, an on-site role in a home state outside the
+ * listed towns, or no location at all). `elsewhere` is a place the policy rules out.
+ * @param {Function & { homeStates?: readonly string[], homeCountryNames?: readonly string[] }} gate from buildWorkplacePolicy
+ * @param {unknown} location
+ * @param {string} [title]
+ * @param {object} [offer]
+ * @returns {{ tier: 'fit' | 'review' | 'elsewhere', reason: string }}
+ */
+export function locationVerdict(gate, location, title = '', offer = {}) {
+  const raw = typeof location === 'string' ? location : '';
+  const homeStates = gate.homeStates ?? [], countryNames = gate.homeCountryNames ?? [];
+  const { eligible, reason } = gate(raw, title, offer);
+  const verdict = (tier, why = reason) => ({ tier, reason: why });
+  if (eligible) return reason === 'remote_region_allowed' && scopedToOtherState(raw, homeStates, countryNames) ? verdict('review', 'remote_scoped_to_other_state') : verdict('fit');
+  if (reason === 'location_unknown' || reason === 'remote_eligibility_unconfirmed') return verdict('review');
+  if (reason === 'onsite_outside_allowed_locations' && namesNoPlace(raw, homeStates, countryNames)) return verdict('review', 'location_names_no_place');
+  if (reason === 'onsite_outside_allowed_locations' && namesHomeState(raw, homeStates)) return verdict('review', 'onsite_in_home_state');
+  // Asked again as another state: would this pass if Georgia were the state, not the country?
+  const asState = raw.replace(GEORGIA_WORD, 'Tennessee');
+  if (reason === 'remote_country_restricted' && asState !== raw && gate(asState, title, offer).eligible) return verdict('review', 'remote_scoped_to_other_state');
+  return verdict('elsewhere');
+}
