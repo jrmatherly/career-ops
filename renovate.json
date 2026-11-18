@@ -5,10 +5,25 @@
     "group:allNonMajor",
     ":semanticCommits"
   ],
+  "description": "Fork scope: npm and Go pins arrive with the upstream merge (/upstream-review), so Renovate here moves only what the fork pins itself: workflow actions, Docker base digests and the golangci-lint pin. Security fixes come from Dependabot security updates (a repository setting), which Renovate would raise a second time.",
+  "enabledManagers": ["github-actions", "dockerfile", "custom.regex"],
+  "timezone": "America/New_York",
+  "minimumReleaseAge": "7 days",
+  "vulnerabilityAlerts": { "enabled": false },
   "labels": ["dependencies"],
   "schedule": ["before 7am on monday"],
   "prHourlyLimit": 3,
   "prConcurrentLimit": 5,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The golangci-lint version test.yml runs with `go run`",
+      "managerFilePatterns": ["/^\\.github/workflows/test\\.yml$/"],
+      "matchStrings": ["golangci-lint/v2/cmd/golangci-lint@(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    }
+  ],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -31,6 +46,22 @@
       "matchFileNames": [".github/workflows/test.yml"],
       "matchDatasources": ["node-version"],
       "enabled": false
+    },
+    {
+      "description": "Base image tags follow what upstream ships (the Playwright tag equals the playwright version in package.json), so only a rebuilt digest of the same tag moves here, in one PR for every Dockerfile.",
+      "matchManagers": ["dockerfile"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "groupName": "Docker base digests",
+      "automerge": false
+    },
+    {
+      "description": "The run line names the v2 module path, so a v3 needs the path changed by hand.",
+      "matchDepNames": ["golangci/golangci-lint"],
+      "allowedVersions": "<3"
     }
   ]
 }

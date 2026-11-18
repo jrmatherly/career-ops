@@ -73,7 +73,7 @@ A standalone Go TUI under `dashboard/` for browsing the pipeline. Isolated from 
 
 - `test-all.mjs` — the full suite (scoring, scan, tracker, PDF, security, updater; one file per suite under `tests/`).
 - `updater-migration-tests.mjs` — enforces the system/user boundary and safe cross-version upgrades.
-- CI: `test` runs on every push and PR, and CodeQL on code changes to `main` and PRs against it; Dependabot (`.github/dependabot.yml`) bumps the pinned Actions; `renovate.json` is upstream's and inert here.
+- CI: `test` runs on every push and PR, and CodeQL on code changes to `main` and PRs against it; Renovate (`renovate.json`, scoped to what the fork pins) bumps the pinned Actions, the Docker base digests and the golangci-lint pin; Dependabot raises security fixes only.
 
 ## Where to start reading
 
