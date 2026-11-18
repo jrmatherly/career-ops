@@ -184,7 +184,7 @@ export function CreateJobModal({
   );
 }
 
-export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string; holdOnsite: string[]; holdRemote: string[] };
+export type EvaluateForm = { mode: EvaluateSettings["mode"]; rankThreshold: string; maxPerRun: string; holdOnsite: string[]; holdRemote: string[]; holdStates: string[] };
 
 export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onChange: (value: EvaluateForm) => void }) {
   const id = useId();
@@ -219,7 +219,7 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
               <input id={`${id}-max`} type="number" min={1} max={20} step={1} value={value.maxPerRun} onChange={(e) => onChange({ ...value, maxPerRun: e.target.value })} onBlur={clampShown} className={field} />
             </div>
           </div>
-          <p className="text-xs text-faint">Leave both empty to auto-evaluate every location.</p>
+          <p className="text-xs text-faint">Leave all three empty to auto-evaluate every location.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="mb-1 block text-[13px] font-medium text-foreground">Home area</p>
@@ -230,6 +230,11 @@ export function EvaluateFields({ value, onChange }: { value: EvaluateForm; onCha
               <p className="mb-1 block text-[13px] font-medium text-foreground">Remote from</p>
               <KeywordField ariaLabel="Remote from" values={value.holdRemote} tone="inc" placeholder="United States…" onChange={(holdRemote) => onChange({ ...value, holdRemote })} />
               <p className="mt-1 text-xs text-faint">Countries you can work remotely from. A posting that says only &quot;Remote&quot; is held.</p>
+            </div>
+            <div>
+              <p className="mb-1 block text-[13px] font-medium text-foreground">Home states</p>
+              <KeywordField ariaLabel="Home states" values={value.holdStates} tone="inc" placeholder="Georgia…" onChange={(holdStates) => onChange({ ...value, holdStates })} />
+              <p className="mt-1 text-xs text-faint">Optional. US states you count as home, by name or code. A remote posting limited to one of them is auto-evaluated. With none, a remote posting limited to any one state is held.</p>
             </div>
           </div>
         </>

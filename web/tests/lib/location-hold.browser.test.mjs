@@ -32,6 +32,8 @@ test("a held posting keeps its rank in the Inbox, and the job form shows the hol
   await dialog.getByText("Remote from", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Remove Springfield" }).waitFor();
   await dialog.getByRole("button", { name: "Remove United States" }).waitFor();
+  await dialog.getByText("Home states", { exact: true }).waitFor();
+  await dialog.getByRole("button", { name: "Remove Illinois" }).waitFor();
   await dialog.getByText("Source groups", { exact: true }).waitFor();
   await dialog.getByRole("button", { name: "Remove weekly" }).waitFor();
   for (const [role, name] of [["button", "Close"], ["textbox", "Scan Name"], ["combobox", "Where to check"], ["spinbutton", "Repeat Cadence"], ["combobox", "Repeat unit"]]) {

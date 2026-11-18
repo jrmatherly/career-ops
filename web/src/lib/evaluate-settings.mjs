@@ -20,20 +20,21 @@ export function clampEvaluate(input) {
  * The `evaluate` a modal sends: undefined (keep what is stored) when the form is Off and
  * the job has no settings to turn off; the mode alone for Off and Review, so the hidden
  * Auto fields are neither validated nor changed; clamped numbers for Auto, with the
- * location hold from the two chip lists, or null when both are empty, so clearing them removes it.
+ * location hold from the three chip lists, or null when all are empty, so clearing them removes it.
  */
 export function evaluateBody(form, stored) {
   if (form.mode === "off" && !stored) return undefined;
   if (!evaluateFieldsVisible(form.mode)) return { mode: form.mode };
   const onsiteLocations = form.holdOnsite ?? [];
   const remoteCountries = form.holdRemote ?? [];
+  const homeStates = form.holdStates ?? [];
   // A stored hold the form cannot show in full (a store edited by hand) is kept until its fields are edited: the runner refuses it and says why.
   const strings = (value) => Array.isArray(value) && value.every((item) => typeof item === "string");
-  const unreadable = stored?.hold !== undefined && !(strings(stored.hold?.onsiteLocations) && strings(stored.hold?.remoteCountries));
+  const unreadable = stored?.hold !== undefined && !(strings(stored.hold?.onsiteLocations) && strings(stored.hold?.remoteCountries) && (stored.hold?.homeStates === undefined || strings(stored.hold.homeStates)));
   const shown = evaluateForm(stored);
   const same = (left, right) => left.length === right.length && left.every((item, i) => item === right[i]);
-  if (unreadable && same(onsiteLocations, shown.holdOnsite) && same(remoteCountries, shown.holdRemote)) return clampEvaluate(form);
-  return { ...clampEvaluate(form), hold: onsiteLocations.length || remoteCountries.length ? { onsiteLocations, remoteCountries } : null };
+  if (unreadable && same(onsiteLocations, shown.holdOnsite) && same(remoteCountries, shown.holdRemote) && same(homeStates, shown.holdStates)) return clampEvaluate(form);
+  return { ...clampEvaluate(form), hold: onsiteLocations.length || remoteCountries.length || homeStates.length ? { onsiteLocations, remoteCountries, ...(homeStates.length ? { homeStates } : {}) } : null };
 }
 
 /** The job card's mode badge, or null when evaluation is off. */
@@ -90,7 +91,7 @@ const chipList = (value) => (Array.isArray(value) ? value.filter((item) => typeo
 export function evaluateForm(stored) {
   return {
     mode: stored?.mode ?? "off", rankThreshold: String(stored?.rankThreshold ?? 3.5), maxPerRun: String(stored?.maxPerRun ?? 5),
-    holdOnsite: chipList(stored?.hold?.onsiteLocations), holdRemote: chipList(stored?.hold?.remoteCountries),
+    holdOnsite: chipList(stored?.hold?.onsiteLocations), holdRemote: chipList(stored?.hold?.remoteCountries), holdStates: chipList(stored?.hold?.homeStates),
   };
 }
 

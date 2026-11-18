@@ -24,19 +24,31 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 }
 
 /** The workplace policy (providers/_country.mjs) a stored hold stands for. */
-export const holdPolicy = (hold) => ({ onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries });
+export const holdPolicy = (hold) => ({ onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries, home_states: hold.homeStates ?? [] });
 
-// Null or two empty lists remove the hold.
+/**
+ * The verdict a stored hold gives a location: `core` is the providers/_country.mjs module. Throws what the gate throws.
+ *
+ * @returns {(location: string, title: string) => { tier: "fit" | "review" | "elsewhere", reason: string }}
+ */
+export function holdVerdict(core, hold) {
+  const gate = core.buildWorkplacePolicy(holdPolicy(hold ?? {}));
+  return (location, title) => core.locationVerdict(gate, location, title);
+}
+
+// Null or two empty lists with no home states remove the hold.
 function scheduledHold(value) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "object" || !Array.isArray(value.onsiteLocations) || !Array.isArray(value.remoteCountries)) throw new Error("Invalid location hold.");
   const onsiteLocations = cleanChips(value.onsiteLocations);
   const remoteCountries = cleanChips(value.remoteCountries);
+  if (value.homeStates !== undefined && !Array.isArray(value.homeStates)) throw new Error("Invalid location hold.");
+  const homeStates = cleanChips(value.homeStates ?? []);
   // Entries that all clean away are a bad hold, not an empty one: reading them as "no hold" would let every location through.
-  if ((value.onsiteLocations.length && !onsiteLocations.length) || (value.remoteCountries.length && !remoteCountries.length)) throw new Error("Invalid location hold.");
-  if (!onsiteLocations.length && !remoteCountries.length) return undefined;
+  if ((value.onsiteLocations.length && !onsiteLocations.length) || (value.remoteCountries.length && !remoteCountries.length) || (value.homeStates?.length && !homeStates.length)) throw new Error("Invalid location hold.");
+  if (!onsiteLocations.length && !remoteCountries.length && !homeStates.length) return undefined;
   if (!onsiteLocations.length || !remoteCountries.length) throw new Error("A location hold needs both a home area and a remote country.");
-  return { onsiteLocations, remoteCountries };
+  return { onsiteLocations, remoteCountries, ...(homeStates.length ? { homeStates } : {}) };
 }
 
 /*

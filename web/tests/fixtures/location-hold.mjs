@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(root, "data/scheduled-jobs.json"), JSON.stringify({
     id: JOB, name: "Fixture hold scan", status: "active", engine: "portals", filtersFrom: "file", sourceGroups: ["weekly"], timezone: "UTC",
     startAt: NOW, nextRunAt: "2099-01-01T00:00:00.000Z", every: 1, unit: "days", createdAt: NOW, updatedAt: NOW,
     filters: { positive: [], negative: [], allow: [], block: [], blockHard: [], alwaysAllow: [], sinceDays: 7, ats: ["greenhouse"], limitPerAts: 150 },
-    evaluate: { mode: "auto", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: ["Springfield"], remoteCountries: ["United States"] } },
+    evaluate: { mode: "auto", enabledAt: "2026-11-01", rankThreshold: 3.5, maxPerRun: 5, hold: { onsiteLocations: ["Springfield"], remoteCountries: ["United States"], homeStates: ["Illinois"] } },
   }],
   runs: [],
   queue: [],

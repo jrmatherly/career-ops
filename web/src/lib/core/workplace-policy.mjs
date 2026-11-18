@@ -44,6 +44,7 @@ export async function holdPolicyProblem(hold, codeRoot = resolveCodeRoot(process
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('workplace_policy.home_states')) return '"Home states" must name US states, such as Georgia or GA.';
     return message.startsWith('workplace_policy.remote_countries') ? '"Remote from" must name a country, such as United States.' : message;
   }
 }
