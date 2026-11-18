@@ -10,7 +10,8 @@
 #
 # On this fork every pattern names the one maintainer, so the split below only
 # records which paths upstream treats as sensitive. Nothing enforces it here
-# (the protect-main ruleset blocks only deletion and force-push).
+# (the protect-main ruleset blocks deletion and force-push, and the
+# main-required-checks ruleset requires the test and user-layer checks).
 
 # Repo docs & governance
 /README*.md            @jrmatherly
