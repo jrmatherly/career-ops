@@ -152,6 +152,10 @@ const LABEL_PLACE = `(?:${[...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name
 // "Canada-based roles only:" before pay or a privacy notice scopes that line, not who can be hired.
 const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only:(?![^.!?\\n]*\\b(?:not|cannot|can['’]t|unable)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
 const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLOCK_TAG, '\n').replace(SCOPE_LABEL, '$1$2') : text;
+// "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
+// are not its text. Folded, "US" would be the pronoun.
+const US_CAPITAL = /(?<![\p{L}\p{N}.])US(?![\p{L}\p{N}])/gu;
+const withCapitalUs = (text) => typeof text === 'string' ? text.replace(/[^.!?\n]+/g, s => /\p{Ll}/u.test(s.replace(/<[^>]*>|&#?\w+;/g, '')) ? s.replace(US_CAPITAL, 'USA') : s) : text;
 
 function excludedHome(text, homes) {
   return homes.some(h => [
@@ -253,11 +257,16 @@ export function buildWorkplacePolicy(policy) {
   if (!localCodes.size) throw new Error('workplace_policy.onsite_countries must name a country or ISO country code');
   const usLocal = localCodes.has('US');
   const homeAliases = [...home.map(countryValue), ...COUNTRY_NAMES.filter(c => homeCodes.has(c.code)).flatMap(c => PROSE_WORD_CODES.has(c.code.toLowerCase()) ? [c.name] : [c.name, c.code.toLowerCase()]), ...COUNTRY_ALIASES.filter(c => homeCodes.has(c.code)).map(c => c.name)];
-  const foreignOnly = [...COUNTRY_NAMES, ...COUNTRY_ALIASES].filter(c => !homeCodes.has(c.code)).map(country => new RegExp(`(?<![\\p{L}\\p{N}])${escape(country.name)}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?\\s*[- ]?only\\b`, 'u'));
+  const afterHome = `(?<!(?:${homeAliases.map(escape).join('|')})\\s*(?:and|or|[&/,])\\s*)`;
+  const foreignOnly = [...COUNTRY_NAMES, ...COUNTRY_ALIASES].filter(c => !homeCodes.has(c.code)).map(country => {
+    const name = escape(country.name);
+    return new RegExp(`(?<![\\p{L}\\p{N}])(?:${name}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?|${afterHome}${name}(?:[ -]based)?\\s+(?:roles|positions|employees|hires))\\s*[- ]?only\\b`, 'u');
+  });
   return (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
     const raw = typeof location === 'string' ? location : '';
-    const loc = fold(location), heading = fold(title), description = plain(withoutScopeLabels(offer.description));
+    const loc = fold(location), heading = fold(title), prose = plain(withoutScopeLabels(offer.description)),
+      description = plain(withCapitalUs(withoutScopeLabels(offer.description)));
     const meta = fold(requirementText(offer));
     const workplace = fold(offer.workplaceType || offer.workplace_type || offer.workArrangement);
     const all = `${loc}. ${heading}. ${meta}. ${description}`;
@@ -320,10 +329,10 @@ export function buildWorkplacePolicy(policy) {
     }).join(' · ') : loc);
     const locationCountries = countries(geoLoc, true);
     if (locationCountries.size && ![...locationCountries].some(c => homeCodes.has(c))) return fail('remote_country_restricted');
-    const remoteDescription = description.split(/[.!?;\n]+/).some(clause => /\b(?:work remotely|work remote|remote work|remote role|work from home|work from)\b/.test(clause) && supportsHomeGeography(clause));
-    const conditionalRegion = description.split(/[.!?;\n]+/).some(clause => REMOTE.test(clause) && has(clause, regions)
+    const remoteDescription = prose.split(/[.!?;\n]+/).some(clause => /\b(?:work remotely|work remote|remote work|remote role|work from home|work from)\b/.test(clause) && supportsHomeGeography(clause));
+    const conditionalRegion = prose.split(/[.!?;\n]+/).some(clause => REMOTE.test(clause) && has(clause, regions)
       && /\bwhere (?:we|the company|the employer) (?:have|has) (?:a |an |our )?hiring presence\b/.test(clause));
-    if (conditionalRegion && !supportsHome(geoLoc) && !supportsHome(meta) && !explicitHomeGeography(description)) return fail('remote_eligibility_unconfirmed');
+    if (conditionalRegion && !supportsHome(geoLoc) && !supportsHome(meta) && !explicitHomeGeography(prose)) return fail('remote_eligibility_unconfirmed');
     if (supportsHome(geoLoc) || has(geoLoc, regions) || (meta && (supportsHome(meta) || has(meta, regions))) || remoteDescription) return { eligible: true, reason: 'remote_region_allowed' };
     return fail(loc ? 'remote_eligibility_unconfirmed' : 'location_unknown');
   };
