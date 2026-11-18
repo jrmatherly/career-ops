@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Ban, Clock, MapPin, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ATS_LABEL, ATS_SOURCES, cleanChips, type AtsSource, type ExploreFilters } from "@/lib/explore";
+import { hasChipSeparator, pasteChips, splitChips } from "@/lib/clean-chips.mjs";
 
 import { CHINA_PRESET, CHINA_SOURCES, EMPLOYER_LABEL } from "@/lib/employer-preset.mjs";
 import type { EmployerSource } from "@/lib/explore";
@@ -35,23 +36,22 @@ export function KeywordField({
   placeholder,
   ariaLabel,
   onChange,
+  keepCommas = false,
 }: {
   values: string[];
   tone: "inc" | "exc";
   placeholder: string;
   ariaLabel?: string;
   onChange: (v: string[]) => void;
+  /** A typed comma stays inside the entry ("Remote, US"). A pasted list still splits at commas. */
+  keepCommas?: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  // Split only on UNAMBIGUOUS item separators (comma / newline / semicolon) — never
-  // bare spaces, which are legitimate inside multi-word entries ("AI platform",
-  // "New York", "Costa Rica"). A space-only paste stays one chip on purpose (#1147).
-  const commit = (text: string) => {
-    const parts = text.split(/[,\n;\t\r]+/);
-    const next = cleanChips([...values, ...parts]);
-    onChange(next);
+  const add = (parts: string[]) => {
+    onChange(cleanChips([...values, ...parts]));
     setDraft("");
   };
+  const commit = (text: string) => add(splitChips(text, keepCommas));
   return (
     <div className={cn("co-fb__field border border-border bg-surface/40 focus-within:border-brand/40 transition-colors")}>
       {values.map((v) => (
@@ -68,7 +68,8 @@ export function KeywordField({
         value={draft}
         onChange={(e) => {
           const val = e.target.value;
-          if (/[,\n;\t\r]$/.test(val)) commit(val);
+          // Only a separator just typed ends the entry: text set in one step stays a draft, so Enter adds it and does not submit the form.
+          if (hasChipSeparator(val.slice(-1), keepCommas)) commit(val);
           else setDraft(val);
         }}
         onKeyDown={(e) => {
@@ -86,7 +87,8 @@ export function KeywordField({
           // Only commit to chips when the paste contains item separators.
           // A plain-text paste (e.g. pasting "-EMEA" after typing "Remote")
           // stays in the input field so the user can keep editing.
-          if (/[,;\n\t\r]/.test(text)) commit(merged);
+          // A paste splits at commas whatever the field: a pasted list kept as one entry would match no posting.
+          if (hasChipSeparator(text)) add(pasteChips(draft, text, keepCommas));
           else setDraft(merged);
         }}
         onBlur={() => draft.trim() && commit(draft)}
@@ -111,6 +113,7 @@ export function FilterBuilder({
   seededFrom = [],
   disabled = false,
   hideLists = false,
+  commaInLocations = false,
 }: {
   filters: ExploreFilters;
   onChange: (f: ExploreFilters) => void;
@@ -118,6 +121,8 @@ export function FilterBuilder({
   disabled?: boolean;
   /** Hide the six title and location lists, for a scheduled job that takes them from portals.yml. */
   hideLists?: boolean;
+  /** Keep a typed comma inside an entry of the four location lists, for a scheduled job. Explore's URL splits on commas, so it leaves this off. */
+  commaInLocations?: boolean;
 }) {
   const employer = filters.preset === CHINA_PRESET;
   const [advanced, setAdvanced] = useState(false);
@@ -159,7 +164,7 @@ export function FilterBuilder({
       </div>}
 
       {!hideLists && <div>
-        <Label hint="matches any city, region, country, or Remote">
+        <Label hint={commaInLocations ? "Enter adds a place. A typed comma stays in it. A pasted list splits at commas." : "matches any city, region, country, or Remote"}>
           <span className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5 text-muted" /> City or location
           </span>
@@ -167,8 +172,9 @@ export function FilterBuilder({
         <KeywordField
           values={filters.allow}
           tone="inc"
-          placeholder="Toronto, New York, Remote…"
+          placeholder={commaInLocations ? "Toronto; New York; Remote, US…" : "Toronto, New York, Remote…"}
           ariaLabel="City or location"
+          keepCommas={commaInLocations}
           onChange={(v) => set({ allow: v })}
         />
       </div>}
@@ -255,16 +261,16 @@ export function FilterBuilder({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label hint="rescues a multi-location posting">Always include</Label>
-              <KeywordField ariaLabel="Always include" values={filters.alwaysAllow} tone="inc" placeholder="Toronto…" onChange={(v) => set({ alwaysAllow: v })} />
+              <KeywordField keepCommas={commaInLocations} ariaLabel="Always include" values={filters.alwaysAllow} tone="inc" placeholder="Toronto…" onChange={(v) => set({ alwaysAllow: v })} />
             </div>
             <div>
               <Label hint="unless Always include also matches">Exclude locations</Label>
-              <KeywordField ariaLabel="Exclude locations" values={filters.block} tone="exc" placeholder="India…" onChange={(v) => set({ block: v })} />
+              <KeywordField keepCommas={commaInLocations} ariaLabel="Exclude locations" values={filters.block} tone="exc" placeholder="India…" onChange={(v) => set({ block: v })} />
             </div>
           </div>
           <div>
             <Label hint="hard reject — overrides Always include">Never include</Label>
-            <KeywordField ariaLabel="Never include" values={filters.blockHard} tone="exc" placeholder="USA, Brazil…" onChange={(v) => set({ blockHard: v })} />
+            <KeywordField keepCommas={commaInLocations} ariaLabel="Never include" values={filters.blockHard} tone="exc" placeholder={commaInLocations ? "USA; Brazil…" : "USA, Brazil…"} onChange={(v) => set({ blockHard: v })} />
           </div>
           </>}
           <div>

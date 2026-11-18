@@ -22,7 +22,7 @@ export type EvaluateSettings = {
   rankThreshold: number;
   maxPerRun: number;
   /** Auto mode queues only postings this workplace policy admits; the rest are ranked and held. */
-  hold?: { onsiteLocations: string[]; remoteCountries: string[] };
+  hold?: { onsiteLocations: string[]; remoteCountries: string[]; homeStates?: string[] };
 };
 
 export type ScheduledJob = {

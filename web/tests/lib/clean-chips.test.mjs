@@ -8,13 +8,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as yaml from "js-yaml";
-import { cleanChips, CHIP_CAP } from "../../src/lib/clean-chips.mjs";
+import { CHIP_CAP, cleanChips, hasChipSeparator, pasteChips, splitChips } from "../../src/lib/clean-chips.mjs";
 
-/** Split a raw input string the same way filter-builder's commit() does —
- *  on unambiguous item separators only (never bare spaces). */
-function split(text) {
-  return text.split(/[,\n;\t\r]+/);
-}
+const split = (text) => splitChips(text);
 
 test("comma-separated → 3 chips", () => {
   const parts = split("Afghanistan, Albania, Algeria");
@@ -130,4 +126,28 @@ test("null/undefined input → []", () => {
 
 test("non-array string input wraps to single chip", () => {
   assert.deepEqual(cleanChips("Afghanistan"), ["Afghanistan"]);
+});
+
+test("splitChips keeps a comma only when asked", () => {
+  assert.deepEqual(cleanChips(splitChips("Remote, US; Atlanta\nAustin")), ["Remote", "US", "Atlanta", "Austin"]);
+  assert.deepEqual(cleanChips(splitChips("Remote, US; Atlanta\nAustin", true)), ["Remote, US", "Atlanta", "Austin"]);
+  // What a paste runs, whatever the field: a pasted list never becomes one chip.
+  assert.deepEqual(cleanChips(splitChips("Atlanta, Alpharetta, Marietta")), ["Atlanta", "Alpharetta", "Marietta"]);
+});
+
+test("hasChipSeparator treats a comma as text when commas are kept", () => {
+  assert.equal(hasChipSeparator("Remote,"), true);
+  assert.equal(hasChipSeparator("Remote,", true), false);
+  assert.equal(hasChipSeparator("Remote;", true), true);
+  assert.equal(hasChipSeparator("Remote\tUS", true), true);
+  assert.equal(hasChipSeparator("New York"), false);
+});
+
+test("a paste splits at commas and keeps what was typed before it whole", () => {
+  assert.deepEqual(cleanChips(pasteChips("Remote, India", "; Brazil", true)), ["Remote, India", "Brazil"]);
+  assert.deepEqual(cleanChips(pasteChips("", "Atlanta, Alpharetta, Marietta", true)), ["Atlanta", "Alpharetta", "Marietta"]);
+  assert.deepEqual(cleanChips(pasteChips("New", " York, Boston", true)), ["New York", "Boston"]);
+  // Without kept commas the typed text and the paste split as one, as before.
+  assert.deepEqual(cleanChips(pasteChips("New", " York, Boston")), ["New York", "Boston"]);
+  assert.deepEqual(cleanChips(pasteChips("a, b", "; c")), ["a", "b", "c"]);
 });

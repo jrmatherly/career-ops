@@ -47,3 +47,27 @@ export function cleanChips(v) {
   }
   return out;
 }
+
+// Item separators in a chip field: never a bare space, which is legitimate inside "New York" (#1147).
+const SEPARATORS = /[,\n;\t\r]+/;
+const SEPARATORS_KEEPING_COMMAS = /[\n;\t\r]+/;
+
+/** Split typed or pasted text into chip entries. With `keepCommas` a comma is part of an entry ("Remote, US"). */
+export function splitChips(text, keepCommas = false) {
+  return text.split(keepCommas ? SEPARATORS_KEEPING_COMMAS : SEPARATORS);
+}
+
+/** Whether text holds an item separator, by the rule `splitChips` splits on. */
+export function hasChipSeparator(text, keepCommas = false) {
+  return (keepCommas ? SEPARATORS_KEEPING_COMMAS : SEPARATORS).test(text);
+}
+
+/**
+ * The entries a paste adds to a field whose input already holds `draft`. The pasted text always splits at
+ * commas, since a pasted list kept as one entry matches no posting. With `keepCommas` the typed draft stays whole.
+ */
+export function pasteChips(draft, text, keepCommas = false) {
+  if (!keepCommas) return splitChips(draft + text);
+  const [first, ...rest] = splitChips(text);
+  return [...splitChips(draft + first, true), ...rest];
+}

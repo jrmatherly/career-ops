@@ -12,7 +12,8 @@ import { daysSince, seniorityFromTitle, sourceFromUrl, SENIORITY_ORDER, type Sen
 import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selectionWithin, selectionWithout, typingFromTarget } from "@/lib/inbox-keys.mjs";
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
 import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
-import { FacetChips } from "./facet-chips";
+import { FacetChips, type TierFilter } from "./facet-chips";
+import { inboxEmptyState, inTier, scoreLocationNote, shortlistVerdicts, tierCounts, tierView } from "@/lib/inbox-verdict.mjs";
 import { TriageRow, type RowScore } from "./triage-row";
 import { ShortlistTray, type ShortItem } from "./shortlist-tray";
 import { cn } from "@/lib/cn";
@@ -54,6 +55,8 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
 
   // facets
   const [within, setWithin] = useState<number | null>(null);
+  // null is the default tier: Fit when a scheduled scan has a hold, every row when none does.
+  const [tier, setTier] = useState<TierFilter | null>(null);
   const [sources, setSources] = useState<Set<AtsSource>>(() => new Set());
   const [seniorities, setSeniorities] = useState<Set<Seniority>>(() => new Set());
   const [locQ, setLocQ] = useState("");
@@ -174,7 +177,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
   const availAdded = added && !latestAdded.includes(added) ? [added, ...latestAdded] : latestAdded;
   const addedCopy = useMemo(() => addedEmptyState(added, enrichedJobs, hidden, scanDates), [enrichedJobs, hidden, added, scanDates]);
 
-  const filtered = useMemo(
+  const matched = useMemo(
     () =>
       enriched.filter((e) => {
         if (hidden.includes(e.job.url)) return false;
@@ -188,13 +191,21 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
       }),
     [enriched, hidden, added, within, sources, seniorities, locQ, kw],
   );
+  const locationNote = useMemo(
+    () => scoreLocationNote(shortlist, shortlistVerdicts(shortlist, inbox)),
+    [shortlist, inbox],
+  );
+  // Counted before the tier filter, so each segment button says what its tier holds.
+  const counts = useMemo(() => tierCounts(matched.map((e) => e.job)), [matched]);
+  const otherFacets = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
+  const { activeTier, anyFacet, capped } = tierView({ counts, tier, showAll, otherFacets });
+  const filtered = useMemo(() => matched.filter((e) => inTier(e.job, activeTier)), [matched, activeTier]);
+  const emptyCopy = inboxEmptyState(activeTier, counts, addedCopy);
 
   // 🔴 SINGLE ORDER PLUG POINT — compareInboxJobs (gated last, ranked rows first, then freshness),
   // with the zero-token fit ordering the unranked rows. Facets/triage/shortlist/score never touch relevance.
   const ordered = useMemo(() => [...filtered].sort(compareWithFit), [filtered]);
 
-  const anyFacet = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
-  const capped = !showAll && !anyFacet;
   const visible = useMemo(() => (capped ? ordered.slice(0, BATCH) : ordered), [capped, ordered]);
   const hiddenCount = hidden.length;
 
@@ -234,7 +245,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
 
   const save = (job: InboxJob) => {
     if (isShortlisted(job.url)) return;
-    setShortlist((s) => [...s, { url: job.url, company: job.company, role: job.role }]);
+    setShortlist((s) => [...s, { url: job.url, company: job.company, role: job.role, verdict: job.verdict }]);
   };
   const skip = (job: InboxJob) => {
     setWriteError("");
@@ -280,7 +291,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
   const saveSelected = () => {
     const add = visible
       .filter((e) => selected.has(e.job.url) && !isShortlisted(e.job.url))
-      .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role }));
+      .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role, verdict: e.job.verdict }));
     if (add.length) setShortlist((s) => [...s, ...add]);
     setSelected(new Set());
   };
@@ -420,7 +431,9 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         resultCount={filtered.length}
         totalCount={enriched.length - hiddenCount}
         anyActive={anyFacet}
-        onClear={() => { setAdded(null); setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); }}
+        onClear={() => { setAdded(null); setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); setTier(null); }}
+        tiers={counts && { active: activeTier, counts }}
+        setTier={setTier}
       />
       {availAdded.length > 0 && (
         <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Added by scan date">
@@ -444,7 +457,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
       {/* batch header: fresh slice by default, or the full filtered set */}
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground">
-          {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
+          {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : counts ? "All fit roles" : "All roles"}
         </p>
         {visible.some((e) => !selected.has(e.job.url)) && (
           <button type="button" onClick={() => setSelected((s) => selectionWithAll(s, visible.map((e) => e.job.url)))} className="ml-auto inline-flex min-h-6 items-center text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
@@ -497,8 +510,8 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         </ul>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-10 text-center">
-          <p className="font-display text-lg">{addedCopy?.title ?? "No matches"}</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{addedCopy?.hint ?? "Loosen the filters to see more of your inbox."}</p>
+          <p className="font-display text-lg">{emptyCopy.title}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{emptyCopy.hint}</p>
         </div>
       )}
 
@@ -509,7 +522,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
           onClick={() => setShowAll(true)}
           className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-border bg-surface/40 py-2.5 text-sm font-medium text-muted transition-colors hover:border-brand/40 hover:text-brand-text max-sm:min-h-[44px]"
         >
-          See all {ordered.length} in inbox →
+          {counts ? `See all ${ordered.length} fit roles →` : `See all ${ordered.length} in inbox →`}
         </button>
       )}
 
@@ -543,6 +556,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         onRemove={(url) => setShortlist((s) => s.filter((x) => x.url !== url))}
         onClear={() => setShortlist([])}
         onScore={scoreShortlist}
+        locationNote={locationNote}
       />
     </div>
   );

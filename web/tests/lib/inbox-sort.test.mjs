@@ -73,8 +73,6 @@ test("addedEmptyState: a scanned date with no pending row was skipped or tracked
 test("the Inbox empty state renders addedEmptyState's copy", () => {
   const src = readFileSync(new URL("../../src/components/inbox/inbox-triage.tsx", import.meta.url), "utf8");
   assert.match(src, /addedEmptyState\(added, enrichedJobs, hidden, scanDates\)/);
-  assert.match(src, /\{addedCopy\?\.title \?\? "No matches"\}/);
-  assert.match(src, /\{addedCopy\?\.hint \?\? "Loosen the filters to see more of your inbox\."\}/);
 });
 
 test("addedEmptyState counts a hidden row as skipped", () => {

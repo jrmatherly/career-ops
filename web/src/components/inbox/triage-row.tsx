@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
 import { compactLocation, displayCompany } from "@/lib/company-presentation.mjs";
 import { inboxScoreTarget } from "@/lib/inbox-score-target.mjs";
 import { agoLabel } from "@/lib/format-time.mjs";
+import { verdictBadge } from "@/lib/inbox-verdict.mjs";
 
 export type RowScore = { score: number | null; tone: "good" | "warn" | "bad" | "muted"; jobId: string; running: boolean; reportN?: number | null; needsReview?: boolean };
 
@@ -52,6 +53,7 @@ export function TriageRow({
   const rankLabel = job.rank != null ? `est. ${job.rank.toFixed(1)}` : null;
   const company = displayCompany(job.company);
   const location = job.location ? compactLocation(job.location) : "";
+  const verdict = verdictBadge(job.verdict);
   const title = (
     <>
       <span className="font-medium text-foreground">{company}</span>
@@ -94,7 +96,7 @@ export function TriageRow({
           {location && <span className="truncate" title={job.location}>{location}</span>}
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
-          {job.held && <Badge tone="info" title="Ranked, not auto-evaluated. Its location is not confirmed remote or in your home area.">Held: location</Badge>}
+          {verdict && <Badge tone={verdict.tone} title={verdict.title}>{verdict.label}<span className="sr-only">: {verdict.reason}</span></Badge>}
           {job.gated ? (
             <Badge tone="bad">Gated: {job.gated}</Badge>
           ) : rankLabel && (

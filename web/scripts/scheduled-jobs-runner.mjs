@@ -25,7 +25,7 @@ import { isMapping } from "../src/lib/portals-config.mjs";
 import { foldTitle } from "../../title-keywords.mjs";
 import { parseScanHistoryLine, scanHistoryDataLines } from "../../lib/scan-history-columns.mjs";
 import { candidateSince, candidatesFor, heldForLocation, pendingRows } from "../src/lib/core/evaluate-candidates.mjs";
-import { holdPolicy } from "../src/lib/scheduled-job-input.mjs";
+import { holdVerdict } from "../src/lib/scheduled-job-input.mjs";
 
 const CODE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MAX_RUNS = 100;
@@ -718,8 +718,7 @@ async function rankJob({ root, storePath, store, pipelinePath, scanHistoryRows, 
     if (job.evaluate.hold !== undefined) {
       // The store does not validate a hold, so one edited by hand can be unusable. Queue nothing then: a hold that cannot be read must not let every location through.
       try {
-        const { buildWorkplacePolicy } = await import("../../providers/_country.mjs");
-        held = heldForLocation({ rows, scanHistoryRows, gate: buildWorkplacePolicy(holdPolicy(job.evaluate.hold ?? {})) });
+        held = heldForLocation({ rows, scanHistoryRows, verdict: holdVerdict(await import("../../providers/_country.mjs"), job.evaluate.hold) });
       } catch (error) {
         holdProblem = `${HOLD_PROBLEM}${error instanceof Error ? error.message : String(error)}${NOTHING_QUEUED}`;
       }

@@ -24,19 +24,49 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 }
 
 /** The workplace policy (providers/_country.mjs) a stored hold stands for. */
-export const holdPolicy = (hold) => ({ onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries });
+export function holdPolicy(hold) {
+  const policy = { onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries, home_states: hold.homeStates ?? [] };
+  // The gate reads null as no home states. A store edited by hand must be refused, not judged without them.
+  if (hold.homeStates === null) throw new Error('"Home states" must be a list.');
+  // The gate drops an entry that is not text, which would judge a store edited by hand with part of its hold missing.
+  if (Object.values(policy).some((list) => Array.isArray(list) && list.some((entry) => typeof entry !== "string"))) throw new Error("A location hold entry is not text.");
+  return policy;
+}
 
-// Null or two empty lists remove the hold.
+/**
+ * The verdict a stored hold gives a location: `core` is the providers/_country.mjs module. Throws what the gate throws.
+ *
+ * @param {unknown} hold
+ * @returns {(location: string, title: string) => import("./inbox-verdict.mjs").Verdict}
+ */
+export function holdVerdict(core, hold) {
+  const gate = core.buildWorkplacePolicy(holdPolicy(hold ?? {}));
+  return (location, title) => core.locationVerdict(gate, location, title);
+}
+
+/**
+ * The hold of every job that is not deleted, with the job's name. A null hold is kept, so its reader can report it.
+ *
+ * @param {Array<{ name: string, status: string, evaluate?: { hold?: unknown } }>} jobs
+ * @returns {{ name: string, hold: unknown }[]}
+ */
+export function storedHolds(jobs) {
+  return jobs.filter((job) => job.status !== "deleted" && job.evaluate?.hold !== undefined).map((job) => ({ name: job.name, hold: job.evaluate.hold }));
+}
+
+// Null or two empty lists with no home states remove the hold.
 function scheduledHold(value) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "object" || !Array.isArray(value.onsiteLocations) || !Array.isArray(value.remoteCountries)) throw new Error("Invalid location hold.");
   const onsiteLocations = cleanChips(value.onsiteLocations);
   const remoteCountries = cleanChips(value.remoteCountries);
+  if (value.homeStates !== undefined && !Array.isArray(value.homeStates)) throw new Error("Invalid location hold.");
+  const homeStates = cleanChips(value.homeStates ?? []);
   // Entries that all clean away are a bad hold, not an empty one: reading them as "no hold" would let every location through.
-  if ((value.onsiteLocations.length && !onsiteLocations.length) || (value.remoteCountries.length && !remoteCountries.length)) throw new Error("Invalid location hold.");
-  if (!onsiteLocations.length && !remoteCountries.length) return undefined;
+  if ((value.onsiteLocations.length && !onsiteLocations.length) || (value.remoteCountries.length && !remoteCountries.length) || (value.homeStates?.length && !homeStates.length)) throw new Error("Invalid location hold.");
+  if (!onsiteLocations.length && !remoteCountries.length && !homeStates.length) return undefined;
   if (!onsiteLocations.length || !remoteCountries.length) throw new Error("A location hold needs both a home area and a remote country.");
-  return { onsiteLocations, remoteCountries };
+  return { onsiteLocations, remoteCountries, ...(homeStates.length ? { homeStates } : {}) };
 }
 
 /*
