@@ -134,10 +134,10 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 // job outside onsite_locations into an eligible country-wide remote role.
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
 // Home-working words in a location. Read only under a policy that allows the United States.
-const HOME_WORDS = 'virtual|telework\\w*|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?)';
+const HOME_WORDS = 'virtual|telework\\w*|telecommut\\w*|anywhere|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?)';
 const HOME_WORKING = new RegExp(`\\b(?:${HOME_WORDS})\\b|(?:^|[·;] ?)home ?[-,]`);
 // Built from the same words, so a marker that reads as remote is always one that can be negated.
-const NOT_REMOTE = new RegExp(`\\b(?:non|not|no)[^a-z]*(?:remote|${HOME_WORDS})\\b`);
+const NOT_REMOTE = new RegExp(`\\b(?:non|not|no)[^a-z]*(?:remote|${HOME_WORDS})\\b|\\b(?:remote|${HOME_WORDS})\\b[^a-z]*not available\\b`);
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
 // A location lists its places between middle dots and semicolons.
@@ -412,7 +412,7 @@ function compileHomeState(home) {
   const name = escape(home);
   // A state ends its place part: a word after it means it is not one ("Dublin, Co Dublin" is a county, "Dublin or London" a word).
   const after = new RegExp(`((?<![\\p{L}\\p{N}])${name})(?:\\s*,\\s*|\\s+)(?:${US_STATE_PATTERN})(?![\\p{L}\\p{N}])(?!\\.?\\s*\\p{L})`, 'u');
-  const before = new RegExp(`^(\\s*)(?:${US_STATE_CODE_PATTERN})-(?=${name}(?![\\p{L}\\p{N}]))`, 'u');
+  const before = new RegExp(`^(\\s*)(?:(?:${US_STATE_CODE_PATTERN})-|(?:${US_SPACED_STATE_CODE_PATTERN}) )(?=${name}(?![\\p{L}\\p{N}]))`, 'u');
   return (place) => {
     if (after.test(place)) return brackets(place.replace(after, '$1'));
     const parts = place.split(',');
@@ -423,6 +423,8 @@ function compileHomeState(home) {
 
 // CA, CO, DE, IL and IN are also Canada, Colombia, Germany, Israel and India, and boards write "Remote, CA" for both.
 const AMBIGUOUS_STATE_CODES = ['ca', 'co', 'de', 'il', 'in'];
+// A code that is also a country needs the hyphen: "CA Richmond" is Canada's.
+const US_SPACED_STATE_CODE_PATTERN = USPS_STATES.map(([, abbr]) => abbr).filter(abbr => !AMBIGUOUS_STATE_CODES.includes(abbr)).join('|');
 // HI, ME, OH, OK and OR are also words in capitals ("Remote (OK to work anywhere)"), so a lower-case word after one makes it a word.
 // The District of Columbia counts here as a state does.
 const US_STATE_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:HI|ME|OH|OK|OR)(?!\\s+\\p{Ll})|DC|${USPS_STATES.map(([, abbr]) => abbr).filter(abbr => ![...AMBIGUOUS_STATE_CODES, 'hi', 'me', 'oh', 'ok', 'or'].includes(abbr)).join('|').toUpperCase()})(?![\\p{L}\\p{N}])`, 'gu');
