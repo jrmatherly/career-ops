@@ -1383,19 +1383,23 @@ export function structuredFieldClaims(text) {
  *
  * The whole line is not a claim: "status notes, agendas, Kubernetes" may
  * reword the first items and still invent the last. "and" and "or" split a
- * token the way a comma does. A single capitalised name, or a token with a
- * digit or a product mark, blocks when no source contains it. A Title Case
- * phrase of more than one plain word warns instead. Lowercase items are left
- * alone. A LaTeX skills row is read the same way as an HTML skill item.
+ * token the way a comma does. A round or square bracket that holds a list
+ * is opened first: "Cloud (Azure, AKS)" lists three names. A bracket with one
+ * item is a gloss on the name before it ("Python (Advanced)") and stays part
+ * of that token. A single capitalised name, or a token with a digit or a
+ * product mark, blocks when no source contains it. A Title Case phrase of
+ * more than one plain word warns instead. Lowercase items are left alone. A
+ * LaTeX skills row is read the same way as an HTML skill item.
  *
  * @param {string} text generated HTML or LaTeX
  * @returns {{kind: string, value: string, blocking: boolean}[]}
  */
 const LATEX_SKILL_ROW_RE = /^\s*(?:\\textbf\{(?:[^{}]|\{[^{}]*\})*\}\{: \})?\{((?:[^{}]|\{[^{}]*\})*)\}\s*\\\\/gm;
+const BRACKETED_SKILL_LIST_RE = /[([]([^()[\]]*(?:[,;|•·]|\s(?:and|or)\s)[^()[\]]*)[)\]]/gi;
 
 function skillTokens(text) {
   const tokens = [];
-  for (const piece of String(text).split(/[,;|•·]/)) {
+  for (const piece of String(text).replace(BRACKETED_SKILL_LIST_RE, ',$1,').split(/[,;|•·]/)) {
     for (const part of piece.split(/\s+\b(?:and|or)\b\s+/i)) {
       const trimmed = part.replace(/^(?:and|or)\b\s+/i, '').trim();
       if (trimmed) tokens.push(trimmed);
