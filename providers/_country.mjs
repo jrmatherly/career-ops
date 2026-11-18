@@ -159,7 +159,7 @@ const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section)\b[^<>
 const LABEL_PLACE = `(?:${[...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat('us').sort((a, b) => b.length - a.length).map(escape).join('|')})`;
 // "Canada-based roles only:" before pay or a privacy notice scopes that line, not who can be hired. The pay or the
 // notice must start within 80 characters, about one line: further on it is another statement's.
-const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^<>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only(?:\\s*<[^<>]*>)*\\s*:(?![^.!?\\n]*\\b(?:not|cannot|can['’]t|unable|(?:limited|restricted) to)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
+const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^<>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only(?:\\s*<[^<>]*>)*\\s*:(?![^.!?\\n]*\\b(?:no|not|cannot|can['’]t|unable|(?:limited|restricted) to)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
 const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLOCK_TAG, '\n').replace(SCOPE_LABEL, '$1$2') : text;
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
@@ -167,7 +167,7 @@ const US_CAPITAL = /(?<![\p{L}\p{N}.])(?<!\b(?:ABOUT|JOIN|WHY|CONTACT|WITH) )US(
 // A tag is part of its sentence whole: the dot in an attribute does not end one.
 const HTML_SENTENCE = /(?:<[^<>]*>|[^.!?\n])+/g;
 // "U.S." and "U.S.A." with their dots would end a sentence at each one. The last dot stays a full stop before a capital or a tag.
-const US_DOTTED_CAPITAL = /(?<![\p{L}\p{N}.])U\.S\.(?:A\.)?(?![\p{L}\p{N}])(\s*(?:\p{Lu}|<))?/gu;
+const US_DOTTED_CAPITAL = /(?<![\p{L}\p{N}.])U\.S\.(?:A\.)?(?![\p{L}\p{N}])(\s*(?![Oo][Nn][Ll][Yy]\b)(?:\p{Lu}|<))?/gu;
 const withCapitalUs = (text) => typeof text === 'string' ? text.replace(US_DOTTED_CAPITAL, (_, end = '') => `USA${end && '.'}${end}`).replace(HTML_SENTENCE, s => s.split(/<[^<>]*>|&#?\w+;/).some(t => /\p{Ll}/u.test(t)) ? s.replace(US_CAPITAL, 'USA') : s) : text;
 
 function excludedHome(text, homes) {
@@ -354,7 +354,7 @@ export function buildWorkplacePolicy(policy) {
     // A negation covers its own place: "Remote - United States · Remote not available - London, UK" is still remote.
     const marked = (place) => !NOT_REMOTE.test(place) && (REMOTE.test(place) || (usHome && HOME_WORKING.test(place.trim())));
     const remote = !structuredOffice && !NOT_REMOTE.test(heading)
-      && (places(loc).some(marked) || (!NOT_REMOTE.test(loc) && (workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)))));
+      && (loc.split(/[·;|]/).some(marked) || (!NOT_REMOTE.test(loc) && (workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)))));
     // Under a US policy a posting marked remote that names a home place is judged as that place first ("Atlanta or Remote").
     if (!remote || (usLocal && has(loc, onsite))) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');

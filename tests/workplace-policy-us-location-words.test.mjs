@@ -21,6 +21,7 @@ for (const l of ['WFH - US', 'WFH (US)', 'US - WFH', 'WFH - Texas'])
 test('WFH in another country is remote there', () => assert.deepEqual(gate('WFH - Canada', 'Platform Engineer'), { eligible: false, reason: 'remote_country_restricted' }));
 test('a negation covers its own place only', () => {
   assert.deepEqual(gate('Remote - United States · Remote not available - London, UK', 'Platform Engineer'), { eligible: true, reason: 'remote_region_allowed' });
+  assert.deepEqual(gate('Remote - United States | Remote not available - London, UK', 'Platform Engineer'), { eligible: true, reason: 'remote_region_allowed' });
   assert.deepEqual(gate('Remote not available - Dallas, TX', 'Platform Engineer'), { eligible: false, reason: 'onsite_outside_allowed_locations' });
 });
 for (const l of ['Spain Telecommuter', 'WFH - Spain'])

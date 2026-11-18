@@ -47,6 +47,8 @@ for (const d of [
   'ABOUT US - we only hire kind people.',
 ]) test(`under another home country a capital US in an ordinary clause is not a restriction: ${d}`, () =>
   assert.deepEqual(es('Remote - Spain', '', { description: d }), { eligible: true, reason: 'remote_region_allowed' }));
+test('under another home country a dotted U.S. keeps its "Only"', () =>
+  assert.deepEqual(es('Remote - Spain', '', { description: 'U.S. Only.' }), { eligible: false, reason: 'exclusive_foreign_country' }));
 test('under another home country a country list that names home is not a foreign restriction', () =>
   assert.deepEqual(es('Remote - Spain', '', { description: 'Spain, US and Mexico roles only.' }), { eligible: true, reason: 'remote_region_allowed' }));
 for (const d of [

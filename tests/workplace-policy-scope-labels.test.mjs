@@ -31,6 +31,7 @@ const REJECTED = [
   ['Canada-based candidates only: see the benefits below\n$140,000 CAD', FOREIGN_ONLY],
   ['Canada-based candidates only: hiring is limited to Canada; salary is $140,000 CAD.', FOREIGN_ONLY],
   ['Canada-based candidates only: hiring is restricted to Canada; salary is $140,000 CAD.', FOREIGN_ONLY],
+  ['Canada-based candidates only: no US applicants; salary starts at $140,000 CAD.', FOREIGN_ONLY],
   ['Canada-based candidates only: you must be located in Canada; salary is $140,000 CAD.', COUNTRY_RESTRICTED],
   ['Canada-based candidates only: we are building a distributed team across North America and Europe this year, and the base salary is $140,000 CAD.', FOREIGN_ONLY],
   ['Canada-based roles only: $140,000 CAD. You must be based in Canada.', COUNTRY_RESTRICTED],
