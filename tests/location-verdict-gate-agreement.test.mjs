@@ -8,6 +8,7 @@ const gate = buildWorkplacePolicy({ ...HOLD, home_states: ['Georgia'] });
 const FIT = { tier: 'fit', reason: 'remote_region_allowed' };
 const OTHER_STATE = { tier: 'review', reason: 'remote_scoped_to_other_state' };
 const ABROAD = { tier: 'elsewhere', reason: 'remote_country_restricted' };
+const UNCONFIRMED = { tier: 'review', reason: 'remote_eligibility_unconfirmed' };
 const rows = (name, expected, locations) => test(name, () => { for (const l of locations) assert.deepEqual(locationVerdict(gate, l), expected, l); });
 
 rows('letter case is judged per place, so a code after a bar or a spaced slash is a state', OTHER_STATE, ['Remote | TN', 'Remote / TX']);
@@ -22,14 +23,15 @@ rows('a code that is also a country, beside the home country, is review', OTHER_
   ['Remote - US, CA', 'Remote - USA, CO', 'Remote - United States, IN', 'United States, CA - Remote', 'REMOTE - CA, USA', 'Remote, CA, USA']);
 rows('a home state beside the home country is home in capitals too', FIT, ['REMOTE - GA, USA', 'Remote - USA, GA']);
 rows('a slash between the home country and a code is two countries', FIT, ['Remote - US/CA']);
-rows('a code that is also a country, with no home country beside it, is the country', ABROAD, ['Remote - CA', 'Remote, CO', 'REMOTE - CA', 'Remote, Canada']);
-rows('a foreign country beside a capital state code is still abroad', ABROAD, ['REMOTE - UK OR IE', 'REMOTE - TN, TUNISIA', 'REMOTE - PA, PERU']);
+rows('a bare code that is also a country reads two ways', OTHER_STATE, ['Remote - CA', 'Remote, CO', 'REMOTE - CA']);
+rows('a foreign country beside a capital state code is still abroad', ABROAD, ['Remote, Canada', 'REMOTE - UK OR IE', 'REMOTE - TN, TUNISIA', 'REMOTE - PA, PERU']);
 
 rows('a US timezone abbreviation beside a US place is not a country', FIT,
   ['Remote - Georgia (EST)', 'Remote - Georgia (ET)', 'Remote - United States (EST)', 'Remote - US - PST', 'Remote - Georgia, EDT', 'Remote - Georgia (PT)', 'Remote - GA (CST)', 'Remote - Georgia - EST', 'Remote - Georgia, PT']);
 rows('a state with its timezone is still another state', OTHER_STATE, ['Remote - Florida (EST)', 'Remote - Texas, CDT', 'Remote - United States (CT)', 'Remote - Arizona (MST)', 'Remote - Oregon - PT', 'Remote - Florida, ET', 'Remote - Georgia (EST) · Remote - Estonia']);
 rows('a timezone abbreviation with no US place beside it is the country code', ABROAD,
-  ['Remote - Estonia', 'Remote - EST', 'Remote - Ethiopia', 'Remote (Estonia)', 'Remote - PT', 'Remote (EST)', 'Remote - Tallinn, EST', 'Remote - Lisbon (PT)']);
+  ['Remote - Estonia', 'Remote - Ethiopia', 'Remote (Estonia)', 'Remote - Tallinn, EST', 'Remote - Lisbon (PT)']);
+rows('a bare timezone abbreviation in a remote location reads two ways', UNCONFIRMED, ['Remote - EST', 'Remote - PT', 'Remote (EST)']);
 test('an on-site Estonian code is Estonia', () =>
   assert.deepEqual(locationVerdict(gate, 'Tallinn, EST'), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }));
 
@@ -67,7 +69,7 @@ rows('a spaced slash inside brackets does not split the place', OTHER_STATE, ['R
 test('a timezone code with no US state beside it is still the country on-site', () => {
   for (const l of ['Tallinn, Estonia', 'Tallinn, EST', 'Addis Ababa, ET', 'Lisbon, PT'])
     assert.deepEqual(locationVerdict(gate, l), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }, l);
-  assert.deepEqual(locationVerdict(gate, 'Remote, PT'), ABROAD);
+  assert.deepEqual(locationVerdict(gate, 'Remote, PT'), UNCONFIRMED);
   const spain = buildWorkplacePolicy({ onsite_locations: ['Barcelona'], remote_countries: ['Spain'], remote_regions: ['Europe'] });
   assert.deepEqual(spain('Barcelona, Spain (CET)'), { eligible: true, reason: 'onsite_location_allowed' });
   assert.deepEqual(spain('Barcelona (EST)'), { eligible: false, reason: 'onsite_country_restricted' });

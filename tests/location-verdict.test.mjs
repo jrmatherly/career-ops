@@ -60,7 +60,7 @@ const TABLE = [
   ['Remote - IL, USA', 'review', 'remote_scoped_to_other_state'],
   ['Remote, CO, US', 'review', 'remote_scoped_to_other_state'],
   ['Remote - US/CA', 'fit', 'remote_region_allowed'],
-  ['Remote - CA', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - CA', 'review', 'remote_scoped_to_other_state'],
   ['Remote, GA', 'fit', 'remote_region_allowed'],
   ['Remote - Georgia', 'fit', 'remote_region_allowed'],
   ['GEORGIA - REMOTE', 'fit', 'remote_region_allowed'],
@@ -79,10 +79,10 @@ const TABLE = [
   ['Remote - Wilmington, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote-Friendly (Travel Required) | San Francisco, CA', 'review', 'remote_scoped_to_other_state'],
   ['Remote - New York, NY', 'review', 'remote_scoped_to_other_state'],
-  // The same codes beside a foreign city cannot be told apart, so the first two are review too. With no city, or with the country written out, they are elsewhere.
+  // The same codes beside a foreign city cannot be told apart, so the first two are review too. A code with no city reads two ways and is review as well. With the country written out they are elsewhere.
   ['Remote - Berlin, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote - Tel Aviv, IL', 'review', 'remote_scoped_to_other_state'],
-  ['Remote, CA', 'elsewhere', 'remote_country_restricted'],
+  ['Remote, CA', 'review', 'remote_scoped_to_other_state'],
   ['Remote - Toronto, Canada', 'elsewhere', 'remote_country_restricted'],
   ['Remote - Toronto, ON, CA', 'elsewhere', 'remote_country_restricted'],
   ['Remote - Bogota, DC, CO', 'elsewhere', 'remote_country_restricted'],
@@ -106,7 +106,7 @@ const TABLE = [
   ['Flexible - US', 'review', 'location_names_no_place'],
   ['United States; London', 'elsewhere', 'onsite_outside_allowed_locations'],
   ['Canada; Mexico', 'elsewhere', 'onsite_outside_allowed_locations'],
-  ['Flexible', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['Flexible', 'review', 'location_names_no_place'],
   ['East Coast', 'elsewhere', 'onsite_outside_allowed_locations'],
   ['South Carolina, USA', 'elsewhere', 'onsite_outside_allowed_locations'],
   // Remote and hybrid together name no place.

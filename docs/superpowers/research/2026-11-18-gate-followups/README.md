@@ -25,7 +25,7 @@ Both ran under the pod's hold (Atlanta, Alpharetta, Marietta, Johns Creek; remot
 | Scope of the one PR | The six changes in "What the plan builds". Everything in "Left as documented limits" stays out | Owner, 2026-11-18 |
 | The pay-label rule | Sibling labels. A scope label is a heading only when one label in the posting names a home country. The pay, currency, notice and 80-character lookahead is deleted. A lone foreign label is a restriction, as it was before PR 107 | Owner, 2026-11-18, from Finding 2 |
 | A location that reads two ways | `review`, as the earlier spec already says. A bare `CA`, `CO`, `DE`, `IL` or `IN` in a remote location, a bare US timezone abbreviation, a placeholder and a remote option beside an office word all get it. This replaces the Known-limits answers `elsewhere` for those shapes | Coordinator default, 2026-11-18, from Finding 1. The owner can overrule it |
-| A description that shuts a home state out | Not eligible at the gate, new reason `home_state_excluded`, tier `elsewhere`. Only a sentence about hiring counts. One the rule does not know stays `fit` | Coordinator default, 2026-11-18. The owner named this the first follow-up |
+| A description that shuts a home state out | Not eligible at the gate, new reason `home_state_excluded`, tier `review`. The owner chose `review` over `elsewhere` on 2026-11-18, after review found the rule refusing benefit sentences in four rounds: a sentence it misreads must not hide a home posting. Only a sentence about hiring counts. One the rule does not know stays `fit` | Owner, 2026-11-18 |
 
 ## Finding 1: three location shapes hide real rows from the inbox
 
@@ -97,7 +97,7 @@ Reading a timezone as home needs a table from state to timezone and a rule for s
 2. A remote location whose only place is a bare `CA`, `CO`, `DE`, `IL` or `IN`, or a bare US timezone abbreviation, is `review`.
 3. A location the gate reads as an office role, which names the home country and has a remote place of its own, is `review`.
 4. The sibling label rule replaces the pay lookahead.
-5. A description that shuts a home state out is not eligible, `home_state_excluded`.
+5. A description that shuts a home state out is not eligible, `home_state_excluded`, and `review` in the verdict.
 6. A country list that names home is home before `only`, with any of the seven nouns or none.
 
 ## Left as documented limits
@@ -118,7 +118,7 @@ Each still reproduces on `main` (measured) and stays in `docs/WORKPLACE_GEOGRAPH
 
 - Boards outside the 39. The label finding rests on one employer's template.
 - Descriptions on the pod. Scan history stores none, so Findings 2 to 4 were measured on the corpus only.
-- The sketch is not the implementation. `repro/prototype-patch.mjs` writes it. In a scratch worktree it turned over 23 pinned test rows, all in the five test files the plan edits, and nothing else in `node test-all.mjs --quick`. The plan's last task re-runs `repro/delta.mjs` against the real change.
+- Measured on the real change, 2026-11-18, `repro/delta.mjs` with `main` at `7fb91d47` against the branch, on a fresh corpus (39 boards, 3,348 postings) and the pod's 27,902 scan-history rows (5,784 distinct locations). Under both policies the corpus gate changes are 0 eligible to not and 0 not to eligible. Every tier change is `elsewhere` to `review`: 10 corpus postings, and on the pod 27 placeholder rows, 7 remote-beside-office rows and 3 bare-code rows.
 - The live postings behind the 37 pod rows. Their tiers were judged from the location string.
 
 ## Scripts
