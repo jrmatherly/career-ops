@@ -236,6 +236,14 @@ export function buildWorkplacePolicy(policy) {
   }))]);
   const usHome = homeCodes.has('US');
   if (homeStateCodes.length && !usHome) throw new Error('workplace_policy.home_states names US states, and remote_countries does not include the United States, so it would do nothing');
+  // A sentence that shuts a home state out of hiring. It reads a hiring negation before the state, or the state's
+  // residents before "not eligible", and the state must end its phrase: "not in Georgia" about a headquarters,
+  // "Georgia Power" and "not eligible for relocation" are not it. A wrong match hides a home posting.
+  const homeStateName = `(?:${STATES_AND_DC.filter(([, code]) => homeStateCodes.includes(code)).map(([name]) => escape(name)).join('|')})`;
+  const otherStates = `(?:(?:${USPS_STATES.map(([name]) => name).join('|')})(?:\\s*,\\s*(?:and |or )?|\\s+(?:and|or)\\s+))*`;
+  const hiringNegation = "(?:not (?:available|eligible|open|supported|hiring)|unable to hire|cannot hire|can't hire|do(?:es)? not hire)(?: [a-z]+){0,3}? (?:in|of|from)(?: the following(?: us)? states)?|excluding|except(?: for)?";
+  const shutsOutHomeState = homeStateCodes.length ? new RegExp(`(?:${hiringNegation})[\\s:]+(?:the state of\\s+)?${otherStates}${homeStateName}(?=\\s*(?:$|[,;:)]|and\\b|or\\b))`
+    + `|(?<![\\p{L}\\p{N}])${homeStateName}(?:[ -]based)? (?:residents|applicants|candidates) (?:are|is) (?:not eligible|ineligible|excluded)(?=\\s*(?:$|[,;)]|to apply|for (?:this|the) (?:role|position|job)))`, 'u') : null;
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
   // must not become eligibility evidence. Structured fields still accept ISO.
@@ -322,6 +330,9 @@ export function buildWorkplacePolicy(policy) {
     const fail = reason => ({ eligible: false, reason });
     // Read before Georgia is written as the home country: "not available in Georgia" must not become "not available in the United States".
     if (excludedHome(`${loc}. ${heading}. ${meta}. ${written}`, homeAliases)) return fail('candidate_country_excluded');
+    // A sentence's Georgia is the home state only where the posting's is, and no other country or abroad word stands beside it.
+    if (shutsOutHomeState && written.split(/[.!?\n]+/).some(sentence => shutsOutHomeState.test(sentence)
+      && !(sentence.includes('georgia') && (!georgiaIsHome || otherCountry(sentence) || GEORGIA_ABROAD.test(sentence))))) return fail('home_state_excluded');
     // An explicitly exclusive foreign country cannot be rescued by a mention
     // of Spain elsewhere in the same field ("Spain / UK only").
     const exclusive = `${withHomeGeorgia(loc)}. ${heading}. ${meta}. ${restrictions}`;

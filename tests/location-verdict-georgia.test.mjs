@@ -255,11 +255,11 @@ const GEORGIA_SENTENCES = [
   [US_REMOTE, 'Must be based in Georgia (the country).', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
   [US_REMOTE, 'Must reside in Georgia or Armenia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
   [US_REMOTE, 'This role is not open to Georgia residents.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
-  [US_REMOTE, 'This position is not open to residents of Georgia, Alaska or Hawaii.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
-  [US_REMOTE, 'This role is not open to candidates in Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'This position is not open to residents of Georgia, Alaska or Hawaii.', ['elsewhere', 'home_state_excluded'], COUNTRY_RESTRICTED],
+  [US_REMOTE, 'This role is not open to candidates in Georgia.', ['elsewhere', 'home_state_excluded'], COUNTRY_RESTRICTED],
   [US_REMOTE, 'Open to residents of all states except Georgia only.', FOREIGN_ONLY, FOREIGN_ONLY],
   [US_REMOTE, 'Must be based outside Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
-  [US_REMOTE, 'Open to candidates in all states excluding Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Open to candidates in all states excluding Georgia.', ['elsewhere', 'home_state_excluded'], COUNTRY_RESTRICTED],
   [US_REMOTE, 'Applicants in Georgia only cannot apply.', FOREIGN_ONLY, FOREIGN_ONLY],
   [US_REMOTE, "Georgia residents only can't apply.", FOREIGN_ONLY, FOREIGN_ONLY],
   [US_REMOTE, 'Georgia residents only are ineligible.', FOREIGN_ONLY, FOREIGN_ONLY],
@@ -290,8 +290,8 @@ const GEORGIA_SENTENCES = [
   ['Remote - Tbilisi, Georgia', 'Must be based in Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
   [US_REMOTE, 'Canada residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
   [US_REMOTE, 'Must be based in Canada. Our Georgia office is closed.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
-  // Known limit: an exclusion the gate does not read as a restriction stays a fit.
-  [US_REMOTE, 'Not available in Georgia.', REMOTE_FIT, REMOTE_FIT],
+  // A home state shut out of hiring is refused. With no home state the sentence is not read.
+  [US_REMOTE, 'Not available in Georgia.', ['elsewhere', 'home_state_excluded'], REMOTE_FIT],
 ];
 for (const [location, description, [tier, reason], [bareTier, bareReason]] of GEORGIA_SENTENCES) test(`Georgia is home in a sentence only with no other country, no exclusion and no Georgian place: ${location}, ${description}`, () => {
   const offer = { ...(description === undefined ? {} : { description }), workplaceType: 'Remote' };
