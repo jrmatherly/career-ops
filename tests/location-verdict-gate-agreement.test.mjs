@@ -12,6 +12,9 @@ const rows = (name, expected, locations) => test(name, () => { for (const l of l
 
 rows('letter case is judged per place, so a code after a bar or a spaced slash is a state', OTHER_STATE, ['Remote | TN', 'Remote / TX']);
 rows('a home state after a bar is home', FIT, ['Remote | GA', 'Remote / GA']);
+rows('a place in capitals after a bar does not borrow lower case from a place that names somewhere else', OTHER_STATE, ['Remote - Canada | LIBREVILLE, GA', 'Remote - Canada / LIBREVILLE, GA']);
+test('the gate does not read a state code in capitals beside another named place', () =>
+  assert.deepEqual(gate('Remote - Canada | LIBREVILLE, GA'), { eligible: false, reason: 'remote_country_restricted' }));
 rows('a timezone phrase is not a state', FIT, ['Remote - US (CT hours)', 'Remote - United States, MT working hours', 'REMOTE - UNITED STATES (CT HOURS)']);
 rows('a bare code after the country is a state', OTHER_STATE, ['Remote - United States (CT)', 'REMOTE - UNITED STATES (CT)']);
 rows('a state code in a place written all in capitals is review, not Tunisia', OTHER_STATE, ['REMOTE, TN', 'Remote; TN', 'Remote · TN', 'REMOTE, GA', 'REMOTE - GA', 'REMOTE | GA', 'REMOTE - LIBREVILLE, GA']);
@@ -59,7 +62,8 @@ test('a home place with its state and a US timezone abbreviation is the home pla
   assert.deepEqual(locationVerdict(gate, 'Dallas, TX (CST)'), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' });
   assert.deepEqual(gate('Atlanta, GA · Tallinn, Estonia'), { eligible: true, reason: 'onsite_location_allowed' });
 });
-rows('timezone abbreviations joined by a slash are stripped together', FIT, ['Remote - Georgia (EST/CST)', 'Remote - Georgia - EST/EDT']);
+rows('timezone abbreviations joined by a slash are stripped together', FIT, ['Remote - Georgia (EST/CST)', 'Remote - Georgia - EST/EDT', 'Remote - Georgia (EST / EDT)']);
+rows('a spaced slash inside brackets does not split the place', OTHER_STATE, ['Remote - Texas (EST / CST)', 'Remote - Texas (EST / EDT)', 'Remote - Florida (ET / CT) / Remote - Texas']);
 test('a timezone code with no US state beside it is still the country on-site', () => {
   for (const l of ['Tallinn, Estonia', 'Tallinn, EST', 'Addis Ababa, ET', 'Lisbon, PT'])
     assert.deepEqual(locationVerdict(gate, l), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }, l);

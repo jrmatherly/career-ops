@@ -92,15 +92,16 @@ for (let a = 65; a <= 90; a++) for (let b = 65; b <= 90; b++) {
   const code = String.fromCharCode(a, b), name = countryName(code);
   if (name && name !== 'Unknown Region' && !['EU', 'EZ', 'UN'].includes(code)) COUNTRY_NAMES.push({ code, name: fold(name), match: word(fold(name)) });
 }
-// Spellings boards use that the CLDR names lack ("Türkiye", "Czechia", "Hong Kong SAR China"). England is not read
-// after "new": New England is a US region.
+// England and Mexico are not read after "new" where this pattern is used: New England is a US region and New Mexico a state.
+const countryPattern = (name) => `${name === 'england' || name === 'mexico' ? '(?<!new )' : ''}${escape(name)}`;
+// Spellings boards use that the CLDR names lack ("Türkiye", "Czechia", "Hong Kong SAR China").
 const COUNTRY_ALIASES = [
   ['US', 'usa'], ['US', 'u.s.'], ['US', 'u.s.a.'], ['US', 'united states of america'],
   ['GB', 'uk'], ['GB', 'u.k.'], ['GB', 'great britain'], ['GB', 'england'],
   ['ES', 'espana'], ['ES', 'esp'],
   ['TR', 'turkey'], ['CZ', 'czech republic'], ['HK', 'hong kong'], ['MO', 'macau'], ['MO', 'macao'], ['CI', 'ivory coast'],
   ['MM', 'burma'], ['MM', 'myanmar'], ['SZ', 'swaziland'], ['TL', 'east timor'], ['CD', 'democratic republic of the congo'],
-].map(([code, name]) => ({ code, name, match: new RegExp(`${name === 'england' ? '(?<!new )' : ''}${word(name).source}`, 'u') }));
+].map(([code, name]) => ({ code, name, match: new RegExp(`(?<![\\p{L}\\p{N}])${countryPattern(name)}(?![\\p{L}\\p{N}])`, 'u') }));
 const PROSE_WORD_CODES = new Set(['in', 'as', 'at', 'be', 'is', 'it', 'no', 'so', 'to', 'do', 'me', 'my', 'am']);
 // Read only where codes are: in prose "DRC" is a design-rule check and "UAE Pass" a sign-in service.
 const COUNTRY_ACRONYMS = new Map([['uae', 'AE'], ['drc', 'CD']]);
@@ -140,10 +141,10 @@ const REMOTE = /\b(?:remote|work from (?:home|anywhere)|distributed)\b/;
 // job outside onsite_locations into an eligible country-wide remote role.
 const REMOTE_TITLE = /(?<![a-z])remote(?=$|\s*[^a-z\s]|\s+in\b)/;
 // Home-working words in a location. Read only under a policy that allows the United States.
-const HOME_WORDS = 'virtual|telework\\w*|telecommut\\w*|anywhere|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?)';
+const HOME_WORDS = 'virtual|telework\\w*|telecommut\\w*|anywhere|wfh|work(?:ing)? (?:at|from) home|home[ -]?(?:based|office|workers?|teleworkers?)';
 const HOME_WORKING = new RegExp(`\\b(?:${HOME_WORDS})\\b|(?:^|[·;] ?)home ?[-,]`);
 // Built from the same words, so a marker that reads as remote is always one that can be negated.
-const NOT_REMOTE = new RegExp(`\\b(?:non|not|no)[^a-z]*(?:remote|${HOME_WORDS})\\b|\\b(?:remote|${HOME_WORDS})\\b[^a-z]*not available\\b`);
+const NOT_REMOTE = new RegExp(`\\b(?:non|not|no)[^a-z]*(?:remote|${HOME_WORDS})\\b|\\b(?:remote|${HOME_WORDS})\\b[^a-z]*(?:(?:is|are) )?not available\\b`);
 const OFFICE = /\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/;
 const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ');
 // A location lists its places between middle dots and semicolons.
@@ -154,16 +155,20 @@ const CURRENCY = 'usd|cad|gbp|eur|aud|mxn';
 const AMOUNT = `(?:[$£€]\\s?\\d|\\d[\\d,.]*k?\\s?(?:${CURRENCY})\\b|\\b(?:${CURRENCY})\\s?\\d)`;
 const NOTICE = 'privacy\\s+(?:notice|policy|statement)';
 // A block tag becomes a newline, which ends a sentence here: a label in one list item must not reach the next.
-const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section)\b[^>]*>/gi;
+const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section)\b[^<>]*>/gi;
 const LABEL_PLACE = `(?:${[...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat('us').sort((a, b) => b.length - a.length).map(escape).join('|')})`;
 // "Canada-based roles only:" before pay or a privacy notice scopes that line, not who can be hired. The pay or the
 // notice must start within 80 characters, about one line: further on it is another statement's.
-const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only:(?![^.!?\\n]*\\b(?:not|cannot|can['’]t|unable)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
+const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^<>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only(?:\\s*<[^<>]*>)*\\s*:(?![^.!?\\n]*\\b(?:not|cannot|can['’]t|unable|(?:limited|restricted) to)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
 const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLOCK_TAG, '\n').replace(SCOPE_LABEL, '$1$2') : text;
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
-const US_CAPITAL = /(?<![\p{L}\p{N}.])US(?![\p{L}\p{N}])/gu;
-const withCapitalUs = (text) => typeof text === 'string' ? text.replace(/[^.!?\n]+/g, s => s.split(/<[^>]*>|&#?\w+;/).some(t => /\p{Ll}/u.test(t)) ? s.replace(US_CAPITAL, 'USA') : s) : text;
+const US_CAPITAL = /(?<![\p{L}\p{N}.])(?<!\b(?:ABOUT|JOIN|WHY|CONTACT|WITH) )US(?![\p{L}\p{N}])/gu;
+// A tag is part of its sentence whole: the dot in an attribute does not end one.
+const HTML_SENTENCE = /(?:<[^<>]*>|[^.!?\n])+/g;
+// "U.S." and "U.S.A." with their dots would end a sentence at each one. The last dot stays a full stop before a capital or a tag.
+const US_DOTTED_CAPITAL = /(?<![\p{L}\p{N}.])U\.S\.(?:A\.)?(?![\p{L}\p{N}])(\s*(?:\p{Lu}|<))?/gu;
+const withCapitalUs = (text) => typeof text === 'string' ? text.replace(US_DOTTED_CAPITAL, (_, end = '') => `USA${end && '.'}${end}`).replace(HTML_SENTENCE, s => s.split(/<[^<>]*>|&#?\w+;/).some(t => /\p{Ll}/u.test(t)) ? s.replace(US_CAPITAL, 'USA') : s) : text;
 
 function excludedHome(text, homes) {
   return homes.some(h => [
@@ -223,6 +228,7 @@ export function buildWorkplacePolicy(policy) {
     return state[1];
   }))]);
   const usHome = homeCodes.has('US');
+  if (homeStateCodes.length && !usHome) throw new Error('workplace_policy.home_states names US states, and remote_countries does not include the United States, so it would do nothing');
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
   // must not become eligibility evidence. Structured fields still accept ISO.
@@ -239,7 +245,9 @@ export function buildWorkplacePolicy(policy) {
   // Read the geography immediately attached to a worker-location phrase, plus
   // genuine country alternatives. Stop before unrelated duties/office mentions.
   const geographyTarget = (text, { allowAmbiguousCodes = true } = {}) => {
-    let rest = withoutTimezonePhrases(text).trim().replace(/^(?:(?:a|an|any) (?:eligible )?country (?:in|within) |(?:a|an|any) )/, ''), region = false, local = false;
+    // "the contiguous United States" and "the lower 48 states" are the United States.
+    let rest = withoutTimezonePhrases(text).trim().replace(/^(?:(?:a|an|any) (?:eligible )?country (?:in|within) |(?:a|an|any) )/, '')
+      .replace(/^(the +)?(?:contiguous|continental) +(?=united states|usa?\b)/, '$1').replace(/^(?:the +)?lower 48(?: +states)?/, 'united states'), region = false, local = false;
     const codes = new Set();
     while (rest) {
       const match = rest.match(geographyAtom);
@@ -272,11 +280,11 @@ export function buildWorkplacePolicy(policy) {
   if (!localCodes.size) throw new Error('workplace_policy.onsite_countries must name a country or ISO country code');
   const usLocal = localCodes.has('US');
   const homeAliases = [...home.map(countryValue), ...COUNTRY_NAMES.filter(c => homeCodes.has(c.code)).flatMap(c => PROSE_WORD_CODES.has(c.code.toLowerCase()) ? [c.name] : [c.name, c.code.toLowerCase()]), ...COUNTRY_ALIASES.filter(c => homeCodes.has(c.code)).map(c => c.name)];
-  const afterHome = `(?<!(?:${homeAliases.map(escape).join('|')})\\s*(?:and|or|[&/,])\\s*)`;
+  const afterHome = `(?<!(?<![\\p{L}\\p{N}])(?:${homeAliases.map(escape).join('|')})\\s*(?:and|or|[&/,])\\s*)`;
   const listSeparator = '\\s*(?:,\\s*(?:and|or)\\b|and\\b|or\\b|[&/,])\\s*';
-  const listCountry = `(?:the\\s+)?(?:${[...new Set([...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat(homeAliases))].map(escape).sort((a, b) => b.length - a.length).join('|')})(?![\\p{L}\\p{N}])`;
+  const listCountry = `(?:the\\s+)?(?:${[...new Set([...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat(homeAliases, 'us'))].map(escape).sort((a, b) => b.length - a.length).join('|')})(?![\\p{L}\\p{N}])`;
   const foreignOnly = [...COUNTRY_NAMES, ...COUNTRY_ALIASES].filter(c => !homeCodes.has(c.code)).map(country => {
-    const name = escape(country.name);
+    const name = countryPattern(country.name);
     return new RegExp(`(?<![\\p{L}\\p{N}])(?:${name}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?|${afterHome}${name}(?:[ -]based)?\\s+(?:roles|positions|employees|hires))\\s*[- ]?only\\b`, 'u');
   });
   // A description's country list before one of the four nouns that names a home country stands for the home country
@@ -286,23 +294,25 @@ export function buildWorkplacePolicy(policy) {
   const gate = (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
     const raw = typeof location === 'string' ? location : '';
-    const parts = usHome ? stateParts(raw, homeAliases, onsite) : [];
     const unlabelled = withoutScopeLabels(offer.description);
-    const loc = fold(location), heading = fold(title), prose = plain(unlabelled), written = plain(withCapitalUs(unlabelled));
+    const capital = withCapitalUs(unlabelled);
+    const loc = fold(location), heading = fold(title), prose = plain(unlabelled), written = capital === unlabelled ? prose : plain(capital);
+    const context = usHome && (loc.includes('georgia') || written.includes('georgia')) ? georgiaContext(heading, written) : null;
+    const parts = usHome ? stateParts(raw, homeAliases, onsite, context, placeText) : [];
     // A home state Georgia stands for the home country only in a sentence with no other country and no exclusion, in a posting that names no Georgian place.
-    const georgiaIsHome = usHome && homeStateCodes.includes('ga') && !parts.some(one => one.georgia === 'country')
-      && !GEORGIAN_PLACE.test(fold(raw)) && !GEORGIAN_PLACE.test(written);
+    const georgiaIsHome = usHome && homeStateCodes.includes('ga') && context !== 'country' && !parts.some(one => one.georgia === 'country') && !GEORGIAN_PLACE.test(loc);
     const otherCountry = sentence => [...countries(sentence.replace(US_STATE_NAME, ' '))].some(code => code !== 'GE' && !homeCodes.has(code));
     const withHomeGeorgia = text => georgiaIsHome && text.includes('georgia') ? text.replace(/[^.!?\n]+/g, sentence => sentence.search(GEORGIA_WORD) < 0 || otherCountry(sentence) || GEORGIA_EXCLUSION.test(sentence)
-      || georgiaReading({ part: sentence, codes: false }, [], homeAliases, onsite) === 'country' ? sentence : sentence.replace(GEORGIA_WORD, 'united states')) : text;
-    const description = withHomeGeorgia(withHomeList(written));
+      || GEORGIA_ABROAD.test(sentence) ? sentence : sentence.replace(GEORGIA_WORD, 'united states')) : text;
+    // A capital US is a country in every clause only where the United States is home. Under another home country it is one before "only" alone.
+    const restrictions = withHomeGeorgia(withHomeList(written)), description = usHome ? restrictions : withHomeList(prose);
     const meta = fold(requirementText(offer));
     const workplace = fold(offer.workplaceType || offer.workplace_type || offer.workArrangement);
     const fail = reason => ({ eligible: false, reason });
     if (excludedHome(`${loc}. ${heading}. ${meta}. ${written}`, homeAliases)) return fail('candidate_country_excluded');
     // An explicitly exclusive foreign country cannot be rescued by a mention
     // of Spain elsewhere in the same field ("Spain / UK only").
-    const exclusive = `${withHomeGeorgia(loc)}. ${heading}. ${meta}. ${description}`;
+    const exclusive = `${withHomeGeorgia(loc)}. ${heading}. ${meta}. ${restrictions}`;
     if (foreignOnly.some(pattern => pattern.test(exclusive))) return fail('exclusive_foreign_country');
     if (meta && !supportsHome(meta) && (restricted(meta, true) || !has(meta, regions))) return fail('metadata_country_restricted');
     for (const sentence of description.split(/[.!?\n]+/)) {
@@ -330,8 +340,10 @@ export function buildWorkplacePolicy(policy) {
       if (/\b(?:hybrid|on[ -]?site|in[ -]?office|office[ -]?based)\b/.test(clause) && !has(clause, onsite)) return fail('description_onsite_restricted');
     }
     const structuredOffice = OFFICE.test(loc) || OFFICE.test(workplace) || OFFICE.test(heading);
-    const remote = !structuredOffice && !NOT_REMOTE.test(loc) && !NOT_REMOTE.test(heading)
-      && (REMOTE.test(loc) || (usHome && HOME_WORKING.test(loc)) || workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)));
+    // A negation covers its own place: "Remote - United States · Remote not available - London, UK" is still remote.
+    const marked = (place) => !NOT_REMOTE.test(place) && (REMOTE.test(place) || (usHome && HOME_WORKING.test(place.trim())));
+    const remote = !structuredOffice && !NOT_REMOTE.test(heading)
+      && (places(loc).some(marked) || (!NOT_REMOTE.test(loc) && (workplace === 'remote' || offer.isRemote === true || (!workplace && REMOTE_TITLE.test(heading)))));
     // Under a US policy a posting marked remote that names a home place is judged as that place first ("Atlanta or Remote").
     if (!remote || (usLocal && has(loc, onsite))) {
       if (!has(loc, onsite)) return fail(loc ? 'onsite_outside_allowed_locations' : 'location_unknown');
@@ -347,10 +359,10 @@ export function buildWorkplacePolicy(policy) {
     // are allowed. No timezone token is an eligibility signal.
     // Under a US policy a place that names a US state and no foreign country stands for the United States. There a
     // bar or a spaced slash separates places too, and "US:" and "U.S.A" are written as the country reader knows them.
-    const geoLoc = withoutTimezonePhrases(usHome ? parts.map(({ part, codes, georgia }) => {
-      // A timezone goes first, so the "MT" of "MT working hours" is not Montana. Brackets are read as the
-      // country reader writes them, so "Texas [IE]" keeps its country.
-      const rest = withoutUsStates(placeText(part), codes, homeStateCodes.includes('ga') && georgia === 'state');
+    const geoLoc = withoutTimezonePhrases(usHome ? parts.map(({ part, place, codes, georgia }) => {
+      // A part whose Georgia is the country names no US state, whatever code stands beside it ("Tbilisi, Georgia (GA)").
+      // Brackets are read as the country reader writes them, so "Texas [IE]" keeps its country.
+      const rest = georgia === 'country' ? null : withoutUsStates(place, codes, homeStateCodes.includes('ga') && georgia === 'state');
       return rest !== null && [...countries(brackets(rest), true)].every(c => homeCodes.has(c)) ? `${rest} united states` : brackets(fold(part));
     }).join(' · ') : loc);
     const locationCountries = countries(geoLoc, true);
@@ -363,7 +375,8 @@ export function buildWorkplacePolicy(policy) {
     return fail(loc ? 'remote_eligibility_unconfirmed' : 'location_unknown');
   };
   // geographyText is placeText: it strips a US timezone abbreviation whether or not the part names a US state.
-  return Object.assign(gate, { geographyText: placeText, homePlaces: Object.freeze(onsite), homeStates: homeStateCodes, homeCountryNames: Object.freeze([...new Set(homeAliases)].sort((a, b) => b.length - a.length)) });
+  const carried = { geographyText: placeText, homePlaces: Object.freeze(onsite), homeStates: homeStateCodes, homeCountryNames: Object.freeze([...new Set(homeAliases)].sort((a, b) => b.length - a.length)) };
+  return Object.defineProperties(gate, Object.fromEntries(Object.entries(carried).map(([key, value]) => [key, { value, enumerable: true }])));
 }
 
 // USPS state names and codes. scan.mjs builds its always_allow matchers from the same table.
@@ -480,17 +493,17 @@ const US_DOTTED = /(?<![\p{L}\p{N}.])u\.s(?:\.a)?(?![\p{L}\p{N}.])/giu;
 // A street number, then the words up to the next comma, slash, bar, bracket or spaced dash.
 const ADDRESS_RUN = /(?<![\p{L}\p{N}])\d[\p{L}\p{N}]*\s.*?(?=\s-\s|[,/|()[\]·;]|$)/gu;
 
+// Turkey with a state after it in the same place is a US town or a creek ("Turkey, TX"). After the state it is the
+// country ("Atlanta, GA or Istanbul, Turkey").
+const withoutTurkeyTowns = (place, hasState) => place.replace(/\bturkey\b/gi, (name, at) => (hasState(place.slice(at + name.length)) ? ' ' : name));
+
 /** A raw location with its capital US state codes other than CA, CO, DE, IL and IN taken out, folded. A place written all in capitals keeps
  * them, because nothing there tells "OR" the state from "or" the word.
  * @param {string} location
  * @returns {string} the places, folded and joined by a middle dot
  */
 function withoutStateCodes(location) {
-  return places(location).map(place => {
-    const bare = /\p{Ll}/u.test(place) ? place.replace(US_STATE_CODE, ' ') : place;
-    // Beside a state Turkey is a town or a creek.
-    return fold(bare === place ? place : bare.replace(/\bturkey\b/gi, ' '));
-  }).join(' · ');
+  return places(location).map(place => fold(/\p{Ll}/u.test(place) ? withoutTurkeyTowns(place, rest => rest.search(US_STATE_CODE) >= 0).replace(US_STATE_CODE, ' ') : place)).join(' · ');
 }
 
 const withoutAmbiguousCodes = (text) => text.replace(AMBIGUOUS_STATE_CODE, (code, at) => (foreignCode(CODE_BEFORE, text.slice(0, at), code) || foreignCode(CODE_AFTER, text.slice(at + 2), code) ? code : ' '));
@@ -505,19 +518,20 @@ const withoutAmbiguousCodes = (text) => text.replace(AMBIGUOUS_STATE_CODE, (code
  * @returns {string | null}
  */
 function withoutUsStates(place, codes, georgia = false) {
-  const named = (georgia || GEORGIA_CODE.test(place) ? place.replace(GEORGIA_WORD, ' ') : place).replace(US_STATE_NAME, ' ');
-  if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === place) return null;
+  // Georgia's name is no state for Turkey: beside it alone Turkey is the country next door.
+  const towns = withoutTurkeyTowns(place, rest => rest.search(US_STATE_NAME) >= 0 || (codes && rest.search(US_STATE_CODE) >= 0));
+  const named = (georgia || GEORGIA_CODE.test(place) ? towns.replace(GEORGIA_WORD, ' ') : towns).replace(US_STATE_NAME, ' ');
+  if ((codes ? named.replace(US_STATE_CODE, ' ') : named) === towns) return null;
   // Judged before the other codes go, so the code next to an ambiguous one is still there to see.
   const sure = withoutAmbiguousCodes(named);
-  const bare = codes ? sure.replace(US_STATE_CODE, ' ') : sure;
-  // Beside a state "and" is the word, not Andorra's three-letter code, and Turkey is a town or a creek. Beside
-  // Georgia's name alone Turkey is the country next door.
-  return fold(bare.replace(bare === place.replace(GEORGIA_WORD, ' ') ? /\band\b/gi : /\b(?:and|turkey)\b/gi, ' '));
+  // Beside a state "and" is the word, not Andorra's three-letter code.
+  return fold((codes ? sure.replace(US_STATE_CODE, ' ') : sure).replace(/\band\b/gi, ' '));
 }
 
-const GEORGIAN_PLACE = /\b(?:tbilisi|batumi|kutaisi|rustavi|(?:republic|the country) of georgia)\b|\bgeorgia \((?:the )?country\)/;
+const GEORGIAN_PLACE = /\b(?:t['’]?bilisi|tiflis|batumi|kutaisi|rustavi|zugdidi|poti|gori|(?:republic|the country) of georgia)\b|\bgeorgia [([](?:the )?country[)\]]/;
 const GEORGIA_EXCLUSION = /\b(?:not|no|cannot|can't|unable|except|excluding|exclude|excluded|ineligible|outside)\b/i;
-const GEORGIA_ABROAD = new RegExp(`${GEORGIAN_PLACE.source}|\\b(?:emea|europe|eu|caucasus|cis)\\b`);
+// A region outside the United States, a timezone no US state keeps, or an offset east of Greenwich.
+const GEORGIA_ABROAD = new RegExp(`${GEORGIAN_PLACE.source}|\\b(?:emea|europe|eu|eea|cee|mena|middle east|caucasus|cis|asia|eurasia|balkans|cet|cest|eet|eest|msk)\\b|\\b(?:utc|gmt) ?\\+ ?\\d`);
 const HOME_WORKING_WORDS = new RegExp(`\\b(?:remote|distributed|${HOME_WORDS})\\b`, 'g');
 // No letters but Georgia and the home-working words: "100% Remote - Georgia" names only Georgia, "Remote" nothing.
 const namesNoOtherPlace = (text) => !/\p{L}/u.test(text.replace(GEORGIA_WORD, '').replace(HOME_WORKING_WORDS, ''));
@@ -528,12 +542,12 @@ const US_TERRITORY = /\b(?:puerto rico|guam|american samoa|northern mariana isla
  * CA, CO, DE, IL and IN are US beside a city ("Denver, CO") and 'maybe' alone, where the gate reads Canada or
  * Germany. A country code that is no state code is foreign. The US territories are US. The US Virgin Islands read
  * as US through the home country's name in them, and the British Virgin Islands as foreign.
- * @param {{ part: string, codes: boolean }} one
+ * @param {{ place: string, codes: boolean }} one a part from stateParts, read from its `place`
  * @param {readonly string[]} countryNames the home country's names, folded
  * @param {readonly string[]} homePlaces the policy's on-site places, folded
  * @returns {'us' | 'foreign' | 'maybe' | null}
  */
-function placeSide({ part, codes }, countryNames, homePlaces) {
+function placeSide({ place: part, codes }, countryNames, homePlaces) {
   const text = fold(part);
   if (has(text, countryNames) || has(text, homePlaces) || US_TERRITORY.test(text)) return 'us';
   const rest = withoutUsStates(part, codes);
@@ -558,21 +572,36 @@ function placeSide({ part, codes }, countryNames, homePlaces) {
  * Bulgaria"). Anything else is unsure ("Remote - Savannah, Georgia · Remote - Poland", "Remote - Georgia ·
  * Remote - Austin · Remote - Canada", "Remote - Georgia · Remote - CA"). A part with no Georgia reads as
  * 'state'.
- * @param {{ part: string, codes: boolean }} one
- * @param {{ part: string, codes: boolean }[]} others the other parts of the same location
+ * @param {{ part: string, place: string, codes: boolean }} one
+ * @param {{ part: string, place: string, codes: boolean }[]} others the other parts of the same location
  * @param {readonly string[]} countryNames the home country's names, folded
  * @param {readonly string[]} homePlaces the policy's on-site places, folded
+ * @param {'country' | 'unsure' | null} context what the title and the description say, from georgiaContext
  * @returns {'state' | 'country' | 'unsure'}
  */
-function georgiaReading({ part, codes }, others, countryNames, homePlaces) {
-  const text = fold(part);
+function georgiaReading({ part, place, codes }, others, countryNames, homePlaces, context) {
+  const text = fold(part), alone = namesNoOtherPlace(text);
   if (text.search(GEORGIA_WORD) < 0) return 'state';
   if (GEORGIA_ABROAD.test(text)) return 'country';
-  if (has(text, homePlaces) || withoutUsStates(part, codes) !== null) return 'state';
-  if (namesNoOtherPlace(text) && others.some(other => GEORGIAN_PLACE.test(fold(other.part)))) return 'country';
-  const sides = others.filter(other => !namesNoOtherPlace(fold(other.part))).map(other => placeSide(other, countryNames, homePlaces));
-  if (sides.includes('us') || !sides.some(side => side === 'foreign' || side === 'maybe')) return 'state';
-  return namesNoOtherPlace(text) && sides.every(side => side === 'foreign') ? 'country' : 'unsure';
+  if (has(text, homePlaces) || withoutUsStates(place, codes) !== null) return 'state';
+  if (alone && (context === 'country' || others.some(other => GEORGIAN_PLACE.test(fold(other.part))))) return 'country';
+  const sides = others.filter(other => !namesNoOtherPlace(fold(other.place))).map(other => placeSide(other, countryNames, homePlaces));
+  if (sides.includes('us')) return 'state';
+  if (!sides.some(side => side === 'foreign' || side === 'maybe')) return context ? 'unsure' : 'state';
+  return alone && sides.every(side => side === 'foreign') ? 'country' : 'unsure';
+}
+
+/** How a posting's title and description place its Georgia: 'country' where either names a Georgian place, 'unsure'
+ * where the title has a region word or a description sentence has one beside Georgia, null where neither tells.
+ * @param {string} heading the title, folded
+ * @param {string} text the description as plain text, folded
+ * @returns {'country' | 'unsure' | null}
+ */
+function georgiaContext(heading, text) {
+  if (GEORGIAN_PLACE.test(heading) || GEORGIAN_PLACE.test(text)) return 'country';
+  const abroad = GEORGIA_ABROAD.test(heading)
+    || (text.includes('georgia') && text.split(/[.!?\n]+/).some(sentence => sentence.search(GEORGIA_WORD) >= 0 && GEORGIA_ABROAD.test(sentence)));
+  return abroad ? 'unsure' : null;
 }
 
 /** A raw US location as the gate and the verdict both read it: one entry per place, and per side of a bar or a
@@ -580,15 +609,21 @@ function georgiaReading({ part, codes }, others, countryNames, homePlaces) {
  * @param {string} raw
  * @param {readonly string[]} countryNames the home country's names, folded
  * @param {readonly string[]} homePlaces the policy's on-site places, folded
- * @returns {{ part: string, codes: boolean, georgia: 'state' | 'country' | 'unsure' }[]} `codes` is whether capital
- *   state codes are read, false where the whole place is in capitals; `georgia` is how the part's Georgia reads
+ * @param {'country' | 'unsure' | null} [context] what the title and the description say, from georgiaContext
+ * @param {(part: string) => string} [geographyText] the gate's place reader
+ * @returns {{ part: string, place: string, codes: boolean, georgia: 'state' | 'country' | 'unsure' }[]} `place` is the
+ *   part without its timezones, which states and the side of the border are read from; `codes` is whether capital
+ *   state codes are read, false where the part is in capitals; `georgia` is how the part's Georgia reads
  */
-function stateParts(raw, countryNames, homePlaces) {
+function stateParts(raw, countryNames, homePlaces, context = null, geographyText = text => text) {
   const parts = places(raw.replace(/:/g, ' ').replace(US_DOTTED, 'usa')).flatMap(place => {
-    const codes = /\p{Ll}/u.test(place);
-    return place.split(/\||\s\/\s/).map(part => ({ part, codes }));
+    // A spaced slash inside brackets joins timezones ("(EST / EDT)"), not places.
+    const sides = place.split(/\||\s\/\s(?![^()[\]]*[)\]])/);
+    // A side in capitals has its codes read only beside a side that is a remote word alone ("Remote | GA").
+    const marker = sides.some(side => /\p{Ll}/u.test(side) && namesNoOtherPlace(fold(side)));
+    return sides.map(part => ({ part, place: geographyText(part), codes: marker || /\p{Ll}/u.test(part) }));
   });
-  return parts.map(one => ({ ...one, georgia: georgiaReading(one, parts.filter(other => other !== one), countryNames, homePlaces) }));
+  return parts.map(one => ({ ...one, georgia: georgiaReading(one, parts.filter(other => other !== one), countryNames, homePlaces, context) }));
 }
 
 /** A folded place without the two-letter words of its street addresses: the "St" of "999 18th St" and the
@@ -634,19 +669,29 @@ function scopedToOtherState(parts, homeStates, countryNames, geographyText) {
   return named && !countryWide && !home;
 }
 
-function namesNoPlace(location, homeStates, countryNames) {
-  // A state alone names no town either: a home state, or any state where the policy lists none ("Georgia, USA").
-  const single = new Set(STATES_AND_DC.filter(([, code]) => !homeStates.length || homeStates.includes(code)).flatMap(([name, code]) => [name.replace(/ /g, ''), code]));
-  return fold(location).split(/[·;|]/).every(part => {
+// Beside the home country's name these name no place either: "US Only", "US - East", "Flexible - US".
+const BESIDE_COUNTRY_WORDS = /\b(?:only|flexible|east|west|north|south|central)\b/g;
+const ANY_COUNTRY_NAME = new RegExp(`(?<![\\p{L}\\p{N}])${LABEL_PLACE}(?![\\p{L}\\p{N}])`, 'gu');
+
+function namesNoPlace(location, homeStates, countryNames, usHome) {
+  // Under a US policy a state alone names no town either: a home state, or any state where the policy lists none ("Georgia, USA").
+  const single = new Set(STATES_AND_DC.filter(([, code]) => usHome && (!homeStates.length || homeStates.includes(code))).flatMap(([name, code]) => [name.replace(/ /g, ''), code]));
+  const text = fold(location), letters = (part) => part.replace(/\s+/g, ' ').replace(NO_PLACE_WORDS, '').replace(/[^a-z]/g, '');
+  const homeNamed = has(text, countryNames);
+  return text.split(/[·;|]/).every(part => {
     for (const name of countryNames) part = part.replace(new RegExp(word(name).source, 'gu'), ' ');
-    part = part.replace(/\s+/g, ' ').replace(NO_PLACE_WORDS, '').replace(/[^a-z]/g, '');
-    return !part || single.has(part);
+    // "Remote/Hybrid" names no place: the gate reads it as an office role, and the remote word is no town.
+    part = part.replace(HOME_WORKING_WORDS, ' ');
+    const left = letters(part);
+    // Another country beside the home country is a list of countries, not a town ("United States; Canada").
+    return !left || single.has(left) || (homeNamed && !letters(part.replace(ANY_COUNTRY_NAME, ' ').replace(BESIDE_COUNTRY_WORDS, ' ')));
   });
 }
 
 // An on-site place in a home state outside the listed towns is the owner's to judge ("Kennesaw, GA").
+// The code counts in capitals anywhere, and in any letter case where it closes the place after a comma ("Kennesaw, Ga").
 const namesHomeState = (parts, homeStates) => parts.some(({ part }) => STATES_AND_DC.some(([name, code]) => homeStates.includes(code)
-  && (word(code.toUpperCase()).test(part) || STATE_NAME_MATCH.get(name).test(fold(part)))));
+  && (word(code.toUpperCase()).test(part) || fold(part).endsWith(`, ${code}`) || STATE_NAME_MATCH.get(name).test(fold(part)))));
 
 /** Where a posting's location sits for the owner, read from the workplace gate.
  * `fit` is a place the policy allows. `review` is a place the owner may still want, which the gate cannot settle:
@@ -663,17 +708,20 @@ const namesHomeState = (parts, homeStates) => parts.some(({ part }) => STATES_AN
  */
 export function locationVerdict(gate, location, title = '', offer = {}) {
   const raw = typeof location === 'string' ? location : '';
-  const homeStates = gate.homeStates ?? [], countryNames = gate.homeCountryNames ?? [];
+  const countryNames = gate.homeCountryNames ?? [], usHome = countryNames.includes('united states');
+  // US states are home, and scope a remote role, only where the United States is a home country.
+  const homeStates = usHome ? gate.homeStates ?? [] : [];
   const ask = (text) => gate(text, title, offer ?? {});
   const { eligible, reason } = ask(raw);
   const verdict = (tier, why = reason) => ({ tier, reason: why });
-  const homePlaces = gate.homePlaces ?? [], parts = stateParts(raw, countryNames, homePlaces);
+  const homePlaces = gate.homePlaces ?? [], context = /georgia/i.test(raw) ? georgiaContext(fold(title), plain(offer?.description)) : null;
+  const parts = stateParts(raw, countryNames, homePlaces, context, gate.geographyText);
   // A Georgia that reads as the country is taken out, so the checks below do not count it as a state.
   const states = parts.map(one => (one.georgia === 'country' ? { ...one, part: one.part.replace(GEORGIA_WORD, ' ') } : one));
-  if (eligible) return reason === 'remote_region_allowed' && scopedToOtherState(states, homeStates, countryNames, gate.geographyText ?? (text => text)) ? verdict('review', 'remote_scoped_to_other_state') : verdict('fit');
+  if (eligible) return usHome && reason === 'remote_region_allowed' && scopedToOtherState(states, homeStates, countryNames, gate.geographyText ?? (text => text)) ? verdict('review', 'remote_scoped_to_other_state') : verdict('fit');
   // The gate gives onsite_country_restricted only after it found a home place in the location.
   if (['location_unknown', 'remote_eligibility_unconfirmed', 'onsite_country_restricted'].includes(reason)) return verdict('review');
-  if (reason === 'onsite_outside_allowed_locations' && namesNoPlace(raw, homeStates, countryNames)) return verdict('review', 'location_names_no_place');
+  if (reason === 'onsite_outside_allowed_locations' && namesNoPlace(raw, homeStates, countryNames, usHome)) return verdict('review', 'location_names_no_place');
   if (reason === 'onsite_outside_allowed_locations' && namesHomeState(states, homeStates)) return verdict('review', 'onsite_in_home_state');
   // Asked again as states: would this pass if a Georgia that may be the state were one, and if a part in capitals
   // were not? The gate reads a capital state code only in a place with a lower-case letter ("REMOTE, TN" is Tunisia
@@ -685,11 +733,9 @@ export function locationVerdict(gate, location, title = '', offer = {}) {
     return /\p{Ll}/u.test(text) ? text : `remote ${text.replace(/\p{L}+/gu, run => (STATE_ABBRS.has(run) || run === 'DC' ? run : run.toLowerCase()))}`;
   });
   if (reason === 'remote_country_restricted' && asStates.some((text, i) => text !== parts[i].part) && ask(asStates.join(' · ')).eligible) return verdict('review', 'remote_scoped_to_other_state');
-  // placeSide tells US from foreign, so it is asked only where the United States is home.
-  if (reason === 'remote_country_restricted' && countryNames.includes('united states')) {
-    // A US city beside a code the gate read as a country ("Remote - Denver, CO"), and nothing foreign in sight.
-    const sides = parts.filter(one => !namesNoOtherPlace(fold(one.part))).map(one => placeSide(one, countryNames, homePlaces));
-    if (sides.includes('us') && !sides.includes('foreign')) return verdict('review', 'remote_scoped_to_other_state');
-  }
+  // placeSide tells US from foreign, so it is asked only where the United States is home. A US city beside a code the
+  // gate read as a country is the owner's to judge, whatever foreign office stands beside it ("Remote - Denver, CO").
+  if (reason === 'remote_country_restricted' && usHome
+    && parts.some(one => one.georgia !== 'country' && !namesNoOtherPlace(fold(one.part)) && placeSide(one, countryNames, homePlaces) === 'us')) return verdict('review', 'remote_scoped_to_other_state');
   return verdict('elsewhere');
 }

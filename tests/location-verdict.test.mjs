@@ -87,8 +87,41 @@ const TABLE = [
   ['Remote - Toronto, ON, CA', 'elsewhere', 'remote_country_restricted'],
   ['Remote - Bogota, DC, CO', 'elsewhere', 'remote_country_restricted'],
   ['Remote - London, UK', 'elsewhere', 'remote_country_restricted'],
-  ['Remote - San Francisco, CA · Remote - London, UK', 'elsewhere', 'remote_country_restricted'],
   ['Remote - Mexico City, MX', 'elsewhere', 'remote_country_restricted'],
+  // A US city beside a foreign office is review whichever code its state has.
+  ['Remote - San Francisco, CA · Remote - London, UK', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - San Francisco, CA; Remote - London, UK', 'review', 'remote_scoped_to_other_state'],
+  ['San Francisco, CA · London, UK · Remote', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - London, UK; Remote - Denver, CO', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - Austin, TX; Remote - London, UK', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - London, UK; Remote - Toronto, ON, CA', 'elsewhere', 'remote_country_restricted'],
+  // The home country beside another country, a direction or "only", with no city.
+  ['United States; Canada', 'review', 'location_names_no_place'],
+  ['United States, Canada', 'review', 'location_names_no_place'],
+  ['US, Canada', 'review', 'location_names_no_place'],
+  ['US / Canada', 'review', 'location_names_no_place'],
+  ['United States | Canada | Mexico', 'review', 'location_names_no_place'],
+  ['US Only', 'review', 'location_names_no_place'],
+  ['US - East', 'review', 'location_names_no_place'],
+  ['Flexible - US', 'review', 'location_names_no_place'],
+  ['United States; London', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['Canada; Mexico', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['Flexible', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['East Coast', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['South Carolina, USA', 'elsewhere', 'onsite_outside_allowed_locations'],
+  // Remote and hybrid together name no place.
+  ['Remote/Hybrid', 'review', 'location_names_no_place'],
+  ['Remote or Hybrid', 'review', 'location_names_no_place'],
+  ['Hybrid/Remote', 'review', 'location_names_no_place'],
+  ['Remote/Hybrid - US', 'review', 'location_names_no_place'],
+  ['Remote/Hybrid - London, UK', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['WFH', 'review', 'remote_eligibility_unconfirmed'],
+  ['WFH - US', 'fit', 'remote_region_allowed'],
+  // A home state's code in any letter case.
+  ['Kennesaw, Ga', 'review', 'onsite_in_home_state'],
+  ['kennesaw, ga', 'review', 'onsite_in_home_state'],
+  ['Dallas, Tx', 'elsewhere', 'onsite_outside_allowed_locations'],
+  ['Remote - New Mexico only', 'review', 'remote_scoped_to_other_state'],
 ];
 for (const [location, tier, reason] of TABLE)
   test(`${JSON.stringify(location)} is ${tier} (${reason})`, () => assert.deepEqual(locationVerdict(gate, location, 'Platform Engineer'), { tier, reason }));
@@ -97,6 +130,7 @@ test('without home_states no state is known to be home', () => {
   assert.deepEqual(locationVerdict(bare, 'Remote, GA'), { tier: 'review', reason: 'remote_scoped_to_other_state' });
   assert.deepEqual(locationVerdict(bare, 'Georgia, USA'), { tier: 'review', reason: 'location_names_no_place' });
   assert.deepEqual(locationVerdict(bare, 'Tennessee, USA'), { tier: 'review', reason: 'location_names_no_place' });
+  assert.deepEqual(locationVerdict(bare, 'South Carolina, USA'), { tier: 'review', reason: 'location_names_no_place' });
   for (const l of ['Remote - Georgia', 'Remote, Georgia', 'Georgia (Remote)', 'Remote - Georgia, Tennessee', 'GEORGIA - REMOTE'])
     assert.deepEqual(locationVerdict(bare, l), { tier: 'review', reason: 'remote_scoped_to_other_state' }, l);
   assert.deepEqual(locationVerdict(bare, 'Remote - Georgia, Canada'), { tier: 'elsewhere', reason: 'remote_country_restricted' });
@@ -145,9 +179,18 @@ test('under another home country a US city is still elsewhere', () => {
   const spain = buildWorkplacePolicy({ onsite_locations: ['Barcelona'], remote_countries: ['Spain'], remote_regions: ['Europe'] });
   for (const l of ['Remote - Denver, CO', 'Remote - Wilmington, DE', 'Remote - Puerto Rico']) assert.deepEqual(locationVerdict(spain, l), { tier: 'elsewhere', reason: 'remote_country_restricted' }, l);
 });
+test('under another home country a US state beside the home country does not scope the role', () => {
+  const spain = buildWorkplacePolicy({ onsite_locations: ['Barcelona'], remote_countries: ['Spain'], remote_regions: ['Europe'] });
+  for (const l of ['Remote - Spain or Tennessee', 'Remote - Spain or Texas', 'Remote - Spain']) assert.deepEqual(locationVerdict(spain, l), { tier: 'fit', reason: 'remote_region_allowed' }, l);
+  const handBuilt = Object.assign((location) => spain(location), { homeStates: ['ga'], homeCountryNames: spain.homeCountryNames, homePlaces: spain.homePlaces, geographyText: spain.geographyText });
+  assert.deepEqual(locationVerdict(handBuilt, 'Kennesaw, GA'), locationVerdict(spain, 'Kennesaw, GA'));
+  assert.deepEqual(locationVerdict(spain, 'Kennesaw, GA'), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' });
+  assert.deepEqual(locationVerdict(spain, 'Spain; Portugal'), { tier: 'review', reason: 'location_names_no_place' });
+  for (const l of ['Texas', 'Georgia', 'Arizona - Home Teleworkers']) assert.deepEqual(locationVerdict(spain, l), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }, l);
+});
 test('a home town the gate rejects beside another place is review, and the gate still rejects it', () => {
   for (const l of ['San Francisco, CA / Atlanta, GA', 'Atlanta, GA or London, UK', 'Atlanta, GA / London, UK', 'Atlanta; London, UK', 'London, UK · Atlanta', 'Hybrid - Atlanta, GA or Dublin, Ireland',
-    'Atlanta · Istanbul, Turkey', 'Atlanta, GA or Hong Kong', 'Atlanta (ET)', 'Atlanta, GA (ET/CT)']) for (const g of [gate, bare]) {
+    'Atlanta · Istanbul, Turkey', 'Atlanta, GA or Istanbul, Turkey', 'Atlanta, GA or Hong Kong', 'Atlanta (ET)', 'Atlanta (EST)', 'Atlanta, GA (ET/CT)']) for (const g of [gate, bare]) {
     assert.deepEqual(locationVerdict(g, l), { tier: 'review', reason: 'onsite_country_restricted' }, l);
     assert.deepEqual(g(l), { eligible: false, reason: 'onsite_country_restricted' }, l);
   }

@@ -8,7 +8,7 @@ const bare = buildWorkplacePolicy(HOLD);
 
 const ABROAD = ['elsewhere', 'remote_country_restricted'], OFFSITE = ['elsewhere', 'onsite_outside_allowed_locations'];
 const REMOTE_FIT = ['fit', 'remote_region_allowed'], ONSITE_FIT = ['fit', 'onsite_location_allowed'];
-const OTHER_STATE = ['review', 'remote_scoped_to_other_state'], HOME_STATE = ['review', 'onsite_in_home_state'];
+const OTHER_STATE = ['review', 'remote_scoped_to_other_state'], HOME_STATE = ['review', 'onsite_in_home_state'], NO_PLACE = ['review', 'location_names_no_place'];
 
 // [location, verdict with Georgia as a home state, verdict with no home state]
 const TABLE = [
@@ -28,6 +28,40 @@ const TABLE = [
   ['Remote - Georgia, Eastern Europe', ABROAD, ABROAD],
   ['Poland · Georgia · Bulgaria · Romania · Remote', ABROAD, ABROAD],
   ['Remote - Lithuania · Remote - Georgia · Remote - Canada', ABROAD, ABROAD],
+  // More Georgian towns, and the capital's other spellings.
+  ['Remote - Zugdidi, Georgia', ABROAD, ABROAD],
+  ['Remote - Poti, Georgia', ABROAD, ABROAD],
+  ['Remote - Gori, Georgia', ABROAD, ABROAD],
+  ["Remote - T'bilisi, Georgia", ABROAD, ABROAD],
+  ['Remote - Tiflis, Georgia', ABROAD, ABROAD],
+  ['Tiflis, Georgia', OFFSITE, OFFSITE],
+  ['Remote - Georgia · Remote - Zugdidi', ABROAD, ABROAD],
+  // A region outside the United States, a timezone no US state keeps, or an offset east of Greenwich.
+  ['Remote - Georgia (CEE)', ABROAD, ABROAD],
+  ['Remote - CEE (Georgia)', ABROAD, ABROAD],
+  ['Remote - Georgia (MENA)', ABROAD, ABROAD],
+  ['Remote - Georgia (Asia)', ABROAD, ABROAD],
+  ['Remote - Georgia, Central Asia', ABROAD, ABROAD],
+  ['Remote - Georgia, Balkans', ABROAD, ABROAD],
+  ['Remote - Georgia (GMT+4)', ABROAD, ABROAD],
+  ['Remote - Georgia - UTC+4', ABROAD, ABROAD],
+  ['Remote - Georgia (UTC +04:00)', ABROAD, ABROAD],
+  ['Remote - Georgia (EET)', ABROAD, ABROAD],
+  ['Georgia, Remote (CET)', ABROAD, ABROAD],
+  ['Remote - Georgia (GMT+4) · Remote - Armenia (GMT+4)', ABROAD, ABROAD],
+  ['Remote - Georgia (UTC-5)', REMOTE_FIT, OTHER_STATE],
+  ['Remote - Georgia (GMT-4)', REMOTE_FIT, OTHER_STATE],
+  // Square brackets read as round ones.
+  ['Remote - Georgia [country]', ABROAD, ABROAD],
+  ['Remote - Georgia [the country]', ABROAD, ABROAD],
+  ['Remote - Georgia [EU]', ABROAD, ABROAD],
+  // The code GA does not make a Georgian city a US place.
+  ['Remote - Tbilisi, Georgia (GA)', ABROAD, ABROAD],
+  // A timezone phrase in its own place is no state, and a bare MT may be Montana.
+  ['Remote - Georgia · MT working hours · Remote - Poland', ABROAD, ABROAD],
+  ['Remote - Georgia · MT · Remote - Poland', OTHER_STATE, OTHER_STATE],
+  // A US timezone alone in another place is no foreign country beside Georgia.
+  ['Remote - Georgia · Remote (EST)', REMOTE_FIT, OTHER_STATE],
   ['Remote - Georgia', REMOTE_FIT, OTHER_STATE],
   ['Remote, Georgia', REMOTE_FIT, OTHER_STATE],
   ['GEORGIA - REMOTE', REMOTE_FIT, OTHER_STATE],
@@ -90,8 +124,9 @@ const TABLE = [
   ['Remote - Tbilisi, Georgia or USA', REMOTE_FIT, REMOTE_FIT],
   // Another bare Georgia is not a foreign country.
   ['Remote - Georgia · Remote, Georgia', REMOTE_FIT, OTHER_STATE],
-  // The home country in another place ties Georgia to the United States on-site too.
-  ['USA · Georgia · Poland', HOME_STATE, OFFSITE],
+  // On-site, the home country beside a state and another country names no town.
+  ['USA · Georgia · Poland', NO_PLACE, NO_PLACE],
+  ['USA · Savannah, Georgia · Poland', HOME_STATE, OFFSITE],
   // A list of foreign countries makes a bare Georgia one of them, whatever their spelling.
   ['Poland · Georgia · Turkey · Hong Kong · Czech Republic · Romania · Remote', ABROAD, ABROAD],
   // The US territories are US places, the US Virgin Islands through the home country's name. The British ones are foreign.
@@ -146,6 +181,7 @@ test('a US town that shares a country name stays a US place', () => {
   assert.deepEqual(gate('Atlanta · Turkey Creek, FL'), { eligible: true, reason: 'onsite_location_allowed' });
   assert.deepEqual(gate('Atlanta · Istanbul, Turkey'), { eligible: false, reason: 'onsite_country_restricted' });
   assert.deepEqual(gate('Remote - Istanbul, Turkey'), { eligible: false, reason: 'remote_country_restricted' });
+  for (const l of ['Remote - Austin, TX or Istanbul, Turkey', 'Remote - Texas or Turkey']) assert.deepEqual(bare(l), { eligible: false, reason: 'remote_country_restricted' }, l);
   assert.deepEqual(gate('Remote - New England'), { eligible: false, reason: 'remote_eligibility_unconfirmed' });
   assert.deepEqual(gate('Remote - England'), { eligible: false, reason: 'remote_country_restricted' });
 });
@@ -223,6 +259,26 @@ const GEORGIA_SENTENCES = [
   [US_REMOTE, 'This role is not open to candidates in Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
   [US_REMOTE, 'Open to residents of all states except Georgia only.', FOREIGN_ONLY, FOREIGN_ONLY],
   [US_REMOTE, 'Must be based outside Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Open to candidates in all states excluding Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Applicants in Georgia only cannot apply.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, "Georgia residents only can't apply.", FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Georgia residents only are ineligible.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Georgia residents only, we are unable to sponsor.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Georgia residents only, exclude contractors.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Georgia residents only, contractors excluded.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Georgia residents only, no agencies.', FOREIGN_ONLY, FOREIGN_ONLY],
+  // A region word in the sentence keeps its Georgia the country.
+  [US_REMOTE, 'You must be based in Georgia, Europe.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Must be based in Georgia (Caucasus).', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Candidates must reside in Georgia, EMEA.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Candidates must reside in Georgia (UTC+4).', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Georgia', 'Georgia (EU) residents only.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Open to candidates in the country of Georgia only.', FOREIGN_ONLY, FOREIGN_ONLY],
+  // The location's own Georgia is the country, so the description's is too.
+  ['Poland · Georgia · Bulgaria · Remote', 'Georgia residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
+  // New Mexico is a state, not Mexico.
+  [US_REMOTE, 'Candidates must reside in Georgia or New Mexico.', REMOTE_FIT, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Must be based in Georgia, New Mexico or Texas.', REMOTE_FIT, COUNTRY_RESTRICTED],
   ['Remote - Tbilisi', 'Georgia residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
   ['Remote - Georgia', 'Must be based in Georgia.', REMOTE_FIT, COUNTRY_RESTRICTED],
   [US_REMOTE, 'Georgia residents only.', REMOTE_FIT, FOREIGN_ONLY],
@@ -251,6 +307,34 @@ test('a Georgian city in another place makes a bare Georgia the country', () => 
     ['Remote - Georgia · Remote - Texas · Remote - Republic of Georgia', 'Remote - Texas · Remote - Republic of Georgia'],
   ]) for (const g of [gate, bare]) assert.deepEqual(locationVerdict(g, withGeorgia), locationVerdict(g, without), withGeorgia);
   assert.deepEqual(locationVerdict(gate, 'Remote - Georgia · Remote - Texas · Remote - Tbilisi'), { tier: 'review', reason: 'remote_scoped_to_other_state' });
-  assert.deepEqual(locationVerdict(gate, 'Remote - Georgia · Remote - Puerto Rico · Remote - Tbilisi'), { tier: 'elsewhere', reason: 'remote_country_restricted' });
+  assert.deepEqual(locationVerdict(gate, 'Remote - Georgia · Remote - Puerto Rico · Remote - Tbilisi'), { tier: 'review', reason: 'remote_scoped_to_other_state' });
+  assert.deepEqual(locationVerdict(gate, 'Remote - Georgia · Remote - Tbilisi'), { tier: 'elsewhere', reason: 'remote_country_restricted' });
   assert.deepEqual(locationVerdict(gate, 'Atlanta, GA · Tbilisi, Georgia'), { tier: 'fit', reason: 'onsite_location_allowed' });
+});
+
+// [location, title, description, verdict with Georgia as a home state, verdict with no home state]
+const GEORGIA_CONTEXT = [
+  ['Remote, Georgia', '', 'Join our growing team in Tbilisi.', ABROAD, ABROAD],
+  ['Remote, Georgia', '', 'We are a Georgian company headquartered in Batumi.', ABROAD, ABROAD],
+  ['Remote, Georgia', '', 'Work permit for Georgia (country) required.', ABROAD, ABROAD],
+  ['Remote, Georgia', 'Engineer (Tbilisi)', undefined, ABROAD, ABROAD],
+  ['Remote, Georgia', 'Engineer - Georgia (EMEA)', undefined, OTHER_STATE, OTHER_STATE],
+  ['Remote, Georgia', 'Engineer, EMEA', undefined, OTHER_STATE, OTHER_STATE],
+  ['Remote, Georgia', '', 'Our Georgia (EMEA) hub is growing.', OTHER_STATE, OTHER_STATE],
+  ['Remote - Savannah, Georgia', '', 'We have offices in Savannah and Tbilisi.', OTHER_STATE, OTHER_STATE],
+  // A region word in a sentence that does not name Georgia tells nothing about it.
+  ['Remote, Georgia', '', 'We serve customers across EMEA.', REMOTE_FIT, OTHER_STATE],
+  ['Remote, Georgia', '', 'Our team works from Georgia. We serve customers across EMEA.', REMOTE_FIT, OTHER_STATE],
+  // A US place in the location still decides.
+  ['Remote - Georgia · Remote - Texas', 'Engineer, EMEA', undefined, REMOTE_FIT, OTHER_STATE],
+  ['Remote - Georgia, USA', '', 'Join our growing team in Tbilisi.', REMOTE_FIT, REMOTE_FIT],
+  ['Atlanta, Georgia', 'Engineer (Tbilisi)', undefined, ONSITE_FIT, ONSITE_FIT],
+  // A Georgian place in the title keeps a description's Georgia the country.
+  [US_REMOTE, 'Engineer (Tbilisi)', 'Georgia residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
+];
+for (const [location, title, description, [tier, reason], [bareTier, bareReason]] of GEORGIA_CONTEXT) test(`the title and the description place a location's Georgia: ${location}, ${title}, ${description}`, () => {
+  const offer = description === undefined ? {} : { description };
+  assert.deepEqual(locationVerdict(gate, location, title, offer), { tier, reason });
+  assert.deepEqual(locationVerdict(bare, location, title, offer), { tier: bareTier, reason: bareReason });
+  if (tier !== 'fit') assert.equal(gate(location, title, offer).eligible, false);
 });

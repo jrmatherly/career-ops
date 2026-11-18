@@ -420,7 +420,8 @@ export async function validatePortalsConfig(config, { providerIds = new Set() } 
         if (!isObject(policy)) add(errors, 'location_filter.workplace_policy', 'must be an object');
         else {
           for (const key of ['onsite_locations', 'onsite_countries', 'remote_countries', 'remote_regions', 'home_states']) {
-            validateKeywordList(policy[key], 'location_filter.workplace_policy.' + key, errors);
+            // buildWorkplacePolicy reports a value that is no list. Checking its entries would name one the user did not write.
+            if (Array.isArray(policy[key])) validateKeywordList(policy[key], 'location_filter.workplace_policy.' + key, errors);
           }
           try { buildWorkplacePolicy(policy); } catch (error) { add(errors, 'location_filter.workplace_policy', error.message); }
         }
