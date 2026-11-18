@@ -45,7 +45,7 @@ const TABLE = [
   ['Sandy Springs, GA', 'review', 'onsite_in_home_state'],
   ['Savannah, GA', 'review', 'onsite_in_home_state'],
   ['KENNESAW, GA', 'review', 'onsite_in_home_state'],
-  ['Tbilisi, Georgia', 'review', 'onsite_in_home_state'],
+  ['Tbilisi, Georgia', 'elsewhere', 'onsite_outside_allowed_locations'],
   // Remote scoped to a state.
   ['Remote - Tennessee', 'review', 'remote_scoped_to_other_state'],
   ['Remote, TN, USA', 'review', 'remote_scoped_to_other_state'],
