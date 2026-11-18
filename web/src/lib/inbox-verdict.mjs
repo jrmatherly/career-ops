@@ -62,7 +62,7 @@ export function verdictBadge(verdict) {
 export const TIER_FILTERS = [{ id: "fit", label: "Fit" }, { id: "review", label: "Review location" }, { id: "elsewhere", label: "Elsewhere" }, { id: "all", label: "All" }];
 
 /**
- * Rows per tier, or null when no row has a verdict, which means no scan has a hold.
+ * Rows per tier, or null when no row has a verdict: no scan has a usable hold, or there are no rows.
  *
  * @param {{ verdict?: Verdict }[]} jobs
  * @returns {{ fit: number, review: number, elsewhere: number, all: number } | null}
@@ -124,4 +124,17 @@ export function scoreLocationNote(items, verdictByUrl) {
   const rank = (line) => { const at = order.findIndex((sentence) => line.endsWith(`: ${sentence}`)); return at < 0 ? order.length : at; };
   const reasons = [...lines].sort(([a, countA], [b, countB]) => countB - countA || rank(a) - rank(b)).map(([line, count]) => `${count} · ${line}`);
   return { summary, reasons };
+}
+
+/**
+ * The Inbox alert for holds that could not be built (`loadHoldVerdicts`' problems), or null when every hold built.
+ * `judged` says whether any other hold gave the rows a verdict.
+ *
+ * @param {string[]} problems
+ * @param {boolean} judged
+ */
+export function holdProblemNote(problems, judged) {
+  if (!problems.length) return null;
+  const outcome = judged ? `The Inbox judged locations without ${problems.length === 1 ? "it" : "them"}.` : "No location was judged, so the Inbox shows every row.";
+  return `Location hold: ${problems.join("; ")}. ${outcome}`;
 }

@@ -8,6 +8,7 @@ import { markGated, markVerdicts, pendingInbox } from "@/lib/inbox-pending.mjs";
 import { listScheduledJobs } from "@/lib/scheduled-jobs";
 import { storedHolds } from "@/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "@/lib/core/workplace-policy.mjs";
+import { holdProblemNote } from "@/lib/inbox-verdict.mjs";
 import { PipelineView } from "@/components/pipeline-view";
 import { pipelineTab } from "@/lib/pipeline-navigation.mjs";
 import { scorePosting } from "@/lib/core/inbox-rank.mjs";
@@ -36,7 +37,9 @@ async function holdVerdicts(): Promise<Awaited<ReturnType<typeof loadHoldVerdict
   try {
     return await loadHoldVerdicts(storedHolds(listScheduledJobs().jobs));
   } catch (cause) {
-    return { verdicts: [], problems: [cause instanceof Error ? cause.message : String(cause)] };
+    const message = cause instanceof Error ? cause.message : String(cause);
+    console.error(`/pipeline: no location was judged: ${message}`);
+    return { verdicts: [], problems: [message] };
   }
 }
 
@@ -52,7 +55,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const ledger = onInbox ? await ledgerEntries() : [];
   const { verdicts, problems } = onInbox ? await holdVerdicts() : { verdicts: [], problems: [] };
   const pending = markVerdicts(markGated(unmarked, ledger), verdicts);
-  const holdProblem = problems.length ? `Location hold: ${problems.join("; ")}. The Inbox judged locations without it.` : null;
+  const holdProblem = holdProblemNote(problems, verdicts.length > 0);
   const fitted = onInbox ? withInboxFit(pending) : null;
   const trackerShape = readTrackerShape();
   // Tracker row numbers whose tailored CV is indexed (data/pdf-index.tsv) AND on

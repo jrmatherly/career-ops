@@ -135,3 +135,14 @@ test("holdVerdict judges with the hold's home states", async () => {
   for (const location of ["Remote, Global", "Home based - Worldwide"]) assert.deepEqual(none(location, "Engineer"), { tier: "review", reason: "remote_eligibility_unconfirmed" }, location);
   assert.throws(() => holdVerdict(core, null), /requires onsite_locations and remote_countries/);
 });
+test("home states left alone in the form are sent, so the route refuses them and no hold is removed", () => {
+  const stored = scheduledEvaluate({ mode: "auto", hold: STATES }, undefined);
+  const body = evaluateBody({ ...evaluateForm(stored), holdOnsite: [], holdRemote: [] }, stored);
+  assert.deepEqual(body.hold, { onsiteLocations: [], remoteCountries: [], homeStates: ["Georgia"] });
+  assert.throws(() => scheduledEvaluate(body, stored), { message: "A location hold needs both a home area and a remote country." });
+});
+test("stored home states the form cannot show are kept by an unchanged save and replaced by an edit", () => {
+  const stored = { mode: "auto", rankThreshold: 3.5, maxPerRun: 5, hold: { ...HOLD, homeStates: "GA" } };
+  assert.equal("hold" in evaluateBody(evaluateForm(stored), stored), false);
+  assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdStates: ["Georgia"] }, stored).hold, STATES);
+});

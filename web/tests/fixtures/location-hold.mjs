@@ -1,5 +1,6 @@
 // Prints a new disposable, fictional data root for location-hold.browser.test.mjs:
-// four pending rows, one per verdict the Inbox shows, a ledger row marking one held-location, and one Auto scheduled scan with a hold.
+// four pending rows (one fit, one elsewhere, and two to review: remote with no country, and no location),
+// a ledger row marking one held-location, and one Auto scheduled scan with a hold.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

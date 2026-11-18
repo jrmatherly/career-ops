@@ -131,6 +131,8 @@ test("a scheduled scan keeps a comma inside a location entry", options, async (t
   await roles.fill("staff engineer, platform");
   await roles.press("Enter");
   for (const chip of ["staff engineer", "platform"]) assert.equal(await dialog.getByRole("button", { name: `Remove ${chip}`, exact: true }).count(), 1, `a title comma still splits: ${chip}`);
+  // Enter on a field that still holds text adds the entry. It must not submit the form.
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
   assert.deepEqual(errors, []);
 });
 

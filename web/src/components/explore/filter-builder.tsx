@@ -4,7 +4,7 @@ import { useState } from "react";
 import { X, Ban, Clock, MapPin, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ATS_LABEL, ATS_SOURCES, cleanChips, type AtsSource, type ExploreFilters } from "@/lib/explore";
-import { hasChipSeparator, splitChips } from "@/lib/clean-chips.mjs";
+import { hasChipSeparator, pasteChips, splitChips } from "@/lib/clean-chips.mjs";
 
 import { CHINA_PRESET, CHINA_SOURCES, EMPLOYER_LABEL } from "@/lib/employer-preset.mjs";
 import type { EmployerSource } from "@/lib/explore";
@@ -47,15 +47,11 @@ export function KeywordField({
   keepCommas?: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  // Split only on UNAMBIGUOUS item separators (comma / newline / semicolon) — never
-  // bare spaces, which are legitimate inside multi-word entries ("AI platform",
-  // "New York", "Costa Rica"). A space-only paste stays one chip on purpose (#1147).
-  const commit = (text: string, commas = keepCommas) => {
-    const parts = splitChips(text, commas);
-    const next = cleanChips([...values, ...parts]);
-    onChange(next);
+  const add = (parts: string[]) => {
+    onChange(cleanChips([...values, ...parts]));
     setDraft("");
   };
+  const commit = (text: string) => add(splitChips(text, keepCommas));
   return (
     <div className={cn("co-fb__field border border-border bg-surface/40 focus-within:border-brand/40 transition-colors")}>
       {values.map((v) => (
@@ -72,7 +68,8 @@ export function KeywordField({
         value={draft}
         onChange={(e) => {
           const val = e.target.value;
-          if (hasChipSeparator(val, keepCommas)) commit(val);
+          // Only a separator just typed ends the entry: text set in one step stays a draft, so Enter adds it and does not submit the form.
+          if (hasChipSeparator(val.slice(-1), keepCommas)) commit(val);
           else setDraft(val);
         }}
         onKeyDown={(e) => {
@@ -91,7 +88,7 @@ export function KeywordField({
           // A plain-text paste (e.g. pasting "-EMEA" after typing "Remote")
           // stays in the input field so the user can keep editing.
           // A paste splits at commas whatever the field: a pasted list kept as one entry would match no posting.
-          if (hasChipSeparator(text)) commit(merged, false);
+          if (hasChipSeparator(text)) add(pasteChips(draft, text, keepCommas));
           else setDraft(merged);
         }}
         onBlur={() => draft.trim() && commit(draft)}

@@ -85,8 +85,9 @@ function skipReason(root, key, persisted) {
 
 /**
  * The job's location hold as a test for one URL, null when it has none. The
- * rank pass holds rows as it queues them; this covers a row queued before the
- * hold was set. `problem` is set when the stored hold cannot be built.
+ * rank pass holds rows as it queues them; this checks each queued row against
+ * the job's current hold, since the row may have been queued before the hold
+ * was set or changed. `problem` is set when the stored hold cannot be built.
  */
 function locationHold(root, job) {
   if (job.evaluate.hold === undefined) return null;

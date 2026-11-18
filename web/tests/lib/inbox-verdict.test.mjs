@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, scoreLocationNote, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
+import { holdProblemNote, TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, scoreLocationNote, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
 import { markVerdicts } from "../../src/lib/inbox-pending.mjs";
 import { storedHolds } from "../../src/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "../../src/lib/core/workplace-policy.mjs";
@@ -154,4 +154,11 @@ test("scoreLocationNote counts only rows judged not fit", () => {
     summary: "3 of 4 are not a location fit. You can still score them.",
     reasons: ["2 · Elsewhere: On-site or hybrid outside your home area.", "1 · Review location: The posting gives no location."],
   });
+});
+
+test("holdProblemNote names each hold left out and says whether anything was judged", () => {
+  assert.equal(holdProblemNote([], true), null);
+  assert.equal(holdProblemNote(['"Lost city": bad country'], true), 'Location hold: "Lost city": bad country. The Inbox judged locations without it.');
+  assert.equal(holdProblemNote(['"A": x', '"B": y'], true), 'Location hold: "A": x; "B": y. The Inbox judged locations without them.');
+  assert.equal(holdProblemNote(['"Lost city": bad country'], false), 'Location hold: "Lost city": bad country. No location was judged, so the Inbox shows every row.');
 });

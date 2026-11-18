@@ -61,3 +61,13 @@ export function splitChips(text, keepCommas = false) {
 export function hasChipSeparator(text, keepCommas = false) {
   return (keepCommas ? SEPARATORS_KEEPING_COMMAS : SEPARATORS).test(text);
 }
+
+/**
+ * The entries a paste adds to a field whose input already holds `draft`. The pasted text always splits at
+ * commas, since a pasted list kept as one entry matches no posting. With `keepCommas` the typed draft stays whole.
+ */
+export function pasteChips(draft, text, keepCommas = false) {
+  if (!keepCommas) return splitChips(draft + text);
+  const [first, ...rest] = splitChips(text);
+  return [...splitChips(draft + first, true), ...rest];
+}

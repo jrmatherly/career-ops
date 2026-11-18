@@ -458,7 +458,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
       {/* batch header: fresh slice by default, or the full filtered set */}
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground">
-          {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
+          {capped ? (ordered[0]?.job.rank != null ? "Ranked first, then fresh" : "Fresh — worth a look") : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : counts ? "All fit roles" : "All roles"}
         </p>
         {visible.some((e) => !selected.has(e.job.url)) && (
           <button type="button" onClick={() => setSelected((s) => selectionWithAll(s, visible.map((e) => e.job.url)))} className="ml-auto inline-flex min-h-6 items-center text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
