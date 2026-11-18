@@ -222,14 +222,20 @@ export function bamboohrListingIdentity(tenant, id) {
  *
  * BambooHR returns:
  *   { meta: {...}, result: [{ id, jobOpeningName,
- *       location: { city?, state? }, isRemote?, employmentStatusLabel? }] }
+ *       location: { city?, state? }, isRemote?, employmentStatusLabel?,
+ *       atsLocation: { country?, state?, province?, city? }, locationType? }] }
  *
  * - url: built as `<origin>/careers/<id>` — matches the public
  *   `jobOpeningShareUrl`. Rows without a non-empty `id` are dropped (no stable
  *   URL, and url is the scanner's dedup key — a blank id would emit
  *   `/careers/` and collapse distinct postings together).
- * - location: join `city` + `state`; append "Remote" when `isRemote` is truthy.
- *   BambooHR's `isRemote` is `1`/`true` when set and `null` otherwise.
+ * - location: join `location.city` + `location.state`. When both are empty,
+ *   fall back to `atsLocation`: city, then state or else province, then
+ *   country. Append "Remote" once when `isRemote` is truthy or `locationType`
+ *   is 1. BambooHR's `isRemote` is `1`/`true` when set and `null` otherwise.
+ *   `locationType` is "0" on-site, "1" remote, "2" hybrid, read from the list
+ *   API and from BambooHR's own posting pages on 2026-11-17. Hybrid adds no
+ *   word.
  * - listingIdentity: `bamboohr` / tenant / payload `id`, when the id has a
  *   canonical decimal form (see bamboohrListingIdentity); absent otherwise.
  *
@@ -254,8 +260,12 @@ export function parseBambooHRResponse(json, companyName, origin) {
     .filter(j => j && j.jobOpeningName && String(j.id ?? '').trim().length > 0)
     .map(j => {
       const loc = j.location || {};
-      const remote = j.isRemote ? 'Remote' : '';
-      const location = [loc.city, loc.state, remote].filter(Boolean).join(', ');
+      const ats = j.atsLocation || {};
+      const text = v => (typeof v === 'string' ? v.trim() : '');
+      let place = [loc.city, loc.state].map(text).filter(Boolean);
+      if (place.length === 0) place = [ats.city, text(ats.state) || ats.province, ats.country].map(text).filter(Boolean);
+      if (j.isRemote || String(j.locationType) === '1') place.push('Remote');
+      const location = place.join(', ');
       const id = String(j.id).trim();
       // A lone surrogate in id throws URIError out of encodeURIComponent and
       // aborts this .map(), losing every job on the page. Drop this one on a

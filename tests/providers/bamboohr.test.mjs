@@ -77,6 +77,39 @@ try {
   if (jobs[1]?.location === 'Bengaluru, Karnataka, Remote') pass('parseBambooHRResponse appends Remote when isRemote is set');
   else fail(`parseBambooHRResponse location[1] was ${JSON.stringify(jobs[1]?.location)}`);
 
+  // atsLocation and locationType, as /careers/list returned them on 2026-11-17.
+  // BambooHR's own page renders locationType "1" as "(Remote)" and "2" as "(Hybrid)".
+  {
+    const nulls = { country: null, state: null, province: null, city: null };
+    const rows = parseBambooHRResponse({ meta: {}, result: [
+      { id: '79', jobOpeningName: 'Remote Role', location: { city: null, state: null }, isRemote: null, locationType: '1', atsLocation: { country: 'Canada', state: 'British Columbia', province: null, city: 'Vancouver' } },
+      { id: '30', jobOpeningName: 'Hybrid Role', location: { city: 'Lombard', state: 'Illinois' }, isRemote: null, locationType: '2', atsLocation: nulls },
+      { id: '44', jobOpeningName: 'Office Role', location: { city: ' Pocomoke City ', state: 'Maryland' }, isRemote: null, locationType: '0', atsLocation: nulls },
+      { id: '50', jobOpeningName: 'Both Filled', location: { city: 'Houston', state: 'Texas' }, isRemote: null, locationType: '0', atsLocation: { country: 'Canada', state: null, province: 'Ontario', city: 'Toronto' } },
+      { id: '51', jobOpeningName: 'Numeric Type', location: { city: null, state: null }, isRemote: null, locationType: 1, atsLocation: { country: 'United States', state: null, province: null, city: null } },
+      { id: '52', jobOpeningName: 'Province Only', location: {}, locationType: '0', atsLocation: { country: 'Canada', state: null, province: 'Ontario', city: null } },
+      { id: '56', jobOpeningName: 'State And Province', location: {}, locationType: '0', atsLocation: { country: 'United States', state: 'Georgia', province: 'Ignored', city: null } },
+      { id: '53', jobOpeningName: 'Remote Twice', location: { city: 'Austin', state: 'Texas' }, isRemote: 1, locationType: '1', atsLocation: nulls },
+      { id: '54', jobOpeningName: 'Junk Parts', location: { city: {}, state: 7 }, locationType: '0', atsLocation: { country: {}, state: 7, province: null, city: '' } },
+      { id: '55', jobOpeningName: 'No New Fields', location: { city: 'Mayfair', state: 'London, City of' }, isRemote: null },
+    ] }, 'Acme', 'https://acme.bamboohr.com');
+    const want = [
+      'Vancouver, British Columbia, Canada, Remote',
+      'Lombard, Illinois',
+      'Pocomoke City, Maryland',
+      'Houston, Texas',
+      'United States, Remote',
+      'Ontario, Canada',
+      'Georgia, United States',
+      'Austin, Texas, Remote',
+      '',
+      'Mayfair, London, City of',
+    ];
+    const got = rows.map((j) => j.location);
+    if (JSON.stringify(got) === JSON.stringify(want)) pass('parseBambooHRResponse falls back to atsLocation and reads locationType 1 as Remote');
+    else fail(`bamboohr atsLocation/locationType locations were ${JSON.stringify(got)}`);
+  }
+
   if (jobs[1]?.url === 'https://acme.bamboohr.com/careers/22') pass('parseBambooHRResponse coerces numeric id to URL');
   else fail(`parseBambooHRResponse numeric-id url was ${jobs[1]?.url}`);
 

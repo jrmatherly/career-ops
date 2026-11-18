@@ -41,6 +41,16 @@
 //   Response: { status, error, data: { count, positions: [...] } }, with
 //   positions naming fields differently (postedTs, atsJobId, positionUrl);
 //   normalizePcsxPage maps them onto the v2 names above.
+//   A page also carries the tenant's own search facets, as
+//   data.filterDef.smartFilters: [{ filterName: 'work_site', options:
+//   [{ label, value }] }], and `&filter_work_site=<value>` returns only the
+//   postings under that value (Microsoft, observed 2026-11-17: 361 of 2,355
+//   under "0 days / week in-office – remote"). The search rows do not carry
+//   the fact themselves, so after the main walk the provider walks the search
+//   once more for each value that says remote and appends " · Remote" to those
+//   postings. A posting with no location reads "Remote". workLocationOption and
+//   work_location_option are not read: they said `onsite` on remote rows at
+//   Microsoft and NetApp.
 //
 // PAGE SIZE IS SERVER-CAPPED AT 10. Requesting num=25/50/100/200 all return
 // exactly 10 rows (measured against a 616-posting tenant). So a large board
@@ -81,6 +91,9 @@ const RETRY_POLICY = { retries: 3, baseDelayMs: 500, maxDelayMs: 8_000 };
 // 0.5s-to-8s backoff stalls partway.
 const PCSX_INTER_PAGE_DELAY_MS = 400;
 const PCSX_RETRY_POLICY = { retries: 5, baseDelayMs: 2_000, maxDelayMs: 32_000 };
+// One work-site value that returns this share of the board is read as a filter
+// the tenant ignored. Microsoft's remote value returned 15% (361 of 2,355).
+const IGNORED_FILTER_SHARE = 0.9;
 
 /**
  * The entry's opt-in branded API host (`eightfold_host`), lowercased, or null
@@ -202,12 +215,14 @@ export function buildApiUrl(tenant, start = 0, num = PAGE_SIZE) {
  *
  * @param {{host: string, domain?: (string|null)}} tenant
  * @param {number} [start] - Row offset (0-based).
+ * @param {string|null} [workSite] - A `work_site` filter value to search under.
  * @returns {string}
  */
-export function buildPcsxUrl(tenant, start = 0) {
+export function buildPcsxUrl(tenant, start = 0, workSite = null) {
   const params = new URLSearchParams();
   if (tenant.domain) params.set('domain', tenant.domain);
   params.set('start', String(start));
+  if (typeof workSite === 'string') params.set('filter_work_site', workSite);
   return `https://${tenant.host}/api/pcsx/search?${params.toString()}`;
 }
 
@@ -271,6 +286,44 @@ function assembleLocation(p) {
     }
   }
   return [...new Set(parts)].join(' · ');
+}
+
+/**
+ * The values of a PCSX tenant's own `work_site` search filter that say remote.
+ * A value that also says hybrid, partial, on-site, "no", "non", "not" or a
+ * percentage is left out: it names an office or negates the word. Microsoft's
+ * remote value is "0 days / week in-office – remote", so "in-office" cannot be
+ * an exclusion word.
+ *
+ * @param {unknown} json - A raw `/api/pcsx/search` response.
+ * @returns {string[]} Empty for a tenant without the filter, or any other shape.
+ */
+export function remoteWorkSiteValues(json) {
+  const filters = /** @type {any} */ (json)?.data?.filterDef?.smartFilters;
+  if (!Array.isArray(filters)) return [];
+  const options = filters.find((f) => f?.filterName === 'work_site')?.options;
+  if (!Array.isArray(options)) return [];
+  return options
+    .map((o) => o?.value)
+    .filter((v) => typeof v === 'string' && /\bremote\b/i.test(v) && !/hybrid|partial|on[\s-]?site|\bno[nt]?\b|%/i.test(v));
+}
+
+/**
+ * Append " · Remote" to each job whose id is in `remoteIds` and whose location
+ * does not already say remote. An empty location becomes "Remote".
+ *
+ * @param {Array<{location: string, externalId?: string}>} jobs - Mutated in place.
+ * @param {Set<string>} remoteIds
+ * @returns {number} How many locations changed.
+ */
+export function markRemote(jobs, remoteIds) {
+  let changed = 0;
+  for (const job of jobs) {
+    if (!job.externalId || !remoteIds.has(job.externalId) || /remote/i.test(job.location)) continue;
+    job.location = job.location ? `${job.location} · Remote` : 'Remote';
+    changed++;
+  }
+  return changed;
 }
 
 /**
@@ -418,32 +471,35 @@ export default {
     // endpoints' orderings together (duplicated or skipped postings).
     let api = 'v2';
     let rateLimited = false;
+    // The raw first PCSX page, which carries the tenant's search filters.
+    /** @type {any} */
+    let firstPcsxPage = null;
+
+    /** One request on whichever API this tenant is on. */
+    const request = async (/** @type {string} */ which, /** @type {number} */ start, /** @type {string|null} */ workSite = null) => {
+      const url = which === 'pcsx' ? buildPcsxUrl(tenant, start, workSite) : buildApiUrl(tenant, start, PAGE_SIZE);
+      assertEightfoldUrl(url, branded); // SSRF guard before every fetch
+      return /** @type {any} */ (await fetchJsonWithRetry(
+        /** @type {any} */ (ctx),
+        url,
+        {
+          // redirect:'error' prevents SSRF via a server-side redirect; with
+          // assertEightfoldUrl above it guarantees the final hostname stays
+          // inside *.eightfold.ai or the entry's own eightfold_host.
+          redirect: 'error',
+          headers: { 'User-Agent': BROWSER_LIKE_USER_AGENT, Accept: 'application/json' },
+        },
+        which === 'pcsx' ? PCSX_RETRY_POLICY : RETRY_POLICY,
+      ));
+    };
 
     for (let page = 0; page < maxPages; page++) {
       const start = page * PAGE_SIZE;
       if (page > 0) await sleep(api === 'pcsx' ? PCSX_INTER_PAGE_DELAY_MS : INTER_PAGE_DELAY_MS, ctx);
 
-      /** One request on whichever API this tenant is on. */
-      const request = async (/** @type {string} */ which) => {
-        const url = which === 'pcsx' ? buildPcsxUrl(tenant, start) : buildApiUrl(tenant, start, PAGE_SIZE);
-        assertEightfoldUrl(url, branded); // SSRF guard before every fetch
-        return /** @type {any} */ (await fetchJsonWithRetry(
-          /** @type {any} */ (ctx),
-          url,
-          {
-            // redirect:'error' prevents SSRF via a server-side redirect; with
-            // assertEightfoldUrl above it guarantees the final hostname stays
-            // inside *.eightfold.ai or the entry's own eightfold_host.
-            redirect: 'error',
-            headers: { 'User-Agent': BROWSER_LIKE_USER_AGENT, Accept: 'application/json' },
-          },
-          which === 'pcsx' ? PCSX_RETRY_POLICY : RETRY_POLICY,
-        ));
-      };
-
       let json;
       try {
-        json = await request(api);
+        json = await request(api, start);
       } catch (err) {
         const status = /** @type {any} */ (err)?.status;
         // A 403 on the classic endpoint is how a migrated tenant announces
@@ -454,7 +510,7 @@ export default {
         if (api === 'v2' && page === 0 && status === 403) {
           let pcsxJson = null;
           try {
-            pcsxJson = await request('pcsx');
+            pcsxJson = await request('pcsx', start);
           } catch (probeErr) {
             // PCSX refusing too (403), or simply not existing on this host
             // (404/410), makes the original 403 the real story: a WAF or
@@ -476,6 +532,7 @@ export default {
             );
           }
           api = 'pcsx';
+          firstPcsxPage = pcsxJson;
           json = { positions: page0.positions, ...(page0.count === undefined ? {} : { count: page0.count }) };
         } else if (status === 429 && all.length > 0) {
           // Large PCSX tenants rate-limit a sustained walk (measured: Microsoft
@@ -512,6 +569,54 @@ export default {
       // tenants, so a short page has to win.
       if (positions.length === 0 || positions.length < PAGE_SIZE) break;
       if (total !== null && start + PAGE_SIZE >= total) break;
+    }
+
+    // The remote pass: mark the postings the tenant's own work-site filter
+    // calls remote. Skipped on the v2 API, for a probe (any ctx.maxPages) and
+    // after a rate-limited walk. It is all or nothing, because a partial walk
+    // would mark some remote postings and leave others reading as on-site with
+    // nothing to tell them apart.
+    // The pass has its own budget of the same maxPages, counted across all values.
+    const remoteValues = api === 'pcsx' && !rateLimited && !(Number(ctx?.maxPages) > 0)
+      ? remoteWorkSiteValues(firstPcsxPage)
+      : [];
+    if (remoteValues.length > 0) {
+      const remoteIds = new Set();
+      // A posting with no id can never be in a filtered set, so it is not counted.
+      const identified = all.filter((job) => job.externalId);
+      let pages = 0;
+      try {
+        for (const value of remoteValues) {
+          const valueIds = new Set();
+          for (let start = 0; ; start += PAGE_SIZE) {
+            if (pages >= maxPages) throw new Error(`page budget of ${maxPages} reached`);
+            await sleep(PCSX_INTER_PAGE_DELAY_MS, ctx);
+            const page = normalizePcsxPage(await request('pcsx', start, value));
+            // A 200 that is not a PCSX page is a failure, not an empty page.
+            if (!page) throw new Error(`unrecognized /api/pcsx/search body at start=${start}`);
+            pages++;
+            for (const p of page.positions) {
+              // The same id and fallback parseEightfoldResponse gives externalId.
+              const id = coerceId(p?.id) ?? coerceId(p?.position_id);
+              if (id) valueIds.add(id);
+            }
+            // Only a short page ends a value's walk. `count` is not trusted
+            // for it: a count below the real total would mark part of the set.
+            if (page.positions.length < PAGE_SIZE) break;
+          }
+          // A tenant that ignores the filter parameter answers with the whole
+          // board, and marking that would call every posting remote. The two
+          // walks are minutes apart on a large board and a posting can close
+          // between them, so nearly the whole board counts as the whole board.
+          const covered = identified.filter((job) => valueIds.has(job.externalId)).length;
+          if (covered > 0 && covered >= identified.length * IGNORED_FILTER_SHARE) throw new Error(`the filter returned ${covered} of the board's ${identified.length} postings`);
+          for (const id of valueIds) remoteIds.add(id);
+        }
+        const marked = markRemote(all, remoteIds);
+        if (marked > 0) console.error(`ℹ️  eightfold: ${entry.name} marked ${marked} posting(s) Remote from the tenant's work-site filter`);
+      } catch (err) {
+        console.error(`⚠️  eightfold: ${entry.name} remote work-site pass stopped after ${pages} page(s): ${/** @type {any} */ (err)?.message ?? err}. No location was changed`);
+      }
     }
 
     if (rateLimited) {

@@ -5,7 +5,7 @@
 // Every fixture here is synthetic (acme/other/big.eightfold.ai). Nothing in
 // this file touches the network.
 
-import { pass, fail, ROOT } from '../helpers.mjs';
+import { pass, fail, ROOT, captureConsoleErrors } from '../helpers.mjs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 
@@ -39,7 +39,7 @@ function mockCtx(pages) {
 try {
   const mod = await import(pathToFileURL(join(ROOT, 'providers/eightfold.mjs')).href);
   const ef = mod.default;
-  const { resolveTenant, buildApiUrl, buildJobUrl, parseEightfoldResponse } = mod;
+  const { resolveTenant, buildApiUrl, buildJobUrl, parseEightfoldResponse, remoteWorkSiteValues, markRemote, buildPcsxUrl } = mod;
 
   // ── id ──────────────────────────────────────────────────────────────
   if (ef.id === 'eightfold') pass('eightfold.id is "eightfold"');
@@ -355,6 +355,207 @@ try {
     jobs.length === 1 && calls.every((c) => c.url.includes('/api/apply/v2/jobs'))
       ? pass('eightfold makes zero PCSX requests when the classic endpoint answers')
       : fail(`classic tenant made ${calls.length} requests: ${calls.map((c) => c.url).join(' ')}`);
+  }
+
+  // ── PCSX work-site filter: the tenant's own "remote" facet ────────────────
+  const REMOTE_VALUE = '0 days / week in-office – remote';
+  const FILTER_DEF = { facets: {}, smartFilters: [
+    { type: 'multi_select', filterName: 'work_site', title: 'Work site', options: [
+      { label: '3 DAYS / WEEK IN-OFFICE', value: '3 days / week in-office' },
+      { label: '0 DAYS / WEEK IN-OFFICE – REMOTE', value: REMOTE_VALUE },
+      { label: 'FULLY ON-SITE', value: 'fully on-site' },
+      { label: 'HYBRID (PARTIALLY REMOTE)', value: 'hybrid (partially remote)' },
+    ] },
+    { type: 'multi_select', filterName: 'seniority', title: 'Experience level', options: [{ label: 'SENIOR', value: 'Senior' }] },
+  ] };
+  // null stands for a tenant with no filterDef. undefined would take the default.
+  const withFilters = (page, filterDef = FILTER_DEF) => (filterDef === null ? page : { data: { ...page.data, filterDef } });
+  const filterOf = (c) => new URL(c.url).searchParams.get('filter_work_site');
+  // Unfiltered: ids 1 and 2. Filtered by the remote value: id 2 only.
+  const remoteTenant = (onFiltered = () => pcsxPage([position('2', 'Remote Role')], 1), filterDef = FILTER_DEF) => recording((c) => {
+    if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+    if (filterOf(c) !== null) return onFiltered(c);
+    return withFilters(pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2), filterDef);
+  });
+
+  JSON.stringify(remoteWorkSiteValues({ data: { filterDef: FILTER_DEF } })) === JSON.stringify([REMOTE_VALUE])
+    && [null, {}, { data: {} }, { data: { filterDef: { smartFilters: 'x' } } }, { data: { filterDef: { smartFilters: [{ filterName: 'work_site', options: [{ value: 7 }, null] }] } } }]
+      .every((body) => remoteWorkSiteValues(body).length === 0)
+    ? pass('remoteWorkSiteValues returns the work_site values that say remote and not hybrid, and [] for any other shape')
+    : fail(`remoteWorkSiteValues: ${JSON.stringify(remoteWorkSiteValues({ data: { filterDef: FILTER_DEF } }))}`);
+
+  new URL(buildPcsxUrl({ host: 'acme.eightfold.ai', domain: 'acme.com' }, 10, REMOTE_VALUE)).searchParams.get('filter_work_site') === REMOTE_VALUE
+    && !buildPcsxUrl({ host: 'acme.eightfold.ai' }, 0).includes('filter_work_site')
+    ? pass('buildPcsxUrl adds filter_work_site only when a value is given')
+    : fail(`buildPcsxUrl filter: ${buildPcsxUrl({ host: 'acme.eightfold.ai' }, 10, REMOTE_VALUE)}`);
+
+  {
+    const jobs = [{ location: 'Redmond, WA', externalId: '1' }, { location: 'Remote, United States', externalId: '2' }, { location: '', externalId: '3' }, { location: 'Austin, TX', externalId: '4' }];
+    const changed = markRemote(jobs, new Set(['1', '2', '3']));
+    changed === 2 && JSON.stringify(jobs.map((j) => j.location)) === JSON.stringify(['Redmond, WA · Remote', 'Remote, United States', 'Remote', 'Austin, TX'])
+      ? pass('markRemote appends " · Remote" once, to listed ids only')
+      : fail(`markRemote: ${changed} ${JSON.stringify(jobs)}`);
+  }
+
+  {
+    const { ctx, calls } = remoteTenant();
+    const jobs = await ef.fetch(TENANT, ctx);
+    const filtered = calls.filter((c) => filterOf(c) !== null);
+    jobs.length === 2 && jobs[0].location === 'Redmond, WA' && jobs[1].location === 'Redmond, WA · Remote'
+      ? pass('eightfold marks the postings the remote work-site search returns, and no others')
+      : fail(`remote pass locations: ${JSON.stringify(jobs.map((j) => j.location))}`);
+    filtered.length === 1 && filterOf(filtered[0]) === REMOTE_VALUE
+      && new URL(filtered[0].url).hostname === 'microsoft.eightfold.ai' && new URL(filtered[0].url).pathname === '/api/pcsx/search' && filtered[0].opts?.redirect === 'error'
+      ? pass('eightfold remote pass is one filtered /api/pcsx/search request on the pinned host with redirect:"error"')
+      : fail(`remote pass requests: ${JSON.stringify(filtered.map((c) => [c.url, c.opts?.redirect]))}`);
+  }
+
+  for (const [label, filterDef] of [['no filterDef', null], ['no remote option', { smartFilters: [{ filterName: 'work_site', options: [{ label: 'FULLY ON-SITE', value: 'fully on-site' }] }] }]]) {
+    const { ctx, calls } = remoteTenant(undefined, filterDef);
+    const jobs = await ef.fetch(TENANT, ctx);
+    calls.every((c) => filterOf(c) === null) && jobs.every((j) => j.location === 'Redmond, WA')
+      ? pass(`eightfold makes no filtered request and changes no location for a tenant with ${label}`)
+      : fail(`${label}: ${calls.length} requests, ${JSON.stringify(jobs.map((j) => j.location))}`);
+  }
+
+  {
+    const { ctx } = remoteTenant(() => { throw httpErr(429, 'Please try again later'); });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 2 && result.every((j) => j.location === 'Redmond, WA') && result.eightfoldTruncated !== true
+      && errors.some((line) => /remote work-site pass stopped/.test(String(line)))
+      ? pass('eightfold keeps the whole board, untagged, and warns when the remote pass is refused')
+      : fail(`remote pass 429: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // A 200 with a body that is not a PCSX page is a failure, not the end of the walk.
+    const { ctx } = remoteTenant(() => ({}));
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 2 && result.every((j) => j.location === 'Redmond, WA') && result.eightfoldTruncated !== true
+      && errors.filter((line) => /remote work-site pass stopped/.test(String(line))).length === 1
+      ? pass('eightfold changes no location, untagged, and warns once when the remote pass gets an unusable body')
+      : fail(`remote pass unusable body: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  ['Non-remote', 'Not remote', 'No remote work', 'On-site (not remote)', 'remote/onsite', 'Remote or On Site', 'Up to 50% remote']
+    .every((value) => remoteWorkSiteValues({ data: { filterDef: { smartFilters: [{ filterName: 'work_site', options: [{ value }] }] } } }).length === 0)
+    ? pass('remoteWorkSiteValues leaves out a value that negates or dilutes remote')
+    : fail('remoteWorkSiteValues read a negated or diluted value as remote');
+
+  {
+    // A tenant that ignores filter_work_site answers with the whole board.
+    const { ctx } = remoteTenant(() => pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2));
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.every((j) => j.location === 'Redmond, WA') && errors.filter((line) => /remote work-site pass stopped.*returned 2 of the board's 2 postings/.test(String(line))).length === 1
+      ? pass('eightfold changes no location and warns once when the filtered search returns the whole board')
+      : fail(`ignored filter: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // The same ignored filter on a board with one posting that has no id.
+    const noId = { name: 'No Id Role', canonicalPositionUrl: 'https://microsoft.eightfold.ai/careers/job/none', locations: ['Redmond, WA'] };
+    const board = () => pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role'), noId], 3);
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      return filterOf(c) !== null ? board() : withFilters(board());
+    });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 3 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned 2 of the board's 2 postings/.test(String(line)))
+      ? pass('eightfold still refuses an ignored filter when one posting has no id')
+      : fail(`ignored filter with an id-less posting: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // The remote pass collects ids the way externalId does: position_id when id is absent.
+    const byPositionId = (pid, name) => ({ position_id: pid, name, locations: ['Redmond, WA'] });
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      if (filterOf(c) !== null) return pcsxPage([byPositionId('2', 'Remote Role')], 1);
+      return withFilters(pcsxPage([byPositionId('1', 'Office Role'), byPositionId('2', 'Remote Role')], 2));
+    });
+    const jobs = await ef.fetch(TENANT, ctx);
+    JSON.stringify(jobs.map((j) => j.location)) === JSON.stringify(['Redmond, WA', 'Redmond, WA · Remote'])
+      ? pass('eightfold marks a remote posting that carries only position_id')
+      : fail(`position_id remote pass: ${JSON.stringify(jobs.map((j) => j.location))}`);
+  }
+
+  {
+    // An ignored filter on a board that lost one posting between the two walks: 19 of 20 come back.
+    const rows = Array.from({ length: 20 }, (_, i) => position(String(i), `Role ${i}`));
+    const pageOf = (list, c) => pcsxPage(list.slice(Number(new URL(c.url).searchParams.get('start') || 0)).slice(0, 10), list.length);
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      return filterOf(c) !== null ? pageOf(rows.slice(1), c) : withFilters(pageOf(rows, c));
+    });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 20 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned 19 of the board's 20 postings/.test(String(line)))
+      ? pass('eightfold refuses a filtered search that returns nearly the whole board')
+      : fail(`near-whole board: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  const tenRemote = (count) => pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 2), `Remote ${i}`)), count);
+
+  {
+    // Posting 2 is on the first filtered page, and the second page is refused: nothing is marked.
+    const { ctx } = remoteTenant((c) => {
+      if (Number(new URL(c.url).searchParams.get('start') || 0) > 0) throw httpErr(429, 'Please try again later');
+      return tenRemote(30);
+    });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.every((j) => j.location === 'Redmond, WA') && result.eightfoldTruncated !== true && errors.filter((line) => /remote work-site pass stopped/.test(String(line))).length === 1
+      ? pass('eightfold changes no location, untagged, and warns once, when the remote pass fails part-way')
+      : fail(`partial remote pass: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // max_pages: 1 is the pass's budget too. The filtered search answers a full page at every start, so only the budget stops it.
+    const { ctx, calls } = remoteTenant(() => tenRemote(30));
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch({ ...TENANT, max_pages: 1 }, ctx));
+    const filtered = calls.filter((c) => filterOf(c) !== null).length;
+    filtered === 1 && result.every((j) => j.location === 'Redmond, WA') && result.eightfoldTruncated !== true && errors.some((line) => /remote work-site pass stopped.*page budget of 1 reached/.test(String(line)))
+      ? pass('eightfold keeps the remote pass inside max_pages and changes no location, untagged, when the budget cuts it')
+      : fail(`remote pass budget: ${filtered} filtered requests, ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // Two values that say remote: both are walked, and together they cover the board.
+    // A full page is followed by one more request, whatever count says.
+    const second = 'remote – anywhere';
+    const filterDef = { smartFilters: [{ filterName: 'work_site', options: [{ value: REMOTE_VALUE }, { value: second }] }] };
+    const { ctx, calls } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      const start = Number(new URL(c.url).searchParams.get('start') || 0);
+      if (filterOf(c) === REMOTE_VALUE) return pcsxPage(start === 0 ? [position('1', 'Office Role'), ...Array.from({ length: 9 }, (_, i) => position(String(i + 100), `Other ${i}`))] : [], 10);
+      if (filterOf(c) === second) return pcsxPage([position('2', 'Remote Role')], 1);
+      return withFilters(pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2), filterDef);
+    });
+    const jobs = await ef.fetch(TENANT, ctx);
+    const filtered = calls.filter((c) => filterOf(c) !== null).map(filterOf);
+    jobs.every((j) => j.location === 'Redmond, WA · Remote') && JSON.stringify(filtered) === JSON.stringify([REMOTE_VALUE, REMOTE_VALUE, second])
+      ? pass('eightfold walks every remote value to a short page, and marks a board two values cover between them')
+      : fail(`two remote values: ${JSON.stringify(jobs.map((j) => j.location))} ${JSON.stringify(filtered)}`);
+  }
+
+  {
+    const { ctx, calls } = remoteTenant();
+    await ef.fetch(TENANT, { ...ctx, maxPages: 1 });
+    calls.every((c) => filterOf(c) === null)
+      ? pass('eightfold skips the remote pass for a probe (ctx.maxPages)')
+      : fail(`probe made a filtered request: ${calls.map((c) => c.url).join(' ')}`);
+  }
+
+  {
+    // The main walk is cut by a 429 on its second page: no remote pass after it.
+    const { ctx, calls } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      if (filterOf(c) !== null) return pcsxPage([position('0', 'Role 0')], 1);
+      if (Number(new URL(c.url).searchParams.get('start') || 0) > 0) throw httpErr(429, 'Please try again later');
+      return withFilters(pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i), `Role ${i}`)), 30));
+    });
+    const { result } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.eightfoldTruncated === true && calls.every((c) => filterOf(c) === null)
+      ? pass('eightfold sends no filtered request after a walk the edge rate-limited')
+      : fail(`rate-limited walk: truncated=${result.eightfoldTruncated}, filtered=${calls.filter((c) => filterOf(c) !== null).length}`);
   }
 
   // Both endpoints refusing is the WAF case, and the ORIGINAL 403 has to survive
