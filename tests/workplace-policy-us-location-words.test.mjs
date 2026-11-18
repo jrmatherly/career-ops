@@ -9,7 +9,9 @@ const atl = buildWorkplacePolicy({ ...HOLD, onsite_locations: [...HOLD.onsite_lo
 
 for (const l of ['US Telecommuter', 'Anywhere in the U.S.', 'Anywhere, US', 'Telecommute - United States'])
   test(`${l} is remote in the United States`, () => assert.deepEqual(gate(l, 'Platform Engineer'), { eligible: true, reason: 'remote_region_allowed' }));
-for (const l of ['Anywhere in Canada', 'Canada Telecommuter', 'Not Telecommute - United States', 'Telecommuting not available - Dallas, TX', 'Anywhere'])
+for (const l of ['Anywhere in Canada', 'Canada Telecommuter'])
+  test(`${l} is remote in another country`, () => assert.deepEqual(gate(l, 'Platform Engineer'), { eligible: false, reason: 'remote_country_restricted' }));
+for (const l of ['Not Telecommute - United States', 'Telecommuting not available - Dallas, TX', 'Anywhere'])
   test(`${l} stays out`, () => assert.equal(gate(l, 'Platform Engineer').eligible, false));
 test('the new words are read only under a United States policy', () =>
   assert.deepEqual(es('Spain Telecommuter'), { eligible: false, reason: 'onsite_outside_allowed_locations' }));

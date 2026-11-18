@@ -18,11 +18,23 @@ test('the gate carries its home states and home country names', () => {
 });
 test('home_states must be a list of US states', () => {
   assert.throws(() => buildWorkplacePolicy({ ...HOLD, home_states: 'GA' }), /workplace_policy\.home_states must be a list/);
-  assert.throws(() => buildWorkplacePolicy({ ...HOLD, home_states: ['Ontario'] }), /workplace_policy\.home_states: "ontario" is not a US state name or code/);
+  assert.throws(() => buildWorkplacePolicy({ ...HOLD, home_states: ['Ontario'] }), /workplace_policy\.home_states: "Ontario" is not a US state name or code/);
+  for (const [entries, typed] of [[[5], '5'], [[null], 'null'], [[''], '""'], [[' '], '" "'], [[['GA']], '["GA"]'], [['GA', 5], '5']])
+    assert.throws(() => buildWorkplacePolicy({ ...HOLD, home_states: entries }), { message: `workplace_policy.home_states: ${typed} is not a US state name or code` });
+  assert.deepEqual(buildWorkplacePolicy({ ...HOLD, home_states: [] }).homeStates, []);
 });
 test('validate-portals reports a home_states entry that is not text', async () => {
   const { errors } = await validatePortalsConfig({ location_filter: { workplace_policy: { ...HOLD, home_states: [42, ''] } } });
   assert.deepEqual(errors.filter(e => e.path.includes('home_states')).map(e => e.path), ['location_filter.workplace_policy.home_states[0]', 'location_filter.workplace_policy.home_states[1]']);
+});
+test('validate-portals reports a home_states entry that is no state once, with the entry as typed', async () => {
+  const { errors } = await validatePortalsConfig({ location_filter: { workplace_policy: { ...HOLD, home_states: ['Ontario'] } } });
+  assert.deepEqual(errors.filter(e => e.path.startsWith('location_filter')), [{ path: 'location_filter.workplace_policy', message: 'workplace_policy.home_states: "Ontario" is not a US state name or code' }]);
+});
+test('the gate carries its home places and its place reader', () => {
+  assert.deepEqual(home.homePlaces, ['atlanta', 'alpharetta', 'marietta', 'johns creek']);
+  assert.ok(Object.isFrozen(home.homePlaces));
+  assert.equal(home.geographyText('Remote - Georgia (EST), MT working hours').trim().replace(/ +/g, ' '), 'Remote - Georgia ,');
 });
 test('the gate result keeps its two keys', () => assert.deepEqual(home('Remote - United States'), { eligible: true, reason: 'remote_region_allowed' }));
 test('Georgia is the state under a policy whose home states include it', () => {

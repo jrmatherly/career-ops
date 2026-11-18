@@ -16,6 +16,8 @@ for (const d of [
   'HIRING IN CANADA WITH US&nbsp;',
   'Open to candidates in Canada only, join us today.',
 ]) test(`a restriction stays: ${d}`, () => assert.equal(us(d).eligible, false));
+for (const d of ['We are hiring in Canada with us.', 'Open to candidates in Canada and us'])
+  test(`a lower-case us is the pronoun: ${d}`, () => assert.deepEqual(us(d), { eligible: false, reason: 'description_country_restricted' }));
 test('under another home country a capital US is a foreign country', () =>
   assert.equal(es('Remote Europe', '', { description: 'This role is open to candidates in the US only.' }).eligible, false));
 for (const d of [

@@ -6,20 +6,23 @@ const HOLD = { onsite_locations: ['Atlanta', 'Alpharetta', 'Marietta', 'Johns Cr
 const gate = buildWorkplacePolicy({ ...HOLD, home_states: ['Georgia'] });
 const bare = buildWorkplacePolicy(HOLD);
 
-test('LOCATION_TIERS', () => assert.deepEqual(LOCATION_TIERS, ['fit', 'review', 'elsewhere']));
+test('LOCATION_TIERS', () => {
+  assert.deepEqual(LOCATION_TIERS, ['fit', 'review', 'elsewhere']);
+  assert.ok(Object.isFrozen(LOCATION_TIERS));
+});
 
 const TABLE = [
-  // The spec's Finding 1 table.
+  // A country, a count or nothing, and the two fits.
   ['United States', 'review', 'location_names_no_place'],
   ['USA', 'review', 'location_names_no_place'],
   ['United States, Multiple Locations, Multiple Locations', 'review', 'location_names_no_place'],
   ['Georgia, USA', 'review', 'location_names_no_place'],
   ['5 Locations', 'review', 'location_names_no_place'],
   ['Remote', 'review', 'remote_eligibility_unconfirmed'],
+  ['Anywhere', 'review', 'remote_eligibility_unconfirmed'],
   ['', 'review', 'location_unknown'],
   ['Remote - United States', 'fit', 'remote_region_allowed'],
   ['Sunnyvale, CA, USA; Atlanta, GA, USA', 'fit', 'onsite_location_allowed'],
-  // Named in the brief for this plan.
   ['Remote, TN', 'review', 'remote_scoped_to_other_state'],
   ['Atlanta, GA', 'fit', 'onsite_location_allowed'],
   ['London, UK', 'elsewhere', 'onsite_outside_allowed_locations'],
@@ -66,6 +69,26 @@ const TABLE = [
   ['Remote - United States; Remote, TN', 'fit', 'remote_region_allowed'],
   ['Remote - Canada', 'elsewhere', 'remote_country_restricted'],
   ['Remote - Georgia, Canada', 'elsewhere', 'remote_country_restricted'],
+  // A remote role beside a US city whose state code is also a country's.
+  ['Remote - San Francisco, CA', 'review', 'remote_scoped_to_other_state'],
+  ['San Francisco, CA (Remote)', 'review', 'remote_scoped_to_other_state'],
+  ['San Francisco, CA · Remote', 'review', 'remote_scoped_to_other_state'],
+  ['Denver, CO or Remote', 'review', 'remote_scoped_to_other_state'],
+  ['Remote (Chicago, IL)', 'review', 'remote_scoped_to_other_state'],
+  ['Los Angeles, CA / Remote', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - Wilmington, DE', 'review', 'remote_scoped_to_other_state'],
+  ['Remote-Friendly (Travel Required) | San Francisco, CA', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - New York, NY', 'review', 'remote_scoped_to_other_state'],
+  // The same codes beside a foreign city cannot be told apart, so these are review too.
+  ['Remote - Berlin, DE', 'review', 'remote_scoped_to_other_state'],
+  ['Remote - Tel Aviv, IL', 'review', 'remote_scoped_to_other_state'],
+  ['Remote, CA', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - Toronto, Canada', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - Toronto, ON, CA', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - Bogota, DC, CO', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - London, UK', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - San Francisco, CA · Remote - London, UK', 'elsewhere', 'remote_country_restricted'],
+  ['Remote - Mexico City, MX', 'elsewhere', 'remote_country_restricted'],
 ];
 for (const [location, tier, reason] of TABLE)
   test(`${JSON.stringify(location)} is ${tier} (${reason})`, () => assert.deepEqual(locationVerdict(gate, location, 'Platform Engineer'), { tier, reason }));
@@ -100,4 +123,17 @@ test('a gate with no properties and a location that is not a string does not thr
     ['remote_country_restricted', 'elsewhere', 'remote_country_restricted'],
     ['onsite_outside_allowed_locations', 'review', 'location_names_no_place'],
   ]) assert.deepEqual(locationVerdict(() => ({ eligible: reason === 'remote_region_allowed', reason }), null), { tier, reason: said }, reason);
+});
+test('a workplace type of remote beside a US city is review', () =>
+  assert.deepEqual(locationVerdict(gate, 'San Francisco, CA', '', { workplaceType: 'remote' }), { tier: 'review', reason: 'remote_scoped_to_other_state' }));
+test('under another home country a US city is still elsewhere', () => {
+  const spain = buildWorkplacePolicy({ onsite_locations: ['Barcelona'], remote_countries: ['Spain'], remote_regions: ['Europe'] });
+  for (const l of ['Remote - Denver, CO', 'Remote - Wilmington, DE', 'Remote - Puerto Rico']) assert.deepEqual(locationVerdict(spain, l), { tier: 'elsewhere', reason: 'remote_country_restricted' }, l);
+});
+test('a home town the gate rejects beside another place is review, and the gate still rejects it', () => {
+  for (const l of ['San Francisco, CA / Atlanta, GA', 'Atlanta, GA or London, UK', 'Atlanta, GA / London, UK', 'Atlanta; London, UK', 'London, UK · Atlanta', 'Hybrid - Atlanta, GA or Dublin, Ireland',
+    'Atlanta · Istanbul, Turkey', 'Atlanta, GA or Hong Kong', 'Atlanta (ET)', 'Atlanta, GA (ET/CT)']) for (const g of [gate, bare]) {
+    assert.deepEqual(locationVerdict(g, l), { tier: 'review', reason: 'onsite_country_restricted' }, l);
+    assert.deepEqual(g(l), { eligible: false, reason: 'onsite_country_restricted' }, l);
+  }
 });
