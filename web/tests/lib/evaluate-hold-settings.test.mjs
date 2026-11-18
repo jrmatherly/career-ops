@@ -157,3 +157,8 @@ test("holdPolicyProblem tells an unknown home state from home states with no Uni
   assert.equal(await holdPolicyProblem({ onsiteLocations: ["Springfield"], remoteCountries: ["Canada"], homeStates: ["Georgia"] }, CODE_ROOT), '"Home states" apply only when "Remote from" includes the United States.');
   assert.equal(await holdPolicyProblem({ ...HOLD, homeStates: ["Ontario"] }, CODE_ROOT), '"Home states" must name US states, such as Georgia or GA.');
 });
+test("a stored homeStates of null is refused, and a hold stored without the key still builds", async () => {
+  const core = await import(pathToFileURL(path.join(CODE_ROOT, "providers", "_country.mjs")).href);
+  assert.throws(() => holdVerdict(core, { ...HOLD, homeStates: null }), { message: '"Home states" must be a list.' });
+  assert.equal(holdVerdict(core, HOLD)("Springfield", "Engineer").tier, "fit");
+});

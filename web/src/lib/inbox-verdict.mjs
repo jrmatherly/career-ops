@@ -179,13 +179,18 @@ const NO_MATCHES = { title: "No matches", hint: "Loosen the filters to see more 
 export const inboxEmptyState = (tier, counts, addedCopy) => tierEmptyState(tier, counts) ?? addedCopy ?? NO_MATCHES;
 
 /**
- * The verdict of each shortlisted row: the Inbox's current one, else the one saved with the row, which is all
- * that is left once a saved row is skipped or tracked.
+ * The verdict of each shortlisted row. A row still in the Inbox has the Inbox's answer, which is none once no scan
+ * has a hold. A row that has left the Inbox (skipped or tracked) keeps the verdict saved with it.
  *
  * @param {{ url: string, verdict?: Verdict }[]} shortlist
  * @param {{ url: string, verdict?: Verdict }[]} inbox
  * @returns {Map<string, Verdict>}
  */
 export function shortlistVerdicts(shortlist, inbox) {
-  return new Map([...shortlist, ...inbox].flatMap((row) => (row.verdict ? [[row.url, row.verdict]] : [])));
+  const byUrl = new Map(shortlist.flatMap((row) => (row.verdict ? [[row.url, row.verdict]] : [])));
+  for (const row of inbox) {
+    if (row.verdict) byUrl.set(row.url, row.verdict);
+    else byUrl.delete(row.url);
+  }
+  return byUrl;
 }

@@ -26,6 +26,8 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 /** The workplace policy (providers/_country.mjs) a stored hold stands for. */
 export function holdPolicy(hold) {
   const policy = { onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries, home_states: hold.homeStates ?? [] };
+  // The gate reads null as no home states. A store edited by hand must be refused, not judged without them.
+  if (hold.homeStates === null) throw new Error('"Home states" must be a list.');
   // The gate drops an entry that is not text, which would judge a store edited by hand with part of its hold missing.
   if (Object.values(policy).some((list) => Array.isArray(list) && list.some((entry) => typeof entry !== "string"))) throw new Error("A location hold entry is not text.");
   return policy;

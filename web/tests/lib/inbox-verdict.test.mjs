@@ -208,5 +208,6 @@ test("shortlistVerdicts keeps a saved row's verdict once the row has left the In
   assert.equal(byUrl.get("gone"), elsewhere);
   assert.equal(byUrl.get("here"), fit, "the Inbox's current verdict wins");
   assert.equal(byUrl.has("plain"), false);
+  assert.equal(shortlistVerdicts([{ url: "here", verdict: elsewhere }], [{ url: "here" }]).has("here"), false, "a row the Inbox no longer judges drops its saved verdict");
   assert.equal(scoreLocationNote(saved, byUrl).summary, "1 of 3 is not a location fit. You can still score it.");
 });
