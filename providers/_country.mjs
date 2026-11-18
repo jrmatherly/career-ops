@@ -163,7 +163,8 @@ const LABEL_ANYWHERE = new RegExp(`(?<![\\p{L}\\p{N}])${LABEL}(?![\\p{L}\\p{N}])
 const withoutScopeLabels = (text, isHome) => {
   if (typeof text !== 'string') return text;
   const lines = text.replace(BLOCK_TAG, '\n').replace(/&nbsp;|&#160;/gi, ' ');
-  return [...lines.matchAll(LABEL_ANYWHERE)].some(label => isHome(fold(label[1] ?? label[2]))) ? lines.replace(SCOPE_LABEL, '$1$2') : lines;
+  // Tags are taken out for the search alone: a home label may have one inside it.
+  return [...lines.replace(/<[^<>]*>/g, ' ').replace(/ +/g, ' ').matchAll(LABEL_ANYWHERE)].some(label => isHome(fold(label[1] ?? label[2]))) ? lines.replace(SCOPE_LABEL, '$1$2') : lines;
 };
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
