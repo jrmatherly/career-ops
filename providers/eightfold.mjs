@@ -48,7 +48,7 @@
 //   under "0 days / week in-office – remote"). The search rows do not carry
 //   the fact themselves, so after the main walk the provider walks the search
 //   once more for each value that says remote and appends " · Remote" to those
-//   postings. workLocationOption and work_location_option are not read: they
+//   postings (a posting with no location reads "Remote"). workLocationOption and work_location_option are not read: they
 //   said `onsite` on remote rows at Microsoft and NetApp.
 //
 // PAGE SIZE IS SERVER-CAPPED AT 10. Requesting num=25/50/100/200 all return
@@ -286,7 +286,8 @@ function assembleLocation(p) {
 
 /**
  * The values of a PCSX tenant's own `work_site` search filter that say remote.
- * Hybrid and partial values are left out: they name an office. Microsoft's
+ * A value that also says hybrid, partial, on-site, "no", "non", "not" or a
+ * percentage is left out: it names an office or negates the word. Microsoft's
  * remote value is "0 days / week in-office – remote", so "in-office" cannot be
  * an exclusion word.
  *
@@ -300,12 +301,12 @@ export function remoteWorkSiteValues(json) {
   if (!Array.isArray(options)) return [];
   return options
     .map((o) => o?.value)
-    .filter((v) => typeof v === 'string' && /\bremote\b/i.test(v) && !/hybrid|partial/i.test(v));
+    .filter((v) => typeof v === 'string' && /\bremote\b/i.test(v) && !/hybrid|partial|on-?site|\bno[nt]?\b|%/i.test(v));
 }
 
 /**
  * Append " · Remote" to each job whose id is in `remoteIds` and whose location
- * does not already say remote.
+ * does not already say remote. An empty location becomes "Remote".
  *
  * @param {Array<{location: string, externalId?: string}>} jobs - Mutated in place.
  * @param {Set<string>} remoteIds
@@ -567,9 +568,10 @@ export default {
     }
 
     // The remote pass: mark the postings the tenant's own work-site filter
-    // calls remote. Skipped for a probe and after a rate-limited walk. It is
-    // all or nothing, because a partial walk would mark some remote postings
-    // and leave others reading as on-site with nothing to tell them apart.
+    // calls remote. Skipped on the v2 API, for a probe (any ctx.maxPages) and
+    // after a rate-limited walk. It is all or nothing, because a partial walk
+    // would mark some remote postings and leave others reading as on-site with
+    // nothing to tell them apart.
     // Its page budget is a second maxPages, counted across all values.
     const remoteValues = api === 'pcsx' && !rateLimited && !(Number(ctx?.maxPages) > 0)
       ? remoteWorkSiteValues(firstPcsxPage)
@@ -587,13 +589,17 @@ export default {
             if (!page) throw new Error(`unrecognized /api/pcsx/search body at start=${start}`);
             pages++;
             for (const p of page.positions) {
-              const id = coerceId(p?.id);
+              // The same id and fallback parseEightfoldResponse gives externalId.
+              const id = coerceId(p?.id) ?? coerceId(p?.position_id);
               if (id) remoteIds.add(id);
             }
             if (page.positions.length < PAGE_SIZE) break;
             if (page.count !== undefined && start + PAGE_SIZE >= page.count) break;
           }
         }
+        // A tenant that ignores the filter parameter answers with the whole
+        // board, and marking that would call every posting remote.
+        if (all.length > 0 && all.every((job) => remoteIds.has(job.externalId))) throw new Error('the filter returned every posting');
         const marked = markRemote(all, remoteIds);
         if (marked > 0) console.error(`ℹ️  eightfold: ${entry.name} marked ${marked} posting(s) Remote from the tenant's work-site filter`);
       } catch (err) {

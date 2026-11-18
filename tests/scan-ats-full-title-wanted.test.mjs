@@ -4,7 +4,8 @@
 // Run: node --test tests/scan-ats-full-title-wanted.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withTitleWanted } from '../scan-ats-full.mjs';
+import { readFileSync } from 'node:fs';
+import { runHistorySeedScan, withTitleWanted } from '../scan-ats-full.mjs';
 import { buildTitleFilterOverrides, buildTitleFilterWithOverrides } from '../scan.mjs';
 import workday from '../providers/workday.mjs';
 
@@ -55,4 +56,25 @@ test('without the helper every placeholder costs a request', async () => {
   const { ctx, details } = recordingCtx();
   await workday.fetch(ENTRY, ctx);
   assert.equal(details.length, 3);
+});
+
+test('the history seed scan hands the provider the title decision for that company', async () => {
+  const wanted = [];
+  const provider = { id: 'lever', detect: () => ({ url: 'mock' }), fetch: async (entry, ctx) => { wanted.push(ctx.titleWanted('Engineer')); return []; } };
+  await runHistorySeedScan(
+    [{ company: 'Acme', vendor: 'lever', careersUrl: 'https://jobs.lever.co/acme' }],
+    new Map([['lever', provider]]),
+    { atsExplicit: false, ats: [], limit: Infinity, shuffle: false, verbose: false, titleFilter: (title, slug) => `${title}@${slug}` },
+    {},
+    async () => {},
+  );
+  assert.deepEqual(wanted, ['Engineer@Acme']);
+});
+
+// main() is not exported, so its two fetch sites (the parallel sweep and the
+// truncated-board retry) are pinned by their source text.
+test('both sweep fetch sites in main() wrap ctx with withTitleWanted', () => {
+  const src = readFileSync(new URL('../scan-ats-full.mjs', import.meta.url), 'utf8');
+  assert.equal(src.split('source.provider.fetch(entry, withTitleWanted(sourceCtx, titleFilter, entry.name))').length - 1, 2);
+  assert.equal(src.split('source.provider.fetch(entry, ').length - 1, 2);
 });

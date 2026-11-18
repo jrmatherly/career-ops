@@ -84,12 +84,13 @@ try {
     const rows = parseBambooHRResponse({ meta: {}, result: [
       { id: '79', jobOpeningName: 'Remote Role', location: { city: null, state: null }, isRemote: null, locationType: '1', atsLocation: { country: 'Canada', state: 'British Columbia', province: null, city: 'Vancouver' } },
       { id: '30', jobOpeningName: 'Hybrid Role', location: { city: 'Lombard', state: 'Illinois' }, isRemote: null, locationType: '2', atsLocation: nulls },
-      { id: '44', jobOpeningName: 'Office Role', location: { city: 'Pocomoke City', state: 'Maryland' }, isRemote: null, locationType: '0', atsLocation: nulls },
+      { id: '44', jobOpeningName: 'Office Role', location: { city: ' Pocomoke City ', state: 'Maryland' }, isRemote: null, locationType: '0', atsLocation: nulls },
       { id: '50', jobOpeningName: 'Both Filled', location: { city: 'Houston', state: 'Texas' }, isRemote: null, locationType: '0', atsLocation: { country: 'Canada', state: null, province: 'Ontario', city: 'Toronto' } },
       { id: '51', jobOpeningName: 'Numeric Type', location: { city: null, state: null }, isRemote: null, locationType: 1, atsLocation: { country: 'United States', state: null, province: null, city: null } },
       { id: '52', jobOpeningName: 'Province Only', location: {}, locationType: '0', atsLocation: { country: 'Canada', state: null, province: 'Ontario', city: null } },
+      { id: '56', jobOpeningName: 'State And Province', location: {}, locationType: '0', atsLocation: { country: 'United States', state: 'Georgia', province: 'Ignored', city: null } },
       { id: '53', jobOpeningName: 'Remote Twice', location: { city: 'Austin', state: 'Texas' }, isRemote: 1, locationType: '1', atsLocation: nulls },
-      { id: '54', jobOpeningName: 'Junk Parts', location: {}, locationType: '0', atsLocation: { country: {}, state: 7, province: null, city: '' } },
+      { id: '54', jobOpeningName: 'Junk Parts', location: { city: {}, state: 7 }, locationType: '0', atsLocation: { country: {}, state: 7, province: null, city: '' } },
       { id: '55', jobOpeningName: 'No New Fields', location: { city: 'Mayfair', state: 'London, City of' }, isRemote: null },
     ] }, 'Acme', 'https://acme.bamboohr.com');
     const want = [
@@ -99,6 +100,7 @@ try {
       'Houston, Texas',
       'United States, Remote',
       'Ontario, Canada',
+      'Georgia, United States',
       'Austin, Texas, Remote',
       '',
       'Mayfair, London, City of',

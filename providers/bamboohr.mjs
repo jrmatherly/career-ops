@@ -261,7 +261,7 @@ export function parseBambooHRResponse(json, companyName, origin) {
     .map(j => {
       const loc = j.location || {};
       const ats = j.atsLocation || {};
-      const text = v => (typeof v === 'string' && v.trim() ? v : '');
+      const text = v => (typeof v === 'string' ? v.trim() : '');
       let place = [loc.city, loc.state].map(text).filter(Boolean);
       if (place.length === 0) place = [ats.city, text(ats.state) || ats.province, ats.country].map(text).filter(Boolean);
       if (j.isRemote || String(j.locationType) === '1') place.push('Remote');

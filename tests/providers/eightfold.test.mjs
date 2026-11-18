@@ -437,6 +437,20 @@ try {
       : fail(`remote pass unusable body: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
   }
 
+  ['Non-remote', 'Not remote', 'No remote work', 'On-site (not remote)', 'remote/onsite', 'Up to 50% remote']
+    .every((value) => remoteWorkSiteValues({ data: { filterDef: { smartFilters: [{ filterName: 'work_site', options: [{ value }] }] } } }).length === 0)
+    ? pass('remoteWorkSiteValues leaves out a value that negates or dilutes remote')
+    : fail('remoteWorkSiteValues read a negated or diluted value as remote');
+
+  {
+    // A tenant that ignores filter_work_site answers with the whole board.
+    const { ctx } = remoteTenant(() => pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2));
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.every((j) => j.location === 'Redmond, WA') && errors.filter((line) => /remote work-site pass stopped.*returned every posting/.test(String(line))).length === 1
+      ? pass('eightfold changes no location and warns once when the filtered search returns the whole board')
+      : fail(`ignored filter: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
   const tenRemote = (count) => pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 2), `Remote ${i}`)), count);
 
   {
@@ -459,6 +473,23 @@ try {
     filtered === 1 && result.every((j) => j.location === 'Redmond, WA') && result.eightfoldTruncated !== true && errors.some((line) => /remote work-site pass stopped.*page budget of 1 reached/.test(String(line)))
       ? pass('eightfold keeps the remote pass inside max_pages and changes no location, untagged, when the budget cuts it')
       : fail(`remote pass budget: ${filtered} filtered requests, ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
+  {
+    // Two values that say remote: both are walked. A full page that reaches count ends a value's walk.
+    const second = 'remote – anywhere';
+    const filterDef = { smartFilters: [{ filterName: 'work_site', options: [{ value: REMOTE_VALUE }, { value: second }] }] };
+    const { ctx, calls } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      if (filterOf(c) === REMOTE_VALUE) return pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 100), `Other ${i}`)), 10);
+      if (filterOf(c) === second) return pcsxPage([position('2', 'Remote Role')], 1);
+      return withFilters(pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2), filterDef);
+    });
+    const jobs = await ef.fetch(TENANT, ctx);
+    const filtered = calls.filter((c) => filterOf(c) !== null).map(filterOf);
+    jobs[0].location === 'Redmond, WA' && jobs[1].location === 'Redmond, WA · Remote' && JSON.stringify(filtered) === JSON.stringify([REMOTE_VALUE, second])
+      ? pass('eightfold walks every remote value, one request each when the first page reaches count')
+      : fail(`two remote values: ${JSON.stringify(jobs.map((j) => j.location))} ${JSON.stringify(filtered)}`);
   }
 
   {

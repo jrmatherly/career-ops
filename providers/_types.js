@@ -306,8 +306,9 @@
  *                              each posting's default version; scan.mjs then keeps the
  *                              best-ranked version where it keeps one per posting.
  * @property {(title: string) => boolean} [titleWanted] scan.mjs passes it when the entry filters
- *                              on title, and scan-ats-full.mjs passes it for every
- *                              board: this scan's own title decision
+ *                              on title, and scan-ats-full.mjs passes it from its
+ *                              directory sweep and its history seed scan when it has
+ *                              a title filter: this scan's own title decision
  *                              (title_filter, overrides included). A provider that pays an
  *                              extra request per posting (workday's multi-location detail
  *                              GETs, sitemap's fetchDetails) spends it only on postings
