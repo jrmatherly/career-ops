@@ -6,6 +6,10 @@ import { ATS_LABEL } from "@/lib/explore";
 import { FRESHNESS_WINDOWS, SENIORITY_LABEL, type Seniority } from "@/lib/inbox";
 import { CostBadge } from "@/components/cost/cost-badge";
 import { cn } from "@/lib/cn";
+import type { LocationTier } from "@/lib/career-ops";
+import { TIER_FILTERS } from "@/lib/inbox-verdict.mjs";
+
+export type TierFilter = LocationTier | "all";
 
 // Free, client-side facets over the raw firehose — 0 tokens, instant. Mirrors the
 // Explore chip language so the two surfaces read as one system. On mobile the chip
@@ -27,6 +31,8 @@ export function FacetChips({
   totalCount,
   anyActive,
   onClear,
+  tiers,
+  setTier,
 }: {
   within: number | null;
   setWithin: (d: number | null) => void;
@@ -44,6 +50,9 @@ export function FacetChips({
   totalCount: number;
   anyActive: boolean;
   onClear: () => void;
+  /** The location segment's active tier and counts, or null when no scheduled scan has a hold. */
+  tiers: { active: TierFilter; counts: Record<TierFilter, number> } | null;
+  setTier: (tier: TierFilter) => void;
 }) {
   return (
     <div className="space-y-2.5">
@@ -66,6 +75,25 @@ export function FacetChips({
 
       {/* chip row — desktop wraps, mobile scrolls inside the container */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+        {tiers && (
+          <div role="group" aria-label="Location fit" className="inline-flex shrink-0 rounded-lg border border-border bg-surface/40 p-0.5">
+            {(TIER_FILTERS as { id: TierFilter; label: string }[]).map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={tiers.active === id}
+                onClick={() => setTier(id)}
+                className={cn(
+                  "whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium tabular-nums transition-colors max-sm:min-h-[44px]",
+                  tiers.active === id ? "bg-brand-soft text-brand-text" : "text-muted hover:text-foreground",
+                )}
+              >
+                {`${label} ${tiers.counts[id]}`}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* freshness (single-select segmented; click active to clear) */}
         <div className="inline-flex shrink-0 rounded-lg border border-border bg-surface/40 p-0.5">
           {FRESHNESS_WINDOWS.map((w) => (

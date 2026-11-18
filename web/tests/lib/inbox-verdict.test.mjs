@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
+import { TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
 import { markVerdicts } from "../../src/lib/inbox-pending.mjs";
 import { storedHolds } from "../../src/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "../../src/lib/core/workplace-policy.mjs";
@@ -111,4 +111,31 @@ test("the badge names the tier and gives the reason in plain words", () => {
 
 test("a reason with no sentence gets the general one", () => {
   assert.equal(verdictBadge({ tier: "elsewhere", reason: "a_reason_added_later" }).reason, VERDICT_FALLBACK);
+});
+
+const rows = [{ verdict: fit }, { verdict: review }, { verdict: review }, { verdict: elsewhere }];
+
+test("tierCounts counts each tier, and is null when no row has a verdict", () => {
+  assert.deepEqual(tierCounts(rows), { fit: 1, review: 2, elsewhere: 1, all: 4 });
+  assert.equal(tierCounts([{ url: "u" }]), null);
+  assert.equal(tierCounts([]), null);
+});
+
+test("inTier never filters out a row with no verdict", () => {
+  assert.equal(inTier({ verdict: review }, "review"), true);
+  assert.equal(inTier({ verdict: review }, "fit"), false);
+  assert.equal(inTier({ verdict: elsewhere }, "all"), true);
+  assert.equal(inTier({}, "fit"), true);
+});
+
+test("tierEmptyState names the tiers that hold the rows", () => {
+  assert.deepEqual(tierEmptyState("fit", { fit: 0, review: 2, elsewhere: 1, all: 3 }), { title: "No fit roles", hint: "2 under Review location, 1 under Elsewhere." });
+  assert.deepEqual(tierEmptyState("elsewhere", { fit: 1, review: 0, elsewhere: 0, all: 1 }), { title: "Nothing elsewhere", hint: "1 under Fit." });
+  assert.equal(tierEmptyState("review", { fit: 0, review: 0, elsewhere: 0, all: 0 }), null);
+  assert.equal(tierEmptyState("all", { fit: 0, review: 0, elsewhere: 0, all: 0 }), null);
+  assert.equal(tierEmptyState("fit", null), null);
+});
+
+test("the tier labels never say hidden", () => {
+  assert.deepEqual(TIER_FILTERS.map((tier) => tier.label), ["Fit", "Review location", "Elsewhere", "All"]);
 });

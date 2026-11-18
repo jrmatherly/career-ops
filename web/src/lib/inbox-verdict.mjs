@@ -57,3 +57,42 @@ export function verdictBadge(verdict) {
   const reason = Object.hasOwn(REASONS, verdict.reason) ? REASONS[verdict.reason] : VERDICT_FALLBACK;
   return { ...badge, reason, title: `${reason} ${VERDICT_SOURCE}` };
 }
+
+/** The Inbox's location segment, in order. "All" is not a tier: it shows every row. */
+export const TIER_FILTERS = [{ id: "fit", label: "Fit" }, { id: "review", label: "Review location" }, { id: "elsewhere", label: "Elsewhere" }, { id: "all", label: "All" }];
+
+/**
+ * Rows per tier, or null when no row has a verdict, which means no scan has a hold.
+ *
+ * @param {{ verdict?: Verdict }[]} jobs
+ * @returns {{ fit: number, review: number, elsewhere: number, all: number } | null}
+ */
+export function tierCounts(jobs) {
+  const counts = { fit: 0, review: 0, elsewhere: 0, all: jobs.length };
+  let judged = false;
+  for (const job of jobs) {
+    if (!job.verdict) continue;
+    judged = true;
+    counts[job.verdict.tier] += 1;
+  }
+  return judged ? counts : null;
+}
+
+/** Whether a row shows under a tier. A row with no verdict is never filtered out. */
+export const inTier = (job, tier) => tier === "all" || !job.verdict || job.verdict.tier === tier;
+
+const EMPTY_TITLES = { fit: "No fit roles", review: "Nothing to review", elsewhere: "Nothing elsewhere" };
+
+/**
+ * What an empty tier says: where the rows are. Null when there is no hold, under "All", or when no other tier holds a row.
+ *
+ * @param {"fit" | "review" | "elsewhere" | "all"} tier
+ * @param {{ fit: number, review: number, elsewhere: number } | null} counts
+ * @returns {{ title: string, hint: string } | null}
+ */
+export function tierEmptyState(tier, counts) {
+  if (!counts || tier === "all") return null;
+  const others = TIER_FILTERS.filter(({ id }) => id !== tier && id !== "all" && counts[id] > 0);
+  if (!others.length) return null;
+  return { title: EMPTY_TITLES[tier], hint: `${others.map(({ id, label }) => `${counts[id]} under ${label}`).join(", ")}.` };
+}

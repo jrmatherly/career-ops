@@ -1,12 +1,17 @@
 // Disposable fictional data root: four pending rows and an Auto scheduled scan with a location hold.
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.LOCATION_HOLD_TEST_URL;
+const root = process.env.LOCATION_HOLD_TEST_ROOT;
 const options = { skip: liveServerSkip("LOCATION_HOLD_TEST_URL", "LOCATION_HOLD_TEST_ROOT"), timeout: 60_000 };
 const row = (page, company) => page.locator("li:visible").filter({ hasText: company });
+const tierButton = (page, name) => page.getByRole("group", { name: "Location fit" }).getByRole("button", { name, exact: true });
 const badge = (page, company) => row(page, company).getByTitle(/Judged from the row's location and title/);
 
 async function open(t) {
@@ -23,6 +28,7 @@ async function open(t) {
 test("every row that is not a fit says why", options, async (t) => {
   const { page, errors } = await open(t);
   await settled(page, () => page.goto(`${url}/pipeline`));
+  await tierButton(page, "All 4").click();
   await row(page, "Fixture Beta").waitFor();
   assert.equal(await badge(page, "Fixture Beta").count(), 0);
   assert.equal(await badge(page, "Fixture Gamma").getAttribute("title"),
@@ -32,6 +38,26 @@ test("every row that is not a fit says why", options, async (t) => {
   assert.equal(await badge(page, "Fixture Alpha").textContent(), "Elsewhere: On-site or hybrid outside your home area.");
   assert.equal(await row(page, "Fixture Alpha").getByText("est. 4.2", { exact: true }).count(), 1, "the row keeps its rank");
   assert.equal(await page.getByText("Held: location").count(), 0);
+  assert.deepEqual(errors, []);
+});
+
+test("the Inbox opens on the fit rows, and Clear returns to them", options, async (t) => {
+  const { page, errors } = await open(t);
+  await settled(page, () => page.goto(`${url}/pipeline`));
+  await row(page, "Fixture Beta").waitFor();
+  assert.equal(await tierButton(page, "Fit 1").getAttribute("aria-pressed"), "true");
+  for (const name of ["Review location 2", "Elsewhere 1", "All 4"]) assert.equal(await tierButton(page, name).getAttribute("aria-pressed"), "false");
+  for (const company of ["Fixture Alpha", "Fixture Gamma", "Fixture Delta"]) assert.equal(await row(page, company).count(), 0, `${company} is not a fit row`);
+  await page.getByRole("button", { name: "Select all 1", exact: true }).waitFor();
+
+  await tierButton(page, "Review location 2").click();
+  await row(page, "Fixture Gamma").waitFor();
+  await row(page, "Fixture Delta").waitFor();
+  assert.equal(await row(page, "Fixture Beta").count(), 0);
+
+  await page.getByRole("button", { name: "Clear" }).click();
+  assert.equal(await tierButton(page, "Fit 1").getAttribute("aria-pressed"), "true");
+  assert.equal(await row(page, "Fixture Gamma").count(), 0, "Clear returns to Fit");
   assert.deepEqual(errors, []);
 });
 
@@ -63,5 +89,31 @@ test("the job form shows the hold and the source groups", options, async (t) => 
   await dialog.getByRole("button", { name: /Save|Update/ }).click();
   assert.equal((await saved).status(), 400);
   await dialog.getByText('"Remote from" must name a country, such as United States.').waitFor();
+  assert.deepEqual(errors, []);
+});
+
+// Last in the file, because it writes to the fixture's pipeline.
+test("Select all and Skip selected act on the tier in view", options, async (t) => {
+  const relative = path.relative(os.tmpdir(), fs.realpathSync(root));
+  assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative));
+  assert.equal(fs.readFileSync(path.join(root, ".inbox-undo-fixture"), "utf8").trim(), "fictional-only");
+  const pipeline = path.join(root, "data/pipeline.md");
+  const { page, errors } = await open(t);
+  async function until(check) {
+    const start = Date.now();
+    while (!await check()) {
+      if (Date.now() - start > 15_000) assert.fail("UI did not reach expected state");
+      await page.waitForTimeout(50);
+    }
+  }
+  await settled(page, () => page.goto(`${url}/pipeline`));
+  await tierButton(page, "Elsewhere 1").click();
+  await page.getByRole("button", { name: "Select all 1", exact: true }).click();
+  await page.getByRole("button", { name: "Skip selected", exact: true }).click();
+  await until(() => fs.readFileSync(pipeline, "utf8").includes("[x] https://example.com/fixture-held"));
+  const text = fs.readFileSync(pipeline, "utf8");
+  for (const kept of ["fixture-plain", "fixture-remote", "fixture-blank"]) assert.ok(text.includes(`[ ] https://example.com/${kept}`), `${kept} was skipped`);
+  await page.getByText("Nothing elsewhere", { exact: true }).waitFor();
+  await page.getByText("1 under Fit, 2 under Review location.", { exact: true }).waitFor();
   assert.deepEqual(errors, []);
 });
