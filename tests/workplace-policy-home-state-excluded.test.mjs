@@ -15,7 +15,7 @@ for (const d of [
   'We are unable to hire in the following states: Georgia, Hawaii, Alaska.',
   'Open to all US states except Georgia.', 'Open to candidates in all states excluding Georgia.', 'Excluding Georgia and Texas.',
   'We cannot hire in the state of Georgia.', 'We do not hire from Georgia.', 'Georgia candidates are excluded.', 'Georgia residents are ineligible.',
-  'Georgia applicants are not eligible for this role.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
+  'Georgia applicants are not eligible for this role.', 'We cannot hire in the following US states: Georgia.', 'We cannot hire in District of Columbia or Georgia.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
 ]) test(`a sentence that shuts the home state out of hiring is refused: ${d}`, () => assert.deepEqual(us(gate, d), EXCLUDED));
 
 for (const d of [
@@ -33,7 +33,7 @@ for (const d of [
   'You will cover the Southeast territory, excluding Georgia.', 'Territory: Southeast (excluding Georgia).',
   'Pay transparency: ranges are disclosed for all locations except Georgia and Texas.', 'Relocation assistance is not available for candidates in Georgia.',
   'Short-term disability is not supported in Georgia.', 'Sponsorship is not available in Georgia.', 'This position is not eligible for visa sponsorship in Georgia.',
-  'We do not hire contractors in Georgia; employees only.', "Georgia-based candidates are not eligible for this role's relocation package.",
+  'We do not hire contractors in Georgia; employees only.', 'Georgia residents are not eligible to apply for relocation assistance.', "Georgia-based candidates are not eligible for this role's relocation package.",
   'Not available in Georgia, Armenia or Azerbaijan.', 'Not available in Georgia or elsewhere in the Caucasus.',
   'Please Note: For US-based roles open to remote work, we are currently able to hire employees in the following states only: Arizona, California, Colorado, Florida, Georgia, Illinois, New York, Texas.',
 ]) test(`a sentence that is not about hiring in the home state stays eligible: ${d.slice(0, 80)}`, () => assert.deepEqual(us(gate, d), FIT));

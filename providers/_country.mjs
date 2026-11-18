@@ -163,8 +163,9 @@ const LABEL_ANYWHERE = new RegExp(`(?<![\\p{L}\\p{N}])${LABEL}(?![\\p{L}\\p{N}])
 const withoutScopeLabels = (text, isHome) => {
   if (typeof text !== 'string') return text;
   const lines = text.replace(BLOCK_TAG, '\n').replace(/&nbsp;|&#160;/gi, ' ');
-  // Tags are taken out for the search alone: a home label may have one inside it.
-  return [...lines.replace(/<[^<>]*>/g, ' ').replace(/ +/g, ' ').matchAll(LABEL_ANYWHERE)].some(label => isHome(fold(label[1] ?? label[2]))) ? lines.replace(SCOPE_LABEL, '$1$2') : lines;
+  // Labels are found and removed in the text without its tags: a label may have one inside it.
+  const flat = lines.replace(/<[^<>]*>/g, ' ').replace(/ +/g, ' ');
+  return [...flat.matchAll(LABEL_ANYWHERE)].some(label => isHome(fold(label[1] ?? label[2]))) ? flat.replace(SCOPE_LABEL, '$1$2') : lines;
 };
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
@@ -245,15 +246,15 @@ export function buildWorkplacePolicy(policy) {
   // "states". "Paid leave is not available in Georgia" is about a benefit. The state must end its phrase or stand in a
   // list of states: "Georgia Power" and "except Georgia, where it is hybrid" are not it.
   const homeStateName = `(?:${STATES_AND_DC.filter(([, code]) => homeStateCodes.includes(code)).map(([name]) => escape(name)).join('|')})`;
-  const otherStates = `(?:(?:${USPS_STATES.map(([name]) => name).join('|')})(?:\\s*,\\s*(?:and |or )?|\\s+(?:and|or)\\s+))*`;
+  const otherStates = `(?:(?:${STATES_AND_DC.map(([name]) => name).join('|')})(?:\\s*,\\s*(?:and |or )?|\\s+(?:and|or)\\s+))*`;
   const people = '(?:residents|applicants|candidates|employees|anyone|people)';
   const hiringNegation = [
-    `(?:unable to hire|cannot hire|can't hire|do(?:es)? not hire|not hiring)(?: ${people})? (?:in|from)(?: the following(?: us)? states)?`,
+    `(?:unable to hire|cannot hire|can't hire|do(?:es)? not hire|not hiring)(?: ${people})? (?:in|from)(?: the following(?: usa?)? states)?`,
     `(?:^\\s*|(?:this|the) (?:role|position|job|opportunity) is (?:currently )?)not (?:available|open|eligible|supported)(?: (?:to|for) ${people})? (?:in|of|from)`,
     '(?:^\\s*|states )(?:excluding|except(?: for)?)',
   ].join('|');
   const shutsOutHomeState = homeStateCodes.length ? new RegExp(`(?:${hiringNegation})[\\s:]+(?:the state of\\s+)?${otherStates}${homeStateName}(?=\\s*(?:$|[;)]|,?\\s*(?:and|or)\\b|,\\s*(?:${USPS_STATES.map(([name]) => name).join('|')})(?![\\p{L}\\p{N}])))`
-    + `|(?<![\\p{L}\\p{N}])${homeStateName}(?:[ -]based)? (?:residents|applicants|candidates) (?:are|is) (?:not eligible|ineligible|excluded)(?=\\s*(?:$|[,;)]|to apply|for (?:this|the) (?:role|position|job)(?![\\p{L}\\p{N}'’])))`, 'u') : null;
+    + `|(?<![\\p{L}\\p{N}])${homeStateName}(?:[ -]based)? (?:residents|applicants|candidates) (?:are|is) (?:not eligible|ineligible|excluded)(?: to apply)?(?=\\s*(?:$|[,;)]|for (?:this|the) (?:role|position|job)(?![\\p{L}\\p{N}'’])))`, 'u') : null;
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
   // must not become eligibility evidence. Structured fields still accept ISO.
@@ -314,8 +315,9 @@ export function buildWorkplacePolicy(policy) {
     return new RegExp(`(?<![\\p{L}\\p{N}])(?:${name}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?|${afterHome}${name}(?:[ -]based)?\\s+(?:roles|positions|employees|hires))\\s*[- ]?only\\b`, 'u');
   });
   // A description's country list before "only" that names a home country stands for the home country, with a noun
-  // between or none ("USA, Canada and Mexico roles only", "the US and Canada only"). After "outside" or "non-" it is not.
-  const listBeforeOnly = new RegExp(`(?<![\\p{L}\\p{N}])(?<!\\boutside (?:of )?(?:the )?)(?<!\\bnon-)${listCountry}(?:${listSeparator}${listCountry})+(?=(?:[ -]based)?(?:\\s+(?:roles|positions|employees|hires|candidates|applicants|residents))?\\s*[- ]?only\\b)`, 'gu');
+  // between or none ("USA, Canada and Mexico roles only", "the US and Canada only"). After "outside" or "non-" it is not,
+  // and a match starts at the list's first country, so the word before the whole list is the one read.
+  const listBeforeOnly = new RegExp(`(?<![\\p{L}\\p{N}])(?<!\\b(?:outside (?:of )?(?:the )?|non-|${listCountry}${listSeparator}))${listCountry}(?:${listSeparator}${listCountry})+(?=(?:[ -]based)?(?:\\s+(?:roles|positions|employees|hires|candidates|applicants|residents))?\\s*[- ]?only\\b)`, 'gu');
   const withHomeList = text => text.replace(listBeforeOnly, list => has(list, homeAliases) ? homeAliases[0] : list);
   const gate = (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };

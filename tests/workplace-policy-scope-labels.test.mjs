@@ -21,6 +21,7 @@ const ALLOWED = [
   '<p><strong>Canada-based roles only:</strong> CA$1</p><p><strong>US-based&nbsp;roles only:</strong> $2</p>',
   'Canada-based roles only: CA$1.\nUS-based roles only - $2.',
   'USA-based roles <strong>only</strong>: $133,000 USD. Canada-based roles only: $125,000 CAD.',
+  'USA-based roles only: $130,000. Canada-based <strong>roles</strong> only: $120,000.',
 ];
 const FOREIGN_ONLY = 'exclusive_foreign_country', COUNTRY_RESTRICTED = 'description_country_restricted';
 // [description, the gate reason]
