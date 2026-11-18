@@ -41,7 +41,11 @@ and `remote_countries` are required and must be nonempty. The optional fields,
 `onsite_countries`, `remote_regions` and `home_states`, may be omitted or null. An empty `onsite_countries` list also uses `remote_countries`
 as its default; a supplied nonempty country list must name a recognized country.
 `home_states` is a list of US state names or USPS codes (`Georgia`, `GA`). An
-entry that names no state is an error.
+entry that names no state is an error, and so is an entry that is blank or is
+not text. `buildWorkplacePolicy` throws the error itself, so a caller that
+skips `validate-portals.mjs` gets it too. The message shows the entry as
+written: `workplace_policy.home_states: "Ontario" is not a US state name or
+code`.
 
 - Office and hybrid roles must name an allowed onsite location. An explicit
   foreign country prevents a same-named city from matching.
@@ -139,10 +143,11 @@ entry that names no state is an error.
   place.
 - `home_states` names the US states the owner counts as home. An entry is a
   state name or a USPS code, and `DC` and `District of Columbia` are accepted.
-  At the gate the key changes one reading. With Georgia listed, the word
-  `Georgia` in a remote location is the state, unless the location shows that
-  it is the country: `Remote - Georgia` passes and `Remote - Tbilisi, Georgia`
-  fails. Every other state is read without an entry. `locationVerdict` reads
+  At the gate the key changes how one word is read. With Georgia listed, the
+  word `Georgia` in a remote location is the state, unless the location shows
+  that it is the country: `Remote - Georgia` passes and `Remote - Tbilisi,
+  Georgia` fails. The same holds for the word in a restriction (see "Georgia
+  in a restriction" below). Every other state is read without an entry. `locationVerdict` reads
   the key for every state (see "`locationVerdict` sorts every posting into
   three tiers" below).
 - Which list turns on which rule: the two bullets above read
@@ -192,8 +197,8 @@ workplace_policy:
 
 | Reading | What decides it | Example |
 | --- | --- | --- |
-| country | The place names a Georgian city (Tbilisi, Batumi, Kutaisi, Rustavi), says `Republic of Georgia` or `Georgia (country)`, or has a region word (EMEA, Europe, EU, Caucasus, CIS). Or the place names nothing but Georgia and a remote word, and every other place in the location is foreign | `Remote - Tbilisi, Georgia`, `Remote - Georgia, EMEA`, `Poland · Georgia · Bulgaria · Romania · Remote` |
-| state | The place also names a home place, another US state or the code `GA`. Or another place in the location is in the United States. Or no other place is foreign or possibly foreign, which covers a location with no other place and one whose other places the gate cannot identify | `Remote - Georgia or Florida`, `Georgia - Remote; Tennessee - Remote`, `Remote, Georgia`, `Remote - Georgia · Remote - Austin` |
+| country | The place names a Georgian city (Tbilisi, Batumi, Kutaisi, Rustavi), says `Republic of Georgia` or `Georgia (country)`, or has a region word (EMEA, Europe, EU, Caucasus, CIS). Or the place names nothing but Georgia and a remote word, and every other place in the location is foreign. Or the place names nothing but Georgia and a remote word, and another place names a Georgian city, `Republic of Georgia` or `Georgia (country)`, whatever else the location lists | `Remote - Tbilisi, Georgia`, `Remote - Georgia, EMEA`, `Poland · Georgia · Bulgaria · Romania · Remote`, `Remote - Georgia · Remote - Texas · Remote - Tbilisi` |
+| state | The place also names a home place, another US state or the code `GA`. Or another place in the location is in the United States and the country rule for a Georgian city does not apply. Or no other place is foreign or possibly foreign, which covers a location with no other place and one whose other places the gate cannot identify | `Remote - Georgia or Florida`, `Georgia - Remote; Tennessee - Remote`, `Remote, Georgia`, `Remote - Georgia · Remote - Austin` |
 | unsure | Anything else: Georgia with a city the gate does not know beside a foreign place, or Georgia alone beside a possibly foreign place or beside a mix of unknown and foreign places | `Remote - Savannah, Georgia · Remote - Poland`, `Remote - Georgia · Remote - CA`, `Remote - Georgia · Remote - Austin · Remote - Canada` |
 
 A place is possibly foreign when it is `CA`, `CO`, `DE`, `IL` or `IN` with no
@@ -225,20 +230,49 @@ Three things hold under every reading:
   `Tbilisi, Georgia` is `elsewhere`, and `Columbus, Georgia` is `review` with
   Georgia in `home_states`.
 
+### Georgia in a restriction
+
+With Georgia in `home_states`, the gate reads the word `Georgia` in a
+restriction as the home country. A restriction is a description clause the
+gate checks, or an "only" phrase in the description or the location. Under
+`Remote - United States` these descriptions pass: `Georgia residents only`,
+`Must be based in Georgia` and `Candidates must reside in Georgia or Florida`.
+The locations `Remote (Georgia only)` and `Remote - Georgia only` are `fit`.
+Without the key each one fails as a foreign country.
+
+The word stays the country in two cases:
+
+- The location reads its own Georgia as the country. `Remote - Tbilisi,
+  Georgia` with `Must be based in Georgia` fails,
+  `description_country_restricted`.
+- The sentence names a Georgian city, `Republic of Georgia`, `Georgia
+  (country)` or a region word. `Open to candidates in the Republic of Georgia
+  only` fails, `exclusive_foreign_country`.
+
+The reading does not confirm a remote role. `Remote` with `Must be based in
+Georgia` is `review`, `remote_eligibility_unconfirmed`.
+
 ## Country spellings, US territories and timezone abbreviations
 
 The gate takes its country names from `Intl.DisplayNames`. It adds the
 spellings boards use that those names lack: Turkey, Czech Republic, Hong Kong,
-Macau, Macao, Ivory Coast, Burma, Myanmar, Swaziland, East Timor, UAE,
-Democratic Republic of the Congo and DRC. The additions apply under every
-policy, in locations and in description text. `England` is not read inside
-`New England`.
+Macau, Macao, Ivory Coast, Burma, Myanmar, Swaziland, East Timor and
+Democratic Republic of the Congo. The additions apply under every policy, in
+locations and in description text. `England` is not read inside `New
+England`.
+
+`UAE` and `DRC` are read only where the gate reads country codes: in a
+location, in a country-list field, and in the place after `must be based in`.
+`Remote - UAE` is `remote_country_restricted`. Elsewhere in a description they
+are not countries, because `DRC` is also a design-rule check and `UAE Pass` is
+a sign-in service. `Run DRC only after LVS is clean` passes.
 
 Puerto Rico, Guam, American Samoa and the Northern Mariana Islands count as
 US places when the gate picks a Georgia reading, so `Remote - Georgia · Remote
 - Puerto Rico` reads Georgia as the state. The US Virgin Islands count through
 the `US` in the name. Alone, a territory is still foreign to the gate:
-`Remote - Puerto Rico` is `remote_country_restricted`.
+`Remote - Puerto Rico` is `remote_country_restricted`. The verdict makes it
+`review`.
 
 Under a US policy the gate strips US timezone abbreviations from a remote
 place that names a US state, and from a home place with its state beside it.
@@ -266,11 +300,15 @@ three are `review`.
 | Reason | When | Example |
 | --- | --- | --- |
 | `location_names_no_place` | An on-site location that names no specific place: the home country alone, a count of locations, or one state with no city | `United States`, `5 Locations`, `Georgia, USA` |
-| `remote_scoped_to_other_state` | The gate admits a remote role whose location names US states, none of them a home state, and no part of it is country-wide. Also a location the gate refuses that would pass if a Georgia that may be the state were one, or if a place written in capitals were not | `Remote, TN`, `Remote, CA, USA`, `REMOTE, TN`, an unsure Georgia |
+| `remote_scoped_to_other_state` | The gate admits a remote role whose location names US states, none of them a home state, and no part of it is country-wide. Also a location the gate refuses that would pass if a Georgia that may be the state were one, or if a place written in capitals were not. Also a remote location the gate refuses as another country, in which one place reads as a US place and none reads as foreign. A US place here is a city beside `CA`, `CO`, `DE`, `IL` or `IN`, a home place, or a US territory. This last rule applies only when the United States is a home country | `Remote, TN`, `Remote, CA, USA`, `REMOTE, TN`, an unsure Georgia, `Remote - Denver, CO`, `San Francisco, CA · Remote` |
 | `onsite_in_home_state` | An on-site place in a home state that `onsite_locations` does not name | `Kennesaw, GA` |
 
 The gate's `location_unknown` and `remote_eligibility_unconfirmed` are
-`review` too. Every other reason the gate gives for refusing is `elsewhere`.
+`review` too. So is `onsite_country_restricted`. The gate gives that reason
+only after it found a home place in the location, so the posting names the
+owner's town beside something that reads as another country: `Atlanta, GA or
+London, UK`, `San Francisco, CA / Atlanta, GA`. Every other reason the gate
+gives for refusing is `elsewhere`.
 
 `home_states` changes three answers:
 
@@ -288,10 +326,12 @@ capitals, both use the same Georgia reading, and the verdict strips timezones
 with the gate's own stripper (`gate.geographyText`).
 `tests/location-verdict-gate-agreement.test.mjs` pins the agreement.
 
-The two disagree on purpose in two cases. `Remote, TN` is eligible at the gate
-and `review` in the verdict. An unsure Georgia and a state code in an
-all-capitals place (`REMOTE, TN`) are not eligible at the gate and `review` in
-the verdict.
+The two disagree on purpose. `Remote, TN` is eligible at the gate and `review`
+in the verdict. These are not eligible at the gate and `review` in the
+verdict: an unsure Georgia, a state code in an all-capitals place (`REMOTE,
+TN`), a US city beside a code that is also a country's (`Remote - Denver,
+CO`), and a home place the gate refuses for what stands beside it (`Atlanta,
+GA or London, UK`).
 
 ## What the gate function carries
 
@@ -306,20 +346,24 @@ with no policy carries none of them, and its verdict is `fit`,
 | `gate.homeStates` | The USPS codes of `home_states`, in lower case, without duplicates. Empty when the key is absent | Which states are home |
 | `gate.homeCountryNames` | The names, spellings and ISO codes of the `remote_countries`, folded to lower case, longest first | Whether a place names the home country |
 | `gate.homePlaces` | The `onsite_locations`, folded to lower case | The Georgia reading |
-| `gate.geographyText` | A function that takes one place and returns it without timezone phrases (`MT working hours`) and without the US timezone abbreviations above | Reading a place as the gate reads it |
+| `gate.geographyText` | A function that takes one place and returns it without timezone phrases (`MT working hours`) and without the US timezone abbreviations above. It strips an abbreviation without checking that the place names a US state (`Remote - Estonia (EST)` loses its `(EST)`), so call it only on a place that does | Reading a place as the gate reads it |
 
 ## Known limits
 
 Each line was run against the gate under the Georgia policy above. The first
-three share one cause: the gate has no list of cities.
+three have one cause, which is that the gate has no list of cities.
 
 - A city the gate does not know is not evidence of a foreign place. `Remote -
   Georgia · Remote - Warsaw` is `fit`.
 - A city beside `CA`, `CO`, `DE`, `IL` or `IN` reads as a US place when the
   gate picks a Georgia reading. `Remote - Georgia · Toronto, CA` is `fit`.
-- Alone in a remote location, the same city and code read as the country.
-  `Remote - Denver, CO` is `elsewhere`, and `Chicago, IL / Remote` is
-  `elsewhere` (`IL` as Israel) unless Chicago is in `onsite_locations`.
+- Alone in a remote location, the same city and code are not eligible at the
+  gate, and the verdict makes them `review` whether the city is in the United
+  States or not. `Remote - Denver, CO`, `Remote - Berlin, DE` and `Remote -
+  Tel Aviv, IL` are all `review`. So is `Remote Europe - DE`, because the
+  verdict takes `Europe` for the city.
+- One of the five codes with no city is the country. `Remote, CA`, `Remote,
+  DE` and `Remote - IL` are `elsewhere`.
 - Holland, Wales, Scotland and Palestine are not read as countries, because
   each is also a US town (`Holland, MI`). `Remote - Georgia · Remote -
   Holland` is `fit`. Korea and Congo without their full names are not read
@@ -332,8 +376,34 @@ three share one cause: the gate has no list of cities.
   OH` is `elsewhere`. Turkey is the one exception, and only beside a state
   code that counts alone: `Remote - Turkey, TX` is eligible and `Remote -
   Turkey Run, IN` is `elsewhere`.
-- A home place with a timezone and no state keeps the timezone. `Atlanta (ET)`
-  is `elsewhere`, as Ethiopia.
+- A home place the gate refuses is `review`, never `fit`. `Atlanta (Georgia)`
+  and `Atlanta - Georgia` are refused because the state in brackets or after
+  a dash reads as the country. `Atlanta (ET)` is refused because a timezone
+  with no state beside it reads as Ethiopia.
+- A timezone abbreviation with no US place is a country code. `Remote - EST`
+  and `Remote - ET` are `elsewhere`, as Estonia and Ethiopia.
+- A placeholder is an on-site place outside the home area. `N/A`, `Not
+  specified` and `Flexible` are `elsewhere`.
+- A US territory alone is not a home place. `Remote - Puerto Rico` is not
+  eligible at the gate and `review` in the verdict, and `San Juan, PR` is
+  `elsewhere`.
+- A region word in another place does not make a bare Georgia the country
+  when a US state is listed too. `Remote - Georgia · Remote - Texas · Remote -
+  Europe` is `fit`. A Georgia with a city beside it is not covered by the
+  Georgian-city rule either: `Remote - Savannah, Georgia · Remote - Texas ·
+  Remote - Tbilisi` is `fit`.
+- With Georgia in `home_states`, a description that shuts Georgia out still
+  passes. `Georgia residents are not eligible` and `Not available in Georgia`
+  are `fit` under `Remote - United States`.
+- A location with no Georgia of its own does not make a description's Georgia
+  the country. `Remote - Europe` with `Must be based in Georgia` is `review`,
+  not `elsewhere`.
+- `home_states` has no effect under a policy whose home country is not the
+  United States. With `remote_countries: [Spain]` and `home_states:
+  [Georgia]`, `Remote - Georgia` and `Remote, GA` are `elsewhere`.
+- `turkey` in lower case is the country in a restriction clause. `Candidates
+  must be willing to quit legacy tooling cold turkey` fails,
+  `description_country_restricted`.
 - A bracket that joins `CT` or `MT` to another abbreviation is not stripped.
   `Remote - Georgia (ET/CT)` is `elsewhere`.
 - A place written all in capitals is `review` at best. `REMOTE, GA` and

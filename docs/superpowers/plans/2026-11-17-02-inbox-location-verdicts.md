@@ -319,6 +319,8 @@ Run: `git add web/src/lib/core/evaluate-candidates.mjs web/scripts web/tests/lib
 | `description_locality_restricted` | The posting text limits it to a narrower area. |
 | `description_onsite_restricted` | The posting text requires office days somewhere else. |
 
+Since plan 1's review fixes, `onsite_country_restricted` is tier `review`, not `elsewhere`, and its sentence must also cover a home area listed beside another place (`Atlanta, GA or London, UK`).
+
 `VERDICT_FALLBACK` is "Your scheduled scans' location hold does not admit this location." `VERDICT_SOURCE` is "Judged from the row's location and title, not the posting text."
 
 - [ ] **Step 1: Write the failing tests.** Create `web/tests/lib/inbox-verdict.test.mjs`. It imports `LOCATION_TIERS` from `../../../providers/_country.mjs`, the way `inbox-held.test.mjs` imports from `../../../lib/`. `CODE_ROOT` is built as in `evaluate-hold-settings.test.mjs:11`.

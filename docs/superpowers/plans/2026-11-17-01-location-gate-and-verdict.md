@@ -277,6 +277,8 @@ In `compileHomeState` (line 398) the `before` pattern accepts `<code>-` today. M
 
 ### Task 4: `home_states` and the gate's two properties
 
+> Superseded in part by Task 5b. This task reads every `Georgia` as the state when Georgia is a home state. Task 5b replaced that with the state, country and unsure readings. The text below is kept as written.
+
 The verdict's tiers turn on "a home state" twice, and the policy has cities and a country only. This task adds the fact as an optional key and makes the gate carry what `locationVerdict` needs, because `locationVerdict` takes the gate function and nothing else.
 
 Georgia is the one state whose full name the gate reads as a country (line 412). `Remote - Georgia` is `remote_country_restricted` today. So this task reads "Georgia" as a state name, in any letter case, when the policy says Georgia is home. With no home state the gate keeps today's answer and Task 5 turns it into `review`.
