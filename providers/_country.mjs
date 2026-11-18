@@ -163,8 +163,9 @@ const LABEL_ANYWHERE = new RegExp(`(?<![\\p{L}\\p{N}])${LABEL}(?![\\p{L}\\p{N}])
 const withoutScopeLabels = (text, isHome) => {
   if (typeof text !== 'string') return text;
   const lines = text.replace(BLOCK_TAG, '\n').replace(/&nbsp;|&#160;/gi, ' ');
-  // Labels are found and removed in the text without its tags: a label may have one inside it.
-  const flat = lines.replace(/<[^<>]*>/g, ' ').replace(/ +/g, ' ');
+  // Labels are found and removed in the text without its inline tags, which leave no space behind, as on the
+  // rendered page: a label may have one inside it ("<strong>USA</strong>-based roles only:").
+  const flat = lines.replace(/<[^<>]*>/g, '');
   return [...flat.matchAll(LABEL_ANYWHERE)].some(label => isHome(fold(label[1] ?? label[2]))) ? flat.replace(SCOPE_LABEL, '$1$2') : lines;
 };
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
