@@ -1127,6 +1127,72 @@ async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
   }
 }
 
+const GOOGLE_DS0_RE = /AF_initDataCallback\(\{key: 'ds:0', hash: '[^']*', data:([\s\S]*?), sideChannel: \{\}\}\);<\/script>/;
+// The record is positional. A field count other than this is the only sign that
+// positions moved, so it reads as no text.
+const GOOGLE_RECORD_FIELDS = 21;
+// Measured 2026-11-17 on 41 records: the shortest section was 342 characters of text.
+const GOOGLE_SECTION_FLOOR = 100;
+
+/**
+ * Posting text from a Google Careers detail page, or null. The page embeds the
+ * posting as one unnamed 21-field record in `ds:0`, and 20 unrelated postings in
+ * `ds:1`. So text is returned only when `ds:0` holds exactly one record of the
+ * known shape whose id is the URL's id. A missing posting is `ds:0 = []`.
+ *
+ * @param {string} html
+ * @param {string} id - The posting id from the URL.
+ * @param {string} postingUrl
+ * @param {number} [textCap]
+ * @returns {{url: string, title: string, text: string} | null}
+ */
+export function normalizeGoogleJob(html, id, postingUrl, textCap = JD_TEXT_CAP) {
+  const m = typeof html === 'string' ? html.match(GOOGLE_DS0_RE) : null;
+  if (!m) return null;
+  let data;
+  try { data = JSON.parse(m[1]); } catch { return null; }
+  if (!Array.isArray(data) || data.length !== 1) return null;
+  const r = data[0];
+  if (!Array.isArray(r) || r.length !== GOOGLE_RECORD_FIELDS || r[0] !== id) return null;
+  const filled = (v) => typeof v === 'string' && v.trim() !== '';
+  if (!filled(r[1]) || !filled(r[7])) return null;
+  // 3 responsibilities, 4 qualifications, 10 about. Each is a pair [null, "<html>"].
+  const section = (i) => (Array.isArray(r[i]) && r[i].length === 2 && typeof r[i][1] === 'string' ? jdHtmlToText(r[i][1]) : '');
+  const [responsibilities, qualifications, about] = [3, 4, 10].map(section);
+  if ([responsibilities, qualifications, about].some((text) => text.length < GOOGLE_SECTION_FLOOR)) return null;
+  if (!Array.isArray(r[9]) || !r[9].every((l) => Array.isArray(l) && filled(l[0]))) return null;
+  const locations = r[9].map((l) => l[0].trim()).join(' | ');
+  return {
+    url: postingUrl,
+    title: compactText(r[1], 300),
+    text: compactText([
+      [`Company: ${r[7].trim()}`, locations ? `Location: ${locations}` : ''].filter(Boolean).join('\n'),
+      `Qualifications:\n${qualifications}`,
+      `About the job:\n${about}`,
+      `Responsibilities:\n${responsibilities}`,
+    ].join('\n\n'), textCap),
+  };
+}
+
+async function fetchGoogleJd(apiUrl, id, postingUrl, textCap, timeoutMs) {
+  if (rejectPrivateOrInvalid(apiUrl)) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(apiUrl, {
+      headers: { accept: 'text/html', 'user-agent': DEFAULT_USER_AGENT },
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    if (!res.ok) return await discard(res);
+    return normalizeGoogleJob(await res.text(), id, postingUrl, textCap);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * ats id → fetcher. THE routing table `fetchJdViaKnownApi` dispatches through,
  * exported so the owned test can assert its key set IS `JD_TEXT_API_ATS`.
@@ -1138,7 +1204,7 @@ async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
  *
  * Every entry takes the same `(resolved, url, textCap, timeoutMs)` shape so
  * dispatch stays a lookup; the extra `parts` arguments (Ashby's `jobId`, Zoho
- * Recruit's, UltiPro's and HireHive's `id`) are unpacked inside their own
+ * Recruit's, UltiPro's, Google's and HireHive's `id`) are unpacked inside their own
  * entries rather than widening the shared signature.
  */
 export const JD_FETCHERS = {
@@ -1160,6 +1226,8 @@ export const JD_FETCHERS = {
     fetchZohoJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
   ultipro: (resolved, url, textCap, timeoutMs) =>
     fetchUltiproJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
+  google: (resolved, url, textCap, timeoutMs) =>
+    fetchGoogleJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
   hirehive: (resolved, url, textCap, timeoutMs) =>
     fetchHireHiveJd(resolved.apiUrl, resolved.parts.id, url, textCap, timeoutMs),
   hibob: fetchHibobJd,
