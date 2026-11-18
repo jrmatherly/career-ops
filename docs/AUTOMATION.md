@@ -300,26 +300,39 @@ Check the queue with `node evaluate-queue.mjs dump --json`.
 An Auto job can evaluate only postings that are confirmed remote or in your
 home area, and hold the rest for you. In the job form, Auto mode shows two
 fields: **Home area** (places you would work on-site or hybrid) and **Remote
-from** (countries you can work remotely from). Fill both to turn the hold on,
-and leave both empty to evaluate every location.
+from** (countries you can work remotely from). Fill both to turn the hold on.
 
-- **What is held.** A ranked row at or above the threshold whose location the
-  hold does not admit. The test is the workplace policy in
+A third field, **Home states**, is optional. List the US states you count as
+home, by name or code. Leave all three fields empty to evaluate every location.
+
+The location hold limits automatic evaluation only. Score in the web app, the
+CLI and batch runs evaluate whatever you give them.
+
+- **What is held.** A ranked row at or above the threshold whose location
+  verdict is not a fit. The verdict is `locationVerdict` in
   [WORKPLACE_GEOGRAPHY.md](WORKPLACE_GEOGRAPHY.md), given the location and
   title from the row's scan history. A posting that says only "Remote", one
-  with no location, and one in another city are all held. When **Remote
-  from** includes the United States, a remote posting that names a US state
-  is admitted (`Remote, TN`, `Remote - Texas`). Five state codes that boards
-  also write for a country are the exception (`CA`, `CO`, `DE`, `IL` and
-  `IN`): `Remote - CO` needs the country written out, a full state name or
-  another state's code in the same place (`Remote - Colorado, CO`,
-  `Remote - CO, UT`). So does
-  `Remote, Georgia`, which is read as the country unless `GA` is written
-  with it. Other codes that a country shares (`TN`, `AR`, `PA`, `GA`) are
-  read as the state.
-- **A held row is not dropped.** It stays in the Inbox with its rank and a
-  **Held: location** badge, and the ledger records it as `skipped` with the
-  reason `held-location`. Evaluate it from the Inbox when you want it.
+  with no location, and one in another city are all held. A remote posting
+  limited to a US state is held unless that state is one of the job's **Home
+  states**. `Remote, TN` is held, and `Remote, GA` and `Remote - Georgia` are
+  evaluated when Georgia is a home state. With no home state set, every remote
+  posting limited to one state is held. So is a posting that names no specific
+  place (`United States`, `5 Locations`, `Multiple US Locations`,
+  `Nationwide`), an on-site posting in a home state outside the home area
+  (`Kennesaw, GA`), and a posting open worldwide (`Remote, Global`,
+  `Home based - Worldwide`). [WORKPLACE_GEOGRAPHY.md](WORKPLACE_GEOGRAPHY.md)
+  says how a state code that is also a country code is read.
+- **A held row is not dropped.** It stays in the Inbox with its rank, and the
+  ledger records it as `skipped` with the reason `held-location`. Evaluate it
+  from the Inbox when you want it.
+- **The Inbox judges every pending row with the same verdict.** A row that any
+  scan's hold admits is a fit. Each other row carries a **Review location** or
+  **Elsewhere** badge, and the badge's tooltip gives the reason. The Inbox
+  opens on the fit rows. The **Review location**, **Elsewhere** and **All**
+  buttons show the rest. The Inbox takes the best verdict across every scan's
+  hold, paused scans included, so a row one scan held can be a fit under
+  another scan's hold. Pressing Score on a row that is not a fit is never
+  blocked. The confirm says how many of the rows are not a fit and why.
 - **A held row is not weighed again.** Changing the hold later does not
   release rows it already held. A row queued before the hold was set is
   checked again when its turn to be evaluated comes, and held then.

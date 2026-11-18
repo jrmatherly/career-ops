@@ -603,7 +603,8 @@ Restrictions in a description.
 The policy above drops an ineligible posting at scan time. A dashboard
 scheduled scan can use the same check without dropping anything: its location
 hold, set on the job in Auto mode, keeps an ineligible posting in the Inbox,
-ranked and marked **Held: location**, and only skips its automatic evaluation.
-The hold has its own two lists (home area and remote countries) and does not
-read `location_filter.workplace_policy`. See "Location hold" in
+ranked and marked **Review location** or **Elsewhere**, and only skips its
+automatic evaluation. The hold has its own lists (home area, remote countries
+and optional home states), lists no remote regions, holds every posting whose
+`locationVerdict` is not `fit`, and does not read `location_filter.workplace_policy`. See "Location hold" in
 [AUTOMATION.md](AUTOMATION.md).
