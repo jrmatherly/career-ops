@@ -21,6 +21,14 @@ const ALLOWED = [
   '<p><strong>Canada-based roles only:</strong> CA$1</p><p><strong>US-based&nbsp;roles only:</strong> $2</p>',
   'Canada-based roles only: CA$1.\nUS-based roles only - $2.',
   'USA-based roles <strong>only</strong>: $133,000 USD. Canada-based roles only: $125,000 CAD.',
+  // Words on either side of an inline tag stay apart, so a sentence after the labels reads as written.
+  '<p>USA-based roles only: $133,000 USD</p><p>Canada-based roles only: $125,000 CAD</p><span>Must be based in the United States</span><span>or Canada</span>',
+  // A home pay line counts as the sibling in the singular, without "only", or as a pay range.
+  'US pay range: $120k. Canada-based roles only: CA$100k.',
+  'US-based roles: $133,000 USD. Canada-based roles only: $125,000 CAD.',
+  'US-based role only: $133,000 USD. Canada-based roles only: $125,000 CAD.',
+  '<p>For US-based roles only: $150,000 - $180,000</p><p>For Canada-based roles only: CAD 160,000</p>',
+  '<p>US-based roles only: $150,000 - $180,000</p><p>The Canada-based roles only: CAD 160,000</p>',
   'USA-based roles only: $130,000. Canada-based <strong>roles</strong> only: $120,000.',
   '<strong>USA</strong>-based roles only: $130,000. <strong>Canada</strong>-based roles only: $120,000.',
   '<p><b>USA</b>-based <i>roles</i> only: $130,000</p><p><b>Canada</b>-based <i>roles</i> only: $120,000</p>',
@@ -95,4 +103,10 @@ test('under another home country its own label is the home label', () => {
   const es = (description) => spain('Remote - Spain', 'Platform Engineer', { description });
   assert.equal(es('Spain-based roles only: €50,000. UK-based roles only: £60,000.').eligible, true);
   assert.equal(es('UK-based roles only: £60,000.').eligible, false);
+});
+
+test('a home label is kept as evidence of the home country', () => {
+  for (const d of ['United States-based candidates only: This is a fully remote role.', '<p><strong>USA-based candidates only:</strong> work from home with quarterly travel.</p>',
+    '<p>USA-based roles only: $1</p><p>Canada-based roles only: $2</p><div><span>This is a remote role within the United States</span><span>Competitive benefits</span></div>'])
+    assert.deepEqual(gate('Remote', 'Platform Engineer', { description: d }), { eligible: true, reason: 'remote_region_allowed' }, d);
 });

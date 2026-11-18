@@ -85,8 +85,12 @@ list`.
   a home country, the gate takes every label out before it looks for
   restrictions: `USA-based roles only: $133,000 USD. Canada-based roles only:
   $125,000 CAD.` passes under a US policy, with or without tags around the
-  labels. The home label is found however it is written: after `the`, with
-  no colon, or anywhere in a sentence. A lone foreign label is a
+  labels. The home country's line is found however it is written: after
+  `the`, with no colon, anywhere in a sentence, in the singular or without
+  `only` (`US-based roles: $133,000 USD`), or as `US pay range`. A home label
+  stays in the text, since it may be the only place the posting names the
+  home country: `Remote` with `USA-based candidates only: This is a fully
+  remote role.` is eligible. A lone foreign label is a
   restriction, whatever follows it:
   `Canada-based roles only: $140,000 CAD` fails,
   `exclusive_foreign_country`. A restriction elsewhere in a labelled posting
@@ -316,14 +320,19 @@ Georgia` is `review`, `remote_eligibility_unconfirmed`.
 
 With `home_states` set, a description sentence that shuts a home state out
 of hiring fails the posting, `home_state_excluded`. The verdict makes it
-`elsewhere`. Two shapes are read, by the state's full name only:
+`review`, not `elsewhere`: the rule reads one sentence of prose, and a sentence
+it misreads (`Employees are eligible for unlimited PTO in all states except
+Georgia.`) must not hide a home posting. Two shapes are read, by the state's full name only:
 
 - A hiring negation before the state. It is a hire verb (`We cannot hire in
   Alabama, Georgia or Hawaii.`), `not available`, `not open`, `not eligible`
   or `not supported` said of the role or opening the sentence (`Not
   available in Georgia.`, `This role is not open to residents of Georgia.`),
-  or `except` or `excluding` after `states` (`Open to all US states except
-  Georgia.`). Other states may stand in the list. The state must end its
+  or `except` or `excluding` opening the sentence or after `states` in a
+  sentence with a hiring word before it, such as `open`, `hire`, `eligible`,
+  `available` or `candidates` (`Open to all US states except Georgia.`). `We
+  ship to all states except Georgia.` is not it. Other states may stand in
+  the list. The state must end its
   phrase or stand in a list of states, so `Georgia Power` and `Remote in all
   states except Georgia, where it is hybrid in Atlanta` are not it.
 - The state's residents before `not eligible`, `ineligible` or `excluded`:
@@ -334,7 +343,9 @@ posting. `Our headquarters is not in Georgia.`, `Paid family leave is not
 available in Georgia.` and `Applicants from Georgia are not eligible for
 relocation.` pass. A Georgia that is the country is not
 the home state: `Not available in Georgia, Armenia or Azerbaijan.` passes,
-and under `Remote - Tbilisi, Georgia` the location decides. A posting whose
+and under `Remote - Tbilisi, Georgia` the location decides. That question is
+Georgia's alone: another home state named in the same sentence is still shut
+out. A posting whose
 location names a home place is judged by that place, and the rule is not
 asked. Without
 `home_states` no sentence is read this way.
@@ -411,13 +422,14 @@ apply only under a US policy.
 | A placeholder | `location_names_no_place` | `N/A`, `Not specified`, `Flexible`, `See description` |
 | A remote location whose only place is a bare `CA`, `CO`, `DE`, `IL` or `IN`, a state or a country | `remote_scoped_to_other_state` | `Remote, CA` |
 | A remote location whose only place is a bare US timezone abbreviation, which is also a country code | `remote_eligibility_unconfirmed` | `Remote - EST` |
-| A location the gate reads as an office role, which names the home country and has a remote place of its own | `remote_eligibility_unconfirmed` | `United States - Remote; Preferred: Denver, CO - Hybrid, Hybrid` |
+| A location the gate reads as an office role, which names the home country and has a remote place of its own that names no foreign country | `remote_eligibility_unconfirmed` | `United States - Remote; Preferred: Denver, CO - Hybrid, Hybrid` |
 
 A foreign place written with such a code stays `elsewhere`: `Remote -
 Toronto, ON, CA`, `Remote - Tallinn, EST`. Every other reason the gate gives
 for refusing is `elsewhere`.
 
-`home_states` changes three answers:
+`home_states` turns on the `home_state_excluded` check above and changes
+three answers of the verdict:
 
 - With no `home_states`, any single state counts. A state-only location
   (`Texas`) and a state-scoped remote role (`Remote, GA`) are both `review`.

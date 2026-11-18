@@ -15,7 +15,7 @@ for (const d of [
   'We are unable to hire in the following states: Georgia, Hawaii, Alaska.',
   'Open to all US states except Georgia.', 'Open to candidates in all states excluding Georgia.', 'Excluding Georgia and Texas.',
   'We cannot hire in the state of Georgia.', 'We do not hire from Georgia.', 'Georgia candidates are excluded.', 'Georgia residents are ineligible.',
-  'Georgia applicants are not eligible for this role.', 'We cannot hire in the following US states: Georgia.', 'We cannot hire in District of Columbia or Georgia.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
+  'Georgia applicants are not eligible for this role.', 'We cannot hire in the following US states: Georgia.', 'We cannot hire in District of Columbia or Georgia.', 'We cannot hire in Georgia; sorry about that.', 'Georgia residents are not eligible, sadly.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
 ]) test(`a sentence that shuts the home state out of hiring is refused: ${d}`, () => assert.deepEqual(us(gate, d), EXCLUDED));
 
 for (const d of [
@@ -33,8 +33,8 @@ for (const d of [
   'You will cover the Southeast territory, excluding Georgia.', 'Territory: Southeast (excluding Georgia).',
   'Pay transparency: ranges are disclosed for all locations except Georgia and Texas.', 'Relocation assistance is not available for candidates in Georgia.',
   'Short-term disability is not supported in Georgia.', 'Sponsorship is not available in Georgia.', 'This position is not eligible for visa sponsorship in Georgia.',
-  'We do not hire contractors in Georgia; employees only.', 'Georgia residents are not eligible to apply for relocation assistance.', "Georgia-based candidates are not eligible for this role's relocation package.",
-  'Not available in Georgia, Armenia or Azerbaijan.', 'Not available in Georgia or elsewhere in the Caucasus.',
+  'We do not hire contractors in Georgia; employees only.', 'We ship to all states except Georgia.', 'Our product is sold in all states excluding Georgia.', 'Georgia residents are not eligible to apply for relocation assistance.', "Georgia-based candidates are not eligible for this role's relocation package.",
+  'Not available in Georgia, Armenia or Azerbaijan.', 'We cannot hire in Georgia or Russia.', 'Not available in Georgia or elsewhere in the Caucasus.',
   'Please Note: For US-based roles open to remote work, we are currently able to hire employees in the following states only: Arizona, California, Colorado, Florida, Georgia, Illinois, New York, Texas.',
 ]) test(`a sentence that is not about hiring in the home state stays eligible: ${d.slice(0, 80)}`, () => assert.deepEqual(us(gate, d), FIT));
 
@@ -45,13 +45,26 @@ test('each home state is read, and a longer name that starts with one is not', (
   assert.deepEqual(us(two, 'Not available in New York.'), EXCLUDED);
   assert.deepEqual(us(two, 'We cannot hire in New York or Georgia.'), EXCLUDED);
   assert.deepEqual(us(two, 'Not available in New York City.'), FIT);
+  const newYork = buildWorkplacePolicy({ ...HOLD, home_states: ['New York'] });
+  assert.deepEqual(us(newYork, 'We cannot hire in New York or Georgia.'), EXCLUDED);
+  assert.deepEqual(us(newYork, 'We cannot hire in Georgia or New York.'), EXCLUDED);
+  assert.deepEqual(us(newYork, 'We cannot hire in Georgia or Texas.'), FIT);
+  const virginia = buildWorkplacePolicy({ ...HOLD, home_states: ['Virginia'] });
+  assert.deepEqual(us(virginia, 'Virginia residents are not eligible.'), EXCLUDED);
+  assert.deepEqual(us(virginia, 'West Virginia residents are not eligible.'), FIT);
+  assert.deepEqual(us(virginia, 'We cannot hire in West Virginia.'), FIT);
+  const dc = buildWorkplacePolicy({ ...HOLD, home_states: ['DC'] });
+  assert.deepEqual(us(dc, 'We cannot hire in the District of Columbia.'), EXCLUDED);
 });
 
 test('a Georgia that is the country is not the home state', () =>
   assert.deepEqual(us(gate, 'Not available in Georgia.', 'Remote - Tbilisi, Georgia'), { eligible: false, reason: 'remote_country_restricted' }));
 
-test('the verdict for a shut-out home state is elsewhere', () =>
-  assert.deepEqual(locationVerdict(gate, 'Remote - United States', '', { description: 'Not available in Georgia.' }), { tier: 'elsewhere', reason: 'home_state_excluded' }));
+test('the verdict for a shut-out home state is review, so a sentence the rule misreads hides nothing', () => {
+  for (const d of ['Not available in Georgia.', 'Employees are eligible for unlimited PTO in all states except Georgia.', 'We are unable to hire in Georgia or any other non-US location.'])
+    assert.deepEqual(locationVerdict(gate, 'Remote - United States', '', { description: d }), { tier: 'review', reason: 'home_state_excluded' }, d);
+  assert.deepEqual(locationVerdict(gate, 'Savannah, GA', '', { description: 'We cannot hire in Georgia or Texas.' }), { tier: 'review', reason: 'home_state_excluded' });
+});
 
 test('a posting in a home town is judged by its location, whatever the description says of the state', () =>
   assert.deepEqual(us(gate, 'We cannot hire in Georgia.', 'Atlanta, GA'), { eligible: true, reason: 'onsite_location_allowed' }));

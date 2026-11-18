@@ -94,3 +94,16 @@ test('under another home country a list that names it is home with any noun', ()
   assert.equal(spain('Spain and Portugal residents only.').eligible, true);
   assert.equal(spain('Portugal and France residents only.').eligible, false);
 });
+
+test('a home country written with dots still reads a list that names it as home', () => {
+  const dotted = buildWorkplacePolicy({ onsite_locations: ['Atlanta'], remote_countries: ['U.S.'] });
+  assert.deepEqual(dotted('Remote - United States', 'Platform Engineer', { description: 'Candidates must be based in Canada or USA only.' }), { eligible: true, reason: 'remote_region_allowed' });
+});
+
+test('New England and New Mexico are not England and Mexico in a list', () => {
+  const uk = buildWorkplacePolicy({ onsite_locations: ['London'], remote_countries: ['United Kingdom'] });
+  const mx = buildWorkplacePolicy({ onsite_locations: ['Monterrey'], remote_countries: ['Mexico'] });
+  assert.equal(uk('Remote - United Kingdom', 'Platform Engineer', { description: 'Open to candidates in New England and Canada only.' }).eligible, false);
+  assert.equal(mx('Remote - Mexico', 'Platform Engineer', { description: 'Candidates in New Mexico and Canada only.' }).eligible, false);
+  assert.equal(mx('Remote - Mexico', 'Platform Engineer', { description: 'Mexico and Canada only.' }).eligible, true);
+});

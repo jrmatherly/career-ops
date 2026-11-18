@@ -79,7 +79,7 @@ const TABLE = [
   ['Remote - Wilmington, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote-Friendly (Travel Required) | San Francisco, CA', 'review', 'remote_scoped_to_other_state'],
   ['Remote - New York, NY', 'review', 'remote_scoped_to_other_state'],
-  // The same codes beside a foreign city cannot be told apart, so the first two are review too. With no city, or with the country written out, they are elsewhere.
+  // The same codes beside a foreign city cannot be told apart, so the first two are review too. A code with no city reads two ways and is review as well. With the country written out they are elsewhere.
   ['Remote - Berlin, DE', 'review', 'remote_scoped_to_other_state'],
   ['Remote - Tel Aviv, IL', 'review', 'remote_scoped_to_other_state'],
   ['Remote, CA', 'review', 'remote_scoped_to_other_state'],
