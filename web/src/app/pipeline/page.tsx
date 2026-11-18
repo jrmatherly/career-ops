@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { rootScript } from "@/lib/career-ops";
 import { runCoreCli } from "@/lib/core-cli";
 import { markGated, markVerdicts, pendingInbox } from "@/lib/inbox-pending.mjs";
+import { markNoText } from "@/lib/inbox-no-text.mjs";
 import { listScheduledJobs } from "@/lib/scheduled-jobs";
 import { storedHolds } from "@/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "@/lib/core/workplace-policy.mjs";
@@ -26,7 +27,7 @@ async function ledgerEntries(): Promise<{ url?: string; state?: string; reason?:
     const entries: unknown = JSON.parse(r.stdout);
     return Array.isArray(entries) ? entries : [];
   } catch (cause) {
-    console.error(`/pipeline: gated rows are not marked: ${cause instanceof Error ? cause.message : String(cause)}`);
+    console.error(`/pipeline: gated and no-text rows are not marked: ${cause instanceof Error ? cause.message : String(cause)}`);
     return [];
   }
 }
@@ -54,7 +55,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const unmarked = pendingInbox(inbox);
   const ledger = onInbox ? await ledgerEntries() : [];
   const { verdicts, problems } = onInbox ? await holdVerdicts() : { verdicts: [], problems: [] };
-  const pending = markVerdicts(markGated(unmarked, ledger), verdicts);
+  const pending = markNoText(markVerdicts(markGated(unmarked, ledger), verdicts), ledger);
   const holdProblem = holdProblemNote(problems, verdicts.length > 0);
   const fitted = onInbox ? withInboxFit(pending) : null;
   const trackerShape = readTrackerShape();

@@ -137,6 +137,41 @@ test("a scheduled scan keeps a comma inside a location entry", options, async (t
 });
 
 // Last in the file, because it writes to the fixture's pipeline.
+test("a posting with no readable text is marked and the chip filters to it", options, async (t) => {
+  const { page, errors } = await open(t);
+  await settled(page, () => page.goto(`${url}/pipeline`));
+  // The Inbox opens on Fit, and the marked row is the one fit row.
+  await row(page, "Fixture Beta").waitFor();
+  const chip = page.getByRole("button", { name: "Needs manual score 1", exact: true });
+  assert.equal(await chip.getAttribute("aria-pressed"), "false");
+  const mark = (company) => row(page, company).getByTitle(/^Not scored automatically/);
+  assert.equal(await mark("Fixture Beta").textContent(), "Needs manual score");
+  assert.equal(await mark("Fixture Beta").getAttribute("title"),
+    "Not scored automatically. No posting-text reader covered this job board when the drain tried it. Save it to the shortlist and score it yourself.");
+  assert.equal(await badge(page, "Fixture Beta").count(), 0, "a fit row has no verdict badge");
+
+  await tierButton(page, "All 4").click();
+  await row(page, "Fixture Alpha").waitFor();
+  assert.equal(await mark("Fixture Alpha").count(), 0);
+  assert.equal(await badge(page, "Fixture Alpha").count(), 1, "the verdict badge is still there");
+
+  await chip.click();
+  await tierButton(page, "All 1").waitFor();
+  assert.equal(await chip.getAttribute("aria-pressed"), "true");
+  assert.equal(await tierButton(page, "Fit 1").count(), 1, "the counts follow the chip");
+  assert.equal(await row(page, "Fixture Alpha").count(), 0);
+  assert.equal(await row(page, "Fixture Beta").count(), 1);
+
+  // Clear returns the tier to Fit, so Alpha stays out of view.
+  await page.getByRole("button", { name: "Clear" }).click();
+  await tierButton(page, "All 4").waitFor();
+  await row(page, "Fixture Beta").waitFor();
+  assert.equal(await chip.getAttribute("aria-pressed"), "false");
+  assert.equal(await tierButton(page, "Fit 1").getAttribute("aria-pressed"), "true");
+  assert.equal(await row(page, "Fixture Alpha").count(), 0, "Clear returns to Fit");
+  assert.deepEqual(errors, []);
+});
+
 test("Select all and Skip selected act on the tier in view", options, async (t) => {
   const relative = path.relative(os.tmpdir(), fs.realpathSync(root));
   assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative));

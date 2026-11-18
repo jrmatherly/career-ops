@@ -7,6 +7,7 @@ import { FRESHNESS_WINDOWS, SENIORITY_LABEL, type Seniority } from "@/lib/inbox"
 import { CostBadge } from "@/components/cost/cost-badge";
 import { cn } from "@/lib/cn";
 import { TIER_FILTERS, type TierFilter } from "@/lib/inbox-verdict.mjs";
+import { NO_TEXT_LABEL } from "@/lib/inbox-no-text.mjs";
 
 export type { TierFilter };
 
@@ -32,6 +33,8 @@ export function FacetChips({
   onClear,
   tiers,
   setTier,
+  noText,
+  toggleNoText,
 }: {
   within: number | null;
   setWithin: (d: number | null) => void;
@@ -52,6 +55,9 @@ export function FacetChips({
   /** The location segment's active tier and counts, or null when no scheduled scan has a hold. */
   tiers: { active: TierFilter; counts: Record<TierFilter, number> } | null;
   setTier: (tier: TierFilter) => void;
+  /** The "Needs manual score" chip, or null when no pending row is marked. */
+  noText: { on: boolean; count: number } | null;
+  toggleNoText: () => void;
 }) {
   return (
     <div className="space-y-2.5">
@@ -92,6 +98,7 @@ export function FacetChips({
             ))}
           </div>
         )}
+        {noText && <Pill on={noText.on} onClick={toggleNoText}>{`${NO_TEXT_LABEL} ${noText.count}`}</Pill>}
 
         {/* freshness (single-select segmented; click active to clear) */}
         <div className="inline-flex shrink-0 rounded-lg border border-border bg-surface/40 p-0.5">
@@ -155,6 +162,7 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   return (
     <button
       type="button"
+      aria-pressed={on}
       onClick={onClick}
       className={cn(
         "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors max-sm:min-h-[44px]",

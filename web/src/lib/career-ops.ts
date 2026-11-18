@@ -125,6 +125,9 @@ export type InboxJob = {
   gated?: string;
   /** Where the posting sits against the scheduled scans' location holds, set by markVerdicts. Absent when no scan has a hold. */
   verdict?: LocationVerdict;
+  /** A scheduled scan ranked this posting and the drain could not read its text, set by markNoText from the ledger's skipped row. */
+  noText?: boolean;
+  noTextReason?: "no-api-text" | "no-text";
 };
 
 import type { LocationTier, Verdict as LocationVerdict } from "./inbox-verdict.mjs";
