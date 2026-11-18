@@ -287,21 +287,23 @@ export function buildWorkplacePolicy(policy) {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
     const raw = typeof location === 'string' ? location : '';
     const parts = usHome ? stateParts(raw, homeAliases, onsite) : [];
+    const unlabelled = withoutScopeLabels(offer.description);
+    const loc = fold(location), heading = fold(title), prose = plain(unlabelled), written = plain(withCapitalUs(unlabelled));
     // A home state Georgia stands for the home country only in a sentence with no other country and no exclusion, in a posting that names no Georgian place.
     const georgiaIsHome = usHome && homeStateCodes.includes('ga') && !parts.some(one => one.georgia === 'country')
-      && !GEORGIAN_PLACE.test(fold(raw)) && !GEORGIAN_PLACE.test(plain(offer.description));
+      && !GEORGIAN_PLACE.test(fold(raw)) && !GEORGIAN_PLACE.test(written);
     const otherCountry = sentence => [...countries(sentence.replace(US_STATE_NAME, ' '))].some(code => code !== 'GE' && !homeCodes.has(code));
-    const withHomeGeorgia = text => georgiaIsHome ? text.replace(/[^.!?\n]+/g, sentence => otherCountry(sentence) || GEORGIA_EXCLUSION.test(sentence)
+    const withHomeGeorgia = text => georgiaIsHome && text.includes('georgia') ? text.replace(/[^.!?\n]+/g, sentence => sentence.search(GEORGIA_WORD) < 0 || otherCountry(sentence) || GEORGIA_EXCLUSION.test(sentence)
       || georgiaReading({ part: sentence, codes: false }, [], homeAliases, onsite) === 'country' ? sentence : sentence.replace(GEORGIA_WORD, 'united states')) : text;
-    const loc = fold(location), heading = fold(title), prose = plain(withoutScopeLabels(offer.description)),
-      written = plain(withCapitalUs(withoutScopeLabels(offer.description))), description = withHomeGeorgia(withHomeList(written));
+    const description = withHomeGeorgia(withHomeList(written));
     const meta = fold(requirementText(offer));
     const workplace = fold(offer.workplaceType || offer.workplace_type || offer.workArrangement);
     const fail = reason => ({ eligible: false, reason });
     if (excludedHome(`${loc}. ${heading}. ${meta}. ${written}`, homeAliases)) return fail('candidate_country_excluded');
     // An explicitly exclusive foreign country cannot be rescued by a mention
     // of Spain elsewhere in the same field ("Spain / UK only").
-    if (foreignOnly.some(pattern => pattern.test(`${withHomeGeorgia(loc)}. ${heading}. ${meta}. ${description}`))) return fail('exclusive_foreign_country');
+    const exclusive = `${withHomeGeorgia(loc)}. ${heading}. ${meta}. ${description}`;
+    if (foreignOnly.some(pattern => pattern.test(exclusive))) return fail('exclusive_foreign_country');
     if (meta && !supportsHome(meta) && (restricted(meta, true) || !has(meta, regions))) return fail('metadata_country_restricted');
     for (const sentence of description.split(/[.!?\n]+/)) {
       if (!/\bmust (?:be |currently )?(?:based|located|reside|live)\b/.test(sentence)) continue;
