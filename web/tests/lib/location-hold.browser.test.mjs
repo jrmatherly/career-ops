@@ -112,6 +112,28 @@ test("the Score confirm says which rows are not a location fit and still scores"
   assert.deepEqual(errors, []);
 });
 
+test("a scheduled scan keeps a comma inside a location entry", options, async (t) => {
+  const { page, errors } = await open(t);
+  await settled(page, () => page.goto(`${url}/scheduled-scans`));
+  await page.getByRole("button", { name: "New scan" }).first().click();
+  const dialog = page.getByRole("dialog");
+  const place = dialog.getByRole("textbox", { name: "City or location" });
+  await place.fill("Remote, US");
+  await place.press("Enter");
+  assert.equal(await dialog.getByRole("button", { name: "Remove Remote, US", exact: true }).count(), 1);
+  await place.evaluate((input) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData("text", "Atlanta, Alpharetta, Marietta");
+    input.dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }));
+  });
+  for (const chip of ["Atlanta", "Alpharetta", "Marietta"]) assert.equal(await dialog.getByRole("button", { name: `Remove ${chip}`, exact: true }).count(), 1, `a pasted list still splits: ${chip}`);
+  const roles = dialog.getByRole("textbox", { name: "Roles to find" });
+  await roles.fill("staff engineer, platform");
+  await roles.press("Enter");
+  for (const chip of ["staff engineer", "platform"]) assert.equal(await dialog.getByRole("button", { name: `Remove ${chip}`, exact: true }).count(), 1, `a title comma still splits: ${chip}`);
+  assert.deepEqual(errors, []);
+});
+
 // Last in the file, because it writes to the fixture's pipeline.
 test("Select all and Skip selected act on the tier in view", options, async (t) => {
   const relative = path.relative(os.tmpdir(), fs.realpathSync(root));

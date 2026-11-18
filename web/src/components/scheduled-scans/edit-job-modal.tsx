@@ -174,7 +174,7 @@ export function EditJobModal({
 
           {/* ─── Reuse FilterBuilder from Explore ─── */}
           <div className="rounded-xl border border-border bg-surface/30 p-4">
-            <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} />
+            <FilterBuilder filters={filters} onChange={setFilters} hideLists={filtersFrom === "file"} commaInLocations />
           </div>
 
           <EvaluateFields value={evaluate} onChange={setEvaluate} />
