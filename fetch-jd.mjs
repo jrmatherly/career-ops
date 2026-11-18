@@ -30,7 +30,7 @@
  * a shell that any text conversion, WebFetch included, reports as empty.
  * Every API fetch runs through fetchJdViaKnownApi() in browser-extract.mjs,
  * the same dispatch its own `jd` mode uses, plus the text-only boards
- * (Eightfold, Atlassian) that jd mode leaves to the page.
+ * (Eightfold, Atlassian, Google) that jd mode leaves to the page.
  */
 
 import { fetchJdViaKnownApi } from './browser-extract.mjs';

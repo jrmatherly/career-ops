@@ -475,6 +475,24 @@ const ATS_PROVIDERS = [
     timeoutMs: 20_000,
   },
   {
+    id: 'google',
+    // Google Careers posting pages, /about/careers/applications/jobs/results/{id}-{slug}.
+    // Measured 2026-11-17: there is no JSON API, and the detail page embeds the
+    // posting as a positional record in AF_initDataCallback `ds:0`. A made-up id
+    // answers 200 with `ds:0 = []`, which is too little to call a posting closed,
+    // so liveness stays with the browser. The request goes to the URL rebuilt
+    // from the id and slug, the form the scanner writes; a URL with no slug does
+    // not resolve.
+    jdTextOnly: true,
+    accept: 'text/html',
+    match(u) {
+      if (u.hostname !== 'www.google.com') return null;
+      const m = u.pathname.match(/^\/about\/careers\/applications\/jobs\/results\/(\d+)-([a-z0-9-]+)\/?$/);
+      return m ? { id: m[1], slug: m[2] } : null;
+    },
+    api: ({ id, slug }) => `https://www.google.com/about/careers/applications/jobs/results/${id}-${slug}`,
+  },
+  {
     id: 'arbeitsagentur',
     match(u) {
       if (u.hostname !== 'www.arbeitsagentur.de') return null;
@@ -1201,6 +1219,8 @@ export function isAtsPosting(url) {
 // Eightfold's per-position API carries `job_description` (PCSX: `jobDescription`),
 // and Atlassian's listings feed carries each posting's overview, responsibilities
 // and qualifications.
+// Google Careers has no JSON API; its posting page embeds the record as unnamed
+// positions, which `normalizeGoogleJob` reads only when the shape and the id match.
 // LinkedIn is on ATS_PROVIDERS
 // for liveness only — its public endpoint answers status, never body
 // text — so it is deliberately excluded here; see fetch-jd.mjs / the
@@ -1212,6 +1232,7 @@ export const JD_TEXT_API_ATS = new Set([
   'ashby',
   'atlassian-icims',
   'eightfold',
+  'google',
   'greenhouse',
   'greenhouse-embedded',
   'hibob',

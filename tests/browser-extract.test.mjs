@@ -610,6 +610,7 @@ try {
     ['hibob', 'https://acme.careers.hibob.com/jobs/0b1c2d3e-0000-4000-8000-000000000001'],
     ['eightfold', 'https://acme.eightfold.ai/careers?pid=42&domain=acme.com'],
     ['atlassian-icims', 'https://careers-americas.icims.com/jobs/90001/engineer/job'],
+    ['google', 'https://www.google.com/about/careers/applications/jobs/results/900000000000000001-platform-program-manager'],
   ];
   const routed = ATS_URL_SHAPES.map(([ats, url]) => {
     const resolved = resolveAtsApi(url);

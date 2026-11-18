@@ -28,6 +28,8 @@ fs.writeFileSync(path.join(root, "data/pipeline.md"), `# Fictional inbox
 fs.writeFileSync(path.join(root, "data/evaluate-queue.tsv"), [
   "url\tat\tjobId\trunId\trank\treason\tstate\tsource",
   `${HELD}\t${NOW}\t${JOB}\trun-1\t4.2\theld-location\tskipped\trank-pass`,
+  // The fit row was ranked, and the drain found no reader for its board.
+  `https://example.com/fixture-plain\t${NOW}\t${JOB}\trun-1\t\tno-api-text\tskipped\tdrain`,
   "",
 ].join("\n"));
 fs.writeFileSync(path.join(root, "data/scheduled-jobs.json"), JSON.stringify({

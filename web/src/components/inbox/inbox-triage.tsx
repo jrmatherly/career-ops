@@ -57,6 +57,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
   const [within, setWithin] = useState<number | null>(null);
   // null is the default tier: Fit when a scheduled scan has a hold, every row when none does.
   const [tier, setTier] = useState<TierFilter | null>(null);
+  const [needsScore, setNeedsScore] = useState(false);
   const [sources, setSources] = useState<Set<AtsSource>>(() => new Set());
   const [seniorities, setSeniorities] = useState<Set<Seniority>>(() => new Set());
   const [locQ, setLocQ] = useState("");
@@ -187,9 +188,10 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         if (seniorities.size && (!e.seniority || !seniorities.has(e.seniority))) return false;
         if (locQ.trim() && !(e.job.location || "").toLowerCase().includes(locQ.trim().toLowerCase())) return false;
         if (kw.trim() && !`${e.job.company} ${e.job.role}`.toLowerCase().includes(kw.trim().toLowerCase())) return false;
+        if (needsScore && !e.job.noText) return false;
         return true;
       }),
-    [enriched, hidden, added, within, sources, seniorities, locQ, kw],
+    [enriched, hidden, added, within, sources, seniorities, locQ, kw, needsScore],
   );
   const locationNote = useMemo(
     () => scoreLocationNote(shortlist, shortlistVerdicts(shortlist, inbox)),
@@ -197,7 +199,8 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
   );
   // Counted before the tier filter, so each segment button says what its tier holds.
   const counts = useMemo(() => tierCounts(matched.map((e) => e.job)), [matched]);
-  const otherFacets = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
+  const otherFacets = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "" || needsScore;
+  const noTextCount = useMemo(() => enriched.filter((e) => e.job.noText && !hidden.includes(e.job.url)).length, [enriched, hidden]);
   const { activeTier, anyFacet, capped } = tierView({ counts, tier, showAll, otherFacets });
   const filtered = useMemo(() => matched.filter((e) => inTier(e.job, activeTier)), [matched, activeTier]);
   const emptyCopy = inboxEmptyState(activeTier, counts, addedCopy);
@@ -431,9 +434,11 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         resultCount={filtered.length}
         totalCount={enriched.length - hiddenCount}
         anyActive={anyFacet}
-        onClear={() => { setAdded(null); setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); setTier(null); }}
+        onClear={() => { setAdded(null); setWithin(null); setSources(new Set()); setSeniorities(new Set()); setLocQ(""); setKw(""); setTier(null); setNeedsScore(false); }}
         tiers={counts && { active: activeTier, counts }}
         setTier={setTier}
+        noText={noTextCount > 0 || needsScore ? { on: needsScore, count: noTextCount } : null}
+        toggleNoText={() => setNeedsScore((on) => !on)}
       />
       {availAdded.length > 0 && (
         <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" role="group" aria-label="Added by scan date">

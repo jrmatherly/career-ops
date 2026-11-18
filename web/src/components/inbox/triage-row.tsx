@@ -13,6 +13,7 @@ import { compactLocation, displayCompany } from "@/lib/company-presentation.mjs"
 import { inboxScoreTarget } from "@/lib/inbox-score-target.mjs";
 import { agoLabel } from "@/lib/format-time.mjs";
 import { verdictBadge } from "@/lib/inbox-verdict.mjs";
+import { noTextBadge } from "@/lib/inbox-no-text.mjs";
 
 export type RowScore = { score: number | null; tone: "good" | "warn" | "bad" | "muted"; jobId: string; running: boolean; reportN?: number | null; needsReview?: boolean };
 
@@ -54,6 +55,7 @@ export function TriageRow({
   const company = displayCompany(job.company);
   const location = job.location ? compactLocation(job.location) : "";
   const verdict = verdictBadge(job.verdict);
+  const noText = noTextBadge(job);
   const title = (
     <>
       <span className="font-medium text-foreground">{company}</span>
@@ -97,6 +99,7 @@ export function TriageRow({
           {source && <span className="rounded bg-surface-hover px-1 py-px font-medium text-muted">{ATS_LABEL[source]}</span>}
           {ago && <span>{ago}</span>}
           {verdict && <Badge tone={verdict.tone} title={verdict.title}>{verdict.label}<span className="sr-only">: {verdict.reason}</span></Badge>}
+          {noText && !evaluated && <Badge tone={noText.tone} title={noText.title}>{noText.label}</Badge>}
           {job.gated ? (
             <Badge tone="bad">Gated: {job.gated}</Badge>
           ) : rankLabel && (

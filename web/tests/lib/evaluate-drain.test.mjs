@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -895,4 +896,111 @@ test("a hold that cannot be built is named on every run it leaves blocked", asyn
   historyOf(root, [[url(1), "Remote, United States"], [url(2), "Remote, United States"]]);
   await drain();
   for (const run of readScheduledStore(storePath).runs) assert.match(run.drainMessage ?? "", /^Location hold: /, `run ${run.id}`);
+});
+
+const UNREADABLE = "https://careers.example.test/job/5";
+const skipNoApiText = (root, u) => appendRow(root, { url: u, at: new Date(T0 - 30_000).toISOString(), jobId: JOB, runId: RUN, reason: "no-api-text", state: "skipped", source: "drain" });
+const ledgerText = (root) => fs.readFileSync(path.join(root, "data", "evaluate-queue.tsv"), "utf8");
+
+test("a row skipped as no-api-text is queued again once its board has a fetcher, and evaluated in the same pass", async (t) => {
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls: [url(1)], answer: () => done(7) });
+  await skipNoApiText(root, url(1));
+  const result = await drain();
+  assert.deepEqual(posts.map((post) => post.body.input), [url(1)]);
+  const entry = state(url(1));
+  assert.deepEqual(entry.rows.map((row) => [row.state, row.reason, row.source]), [
+    ["queued", "", "rank-pass"], ["skipped", "no-api-text", "drain"], ["queued", "fetcher-added", "drain"], ["running", "", "drain"], ["evaluated", "report 7", "drain"],
+  ]);
+  assert.equal(entry.rank, 5, "the rank the rank pass gave is kept");
+  assert.deepEqual([result.status, result.evaluated, result.queued], ["drained", 1, 0]);
+});
+
+test("a board that still has no fetcher stays skipped and the pass writes nothing", async (t) => {
+  const { root, drain, posts } = await withDrainRoot(t, { urls: [UNREADABLE] });
+  await skipNoApiText(root, UNREADABLE);
+  const before = ledgerText(root);
+  assert.equal((await drain()).status, "idle");
+  assert.equal(ledgerText(root), before);
+  assert.equal(posts.length, 0);
+});
+
+test("a revived row whose fetcher returns no text waits as no-text, is not revived twice, and ends as no-text", async (t) => {
+  const { root, drain, state } = await withDrainRoot(t, { urls: [url(1)] });
+  await skipNoApiText(root, url(1));
+  const empty = (now) => drain({ fetchJd: async () => null, now: () => now });
+  await empty(T0);
+  await empty(T0 + 60_000);
+  assert.deepEqual(state(url(1)).rows.slice(2).map((row) => [row.state, row.reason]), [["queued", "fetcher-added"], ["queued", "no-text: the ATS API returned no text"]]);
+  for (const hours of [6, 12, 18, 25]) await empty(T0 + hours * 3_600_000);
+  const final = readLedger(root, { now: T0 + 26 * 3_600_000 }).find((entry) => entry.url === url(1));
+  assert.deepEqual([final.state, final.reason], ["skipped", "no-text"]);
+  const before = ledgerText(root);
+  await empty(T0 + 27 * 3_600_000);
+  assert.equal(ledgerText(root), before, "a no-text skip is final");
+});
+
+test("a revived row still meets the job's location hold", async (t) => {
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, hold: HOLD } });
+  await skipNoApiText(root, url(1));
+  historyOf(root, [[url(1), "Metropolis, NY"]]);
+  await drain();
+  assert.equal(posts.length, 0);
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "held-location"]);
+});
+
+test("a revived row counts toward the daily cap only when it starts", async (t) => {
+  const { root, drain, state } = await withDrainRoot(t, { urls: [url(1), url(2)] });
+  fs.mkdirSync(path.join(root, "config"));
+  fs.writeFileSync(path.join(root, "config", "profile.yml"), "pipeline:\n  auto_evaluate_daily_cap: 1\n");
+  await skipNoApiText(root, url(2));
+  const result = await drain();
+  assert.equal(result.evaluated, 1);
+  assert.deepEqual([state(url(1)).state, state(url(2)).state, state(url(2)).reason], ["evaluated", "queued", "fetcher-added"]);
+});
+
+test("revived rows start no more than the job's limit for one pass", async (t) => {
+  const { root, drain, state, posts } = await withDrainRoot(t, { urls: [url(1), url(2)], evaluate: { ...AUTO, maxPerRun: 1 } });
+  await skipNoApiText(root, url(1));
+  await skipNoApiText(root, url(2));
+  await drain();
+  assert.equal(posts.length, 1);
+  assert.deepEqual([url(1), url(2)].map((u) => [state(u).state, state(u).reason].join(" ")).sort(), ["evaluated report 1", "queued fetcher-added"]);
+});
+
+test("a no-api-text row of a job that left auto mode is left alone", async (t) => {
+  const { root, drain, storePath } = await withDrainRoot(t, { urls: [url(1)] });
+  await skipNoApiText(root, url(1));
+  const store = JSON.parse(fs.readFileSync(storePath, "utf8"));
+  store.jobs[0].evaluate = { ...AUTO, mode: "manual" };
+  fs.writeFileSync(storePath, JSON.stringify(store));
+  const before = ledgerText(root);
+  await drain();
+  assert.equal(ledgerText(root), before);
+});
+
+test("a row ranked under its job's threshold today is not revived", async (t) => {
+  const { root, drain } = await withDrainRoot(t, { urls: [url(1)], evaluate: { ...AUTO, rankThreshold: 5.5 } });
+  await skipNoApiText(root, url(1));
+  const before = ledgerText(root);
+  await drain();
+  assert.equal(ledgerText(root), before);
+});
+
+test("a re-queue write that fails leaves the row skipped and the tick still evaluates the rest", async (t) => {
+  const { root, drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => done(7) });
+  await skipNoApiText(root, url(1));
+  // runDrain has no seam for the ledger write, so the append itself is made to fail for the re-queue row.
+  const append = fs.appendFileSync;
+  fs.appendFileSync = (file, text, ...rest) => {
+    if (String(text).includes("\tfetcher-added\t")) throw Object.assign(new Error("EIO: i/o error, write"), { code: "EIO" });
+    return append(file, text, ...rest);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { fs.appendFileSync = append; syncBuiltinESMExports(); });
+  const result = await drain();
+  assert.deepEqual([result.status, result.evaluated], ["drained", 1]);
+  assert.deepEqual(posts.map((post) => post.body.input), [url(2)]);
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "no-api-text"]);
+  assert.match(stderr.join(""), /queueing no-api-text rows again failed \(EIO: i\/o error, write\); they stay skipped until the next pass/);
+  assert.doesNotMatch(stderr.join(""), /queued again/);
 });
