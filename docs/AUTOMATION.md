@@ -274,9 +274,7 @@ Glob and Grep only. No network tool, no write tool, no apply, no submit.
 - **A daily cap.** `pipeline.auto_evaluate_daily_cap` in `config/profile.yml` (default
   10) caps the evaluations started (running rows) per UTC day across every job. When it
   is reached, the rows wait for the next UTC day.
-- **Boards with a public API only.** A row on a board whose posting text the
-  runner cannot read through an API is skipped as `no-api-text`; evaluate it
-  from the Inbox.
+- **Boards with a readable posting text only.** A row on a board whose posting text the runner cannot read is skipped as `no-api-text`, and the Inbox marks it **Needs manual score**. When a later version can read that board, the next tick queues the row again by itself, if its scan is still active and automatic and its rank still clears the threshold. It is then evaluated under the same limits and the same location hold. A posting whose text does not come in four tries over a day is skipped as `no-text`, gets the same mark, and is not tried again.
 - **Never twice.** A row you already evaluated from the Inbox, or one with a
   report or tracker row, is skipped.
 - **A limit stops the batch.** A usage limit, a rate limit, or a gateway whose
