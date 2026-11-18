@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+const html = readFileSync(process.argv[2], 'utf8');
+const blocks = {};
+for (const m of html.matchAll(/AF_initDataCallback\(\{key: '(ds:\d)', hash: '[^']*', data:([\s\S]*?), sideChannel: \{\}\}\);<\/script>/g)) blocks[m[1]] = JSON.parse(m[2]);
+const strip = (h) => (h ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const rec = (r) => ({ id: r[0], title: r[1].slice(0, 50), emp: r[7], resp: strip(r[3]?.[1]).length, qual: strip(r[4]?.[1]).length, about: strip(r[10]?.[1]).length, locs: (r[9] ?? []).map(l => l?.[0]).join(' | ').slice(0, 80) });
+if (blocks['ds:0']) console.log('ds:0', rec(blocks['ds:0'][0]));
+const list = blocks['ds:1']?.[0] ?? [];
+console.log('ds:1 cards', list.length, 'other top', JSON.stringify(blocks['ds:1']?.slice(1)).slice(0, 120));
+for (const r of list.slice(0, 20)) console.log(rec(r));
