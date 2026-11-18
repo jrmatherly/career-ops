@@ -17,7 +17,7 @@ import { holdVerdict } from "../src/lib/scheduled-job-input.mjs";
 import { CLAUDE_FATAL_STDERR_RE, FATAL_QUOTA_STDERR_RE, isTimeoutMessage } from "../src/lib/run-cli-support.mjs";
 import { readText, recordStepCounts } from "./scheduled-jobs-runner.mjs";
 import { normalizeUrl } from "../../url-key.mjs";
-import { HELD_LOCATION, appendRow, drainPlan, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
+import { HELD_LOCATION, NO_API_TEXT, NO_TEXT, appendRow, drainPlan, readAutoPdfThreshold, readDailyCap, readLedger, startedToday } from "../../lib/evaluate-queue.mjs";
 import { JD_TEXT_API_ATS, resolveAtsApi } from "../../liveness-api.mjs";
 import { fetchJdViaKnownApi } from "../../browser-extract.mjs";
 import { resolveTrackerPath } from "../../path-resolver.mjs";
@@ -233,6 +233,20 @@ export async function runDrain({
   const skippedRows = [];
   const ledger = readLedger(root, { now: now(), skipped: skippedRows });
   if (skippedRows.length) log(`${skippedRows.length} malformed row(s) in data/evaluate-queue.tsv skipped, first at line ${skippedRows[0].line}`);
+  // A row skipped for a missing reader is queued again once its board has one. The rank pass
+  // cannot do it: it sees only the current run's candidates, and the drain reads the whole
+  // ledger. Only a row its own active Auto job would still take is revived, so none waits
+  // under a job that will never drain it. A no-text skip is final.
+  let revived = 0;
+  for (const entry of ledger) {
+    if (entry.state !== "skipped" || entry.reason !== NO_API_TEXT) continue;
+    const job = jobs.find((candidate) => candidate.id === entry.jobId);
+    if (!job || !((entry.rank ?? -Infinity) >= job.evaluate.rankThreshold)) continue;
+    if (!JD_TEXT_API_ATS.has(resolveAtsApi(entry.url)?.ats)) continue;
+    await appendRow(root, { url: entry.url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason: "fetcher-added", state: "queued", source: "drain" });
+    revived += 1;
+  }
+  if (revived) log(`${revived} row(s) skipped as no-api-text now have a posting-text reader; queued again`);
   const dailyCap = readDailyCap(getProfilePath(root));
   const cvThreshold = readAutoPdfThreshold(getProfilePath(root));
   // Re-planned before each row, so the cap counts what this drain started and a
@@ -343,7 +357,7 @@ export async function runDrain({
           continue;
         }
         if (!JD_TEXT_API_ATS.has(resolveAtsApi(url)?.ats)) {
-          await append("skipped", "no-api-text");
+          await append("skipped", NO_API_TEXT);
           continue;
         }
         let jd = null;
@@ -365,7 +379,7 @@ export async function runDrain({
             .filter((row) => row.reason?.startsWith("no-text: "));
           if (tries.length >= NO_TEXT_GIVE_UP_TRIES && now() - Date.parse(tries[0].at) > NO_TEXT_GIVE_UP_MS) {
             log(`job ${job.id}: no posting text for ${url} in a day (${why}); it is skipped`);
-            await append("skipped", "no-text");
+            await append("skipped", NO_TEXT);
             continue;
           }
           log(`job ${job.id}: no posting text for ${url} this time (${why}); it stays queued`);
