@@ -598,8 +598,10 @@ export default {
           }
         }
         // A tenant that ignores the filter parameter answers with the whole
-        // board, and marking that would call every posting remote.
-        if (all.length > 0 && all.every((job) => remoteIds.has(job.externalId))) throw new Error('the filter returned every posting');
+        // board, and marking that would call every posting remote. A posting
+        // with no id can never be in the filtered set, so it is not counted.
+        const identified = all.filter((job) => job.externalId);
+        if (identified.length > 0 && identified.every((job) => remoteIds.has(job.externalId))) throw new Error('the filter returned every posting');
         const marked = markRemote(all, remoteIds);
         if (marked > 0) console.error(`ℹ️  eightfold: ${entry.name} marked ${marked} posting(s) Remote from the tenant's work-site filter`);
       } catch (err) {

@@ -451,6 +451,20 @@ try {
       : fail(`ignored filter: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
   }
 
+  {
+    // The same ignored filter on a board with one posting that has no id.
+    const noId = { name: 'No Id Role', canonicalPositionUrl: 'https://microsoft.eightfold.ai/careers/job/none', locations: ['Redmond, WA'] };
+    const board = () => pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role'), noId], 3);
+    const { ctx } = recording((c) => {
+      if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
+      return filterOf(c) !== null ? board() : withFilters(board());
+    });
+    const { result, errors } = await captureConsoleErrors(() => ef.fetch(TENANT, ctx));
+    result.length === 3 && result.every((j) => j.location === 'Redmond, WA') && errors.some((line) => /returned every posting/.test(String(line)))
+      ? pass('eightfold still refuses an ignored filter when one posting has no id')
+      : fail(`ignored filter with an id-less posting: ${JSON.stringify(result.map((j) => j.location))} ${JSON.stringify(errors)}`);
+  }
+
   const tenRemote = (count) => pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 2), `Remote ${i}`)), count);
 
   {
