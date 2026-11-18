@@ -43,17 +43,24 @@ export async function holdPolicyProblem(hold, codeRoot = resolveCodeRoot(process
     buildWorkplacePolicy(holdPolicy(hold));
     return null;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.startsWith('workplace_policy.home_states')) return '"Home states" must name US states, such as Georgia or GA.';
-    return message.startsWith('workplace_policy.remote_countries') ? '"Remote from" must name a country, such as United States.' : message;
+    return holdProblemText(error);
   }
+}
+
+// The gate's refusal of a hold, in the form's words where the form has a field for it.
+function holdProblemText(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  // The gate has three refusals under this key. Only the one that quotes an entry is about an unknown state.
+  if (message.startsWith('workplace_policy.home_states: "')) return '"Home states" must name US states, such as Georgia or GA.';
+  if (message.startsWith('workplace_policy.home_states names US states')) return '"Home states" apply only when "Remote from" includes the United States.';
+  return message.startsWith('workplace_policy.remote_countries') ? '"Remote from" must name a country, such as United States.' : message;
 }
 
 /**
  * One verdict function per stored hold (`storedHolds`). A hold the gate refuses is left out and named in `problems`.
  *
  * @param {{ name: string, hold: unknown }[]} holds
- * @returns {Promise<{ verdicts: Array<(location: string, title: string) => { tier: "fit" | "review" | "elsewhere", reason: string }>, problems: string[] }>}
+ * @returns {Promise<{ verdicts: Array<(location: string, title: string) => import("../inbox-verdict.mjs").Verdict>, problems: string[] }>}
  */
 export async function loadHoldVerdicts(holds, codeRoot = resolveCodeRoot(process.cwd(), process.env)) {
   const verdicts = [];
@@ -64,7 +71,7 @@ export async function loadHoldVerdicts(holds, codeRoot = resolveCodeRoot(process
     try {
       verdicts.push(holdVerdict(core, hold));
     } catch (error) {
-      problems.push(`"${name}": ${error instanceof Error ? error.message : String(error)}`);
+      problems.push(`"${name}": ${holdProblemText(error)}`);
     }
   }
   return { verdicts, problems };

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { holdProblemNote, TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, scoreLocationNote, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
+import { holdProblemNote, inboxEmptyState, shortlistVerdicts, tierView, TIER_FILTERS, VERDICT_FALLBACK, VERDICT_TIERS, bestVerdict, inTier, scoreLocationNote, tierCounts, tierEmptyState, verdictBadge } from "../../src/lib/inbox-verdict.mjs";
 import { markVerdicts } from "../../src/lib/inbox-pending.mjs";
 import { storedHolds } from "../../src/lib/scheduled-job-input.mjs";
 import { loadHoldVerdicts } from "../../src/lib/core/workplace-policy.mjs";
@@ -58,7 +58,7 @@ test("loadHoldVerdicts builds one verdict per hold and names the scan whose hold
   ], CODE_ROOT);
   assert.equal(verdicts.length, 1);
   assert.equal(problems.length, 2);
-  assert.match(problems[0], /^"Lost city": .*remote_countries/);
+  assert.equal(problems[0], '"Lost city": "Remote from" must name a country, such as United States.');
   assert.match(problems[1], /^"Edited": /);
   assert.deepEqual(await loadHoldVerdicts([], CODE_ROOT), { verdicts: [], problems: [] });
 });
@@ -161,4 +161,52 @@ test("holdProblemNote names each hold left out and says whether anything was jud
   assert.equal(holdProblemNote(['"Lost city": bad country'], true), 'Location hold: "Lost city": bad country. The Inbox judged locations without it.');
   assert.equal(holdProblemNote(['"A": x', '"B": y'], true), 'Location hold: "A": x; "B": y. The Inbox judged locations without them.');
   assert.equal(holdProblemNote(['"Lost city": bad country'], false), 'Location hold: "Lost city": bad country. No location was judged, so the Inbox shows every row.');
+});
+
+test("a tier the web does not know is read as review, never as a fit", () => {
+  const odd = { tier: "maybe", reason: "a_reason_added_later" };
+  assert.equal(bestVerdict([odd, elsewhere]), odd);
+  assert.equal(bestVerdict([odd, fit]), fit);
+  assert.equal(bestVerdict([odd, review]), odd, "the first of equals");
+  assert.deepEqual(tierCounts([{ verdict: odd }, { verdict: fit }]), { fit: 1, review: 1, elsewhere: 0, all: 2 });
+  assert.equal(inTier({ verdict: odd }, "review"), true);
+  assert.equal(inTier({ verdict: odd }, "fit"), false);
+  assert.deepEqual(verdictBadge(odd), { label: "Review location", tone: "warn", reason: VERDICT_FALLBACK, title: `${VERDICT_FALLBACK} Judged from the row's location and title, not the posting text.` });
+});
+
+test("tierView opens on Fit, and only the Fit tier with no other facet is capped", () => {
+  const counts = { fit: 30, review: 2, elsewhere: 1, all: 33 };
+  const view = (input) => tierView({ counts, tier: null, showAll: false, otherFacets: false, ...input });
+  assert.deepEqual(view({}), { activeTier: "fit", anyFacet: false, capped: true });
+  assert.deepEqual(view({ tier: "review" }), { activeTier: "review", anyFacet: true, capped: false });
+  assert.deepEqual(view({ tier: "all" }), { activeTier: "all", anyFacet: true, capped: false });
+  assert.deepEqual(view({ tier: "fit", otherFacets: true }), { activeTier: "fit", anyFacet: true, capped: false });
+  assert.deepEqual(view({ showAll: true }), { activeTier: "fit", anyFacet: false, capped: false });
+  // No hold: every row shows, the tier is not a facet, and a tier picked earlier is ignored.
+  assert.deepEqual(view({ counts: null, tier: "elsewhere" }), { activeTier: "all", anyFacet: false, capped: true });
+});
+
+test("inboxEmptyState points at the other tiers first, then the scan date, then the filters", () => {
+  const added = { title: "Nothing added on 2026-11-05", hint: "Pick another date." };
+  assert.deepEqual(inboxEmptyState("fit", { fit: 0, review: 2, elsewhere: 0, all: 2 }, added), { title: "No fit roles", hint: "2 under Review location." });
+  assert.equal(inboxEmptyState("all", { fit: 0, review: 0, elsewhere: 0, all: 0 }, added), added);
+  assert.deepEqual(inboxEmptyState("fit", null, null), { title: "No matches", hint: "Loosen the filters to see more of your inbox." });
+});
+
+test("scoreLocationNote lists reasons with equal counts in the badge sentences' order", () => {
+  const byUrl = new Map([["a", elsewhere], ["b", { tier: "review", reason: "remote_eligibility_unconfirmed" }], ["c", review]]);
+  assert.deepEqual(scoreLocationNote([{ url: "a" }, { url: "b" }, { url: "c" }], byUrl).reasons, [
+    "1 · Review location: The posting gives no location.",
+    "1 · Review location: Remote, and the posting does not say from where.",
+    "1 · Elsewhere: On-site or hybrid outside your home area.",
+  ]);
+});
+
+test("shortlistVerdicts keeps a saved row's verdict once the row has left the Inbox", () => {
+  const saved = [{ url: "gone", verdict: elsewhere }, { url: "here", verdict: elsewhere }, { url: "plain" }];
+  const byUrl = shortlistVerdicts(saved, [{ url: "here", verdict: fit }, { url: "plain" }]);
+  assert.equal(byUrl.get("gone"), elsewhere);
+  assert.equal(byUrl.get("here"), fit, "the Inbox's current verdict wins");
+  assert.equal(byUrl.has("plain"), false);
+  assert.equal(scoreLocationNote(saved, byUrl).summary, "1 of 3 is not a location fit. You can still score it.");
 });

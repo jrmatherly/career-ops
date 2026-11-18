@@ -9,7 +9,10 @@ import { cn } from "@/lib/cn";
 import { formatRunCostEstimate } from "@/lib/run-cost-estimate.mjs";
 import { EvaluationOptions } from "@/components/evaluation-options";
 
-export type ShortItem = { url: string; company: string; role: string };
+import type { LocationVerdict } from "@/lib/career-ops";
+
+/** `verdict` is the row's location verdict when it was saved, for a row that has since left the Inbox. */
+export type ShortItem = { url: string; company: string; role: string; verdict?: LocationVerdict };
 
 // The persistent shortlist tray — bottom-sheet on mobile (thumb-zone), floating card
 // on desktop. "Score shortlist" is the ONLY token spend in the whole inbox: cost is

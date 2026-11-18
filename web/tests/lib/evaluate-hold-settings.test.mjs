@@ -146,3 +146,14 @@ test("stored home states the form cannot show are kept by an unchanged save and 
   assert.equal("hold" in evaluateBody(evaluateForm(stored), stored), false);
   assert.deepEqual(evaluateBody({ ...evaluateForm(stored), holdStates: ["Georgia"] }, stored).hold, STATES);
 });
+test("a hold with an entry that is not text is refused, not judged with the entry dropped", async () => {
+  const core = await import(pathToFileURL(path.join(CODE_ROOT, "providers", "_country.mjs")).href);
+  for (const hold of [{ ...HOLD, onsiteLocations: ["Springfield", 5] }, { ...HOLD, remoteCountries: ["United States", null] }, { ...HOLD, homeStates: ["Georgia", {}] }]) {
+    assert.throws(() => holdVerdict(core, hold), { message: "A location hold entry is not text." });
+    assert.equal(await holdPolicyProblem(hold, CODE_ROOT), "A location hold entry is not text.");
+  }
+});
+test("holdPolicyProblem tells an unknown home state from home states with no United States", async () => {
+  assert.equal(await holdPolicyProblem({ onsiteLocations: ["Springfield"], remoteCountries: ["Canada"], homeStates: ["Georgia"] }, CODE_ROOT), '"Home states" apply only when "Remote from" includes the United States.');
+  assert.equal(await holdPolicyProblem({ ...HOLD, homeStates: ["Ontario"] }, CODE_ROOT), '"Home states" must name US states, such as Georgia or GA.');
+});

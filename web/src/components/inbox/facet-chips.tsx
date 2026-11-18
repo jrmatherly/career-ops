@@ -6,10 +6,9 @@ import { ATS_LABEL } from "@/lib/explore";
 import { FRESHNESS_WINDOWS, SENIORITY_LABEL, type Seniority } from "@/lib/inbox";
 import { CostBadge } from "@/components/cost/cost-badge";
 import { cn } from "@/lib/cn";
-import type { LocationTier } from "@/lib/career-ops";
-import { TIER_FILTERS } from "@/lib/inbox-verdict.mjs";
+import { TIER_FILTERS, type TierFilter } from "@/lib/inbox-verdict.mjs";
 
-export type TierFilter = LocationTier | "all";
+export type { TierFilter };
 
 // Free, client-side facets over the raw firehose — 0 tokens, instant. Mirrors the
 // Explore chip language so the two surfaces read as one system. On mobile the chip
@@ -77,7 +76,7 @@ export function FacetChips({
       <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
         {tiers && (
           <div role="group" aria-label="Location fit" className="inline-flex shrink-0 rounded-lg border border-border bg-surface/40 p-0.5">
-            {(TIER_FILTERS as { id: TierFilter; label: string }[]).map(({ id, label }) => (
+            {TIER_FILTERS.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"

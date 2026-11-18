@@ -72,8 +72,8 @@ export function markGated(jobs, ledgerEntries) {
  *
  * @template {{ location?: string, role?: string }} T
  * @param {T[]} jobs
- * @param {Array<(location: string, title: string) => { tier: "fit" | "review" | "elsewhere", reason: string }>} verdicts
- * @returns {(T & { verdict?: { tier: "fit" | "review" | "elsewhere", reason: string } })[]}
+ * @param {Array<(location: string, title: string) => import("./inbox-verdict.mjs").Verdict>} verdicts
+ * @returns {(T & { verdict?: import("./inbox-verdict.mjs").Verdict })[]}
  */
 export function markVerdicts(jobs, verdicts) {
   if (!verdicts.length) return jobs;

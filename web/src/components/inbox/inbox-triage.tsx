@@ -13,7 +13,7 @@ import { cursorAfterRemoval, inboxCommand, moveCursor, selectionWithAll, selecti
 import { inboxScoreTarget, skippableJobs } from "@/lib/inbox-score-target.mjs";
 import { addedEmptyState, addedParam, compareInboxJobs, latestAddedDates } from "@/lib/inbox-sort.mjs";
 import { FacetChips, type TierFilter } from "./facet-chips";
-import { inTier, scoreLocationNote, tierCounts, tierEmptyState } from "@/lib/inbox-verdict.mjs";
+import { inboxEmptyState, inTier, scoreLocationNote, shortlistVerdicts, tierCounts, tierView } from "@/lib/inbox-verdict.mjs";
 import { TriageRow, type RowScore } from "./triage-row";
 import { ShortlistTray, type ShortItem } from "./shortlist-tray";
 import { cn } from "@/lib/cn";
@@ -192,21 +192,20 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
     [enriched, hidden, added, within, sources, seniorities, locQ, kw],
   );
   const locationNote = useMemo(
-    () => scoreLocationNote(shortlist, new Map(inbox.flatMap((job) => (job.verdict ? [[job.url, job.verdict]] : [])))),
+    () => scoreLocationNote(shortlist, shortlistVerdicts(shortlist, inbox)),
     [shortlist, inbox],
   );
   // Counted before the tier filter, so each segment button says what its tier holds.
   const counts = useMemo(() => tierCounts(matched.map((e) => e.job)), [matched]);
-  const activeTier: TierFilter = counts ? tier ?? "fit" : "all";
+  const otherFacets = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "";
+  const { activeTier, anyFacet, capped } = tierView({ counts, tier, showAll, otherFacets });
   const filtered = useMemo(() => matched.filter((e) => inTier(e.job, activeTier)), [matched, activeTier]);
-  const tierCopy = tierEmptyState(activeTier, counts);
+  const emptyCopy = inboxEmptyState(activeTier, counts, addedCopy);
 
   // 🔴 SINGLE ORDER PLUG POINT — compareInboxJobs (gated last, ranked rows first, then freshness),
   // with the zero-token fit ordering the unranked rows. Facets/triage/shortlist/score never touch relevance.
   const ordered = useMemo(() => [...filtered].sort(compareWithFit), [filtered]);
 
-  const anyFacet = added != null || within != null || sources.size > 0 || seniorities.size > 0 || locQ.trim() !== "" || kw.trim() !== "" || (counts != null && activeTier !== "fit");
-  const capped = !showAll && !anyFacet;
   const visible = useMemo(() => (capped ? ordered.slice(0, BATCH) : ordered), [capped, ordered]);
   const hiddenCount = hidden.length;
 
@@ -246,7 +245,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
 
   const save = (job: InboxJob) => {
     if (isShortlisted(job.url)) return;
-    setShortlist((s) => [...s, { url: job.url, company: job.company, role: job.role }]);
+    setShortlist((s) => [...s, { url: job.url, company: job.company, role: job.role, verdict: job.verdict }]);
   };
   const skip = (job: InboxJob) => {
     setWriteError("");
@@ -292,7 +291,7 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
   const saveSelected = () => {
     const add = visible
       .filter((e) => selected.has(e.job.url) && !isShortlisted(e.job.url))
-      .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role }));
+      .map((e) => ({ url: e.job.url, company: e.job.company, role: e.job.role, verdict: e.job.verdict }));
     if (add.length) setShortlist((s) => [...s, ...add]);
     setSelected(new Set());
   };
@@ -511,8 +510,8 @@ export function InboxTriage({ inbox, scanDates }: { inbox: InboxJob[]; scanDates
         </ul>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-10 text-center">
-          <p className="font-display text-lg">{tierCopy?.title ?? addedCopy?.title ?? "No matches"}</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{tierCopy?.hint ?? addedCopy?.hint ?? "Loosen the filters to see more of your inbox."}</p>
+          <p className="font-display text-lg">{emptyCopy.title}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{emptyCopy.hint}</p>
         </div>
       )}
 

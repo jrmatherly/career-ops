@@ -24,12 +24,18 @@ function clamped(value, fallback, minimum, maximum, round, label) {
 }
 
 /** The workplace policy (providers/_country.mjs) a stored hold stands for. */
-export const holdPolicy = (hold) => ({ onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries, home_states: hold.homeStates ?? [] });
+export function holdPolicy(hold) {
+  const policy = { onsite_locations: hold.onsiteLocations, remote_countries: hold.remoteCountries, home_states: hold.homeStates ?? [] };
+  // The gate drops an entry that is not text, which would judge a store edited by hand with part of its hold missing.
+  if (Object.values(policy).some((list) => Array.isArray(list) && list.some((entry) => typeof entry !== "string"))) throw new Error("A location hold entry is not text.");
+  return policy;
+}
 
 /**
  * The verdict a stored hold gives a location: `core` is the providers/_country.mjs module. Throws what the gate throws.
  *
- * @returns {(location: string, title: string) => { tier: "fit" | "review" | "elsewhere", reason: string }}
+ * @param {unknown} hold
+ * @returns {(location: string, title: string) => import("./inbox-verdict.mjs").Verdict}
  */
 export function holdVerdict(core, hold) {
   const gate = core.buildWorkplacePolicy(holdPolicy(hold ?? {}));

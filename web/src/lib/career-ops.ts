@@ -127,8 +127,8 @@ export type InboxJob = {
   verdict?: LocationVerdict;
 };
 
-export type LocationTier = "fit" | "review" | "elsewhere";
-export type LocationVerdict = { tier: LocationTier; reason: string };
+import type { LocationTier, Verdict as LocationVerdict } from "./inbox-verdict.mjs";
+export type { LocationTier, LocationVerdict };
 
 /** Parse data/pipeline.md. The row grammar and its labeled-segment handling
  *  live in pipeline-table.mjs — see there for the column rules (#1015, #1017). */
