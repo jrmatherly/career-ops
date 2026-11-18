@@ -546,6 +546,7 @@ Plan: `docs/superpowers/plans/2026-11-17-03-provider-location-resolution.md`. Sp
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
 | `providers/bamboohr.mjs` builds `location` from `location.city`, `location.state` and `isRemote` | `parseBambooHRResponse` falls back to `atsLocation` (city, state or province, country) when `location` is empty and appends `Remote` when `locationType` is `1`; cases added to `tests/providers/bamboohr.test.mjs` | landed 2026-11-18 | ADAPT. Keep our location rule in the row mapping and take upstream's other hunks. `tests/providers/bamboohr.test.mjs` pins it |
+| `providers/eightfold.mjs` takes `location` and `locations[]` from the search rows and reads no work-site field | on a PCSX tenant whose `filterDef.smartFilters` has a `work_site` option that says remote, `fetch` walks `/api/pcsx/search` once more with `filter_work_site` and `markRemote` appends ` · Remote` to those postings, or changes nothing when that walk fails or is cut short; `remoteWorkSiteValues`, `markRemote` and the third parameter of `buildPcsxUrl` are ours; cases added to `tests/providers/eightfold.test.mjs` | landed 2026-11-18 | ADAPT. Keep the remote pass and its helpers and take upstream's other hunks. `tests/providers/eightfold.test.mjs` pins it |
 
 ## Decision log template
 
