@@ -151,16 +151,17 @@ const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, 
 const places = (location) => location.split(/[·;]/);
 // The country reader splits on parentheses, not square brackets, so "[IE]" is written as "(IE)".
 const brackets = (text) => text.replace(/\[/g, '(').replace(/\]/g, ')');
-const CURRENCY = 'usd|cad|gbp|eur|aud|mxn';
-const AMOUNT = `(?:[$£€]\\s?\\d|\\d[\\d,.]*k?\\s?(?:${CURRENCY})\\b|\\b(?:${CURRENCY})\\s?\\d)`;
-const NOTICE = 'privacy\\s+(?:notice|policy|statement)';
 // A block tag becomes a newline, which ends a sentence here: a label in one list item must not reach the next.
 const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section)\b[^<>]*>/gi;
 const LABEL_PLACE = `(?:${[...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat('us').sort((a, b) => b.length - a.length).map(escape).join('|')})`;
-// "Canada-based roles only:" before pay or a privacy notice scopes that line, not who can be hired. The pay or the
-// notice must start within 80 characters, about one line: further on it is another statement's.
-const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^<>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only(?:\\s*<[^<>]*>)*\\s*:(?![^.!?\\n]*\\b(?:no|not|cannot|can['’]t|unable|(?:limited|restricted) to)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
-const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLOCK_TAG, '\n').replace(SCOPE_LABEL, '$1$2') : text;
+// "Canada-based roles only:" heads one country's section of a posting written for several. The place is captured.
+const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^<>]*>\\s*)*)(?:(?:for )?(${LABEL_PLACE})(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for (${LABEL_PLACE})) only(?:\\s*<[^<>]*>)*\\s*:`, 'gi');
+// The labels are headings only where one of them names a home country. A posting whose one label is foreign is a foreign role.
+const withoutScopeLabels = (text, isHome) => {
+  if (typeof text !== 'string') return text;
+  const lines = text.replace(BLOCK_TAG, '\n');
+  return [...lines.matchAll(SCOPE_LABEL)].some(label => isHome(fold(label[3] ?? label[4]))) ? lines.replace(SCOPE_LABEL, '$1$2') : lines;
+};
 // "US" in capitals is the country in a sentence whose own text has a lower-case letter. Tags and entities
 // are not its text. Folded, "US" would be the pronoun.
 const US_CAPITAL = /(?<![\p{L}\p{N}.])(?<!\b(?:ABOUT|JOIN|WHY|CONTACT|WITH) )US(?![\p{L}\p{N}])/gu;
@@ -303,7 +304,7 @@ export function buildWorkplacePolicy(policy) {
     const raw = typeof location === 'string' ? location : '';
     // prose has no capital US read as the country, so "US" never confirms a remote role. written has it, for exclusions.
     // restrictions also reads Georgia and a country list as home, for the clause checks.
-    const unlabelled = withoutScopeLabels(offer.description);
+    const unlabelled = withoutScopeLabels(offer.description, place => homeAliases.includes(place));
     const capital = withCapitalUs(unlabelled);
     const loc = fold(location), heading = fold(title), prose = plain(unlabelled), written = capital === unlabelled ? prose : plain(capital);
     const context = usHome && (loc.includes('georgia') || written.includes('georgia')) ? georgiaContext(heading, written) : null;
