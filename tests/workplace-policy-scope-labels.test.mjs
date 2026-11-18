@@ -75,6 +75,9 @@ const REJECTED = [
   ['Canada-based roles only: $140,000 CAD plus restricted stock units.', FOREIGN_ONLY],
   ['Canada-based candidates only: Apply by Friday; privacy notice below.', FOREIGN_ONLY],
   ['Canada-based roles only: $125,000 CAD. UK-based roles only: £87,000 GBP.', FOREIGN_ONLY],
+  // A home line after a negation in its sentence is not the sibling.
+  ['Canada-based candidates only: We do not offer US-based roles.', FOREIGN_ONLY],
+  ['Canada-based roles only: $140,000 CAD. There are no US-based positions on this team.', FOREIGN_ONLY],
   // A home label makes the labels headings, and a restriction elsewhere in the posting still counts.
   ['USA-based roles only: $133,000 USD. Canada-based roles only: $125,000 CAD. You must be based in Canada.', COUNTRY_RESTRICTED],
   ['USA-based roles only: $133,000 USD. This role is UK only.', FOREIGN_ONLY],

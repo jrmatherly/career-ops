@@ -15,7 +15,7 @@ for (const d of [
   'We are unable to hire in the following states: Georgia, Hawaii, Alaska.',
   'Open to all US states except Georgia.', 'Open to candidates in all states excluding Georgia.', 'Excluding Georgia and Texas.',
   'We cannot hire in the state of Georgia.', 'We do not hire from Georgia.', 'Georgia candidates are excluded.', 'Georgia residents are ineligible.',
-  'Georgia applicants are not eligible for this role.', 'We cannot hire in the following US states: Georgia.', 'We cannot hire in District of Columbia or Georgia.', 'We cannot hire in Georgia; sorry about that.', 'Georgia residents are not eligible, sadly.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
+  'Georgia applicants are not eligible for this role.', 'We cannot hire in the following US states: Georgia.', 'We cannot hire in District of Columbia or Georgia.', 'We cannot hire in Georgia; sorry about that.', 'We cannot hire in Georgia, District of Columbia.', 'Georgia residents are not eligible, sadly.', 'This position is not open to residents of Georgia, Alaska or Hawaii.',
 ]) test(`a sentence that shuts the home state out of hiring is refused: ${d}`, () => assert.deepEqual(us(gate, d), EXCLUDED));
 
 for (const d of [

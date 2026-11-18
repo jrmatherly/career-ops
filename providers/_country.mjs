@@ -161,8 +161,8 @@ const LABEL = `(?:(?:for )?(?:the )?(${LABEL_PLACE})(?:${BASED})? (?:roles|posit
 const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*)${LABEL}\\s*:`, 'gi');
 const ANY_LABEL = new RegExp(`(?<![\\p{L}\\p{N}])${LABEL}(?![\\p{L}\\p{N}])`, 'iu');
 // The home country's own line, read loosely, because missing it turns its foreign sibling into a restriction: a label
-// anywhere and with no colon, in the singular or without "only" ("US-based roles: $1"), or a pay range ("US pay range").
-const HOME_SIBLING = new RegExp(`(?<![\\p{L}\\p{N}])(?:${LABEL}|(${LABEL_PLACE})${BASED} (?:role|position|candidate|applicant|employee|hire)s?|(${LABEL_PLACE}) (?:role|position) only|(${LABEL_PLACE}) pay ranges?)(?![\\p{L}\\p{N}])`, 'giu');
+// anywhere and with no colon, in the singular or without "only" ("US-based roles: $1"), or a pay range ("US pay range"). Not after a negation in its sentence ("We do not offer US-based roles").
+const HOME_SIBLING = new RegExp(`(?<![\\p{L}\\p{N}])(?<!\\b(?:no|not|non|never|cannot|can't|don't|doesn't)\\b[^.!?\\n]{0,40})(?:${LABEL}|(${LABEL_PLACE})${BASED} (?:role|position|candidate|applicant|employee|hire)s?|(${LABEL_PLACE}) (?:role|position) only|(${LABEL_PLACE}) pay ranges?)(?![\\p{L}\\p{N}])`, 'giu');
 // The labels are headings only where the posting has a home country's line too. A posting whose one label is foreign is
 // a foreign role. A home label stays in the text: it may be the only place the posting names the home country.
 const withoutScopeLabels = (text, isHome) => {
@@ -262,7 +262,7 @@ export function buildWorkplacePolicy(policy) {
     // "states except" needs a word about hiring before it: "We ship to all states except Georgia" is not one.
     '(?:^\\s*|\\b(?:open|hir\\w*|eligib\\w*|availab\\w*|candidates|applicants|residents|employ\\w*)\\b[^;]*?\\bstates )(?:excluding|except(?: for)?)',
   ].join('|');
-  const shutsOutHomeState = homeStateCodes.length ? new RegExp(`(?:${hiringNegation})[\\s:]+(?:the )?(?:state of\\s+)?${otherStates}(?:the )?(?<home>${homeStateNames})(?=\\s*(?:$|[;)]|,?\\s*(?:and|or)\\b|,\\s*(?:${USPS_STATES.map(([name]) => name).join('|')})(?![\\p{L}\\p{N}])))`
+  const shutsOutHomeState = homeStateCodes.length ? new RegExp(`(?:${hiringNegation})[\\s:]+(?:the )?(?:state of\\s+)?${otherStates}(?:the )?(?<home>${homeStateNames})(?=\\s*(?:$|[;)]|,?\\s*(?:and|or)\\b|,\\s*(?:${STATES_AND_DC.map(([name]) => name).join('|')})(?![\\p{L}\\p{N}])))`
     + `|(?<![\\p{L}\\p{N}])(?<resident>${homeStateNames})(?:[ -]based)? (?:residents|applicants|candidates) (?:are|is) (?:not eligible|ineligible|excluded)(?: to apply)?(?=\\s*(?:$|[,;)]|for (?:this|the) (?:role|position|job)(?![\\p{L}\\p{N}'’])))`, 'u') : null;
   const supportsHome = (text) => [...countries(text, true)].some(c => homeCodes.has(c));
   // Description prose uses names/aliases only: ordinary "us", "by" or "id"
