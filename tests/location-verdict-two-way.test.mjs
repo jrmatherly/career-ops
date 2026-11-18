@@ -12,6 +12,10 @@ const rows = (expected, locations) => { for (const l of locations) test(`${l} is
 
 rows(review('location_names_no_place'), ['N/A', 'na', 'n/a', 'Not specified', 'Unspecified', 'Flexible', 'See description', 'See job description', 'To be determined']);
 rows(review('remote_scoped_to_other_state'), ['Remote, CA', 'Remote - CA', 'CA - Remote', 'Remote CA', 'Remote, CO', 'Remote - DE', 'Remote - IL', 'REMOTE - CA']);
+rows(review('remote_scoped_to_other_state'), ['Remote, CA; Remote, CO', 'Remote - Tbilisi, Georgia; Remote - CA', 'Remote - CA (PST)']);
+rows(elsewhere('remote_country_restricted'), ['Remote - CA; Remote - Toronto, Canada']);
+rows({ tier: 'fit', reason: 'onsite_location_allowed' }, ['Atlanta, GA (Flexible)', 'Atlanta, GA; N/A']);
+rows(elsewhere('onsite_outside_allowed_locations'), ['United States; Denver, CO (not remote)']);
 rows(review('remote_eligibility_unconfirmed'), ['Remote - EST', 'Remote - ET', 'Remote (EST)', 'Remote - PT', 'Remote, PT']);
 rows(review('remote_eligibility_unconfirmed'), [
   'United States - Remote; Preferred: Denver, CO - Hybrid, Hybrid',

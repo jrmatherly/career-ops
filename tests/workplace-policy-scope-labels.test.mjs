@@ -15,6 +15,11 @@ const ALLOWED = [
   'UK applicants only: please read our privacy notice. US applicants only: please read our CCPA notice.',
   'U.S.-based roles only: $133,000 USD. Canada-based roles only: $125,000 CAD.',
   '<li>USA-based roles only: $133,000 USD</li><li>Canada-based roles only: $125,000 CAD</li>',
+  // A home label counts however it is written: after "the", with an entity for a space, or with no colon.
+  'Pay ranges for Canada only: CA$100k. Pay ranges for the US only: $120k.',
+  '<p>Canada-based roles only: CA$1</p><p>United&nbsp;States based roles only: $2</p>',
+  '<p><strong>Canada-based roles only:</strong> CA$1</p><p><strong>US-based&nbsp;roles only:</strong> $2</p>',
+  'Canada-based roles only: CA$1.\nUS-based roles only - $2.',
 ];
 const FOREIGN_ONLY = 'exclusive_foreign_country', COUNTRY_RESTRICTED = 'description_country_restricted';
 // [description, the gate reason]

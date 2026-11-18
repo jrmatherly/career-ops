@@ -85,7 +85,9 @@ list`.
   a home country, the gate takes every label out before it looks for
   restrictions: `USA-based roles only: $133,000 USD. Canada-based roles only:
   $125,000 CAD.` passes under a US policy, with or without tags around the
-  labels. A lone foreign label is a restriction, whatever follows it:
+  labels. The home label is found however it is written: after `the`, with
+  no colon, or anywhere in a sentence. A lone foreign label is a
+  restriction, whatever follows it:
   `Canada-based roles only: $140,000 CAD` fails,
   `exclusive_foreign_country`. A restriction elsewhere in a labelled posting
   still counts: `USA-based roles only: $133,000 USD. Canada-based roles only:
@@ -95,14 +97,14 @@ list`.
 - A foreign country followed by `only` is exclusive and fails the posting
   (`UK only`). The country may carry `-based` and one of `candidates`,
   `applicants`, `residents`, `roles`, `positions`, `employees` or `hires`
-  (`Canada hires only`). For `roles`, `positions`, `employees` and `hires`, a
-  foreign country joined to a home-country name is not exclusive: `USA and
-  Canada roles only` passes under a US policy. In a description a list of any
-  length that names a home country is the home country before `only`, with
-  any of the seven nouns or none: `USA, Canada and Mexico roles only`,
+  (`Canada hires only`). In a description, a list of
+  countries of any length that names a home country is the home country
+  before `only`, with any of the seven nouns or none: `USA and Canada roles
+  only`, `USA, Canada and Mexico roles only`,
   `United States and Canada residents only` and `This position is open to
   candidates in the US and Canada only` pass. A list that names no home
-  country stays exclusive (`Canada and Mexico only` fails). The home-country
+  country stays exclusive (`Canada and Mexico only` fails), and so does a list after `outside` or
+  `non-` (`Candidates outside the US and Canada only`). The home-country
   name must stand whole: `Belarus and Canada roles only` fails, because the
   `us` that ends `Belarus` is not the United States. `New England` and `New
   Mexico` before `only` are not England and Mexico.
@@ -316,18 +318,25 @@ With `home_states` set, a description sentence that shuts a home state out
 of hiring fails the posting, `home_state_excluded`. The verdict makes it
 `elsewhere`. Two shapes are read, by the state's full name only:
 
-- A hiring negation before the state: `Not available in Georgia.`, `We cannot
-  hire in Alabama, Georgia or Hawaii.`, `Open to all US states except
-  Georgia.` Other states may stand in the list. The state must end its
-  phrase, so `Georgia Power` and `New York City` are not it.
+- A hiring negation before the state. It is a hire verb (`We cannot hire in
+  Alabama, Georgia or Hawaii.`), `not available`, `not open`, `not eligible`
+  or `not supported` said of the role or opening the sentence (`Not
+  available in Georgia.`, `This role is not open to residents of Georgia.`),
+  or `except` or `excluding` after `states` (`Open to all US states except
+  Georgia.`). Other states may stand in the list. The state must end its
+  phrase or stand in a list of states, so `Georgia Power` and `Remote in all
+  states except Georgia, where it is hybrid in Atlanta` are not it.
 - The state's residents before `not eligible`, `ineligible` or `excluded`:
   `Georgia residents are not eligible to apply.`
 
 Only a sentence about hiring counts, because a wrong match hides a home
-posting. `Our headquarters is not in Georgia.` and `Applicants from Georgia
-are not eligible for relocation.` pass. A Georgia that is the country is not
+posting. `Our headquarters is not in Georgia.`, `Paid family leave is not
+available in Georgia.` and `Applicants from Georgia are not eligible for
+relocation.` pass. A Georgia that is the country is not
 the home state: `Not available in Georgia, Armenia or Azerbaijan.` passes,
-and under `Remote - Tbilisi, Georgia` the location decides. Without
+and under `Remote - Tbilisi, Georgia` the location decides. A posting whose
+location names a home place is judged by that place, and the rule is not
+asked. Without
 `home_states` no sentence is read this way.
 
 ## Country spellings, US territories and timezone abbreviations
@@ -394,7 +403,7 @@ only after it found a home place in the location, so the posting names the
 owner's town beside something that reads as another country: `Atlanta, GA or
 London, UK`, `San Francisco, CA / Atlanta, GA`.
 
-Three more shapes are `review`, because each reads two ways. The last two
+Four more shapes are `review`, because each reads two ways. The last three
 apply only under a US policy.
 
 | Shape | Reason | Example |
