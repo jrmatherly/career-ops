@@ -21,7 +21,8 @@ type LedgerEntry = { url?: string; state?: string; reason?: string };
 
 // The auto-mode ledger, read the way /api/evaluate-queue reads it. A ledger that
 // cannot be read marks no row: the inbox still lists every posting, and `problem`
-// says on the page why the marks are missing.
+// says on the page why the marks are missing. The page gets the first line of the
+// cause only: an uncaught crash in the script prints a stack with local paths.
 async function ledgerEntries(): Promise<{ entries: LedgerEntry[]; problem: string | null }> {
   try {
     if (!fs.existsSync(rootScript("evaluate-queue"))) return { entries: [], problem: null };
@@ -32,7 +33,7 @@ async function ledgerEntries(): Promise<{ entries: LedgerEntry[]; problem: strin
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     console.error(`/pipeline: gated and no-text rows are not marked: ${message}`);
-    return { entries: [], problem: `The evaluation queue could not be read, so gated rows and rows that need a manual score are not marked: ${message}` };
+    return { entries: [], problem: `The Evaluate queue could not be read, so no row shows a Gated or Needs manual score badge. (${message.split("\n")[0].slice(0, 300)})` };
   }
 }
 

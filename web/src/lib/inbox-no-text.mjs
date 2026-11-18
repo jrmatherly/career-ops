@@ -3,6 +3,9 @@ import { canonicalJobKey } from "./core/url-key.mjs";
 /** The two reasons the drain skips a ranked row for missing posting text (lib/evaluate-queue.mjs). */
 export const NO_TEXT_REASONS = ["no-api-text", "no-text"];
 
+// The states of a second ledger entry that mean the posting is being handled or has a result.
+const MOVED_ON = ["running", "evaluated", "gated"];
+
 export const NO_TEXT_LABEL = "Needs manual score";
 
 // Past tense on purpose: a row keeps this reason after its board gets a reader when its
@@ -12,9 +15,12 @@ const NO_TEXT_TITLE = "Not scored automatically. The job board returned no posti
 
 /**
  * Marks each posting a scheduled scan ranked and the drain skipped for missing
- * posting text, by posting identity (the key markGated uses). The ledger folds
- * rows by URL, so one posting can have two entries. A posting with an entry that
- * is not skipped (queued again, running, evaluated) is not marked.
+ * posting text, by posting identity (the key markGated uses). The ledger keys
+ * entries by normalizeUrl, which is stricter than that identity, so one posting
+ * can have two entries. A posting whose other entry is running, evaluated or
+ * gated is not marked. One whose other entry is queued or failed keeps the mark,
+ * because a queued row under a paused scan and a failed row are never tried
+ * again and nothing else on the row would say so.
  *
  * @template {{ url: string }} T
  * @param {T[]} jobs
@@ -27,8 +33,8 @@ export function markNoText(jobs, ledgerEntries) {
   for (const entry of ledgerEntries) {
     const key = canonicalJobKey(entry?.url);
     if (!key) continue;
-    if (entry.state !== "skipped") movedOn.add(key);
-    else if (NO_TEXT_REASONS.includes(entry.reason)) reasons.set(key, entry.reason);
+    if (MOVED_ON.includes(entry.state)) movedOn.add(key);
+    else if (entry.state === "skipped" && NO_TEXT_REASONS.includes(entry.reason)) reasons.set(key, entry.reason);
   }
   for (const key of movedOn) reasons.delete(key);
   if (!reasons.size) return jobs;

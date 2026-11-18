@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -983,4 +984,23 @@ test("a row ranked under its job's threshold today is not revived", async (t) =>
   const before = ledgerText(root);
   await drain();
   assert.equal(ledgerText(root), before);
+});
+
+test("a re-queue write that fails leaves the row skipped and the tick still evaluates the rest", async (t) => {
+  const { root, drain, state, posts, stderr } = await withDrainRoot(t, { urls: [url(1), url(2)], answer: () => done(7) });
+  await skipNoApiText(root, url(1));
+  // runDrain has no seam for the ledger write, so the append itself is made to fail for the re-queue row.
+  const append = fs.appendFileSync;
+  fs.appendFileSync = (file, text, ...rest) => {
+    if (String(text).includes("\tfetcher-added\t")) throw Object.assign(new Error("EIO: i/o error, write"), { code: "EIO" });
+    return append(file, text, ...rest);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { fs.appendFileSync = append; syncBuiltinESMExports(); });
+  const result = await drain();
+  assert.deepEqual([result.status, result.evaluated], ["drained", 1]);
+  assert.deepEqual(posts.map((post) => post.body.input), [url(2)]);
+  assert.deepEqual([state(url(1)).state, state(url(1)).reason], ["skipped", "no-api-text"]);
+  assert.match(stderr.join(""), /queueing no-api-text rows again failed \(EIO: i\/o error, write\); they stay skipped until the next pass/);
+  assert.doesNotMatch(stderr.join(""), /queued again/);
 });

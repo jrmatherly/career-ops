@@ -44,8 +44,21 @@ test("a posting whose Inbox URL carries tracking or a trailing slash is still ma
   ]);
 });
 test("a posting with a second ledger entry that moved on is not marked", () => {
-  // The ledger folds by URL, so one posting can hold two entries under one identity.
+  // The ledger keys entries by normalizeUrl, so one posting can hold two entries under one identity.
   const two = (state) => [skipped("https://example.com/a?ref=one", "no-api-text"), { url: "https://example.com/a?ref=two", state, reason: "" }];
-  for (const state of ["queued", "running", "evaluated", "gated"]) assert.equal(markNoText(jobs, two(state)), jobs, state);
+  for (const state of ["running", "evaluated", "gated"]) assert.equal(markNoText(jobs, two(state)), jobs, state);
+  // A queued row under a paused scan and a failed row are never tried again, so the mark stays.
+  for (const state of ["queued", "failed"]) assert.equal(markNoText(jobs, two(state))[0].noText, true, state);
   assert.equal(markNoText(jobs, [skipped("https://example.com/a?ref=one", "no-api-text"), skipped("https://example.com/a?ref=two", "held-location")])[0].noText, true);
+});
+test("the later of two no-text entries for one posting gives the reason", () => {
+  const ledger = [skipped("https://example.com/a?ref=one", "no-api-text"), skipped("https://example.com/a?ref=two", "no-text")];
+  assert.equal(markNoText(jobs, ledger)[0].noTextReason, "no-text");
+});
+test("a ledger entry for a posting not in the Inbox leaves the list as it was", () => {
+  assert.equal(markNoText(jobs, [skipped("https://example.com/c", "no-text")]), jobs);
+});
+test("an entry with no URL marks nothing and does not stop the pass", () => {
+  const listed = [{ url: "not a url" }, ...jobs];
+  assert.equal(markNoText(listed, [null, { state: "skipped", reason: "no-text" }]), listed);
 });

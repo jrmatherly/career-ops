@@ -67,7 +67,7 @@ In Auto mode the form shows **Home area**, **Remote from** and the optional **Ho
 
 When any scheduled scan has a hold, the Inbox opens on the rows whose location fits it and adds four buttons: **Fit**, **Review location**, **Elsewhere** and **All**, each with its count. "Select all" and Shift+X act on the rows in view. In a scheduled scan's four location lists, Enter adds an entry and a typed comma stays inside it, so `Remote, US` typed is one entry. A pasted list still splits at each comma. Home area, Remote from and Home states start a new entry at a comma, typed or pasted.
 
-A posting a scheduled scan ranked and could not read carries a **Needs manual score** badge, and its tooltip says whether the board had no reader or the posting returned no text. The **Needs manual score** button lists only those postings.
+A posting a scheduled scan ranked and could not read carries a **Needs manual score** badge, and its tooltip says whether the board had no reader or the posting returned no text. The **Needs manual score** button lists only those postings. The badge goes once the posting is queued again or evaluated. If the Evaluate queue cannot be read, the Inbox shows a message and marks no row Gated or Needs manual score.
 
 Both sources read `portals.yml` from the data root, or the file `CAREER_OPS_PORTALS` names. The runner writes `portals: <path> (file)` or `portals: <path> (overlay)` to stderr on each run. A missing or unreadable `portals.yml`, or an empty title list, fails the run at the first attempt with no retry.
 
