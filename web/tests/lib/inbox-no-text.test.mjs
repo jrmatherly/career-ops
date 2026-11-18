@@ -37,3 +37,9 @@ test("the badge says why, and a job that is not marked has none", () => {
   assert.equal(noTextBadge({ noText: true }).title, closed);
   assert.equal(noTextBadge({}), null);
 });
+test("a posting whose Inbox URL carries tracking or a trailing slash is still marked", () => {
+  const listed = [{ url: "https://Example.com/a/?utm_source=scan" }];
+  assert.deepEqual(markNoText(listed, [skipped("https://example.com/a", "no-api-text")]), [
+    { url: "https://Example.com/a/?utm_source=scan", noText: true, noTextReason: "no-api-text" },
+  ]);
+});

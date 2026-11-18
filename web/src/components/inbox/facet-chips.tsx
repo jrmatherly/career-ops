@@ -55,7 +55,7 @@ export function FacetChips({
   /** The location segment's active tier and counts, or null when no scheduled scan has a hold. */
   tiers: { active: TierFilter; counts: Record<TierFilter, number> } | null;
   setTier: (tier: TierFilter) => void;
-  /** The "Needs manual score" chip, or null when no pending row is marked. */
+  /** The "Needs manual score" chip, or null when no pending row is marked and the filter is off. */
   noText: { on: boolean; count: number } | null;
   toggleNoText: () => void;
 }) {

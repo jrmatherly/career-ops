@@ -1128,8 +1128,9 @@ async function fetchAtlassianJd(resolved, postingUrl, textCap, timeoutMs) {
 }
 
 const GOOGLE_DS0_RE = /AF_initDataCallback\(\{key: 'ds:0', hash: '[^']*', data:([\s\S]*?), sideChannel: \{\}\}\);<\/script>/;
-// The record is positional. A field count other than this is the only sign that
-// positions moved, so it reads as no text.
+// The record is positional. A different field count means the layout changed,
+// so it reads as no text. A move that keeps the count is caught only by the
+// id, pair and length checks in normalizeGoogleJob.
 const GOOGLE_RECORD_FIELDS = 21;
 // Measured 2026-11-17 on 41 records: the shortest section was 342 characters of text.
 const GOOGLE_SECTION_FLOOR = 100;
@@ -1246,7 +1247,7 @@ export const JD_FETCHERS = {
  * @param {number} [textCap]
  * @param {number} [timeoutMs]
  * @param {{ textOnly?: boolean }} [options] textOnly: also read boards whose API says
- *   nothing about liveness (Eightfold, Atlassian). For callers that judge liveness
+ *   nothing about liveness (Eightfold, Atlassian, Google). For callers that judge liveness
  *   elsewhere, or only need the text.
  * @returns {Promise<{url: string, title: string, text: string, ats: string}|null>}
  *   null = not a JD_TEXT_API_ATS host, a text-only board read without

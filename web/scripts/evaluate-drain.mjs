@@ -238,13 +238,18 @@ export async function runDrain({
   // ledger. Only a row its own active Auto job would still take is revived, so none waits
   // under a job that will never drain it. A no-text skip is final.
   let revived = 0;
-  for (const entry of ledger) {
-    if (entry.state !== "skipped" || entry.reason !== NO_API_TEXT) continue;
-    const job = jobs.find((candidate) => candidate.id === entry.jobId);
-    if (!job || !((entry.rank ?? -Infinity) >= job.evaluate.rankThreshold)) continue;
-    if (!JD_TEXT_API_ATS.has(resolveAtsApi(entry.url)?.ats)) continue;
-    await appendRow(root, { url: entry.url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason: "fetcher-added", state: "queued", source: "drain" });
-    revived += 1;
+  // A failed write here must not cost the tick its evaluations: the rows stay skipped and the next pass tries again.
+  try {
+    for (const entry of ledger) {
+      if (entry.state !== "skipped" || entry.reason !== NO_API_TEXT) continue;
+      const job = jobs.find((candidate) => candidate.id === entry.jobId);
+      if (!job || !((entry.rank ?? -Infinity) >= job.evaluate.rankThreshold)) continue;
+      if (!JD_TEXT_API_ATS.has(resolveAtsApi(entry.url)?.ats)) continue;
+      await appendRow(root, { url: entry.url, at: new Date(now()).toISOString(), jobId: entry.jobId, runId: entry.runId, reason: "fetcher-added", state: "queued", source: "drain" });
+      revived += 1;
+    }
+  } catch (error) {
+    log(`queueing no-api-text rows again failed (${messageOf(error)}); they stay skipped until the next pass`);
   }
   if (revived) log(`${revived} row(s) skipped as no-api-text now have a posting-text reader; queued again`);
   const dailyCap = readDailyCap(getProfilePath(root));

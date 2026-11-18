@@ -480,9 +480,9 @@ const ATS_PROVIDERS = [
     // Measured 2026-11-17: there is no JSON API, and the detail page embeds the
     // posting as a positional record in AF_initDataCallback `ds:0`. A made-up id
     // answers 200 with `ds:0 = []`, which is too little to call a posting closed,
-    // so liveness stays with the browser. The request goes to the posting URL as
-    // the scanner wrote it, with the query dropped; a URL with no slug does not
-    // resolve.
+    // so liveness stays with the browser. The request goes to the URL rebuilt
+    // from the id and slug, the form the scanner writes; a URL with no slug does
+    // not resolve.
     jdTextOnly: true,
     accept: 'text/html',
     match(u) {
