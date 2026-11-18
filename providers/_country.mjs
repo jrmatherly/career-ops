@@ -303,9 +303,9 @@ export function buildWorkplacePolicy(policy) {
     const name = countryPattern(country.name);
     return new RegExp(`(?<![\\p{L}\\p{N}])(?:${name}(?:[ -]based)?(?:\\s+(?:candidates|applicants|residents))?|${afterHome}${name}(?:[ -]based)?\\s+(?:roles|positions|employees|hires))\\s*[- ]?only\\b`, 'u');
   });
-  // A description's country list before one of the four nouns that names a home country stands for the home country
-  // ("USA, Canada and Mexico roles only"), as the two-country form does through afterHome.
-  const listBeforeNoun = new RegExp(`(?<![\\p{L}\\p{N}])${listCountry}(?:${listSeparator}${listCountry})+(?=(?:[ -]based)?\\s+(?:roles|positions|employees|hires)\\s*[- ]?only\\b)`, 'gu');
+  // A description's country list before "only" that names a home country stands for the home country, with a noun
+  // between or none ("USA, Canada and Mexico roles only", "the US and Canada only").
+  const listBeforeNoun = new RegExp(`(?<![\\p{L}\\p{N}])${listCountry}(?:${listSeparator}${listCountry})+(?=(?:[ -]based)?(?:\\s+(?:roles|positions|employees|hires|candidates|applicants|residents))?\\s*[- ]?only\\b)`, 'gu');
   const withHomeList = text => text.replace(listBeforeNoun, list => has(list, homeAliases) ? homeAliases[0] : list);
   const gate = (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };

@@ -9,11 +9,13 @@ const us = (description, location = 'Remote - United States') => gate(location, 
 for (const d of ['We are open to candidates in the US and Canada.', 'This role is open to candidates in the US and Canada.', 'Open to United States and Canada employees only.', 'USA and Canada roles only.'])
   test(`a capital US beside another country is not a foreign restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: true, reason: 'remote_region_allowed' }));
 for (const d of ['USA, Canada and Mexico roles only.', 'United States, Canada, and Mexico employees only.', 'US, Canada, Mexico and Brazil positions only.', 'Canada, USA and Mexico hires only.',
-  'USA, Canada and Mexico-based roles only.', 'USA, Canada, and Mexico based employees only.'])
+  'USA, Canada and Mexico-based roles only.', 'USA, Canada, and Mexico based employees only.', 'USA, Canada and Mexico candidates only.', 'United States and Canada candidates only.',
+  'United States and Canada residents only.', 'This position is open to candidates in the US and Canada only.', 'US and Canada only.', 'USA, Canada or Mexico applicants only.'])
   test(`a country list of any length that names the home country is not a foreign restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: true, reason: 'remote_region_allowed' }));
-for (const d of ['Canada roles only.', 'Canada and Mexico roles only.', 'Canada, Mexico and Brazil roles only.', 'USA, Canada and Mexico candidates only.', 'United States and Canada candidates only.',
-  'Belarus and Canada roles only.', 'Cyprus or Canada positions only.', 'England roles only.', 'Mexico residents only.'])
-  test(`a foreign country list, or one before candidates, stays a restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: false, reason: 'exclusive_foreign_country' }));
+for (const d of ['Canada roles only.', 'Canada and Mexico roles only.', 'Canada, Mexico and Brazil roles only.',
+  'Belarus and Canada roles only.', 'Cyprus or Canada positions only.', 'England roles only.', 'Mexico residents only.', 'Canada and Mexico residents only.', 'Belarus and Canada candidates only.',
+  'Canada and Mexico only.', 'Cyprus or Canada only.'])
+  test(`a foreign country list stays a restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: false, reason: 'exclusive_foreign_country' }));
 for (const [d, reason] of [
   ['Canada-based candidates only: we cannot hire in the US.', 'exclusive_foreign_country'],
   ['Canada-based roles only: we cannot hire in the US.', 'exclusive_foreign_country'],
@@ -85,3 +87,9 @@ for (const [d, reason] of [
 ]) test(`a dotted or qualified restriction to another place stays: ${d}`, () => assert.deepEqual(us(d), { eligible: false, reason }));
 test('a dotted U.S. does not confirm a bare remote location', () =>
   assert.deepEqual(us('This is a U.S. national remote role.', 'Remote - International'), { eligible: false, reason: 'remote_eligibility_unconfirmed' }));
+
+test('under another home country a list that names it is home with any noun', () => {
+  const spain = (description) => es('Remote - Spain', 'Platform Engineer', { description });
+  assert.equal(spain('Spain and Portugal residents only.').eligible, true);
+  assert.equal(spain('Portugal and France residents only.').eligible, false);
+});
