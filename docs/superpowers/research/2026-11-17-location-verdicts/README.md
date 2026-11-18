@@ -43,6 +43,9 @@ A plan line that contradicts a row here is wrong. Check a question against this 
 | Worldwide remote | `review`. `Remote, Global` and `Home based - Worldwide` stay `remote_eligibility_unconfirmed`. An earlier default passed `remote_regions: ['worldwide', 'global']` from the hold. The plan 2 review ran the gate and found that the word "global" also admits `Remote - Global (APAC)` and `London (Remote - Global)`, which would then be evaluated automatically, so the constant was withdrawn. An exact-match upgrade is recorded in plan 2 as offered and not built | Coordinator default, 2026-11-17, changed after review and reported to the owner |
 | The ledger-driven "Held: location" badge | Removed in plan 2. The verdict badge replaces it. Holds on paused and non-automatic jobs count toward the inbox verdict. A hold that cannot be built is left out, the inbox still lists every row, and the page reports the hold | Coordinator default, 2026-11-17, reported to the owner |
 | Greenhouse office merge, and the Eightfold remote pass | Greenhouse is dropped from plan 3. The Eightfold pass fails safe. A failed, throttled or partial walk changes no location string and logs once | Coordinator default, 2026-11-17, reported to the owner |
+| The state Georgia against the country | The gate must tell them apart. A Georgia the location shows to be the country is `elsewhere`, with or without Georgia as a home state. Plan 1's Task 5b builds it (Finding 7) | Owner, 2026-11-17, on reading that `Remote - Tbilisi, Georgia` would be fit: "this is not acceptable - we need to figure out how to identify United States Georgia vs the Country of Georgia" |
+| A Georgia the location does not settle | A bare `Remote, Georgia` with no other place is the state when Georgia is a home state. A location that reads two ways is `review`. A bare code that is both a state and a country (`CA`, `CO`, `DE`, `IL`, `IN`) is unclassified, and beside a city it is a US place. With Georgia as a home state, `Georgia` in a description restriction or an "only" phrase (`Georgia residents only`, `Must be based in Georgia`) is home too, unless the location or the sentence shows it is the country | Coordinator default, 2026-11-17, from the Task 5b review, reported to the owner. The description rule is from the whole-branch review, 2026-11-18 |
+| A place the gate refuses that may still be home | `review`, not `elsewhere`, in two cases. A remote location the gate refuses as another country, where a place reads as a US one and none reads as foreign (`Remote - Denver, CO`), has the reason `remote_scoped_to_other_state`. A location that names a home town beside another place (`Atlanta, GA or London, UK`) keeps the gate's reason `onsite_country_restricted`. The gate's answer does not change in either | Coordinator default, 2026-11-18, from the whole-branch review |
 | Google reader | Text only, no liveness. Adding `google` to `JD_TEXT_API_ATS` makes a `scan.mjs` run with `experience_filter` on read one detail page for each new Google posting. That is accepted | Coordinator default, 2026-11-17, reported to the owner |
 
 ## What was refuted
@@ -182,16 +185,40 @@ The drain writes `skipped no-api-text` when a URL's ATS has no posting-text fetc
 
 `KeywordField` (`web/src/components/explore/filter-builder.tsx:50`) splits on comma, newline, semicolon and tab, on typing and on paste (re-read). `Remote, US` cannot be entered as one chip in the scheduled-scan location fields. Storage is a JSON array and does not split, so only the input blocks it.
 
+## Finding 7: boards write the state Georgia and the country the same way
+
+Plan 1 first accepted that, with Georgia as a home state, `Remote - Tbilisi, Georgia` reads as US remote. The owner overruled it (owner decisions table). The pod's scan history shows how each one is written.
+
+- The history holds 27,166 rows. 134 distinct location strings name Georgia, on 417 rows (re-run).
+- The country Georgia is on 14 rows. Each is `Georgia` or `Remote - Georgia` with nothing else in its place, inside a list of foreign countries (re-run).
+- The state Georgia with no `GA` code and no US word is on 3 rows, all from US employers: `Remote, Georgia` twice and `Georgia` once (re-run).
+- Every other row carries a US city, the code `GA` or a list of US states (re-run).
+
+Tiers of the 417 rows under the hold of Finding 1 with Georgia added as a home state (re-run at each commit):
+
+| Commit | Fit | Review | Elsewhere | The 14 country rows |
+|---|---|---|---|---|
+| `fd734bfa`, before Task 5b | 400 | 17 | 0 | Not `elsewhere` |
+| `9eb9952b`, Task 5b after its third fix round | 386 | 18 | 13 | 13 `elsewhere`, 1 `review`, none `fit` |
+| `7ff76523`, the pull request as first reviewed | 386 | 18 | 13 | The same |
+| `718d1d9a`, after the review fixes | 386 | 18 | 13 | The same. No row changed tier |
+
+Nobody re-ran the count at `cd1be822`, the last commit of Task 5b.
+
+Task 5b gives each Georgia one of three readings: state, country or unsure. The gate reads the word as the home state only for the state reading. The verdict maps the country reading to `elsewhere` and the unsure reading to `review`. [`docs/WORKPLACE_GEOGRAPHY.md`](../../../WORKPLACE_GEOGRAPHY.md) states the rule and its known limits.
+
 ## Names shared across the plans
 
 Plans are implemented by different people. These names are fixed here so they agree. Each is owned by the plan that produces it, and no later plan redefines it.
 
 Plan 1 produces, in `providers/_country.mjs`:
 
-- `locationVerdict(gate, location, title = '', offer = {})`. `gate` is the function `buildWorkplacePolicy` returns. It returns `{ tier: 'fit' | 'review' | 'elsewhere', reason: string }`. `reason` is the gate's own reason, or `location_names_no_place` or `remote_scoped_to_other_state` for the two cases the gate does not name. Plan 2 consumes it.
+- `locationVerdict(gate, location, title = '', offer = {})`. `gate` is the function `buildWorkplacePolicy` returns. It returns `{ tier: 'fit' | 'review' | 'elsewhere', reason: string }`. `reason` is the gate's own reason, or one of the three reason codes below for the cases the gate does not name. Plan 2 consumes it.
 - `LOCATION_TIERS`, exported beside it: `['fit', 'review', 'elsewhere']`.
 - The optional policy key `home_states`, a list of US state names or USPS codes. The gate function carries `gate.homeStates` and `gate.homeCountryNames`.
-- The reason codes `location_names_no_place`, `remote_scoped_to_other_state` and `onsite_in_home_state`, all tier `review`. Plan 2 gives each one badge copy.
+- Two more gate properties, added by Task 5b so that the verdict reads a place as the gate does: `gate.geographyText`, a function that takes one place and returns it without timezone phrases and US timezone abbreviations, and `gate.homePlaces`, the policy's `onsite_locations` folded to lower case. `locationVerdict` reads all four properties. A gate built by hand without them still gets an answer.
+- The reason codes `location_names_no_place`, `remote_scoped_to_other_state` and `onsite_in_home_state`, all tier `review`. Plan 2 gives each one badge copy. `remote_scoped_to_other_state` is also the reason an unsure Georgia gets, and the reason for a state code in a place written all in capitals (`REMOTE, TN`). In both cases the gate says not eligible, so the badge copy has to fit a posting the gate refused as well as one it admitted. It is also the reason for a refused remote location with a US city beside `CA`, `CO`, `DE`, `IL` or `IN` (`Remote - Denver, CO`).
+- The verdict can return `review` with the gate's own reason `onsite_country_restricted`, for a location that names a home place beside something that reads as another country (`Atlanta, GA or London, UK`). Plan 2's badge copy for that reason must cover "your home area and another place".
 
 Plan 2 produces:
 
@@ -243,8 +270,18 @@ Each step changes the pod and needs the owner's yes at the time. None is part of
 - Whether the pod's `portals.yml` has `experience_filter` on or sets `scan_history.dedup_include_location`.
 - The size of the one-time rise in new rows on the first scan after plan 3. Up to about 361 Microsoft remote postings before the title filter is a ceiling, since the pod's `location_filter` was not read.
 - What per-posting Eightfold detail requests would cost under the owner's title filter, against the 37 extra pages of the filtered search.
-- No plan has been implemented. Each plan lists what its writer ran.
+- No plan has been implemented. Each plan lists what its writer ran. (Written 2026-11-17. Plan 1 has since been implemented on `fix/location-gate-and-verdict`.)
 - No browser suite in plans 2 and 4 has run, since those tests need the code the plans describe.
+
+Not checked while plan 1 was implemented, as of `cd1be822`:
+
+- The Georgia tiers on the pod's 417 rows at `cd1be822`. The last count is from `9eb9952b`, one fix round earlier.
+- The public-board corpus against the finished gate. Task 5b added country spellings that apply under every policy and in description text. Plan 1's Task 7 runs the corpus and had not run.
+- The differentials the Task 5b implementers reported: 126 gate changes from `fd734bfa` to `9eb9952b`, and 35 from `9eb9952b` to `cd1be822`. The reports give counts and tables. No reviewer re-ran the scripts.
+- A Georgian city other than Tbilisi, Batumi, Kutaisi and Rustavi. The gate has no list of cities, so `Remote - Georgia · Remote - Warsaw` is `fit`. (The review fixes at `718d1d9a` added Zugdidi, Poti and Gori, and the spellings `T'bilisi` and `Tiflis`.)
+- The country Georgia outside a list of foreign countries. All 14 real rows have that shape.
+- A scan with `workplace_policy` on and `home_states` set, end to end. No shipped code calls `locationVerdict` yet, and the gate drops an unsure Georgia that the verdict would keep.
+- The removed-guard mutants of plan 1's Task 2, which the reviewer did not re-run.
 
 ## Scripts
 
