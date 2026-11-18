@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24 ESM, `node:test`, no new dependency.
 
-**Spec:** [`docs/superpowers/research/2026-11-18-gate-followups/README.md`](../research/2026-11-18-gate-followups/README.md). Read its "Owner decisions" table and "Left as documented limits" before the first task. The earlier spec, [`2026-11-17-location-verdicts`](../research/2026-11-17-location-verdicts/README.md), still binds: read its "Owner decisions" too.
+**Spec:** [`docs/superpowers/research/2026-11-18-gate-followups/README.md`](../../research/2026-11-18-gate-followups/README.md). Read its "Owner decisions" table and "Left as documented limits" before the first task. The earlier spec, [`2026-11-17-location-verdicts`](../../research/2026-11-17-location-verdicts/README.md), still binds: read its "Owner decisions" too.
 
 **Order:** One branch, `fix/location-gate-followups`, one PR, landed before plan 2 (`2026-11-17-02-inbox-location-verdicts.md`). Work in a sibling worktree. Review before the first push, stop at the merge bar, and ask the owner before the merge.
 
@@ -229,7 +229,7 @@ In `gate`, right after the `candidate_country_excluded` line, fail with `home_st
 **Files:**
 - Modify: `docs/WORKPLACE_GEOGRAPHY.md` (the pay-label section, the restriction sections, the verdict table, "Known limits")
 - Modify: `docs/superpowers/research/2026-11-17-location-verdicts/README.md` ("Owner decisions", "Names shared across the plans")
-- Modify: `docs/superpowers/plans/2026-11-17-02-inbox-location-verdicts.md` (the reason-to-copy table near line 317)
+- Modify: `docs/superpowers/plans/completed/2026-11-17-02-inbox-location-verdicts.md` (the reason-to-copy table near line 317)
 - Modify: `.claude/skills/upstream-review/SKILL.md` (the deviations row for `providers/_country.mjs`, near line 540)
 - Modify: `docs/superpowers/research/2026-11-18-gate-followups/README.md` ("Not checked")
 

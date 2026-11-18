@@ -1,6 +1,6 @@
 # Owner decisions, 2026-11-16
 
-The owner decided D1 to D11 of the [audit-fix plan](../../plans/2026-11-16-project-audit-fixes.md) on 2026-11-16. D4 and D8 were decided first, from the measurements in the plan's "Evidence for D4 and D8". The other nine were decided after four researchers checked each default against the code, the live repository settings, the deployed tracker (counts only) and current documentation. The lead re-ran or re-read the claims marked "Confirmed".
+The owner decided D1 to D11 of the [audit-fix plan](../../plans/completed/2026-11-16-project-audit-fixes.md) on 2026-11-16. D4 and D8 were decided first, from the measurements in the plan's "Evidence for D4 and D8". The other nine were decided after four researchers checked each default against the code, the live repository settings, the deployed tracker (counts only) and current documentation. The lead re-ran or re-read the claims marked "Confirmed".
 
 **Where a row here differs from a task's text in the plan, this file wins.** A task marked "Amended" is implemented from its plan section plus the amendment below.
 

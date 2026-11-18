@@ -1,6 +1,6 @@
 # Location gate follow-ups after PR 107
 
-Research from 2026-11-18, run against `main` at `f9627bac` (the merge of [PR 107](https://github.com/jrmatherly/career-ops/pull/107)). It is the spec for one plan, [`2026-11-18-location-gate-followups.md`](../../plans/2026-11-18-location-gate-followups.md), which lands before plan 2 of [the location-verdicts spec](../2026-11-17-location-verdicts/README.md). That spec's goal and its "Owner decisions" table still bind. This page adds to them and replaces nothing.
+Research from 2026-11-18, run against `main` at `f9627bac` (the merge of [PR 107](https://github.com/jrmatherly/career-ops/pull/107)). It is the spec for one plan, [`2026-11-18-location-gate-followups.md`](../../plans/completed/2026-11-18-location-gate-followups.md), which lands before plan 2 of [the location-verdicts spec](../2026-11-17-location-verdicts/README.md). That spec's goal and its "Owner decisions" table still bind. This page adds to them and replaces nothing.
 
 ## Goal
 

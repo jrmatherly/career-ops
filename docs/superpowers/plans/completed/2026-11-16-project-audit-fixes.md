@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24 ESM scripts with `node:test`, Next.js 16.4 and React 19 in `web/`, Go 1.26 in `dashboard/`, GitHub Actions, Docker.
 
-**Spec:** [`docs/superpowers/research/2026-11-16-project-audit/README.md`](../research/2026-11-16-project-audit/README.md). It holds every finding with its evidence status, the findings that were withdrawn, and the findings that get no task. The six area reports and the repro scripts sit beside it. Read the README before the first task.
+**Spec:** [`docs/superpowers/research/2026-11-16-project-audit/README.md`](../../research/2026-11-16-project-audit/README.md). It holds every finding with its evidence status, the findings that were withdrawn, and the findings that get no task. The six area reports and the repro scripts sit beside it. Read the README before the first task.
 
 ## How this plan was checked
 
@@ -41,7 +41,7 @@ These come from `.claude/rules/dev-workflow.md` and the owner's standing instruc
 
 ## Owner decisions
 
-**Decided 2026-11-16.** The owner's outcomes and the amendments they make to tasks are in [`decisions.md`](../research/2026-11-16-project-audit/decisions.md). Where that file differs from the table below or from a task's text, it wins: DOCS-1 is replaced by a docs edit (D2), DOCS-5 is dropped (D3), TEST-4 keeps `tests/set-status-lock-scope.test.mjs` (D9), and CORE-3, WEB-3, WEB-8, SEC-6b, TEST-2 and CI-7 are amended. The release is career-ops 2.6.1.
+**Decided 2026-11-16.** The owner's outcomes and the amendments they make to tasks are in [`decisions.md`](../../research/2026-11-16-project-audit/decisions.md). Where that file differs from the table below or from a task's text, it wins: DOCS-1 is replaced by a docs edit (D2), DOCS-5 is dropped (D3), TEST-4 keeps `tests/set-status-lock-scope.test.mjs` (D9), and CORE-3, WEB-3, WEB-8, SEC-6b, TEST-2 and CI-7 are amended. The release is career-ops 2.6.1.
 
 The table records the defaults as first written.
 
@@ -129,7 +129,7 @@ Expected: `Preparing worktree (new branch 'fix/audit-2026-11-16')`.
 Then check that the plan and the spec came with it:
 
 ```bash
-ls ../career-ops-audit-fixes/docs/superpowers/plans/2026-11-16-project-audit-fixes.md ../career-ops-audit-fixes/docs/superpowers/research/2026-11-16-project-audit/README.md
+ls ../career-ops-audit-fixes/docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md ../career-ops-audit-fixes/docs/superpowers/research/2026-11-16-project-audit/README.md
 ```
 
 Expected: both paths print. If either is missing, stop. The plan was not pushed to `main`.
@@ -182,7 +182,7 @@ Append this after the last section under "Deviations decided" in `.claude/skills
 ```markdown
 ### Project audit fixes (2026-11-16)
 
-Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `docs/superpowers/research/2026-11-16-project-audit/README.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md`. Findings: `docs/superpowers/research/2026-11-16-project-audit/README.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
@@ -4652,7 +4652,7 @@ This task runs last, after DOCS-1 and DOCS-3, which also edit `.claude/skills/up
 ### Task FINAL-1: Verify the whole branch, review it, and hand it to the owner
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md` (tick the boxes of the tasks that ran)
+- Modify: `docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md` (tick the boxes of the tasks that ran)
 
 **Interfaces:**
 - Consumes: every commit on `fix/audit-2026-11-16`, and the launch configuration `audit-web` from PREP-1
@@ -4688,7 +4688,7 @@ Run the four `pr-review-toolkit` reviewers (code, tests, silent failures, commen
 Then tick the boxes in this plan for the tasks that ran, and commit:
 
 ```bash
-git add docs/superpowers/plans/2026-11-16-project-audit-fixes.md
+git add docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md
 git commit -m "docs(plans): tick the audit-fix tasks that ran"
 ```
 
@@ -4882,7 +4882,7 @@ git commit -m "docs(ci): say which checks main requires now"
 ### Task FINAL-2: Close out
 
 **Files:**
-- Move: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md` to `docs/superpowers/plans/completed/`
+- Move: `docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md` to `docs/superpowers/plans/completed/`
 - Modify: every file that names the plan's old path
 
 **Interfaces:**
@@ -4898,13 +4898,13 @@ Release-please opens a release pull request after the merge. The owner merges it
 Run this on `main`, in the main checkout, when no pull request is open:
 
 ```bash
-git mv docs/superpowers/plans/2026-11-16-project-audit-fixes.md docs/superpowers/plans/completed/
-git grep -n "plans/2026-11-16-project-audit-fixes.md"
+git mv docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md docs/superpowers/plans/completed/
+git grep -n "plans/completed/2026-11-16-project-audit-fixes.md"
 ```
 
 Replace each hit with the `completed/` path. Expect hits in `.claude/skills/upstream-review/SKILL.md` (the section PREP-1 opened, and any row that names the plan) and in `docs/superpowers/research/2026-11-16-project-audit/README.md`. This is the defect DOCS-3 fixed for earlier plans, so do not leave it behind.
 
-Run: `git grep -n "plans/2026-11-16-project-audit-fixes.md"`
+Run: `git grep -n "plans/completed/2026-11-16-project-audit-fixes.md"`
 Expected: no output.
 
 ```bash

@@ -2,7 +2,7 @@
 
 Recorded 2026-11-16 against `main` at `2edd1b33`. The audit was read-only. Nothing in the product changed.
 
-The plan that acts on these findings is [`docs/superpowers/plans/2026-11-16-project-audit-fixes.md`](../../plans/2026-11-16-project-audit-fixes.md).
+The plan that acts on these findings is [`docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md`](../../plans/completed/2026-11-16-project-audit-fixes.md).
 
 ## What was checked and how
 

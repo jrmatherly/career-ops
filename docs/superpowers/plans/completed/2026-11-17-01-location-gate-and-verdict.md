@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24 ESM, `node:test`, no new dependency.
 
-**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../research/2026-11-17-location-verdicts/README.md). Read its "Owner decisions" table and "Names shared across the plans" before the first task. This plan covers Finding 2 and the verdict from Finding 1.
+**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../../research/2026-11-17-location-verdicts/README.md). Read its "Owner decisions" table and "Names shared across the plans" before the first task. This plan covers Finding 2 and the verdict from Finding 1.
 
 **Order:** Plan 1 of 4. It lands first and needs nothing from another plan. Plan 2 lands after it and reads `locationVerdict`, `LOCATION_TIERS` and the policy key `home_states`, which this plan owns.
 

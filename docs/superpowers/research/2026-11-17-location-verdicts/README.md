@@ -2,10 +2,10 @@
 
 Research from 2026-11-17, run against `main` at `c4b20ee5` and the deployed pod (career-ops 2.6.1, web 1.7.1). It is the spec for four plans, numbered in the order they land:
 
-1. [`2026-11-17-01-location-gate-and-verdict.md`](../../plans/2026-11-17-01-location-gate-and-verdict.md)
-2. [`2026-11-17-02-inbox-location-verdicts.md`](../../plans/2026-11-17-02-inbox-location-verdicts.md)
-3. [`2026-11-17-03-provider-location-resolution.md`](../../plans/2026-11-17-03-provider-location-resolution.md)
-4. [`2026-11-17-04-no-text-evaluations.md`](../../plans/2026-11-17-04-no-text-evaluations.md)
+1. [`2026-11-17-01-location-gate-and-verdict.md`](../../plans/completed/2026-11-17-01-location-gate-and-verdict.md)
+2. [`2026-11-17-02-inbox-location-verdicts.md`](../../plans/completed/2026-11-17-02-inbox-location-verdicts.md)
+3. [`2026-11-17-03-provider-location-resolution.md`](../../plans/completed/2026-11-17-03-provider-location-resolution.md)
+4. [`2026-11-17-04-no-text-evaluations.md`](../../plans/completed/2026-11-17-04-no-text-evaluations.md)
 
 The spec was revised the same day, after the four plans were drafted, with what their writers measured.
 

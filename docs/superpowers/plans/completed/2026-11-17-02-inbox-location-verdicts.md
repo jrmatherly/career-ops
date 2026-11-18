@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.4 and React 19 in `web/`, plain `.mjs` modules tested with `node:test`, `playwright-core` browser suites run by `web/tests/browser-suites.mjs`.
 
-**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../research/2026-11-17-location-verdicts/README.md). Read its "Owner decisions" table and "Names shared across the plans" before the first task. This plan covers Finding 3, Finding 6, the documentation line about the CLI and batch paths, and the pod steps under "After plan 2 is deployed".
+**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../../research/2026-11-17-location-verdicts/README.md). Read its "Owner decisions" table and "Names shared across the plans" before the first task. This plan covers Finding 3, Finding 6, the documentation line about the CLI and batch paths, and the pod steps under "After plan 2 is deployed".
 
 **Order:** Plan 2 of 4. It lands after plan 1 and needs three things from it, all in `providers/_country.mjs`: `locationVerdict(gate, location, title = '', offer = {})` returning `{ tier: 'fit' | 'review' | 'elsewhere', reason: string }`, `LOCATION_TIERS`, and the optional policy key `home_states` (a list of US state names or USPS codes; an entry that is no state throws `workplace_policy.home_states: "<entry>" is not a US state name or code`). Plans 3 and 4 land after this one.
 

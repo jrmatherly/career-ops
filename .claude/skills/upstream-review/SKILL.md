@@ -491,7 +491,7 @@ Decision log: `.upstream-review/reviews/2026-11-15-review.md` (375 commits, `033
 
 ### Project audit fixes (2026-11-16)
 
-Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `docs/superpowers/research/2026-11-16-project-audit/README.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-16-project-audit-fixes.md`. Findings: `docs/superpowers/research/2026-11-16-project-audit/README.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
@@ -533,7 +533,7 @@ Plan: `docs/superpowers/plans/2026-11-16-project-audit-fixes.md`. Findings: `doc
 
 ### Location gate text and verdict (2026-11-17)
 
-Plan: `docs/superpowers/plans/2026-11-17-01-location-gate-and-verdict.md`. Spec: `docs/superpowers/research/2026-11-17-location-verdicts/README.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-17-01-location-gate-and-verdict.md`. Spec: `docs/superpowers/research/2026-11-17-location-verdicts/README.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
@@ -541,7 +541,7 @@ Plan: `docs/superpowers/plans/2026-11-17-01-location-gate-and-verdict.md`. Spec:
 
 ### Provider location resolution (2026-11-17)
 
-Plan: `docs/superpowers/plans/2026-11-17-03-provider-location-resolution.md`. Spec: `docs/superpowers/research/2026-11-17-location-verdicts/README.md`, Finding 4.
+Plan: `docs/superpowers/plans/completed/2026-11-17-03-provider-location-resolution.md`. Spec: `docs/superpowers/research/2026-11-17-location-verdicts/README.md`, Finding 4.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |

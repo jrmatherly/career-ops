@@ -231,7 +231,9 @@ Expected: the classes sum to about the F5a total (319 blocks, about 228k tokens,
 Run: `python3 -I` over the same files to count `mcp__codegraph__codegraph_explore` calls. The 14-day figure on 2026-11-15 was 132 calls in 61 sessions.
 Expected: a ratio of tokens injected by the hook to explore calls made on purpose.
 
-- [ ] **Step 3: Ask Jason**
+- [x] **Step 3: Ask Jason**
+
+Closed 2026-11-18. The owner kept `prompt-improver` on 2026-11-15 and kept the codegraph prompt hook on 2026-11-18. Nothing was changed.
 
 Present the numbers and one question with these options. Recommend from the numbers.
 
@@ -269,20 +271,24 @@ Expected: `false`, then `true`. If so, the local file is not being applied. Repo
 - Consumes: Tasks 1, 2 and 3 finished.
 - Produces: before and after figures for Jason.
 
-- [ ] **Step 1: Read `/context` in a new session**
+- **Step 1: Read `/context` in a new session.** Dropped by the owner on 2026-11-18. Not run.
 
 Expected: "Memory files" about 26k tokens below the Task 1 baseline, and a smaller skills figure.
 
-- [ ] **Step 2: Read the skill listing**
+- [x] **Step 2: Read the skill listing**
+
+Closed 2026-11-18 with no change. About 79 entries in one session's listing still had no description, about 35 of them from the `skills` plugin. No earlier count exists to compare with. The owner turned no plugin off.
 
 Expected: fewer entries without a description than before. If many are still cut, list the plugins with the most skills and the fewest uses, and ask Jason which to turn off in this project. Do not turn any off unasked.
 
-- [ ] **Step 3: Read `/usage` after a week**
+- **Step 3: Read `/usage` after a week.** Dropped by the owner on 2026-11-18. Not run.
 
 Run `/usage` on or after 2026-11-22.
 Expected: `AGENTS.md` no longer listed. Record the new top rows.
 
-- [ ] **Step 4: Hook timings**
+- [x] **Step 4: Hook timings**
+
+Closed 2026-11-18. Not measured: no change was planned and the owner did not ask for one.
 
 No change is planned for F9. If session starts feel slow, re-run the timing count from Task 4 for `SessionStart` and report the slowest hook.
 
@@ -318,10 +324,10 @@ Each check ran in a fresh headless session (`claude -p --model haiku --output-fo
   The same sessions made 3 `codegraph_explore` calls. The codegraph hook writes to the hook's standard output (`hook_success`), not to `hook_additional_context`, so the F5a total left it out.
   `codegraph --help` has no switch for the hook, and `.codegraph/` holds only the index. The one project-local way to stop it is `codegraph uninit`, which also removes the index and the explore tool here.
 
-Still open:
+Closed on 2026-11-18, with no further change:
 
-- Task 4, Step 3: Jason chose on 2026-11-15 to keep `prompt-improver` on in this project. The codegraph hook is unchanged: he was not asked about it separately, and the recommendation was to keep it.
-- Task 6: `/context` in the desktop app, the skill listing, and `/usage` on or after 2026-11-22.
+- Task 4, Step 3: the owner kept `prompt-improver` (2026-11-15) and the codegraph prompt hook (2026-11-18).
+- Task 6: the owner dropped the `/context` and `/usage` readings and closed the skill listing and the hook timings as they stand.
 
 ## Undo everything
 

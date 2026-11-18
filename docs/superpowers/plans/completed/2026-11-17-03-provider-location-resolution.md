@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node 24 ESM. Provider tests use the repo's `pass`/`fail` helpers from `tests/helpers.mjs`. New root-level tests use `node:test`.
 
-**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../research/2026-11-17-location-verdicts/README.md), Finding 4. Its "Owner decisions" table is binding.
+**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../../research/2026-11-17-location-verdicts/README.md), Finding 4. Its "Owner decisions" table is binding.
 
 **Order:** Plan 3 of 4. It lands after plan 2. It reads no name from plan 1 or plan 2 and compiles without them. It lands after plan 2 because the tiers its location strings move rows between ("Review location", "Elsewhere") exist only there. Plan 4 lands after it and needs nothing from it.
 

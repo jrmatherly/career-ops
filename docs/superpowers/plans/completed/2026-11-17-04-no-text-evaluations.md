@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node ESM scripts at the repo root tested with `node:test` through `test-all.mjs`. Next.js 16.4 and React 19 in `web/`, plain `.mjs` modules tested with `node:test`, `playwright-core` browser suites run by `web/tests/browser-suites.mjs`.
 
-**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../research/2026-11-17-location-verdicts/README.md). This plan covers Finding 5 and the owner decision "Google fetcher, automatic re-queue once a fetcher exists, and an inbox badge".
+**Spec:** [`docs/superpowers/research/2026-11-17-location-verdicts/README.md`](../../research/2026-11-17-location-verdicts/README.md). This plan covers Finding 5 and the owner decision "Google fetcher, automatic re-queue once a fetcher exists, and an inbox badge".
 
 **Order:** Plan 4 of 4. It lands last, after plan 3. It needs plan 2, which needs plan 1, and nothing from plan 3. From plan 2 it uses the Inbox's verdict badge, the "Location fit" group, the lists `matched`, `counts` and `filtered` in `inbox-triage.tsx`, `markVerdicts` in `page.tsx`, and the `location-hold` browser suite with its four-row fixture. Task 3's Interfaces block gives each by exact name.
 
