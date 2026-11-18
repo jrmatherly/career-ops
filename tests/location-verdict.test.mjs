@@ -103,6 +103,21 @@ test('without home_states no state is known to be home', () => {
   for (const l of ['Nashville, TN', 'Kennesaw, GA', 'Dallas, TX'])
     assert.deepEqual(locationVerdict(bare, l), { tier: 'elsewhere', reason: 'onsite_outside_allowed_locations' }, l);
 });
+test('a state whose name holds another state is not that state', () => {
+  const remote = { workplaceType: 'Remote' };
+  for (const [homeStates, rows] of [
+    [['Virginia'], [['Remote - West Virginia', 'review', 'remote_scoped_to_other_state'], ['Charleston, West Virginia', 'elsewhere', 'onsite_outside_allowed_locations'], ['Remote - Virginia', 'fit', 'remote_region_allowed'], ['Richmond, Virginia', 'review', 'onsite_in_home_state']]],
+    [['West Virginia'], [['Remote - West Virginia', 'fit', 'remote_region_allowed'], ['Remote - Virginia', 'review', 'remote_scoped_to_other_state']]],
+    [['Kansas'], [['Remote - Arkansas', 'review', 'remote_scoped_to_other_state'], ['Fayetteville, Arkansas', 'elsewhere', 'onsite_outside_allowed_locations']]],
+    [['Arkansas'], [['Remote - Kansas', 'review', 'remote_scoped_to_other_state'], ['Topeka, Kansas', 'elsewhere', 'onsite_outside_allowed_locations']]],
+    [['Washington'], [['Remote - Washington', 'fit', 'remote_region_allowed'], ['Remote - Washington, DC', 'review', 'remote_scoped_to_other_state'], ['Washington, D.C.', 'elsewhere', 'onsite_outside_allowed_locations'], ['Tacoma, Washington', 'review', 'onsite_in_home_state']]],
+    [['DC'], [['Remote - Washington, DC', 'fit', 'remote_region_allowed'], ['Washington, DC', 'review', 'onsite_in_home_state'], ['Remote - Washington', 'review', 'remote_scoped_to_other_state']]],
+  ]) {
+    const policy = buildWorkplacePolicy({ ...HOLD, home_states: homeStates });
+    for (const [location, tier, reason] of rows)
+      assert.deepEqual(locationVerdict(policy, location, '', location.startsWith('Remote') ? remote : {}), { tier, reason }, `${homeStates}: ${location}`);
+  }
+});
 test('a description restriction is elsewhere, with the gate reason', () =>
   assert.deepEqual(locationVerdict(gate, 'Remote - United States', '', { description: 'You must be based in Canada.' }), { tier: 'elsewhere', reason: 'description_country_restricted' }));
 test('a location that is not a string is unknown', () => {

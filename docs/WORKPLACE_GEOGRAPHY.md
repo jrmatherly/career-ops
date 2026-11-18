@@ -78,7 +78,9 @@ code`.
   `applicants`, `residents`, `roles`, `positions`, `employees` or `hires`
   (`Canada hires only`). For `roles`, `positions`, `employees` and `hires`, a
   foreign country joined to a home-country name is not exclusive: `USA and
-  Canada roles only` passes under a US policy. For the other forms it is
+  Canada roles only` passes under a US policy. In a description this covers a
+  list of any length that names a home country, so `USA, Canada and Mexico
+  roles only` passes too. For the other forms it is
   still exclusive (`USA and Canada candidates only` fails).
 - When the policy's onsite countries include the United States (`onsite_countries`,
   or `remote_countries` when that is not set), a US state written directly
@@ -240,14 +242,22 @@ gate checks, or an "only" phrase in the description or the location. Under
 The locations `Remote (Georgia only)` and `Remote - Georgia only` are `fit`.
 Without the key each one fails as a foreign country.
 
-The word stays the country in two cases:
+The word is home only in a sentence that names no other country and no
+exclusion word (`not`, `no`, `cannot`, `can't`, `unable`, `except`,
+`excluding`, `exclude`, `excluded`, `ineligible`, `outside`). The location and
+the whole description must also name no Georgian place: a Georgian city,
+`Republic of Georgia`, `the country of Georgia` or `Georgia (the country)`.
+`Must be based in Georgia or Florida` passes, while `Must be based in Georgia
+or Armenia`, `This role is not open to Georgia residents` and `Georgia
+residents only. We are a Tbilisi startup.` fail as the country.
+
+The word also stays the country in two more cases:
 
 - The location reads its own Georgia as the country. `Remote - Tbilisi,
   Georgia` with `Must be based in Georgia` fails,
   `description_country_restricted`.
-- The sentence names a Georgian city, `Republic of Georgia`, `Georgia
-  (country)` or a region word. `Open to candidates in the Republic of Georgia
-  only` fails, `exclusive_foreign_country`.
+- The sentence names a region word (EMEA, Europe, EU, Caucasus, CIS). `Must
+  be based in Georgia (Caucasus)` fails, `description_country_restricted`.
 
 The reading does not confirm a remote role. `Remote` with `Must be based in
 Georgia` is `review`, `remote_eligibility_unconfirmed`.

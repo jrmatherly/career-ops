@@ -206,6 +206,43 @@ test('a Georgia the location or the sentence places abroad is still the country 
   assert.deepEqual(locationVerdict(gate, 'Remote - United States', '', { description: 'Canada residents only.' }), { tier: 'elsewhere', reason: 'exclusive_foreign_country' });
 });
 
+const US_REMOTE = 'Remote - United States';
+const COUNTRY_RESTRICTED = ['elsewhere', 'description_country_restricted'], FOREIGN_ONLY = ['elsewhere', 'exclusive_foreign_country'];
+// [location, description, verdict with Georgia as a home state, verdict with no home state]
+const GEORGIA_SENTENCES = [
+  ['Remote - Georgia', 'Must be based in Georgia or Armenia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Georgia', 'Must be based in Georgia, Armenia or Azerbaijan.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Georgia', 'Candidates must reside in Georgia or Ukraine.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Georgia', 'We hire only in Georgia, Armenia and Ukraine.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Georgia', 'You must be based in Georgia. We are a Tbilisi startup.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Candidates must be located in Georgia. Tbilisi preferred.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Must be based in Georgia (the country).', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Must reside in Georgia or Armenia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'This role is not open to Georgia residents.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'This position is not open to residents of Georgia, Alaska or Hawaii.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'This role is not open to candidates in Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Open to residents of all states except Georgia only.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Must be based outside Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  ['Remote - Tbilisi', 'Georgia residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
+  ['Remote - Georgia', 'Must be based in Georgia.', REMOTE_FIT, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Georgia residents only.', REMOTE_FIT, FOREIGN_ONLY],
+  [US_REMOTE, 'Candidates must reside in Georgia or Florida.', REMOTE_FIT, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Georgia, Florida or Texas residents only.', REMOTE_FIT, REMOTE_FIT],
+  [US_REMOTE, 'Must be based in Georgia (US).', REMOTE_FIT, COUNTRY_RESTRICTED],
+  ['Remote (Georgia only)', undefined, REMOTE_FIT, FOREIGN_ONLY],
+  ['Remote - Georgia only', undefined, REMOTE_FIT, FOREIGN_ONLY],
+  ['Remote - Tbilisi, Georgia', 'Must be based in Georgia.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  [US_REMOTE, 'Canada residents only.', FOREIGN_ONLY, FOREIGN_ONLY],
+  [US_REMOTE, 'Must be based in Canada. Our Georgia office is closed.', COUNTRY_RESTRICTED, COUNTRY_RESTRICTED],
+  // Known limit: an exclusion the gate does not read as a restriction stays a fit.
+  [US_REMOTE, 'Not available in Georgia.', REMOTE_FIT, REMOTE_FIT],
+];
+for (const [location, description, [tier, reason], [bareTier, bareReason]] of GEORGIA_SENTENCES) test(`Georgia is home in a sentence only with no other country, no exclusion and no Georgian place: ${location}, ${description}`, () => {
+  const offer = { ...(description === undefined ? {} : { description }), workplaceType: 'Remote' };
+  assert.deepEqual(locationVerdict(gate, location, '', offer), { tier, reason });
+  assert.deepEqual(locationVerdict(bare, location, '', offer), { tier: bareTier, reason: bareReason });
+});
+
 test('a Georgian city in another place makes a bare Georgia the country', () => {
   for (const [withGeorgia, without] of [
     ['Remote - Georgia · Remote - Texas · Remote - Tbilisi', 'Remote - Texas · Remote - Tbilisi'],

@@ -8,6 +8,10 @@ const us = (description, location = 'Remote - United States') => gate(location, 
 
 for (const d of ['We are open to candidates in the US and Canada.', 'This role is open to candidates in the US and Canada.', 'Open to United States and Canada employees only.', 'USA and Canada roles only.'])
   test(`a capital US beside another country is not a foreign restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: true, reason: 'remote_region_allowed' }));
+for (const d of ['USA, Canada and Mexico roles only.', 'United States, Canada, and Mexico employees only.', 'US, Canada, Mexico and Brazil positions only.', 'Canada, USA and Mexico hires only.'])
+  test(`a country list of any length that names the home country is not a foreign restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: true, reason: 'remote_region_allowed' }));
+for (const d of ['Canada roles only.', 'Canada and Mexico roles only.', 'Canada, Mexico and Brazil roles only.', 'USA, Canada and Mexico candidates only.', 'United States and Canada candidates only.'])
+  test(`a foreign country list, or one before candidates, stays a restriction: ${d}`, () => assert.deepEqual(us(d), { eligible: false, reason: 'exclusive_foreign_country' }));
 for (const d of [
   'Canada-based candidates only: we cannot hire in the US.',
   'Canada-based roles only: we cannot hire in the US.',
