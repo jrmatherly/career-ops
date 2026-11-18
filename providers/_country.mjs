@@ -144,6 +144,14 @@ const plain = (v) => fold(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, 
 const places = (location) => location.split(/[·;]/);
 // The country reader splits on parentheses, not square brackets, so "[IE]" is written as "(IE)".
 const brackets = (text) => text.replace(/\[/g, '(').replace(/\]/g, ')');
+const CURRENCY = 'usd|cad|gbp|eur|aud|mxn';
+const AMOUNT = `(?:[$£€]\\s?\\d|\\d[\\d,.]*k?\\s?(?:${CURRENCY})\\b|\\b(?:${CURRENCY})\\s?\\d)`;
+const NOTICE = 'privacy\\s+(?:notice|policy|statement)';
+const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|br|h[1-6]|tr|td|th|table|section)\b[^>]*>/gi;
+const LABEL_PLACE = `(?:${[...COUNTRY_NAMES, ...COUNTRY_ALIASES].map(c => c.name).concat('us').sort((a, b) => b.length - a.length).map(escape).join('|')})`;
+// "Canada-based roles only:" before pay or a privacy notice scopes that line, not who can be hired.
+const SCOPE_LABEL = new RegExp(`(^|[.!?\\n])(\\s*(?:<[^>]*>\\s*)*)(?:${LABEL_PLACE}(?:[ -]based)? (?:roles|positions|candidates|applicants|employees|hires)|pay ranges? for ${LABEL_PLACE}) only:(?![^.!?\\n]*\\b(?:not|cannot|can['’]t|unable)\\b)(?=[^.!?\\n]{0,80}?(?:${AMOUNT}|${NOTICE}))`, 'gi');
+const withoutScopeLabels = (text) => typeof text === 'string' ? text.replace(BLOCK_TAG, '\n').replace(SCOPE_LABEL, '$1$2') : text;
 
 function excludedHome(text, homes) {
   return homes.some(h => [
@@ -249,7 +257,7 @@ export function buildWorkplacePolicy(policy) {
   return (location, title = '', offer = {}) => {
     if (offer.geographyEvidence && typeof offer.geographyEvidence === 'object' && !Array.isArray(offer.geographyEvidence)) offer = { ...offer, ...offer.geographyEvidence };
     const raw = typeof location === 'string' ? location : '';
-    const loc = fold(location), heading = fold(title), description = plain(offer.description);
+    const loc = fold(location), heading = fold(title), description = plain(withoutScopeLabels(offer.description));
     const meta = fold(requirementText(offer));
     const workplace = fold(offer.workplaceType || offer.workplace_type || offer.workArrangement);
     const all = `${loc}. ${heading}. ${meta}. ${description}`;
