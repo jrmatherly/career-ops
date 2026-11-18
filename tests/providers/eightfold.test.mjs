@@ -490,19 +490,21 @@ try {
   }
 
   {
-    // Two values that say remote: both are walked. A full page that reaches count ends a value's walk.
+    // Two values that say remote: both are walked, and together they cover the board.
+    // A full page is followed by one more request, whatever count says.
     const second = 'remote – anywhere';
     const filterDef = { smartFilters: [{ filterName: 'work_site', options: [{ value: REMOTE_VALUE }, { value: second }] }] };
     const { ctx, calls } = recording((c) => {
       if (c.url.includes('/api/apply/v2/jobs')) throw httpErr(403, 'Not authorized for PCSX');
-      if (filterOf(c) === REMOTE_VALUE) return pcsxPage(Array.from({ length: 10 }, (_, i) => position(String(i + 100), `Other ${i}`)), 10);
+      const start = Number(new URL(c.url).searchParams.get('start') || 0);
+      if (filterOf(c) === REMOTE_VALUE) return pcsxPage(start === 0 ? [position('1', 'Office Role'), ...Array.from({ length: 9 }, (_, i) => position(String(i + 100), `Other ${i}`))] : [], 10);
       if (filterOf(c) === second) return pcsxPage([position('2', 'Remote Role')], 1);
       return withFilters(pcsxPage([position('1', 'Office Role'), position('2', 'Remote Role')], 2), filterDef);
     });
     const jobs = await ef.fetch(TENANT, ctx);
     const filtered = calls.filter((c) => filterOf(c) !== null).map(filterOf);
-    jobs[0].location === 'Redmond, WA' && jobs[1].location === 'Redmond, WA · Remote' && JSON.stringify(filtered) === JSON.stringify([REMOTE_VALUE, second])
-      ? pass('eightfold walks every remote value, one request each when the first page reaches count')
+    jobs.every((j) => j.location === 'Redmond, WA · Remote') && JSON.stringify(filtered) === JSON.stringify([REMOTE_VALUE, REMOTE_VALUE, second])
+      ? pass('eightfold walks every remote value to a short page, and marks a board two values cover between them')
       : fail(`two remote values: ${JSON.stringify(jobs.map((j) => j.location))} ${JSON.stringify(filtered)}`);
   }
 

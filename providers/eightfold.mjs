@@ -578,9 +578,12 @@ export default {
       : [];
     if (remoteValues.length > 0) {
       const remoteIds = new Set();
+      // A posting with no id can never be in a filtered set, so it is not counted.
+      const identified = all.filter((job) => job.externalId);
       let pages = 0;
       try {
         for (const value of remoteValues) {
+          const valueIds = new Set();
           for (let start = 0; ; start += PAGE_SIZE) {
             if (pages >= maxPages) throw new Error(`page budget of ${maxPages} reached`);
             await sleep(PCSX_INTER_PAGE_DELAY_MS, ctx);
@@ -591,17 +594,17 @@ export default {
             for (const p of page.positions) {
               // The same id and fallback parseEightfoldResponse gives externalId.
               const id = coerceId(p?.id) ?? coerceId(p?.position_id);
-              if (id) remoteIds.add(id);
+              if (id) valueIds.add(id);
             }
+            // Only a short page ends a value's walk. `count` is not trusted
+            // for it: a count below the real total would mark part of the set.
             if (page.positions.length < PAGE_SIZE) break;
-            if (page.count !== undefined && start + PAGE_SIZE >= page.count) break;
           }
+          // A tenant that ignores the filter parameter answers with the whole
+          // board, and marking that would call every posting remote.
+          if (identified.length > 0 && identified.every((job) => valueIds.has(job.externalId))) throw new Error('the filter returned every posting');
+          for (const id of valueIds) remoteIds.add(id);
         }
-        // A tenant that ignores the filter parameter answers with the whole
-        // board, and marking that would call every posting remote. A posting
-        // with no id can never be in the filtered set, so it is not counted.
-        const identified = all.filter((job) => job.externalId);
-        if (identified.length > 0 && identified.every((job) => remoteIds.has(job.externalId))) throw new Error('the filter returned every posting');
         const marked = markRemote(all, remoteIds);
         if (marked > 0) console.error(`ℹ️  eightfold: ${entry.name} marked ${marked} posting(s) Remote from the tenant's work-site filter`);
       } catch (err) {
