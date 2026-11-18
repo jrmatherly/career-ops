@@ -4,7 +4,10 @@ import { reportNumberFromCell } from "@/lib/apply/cv-selection.mjs";
 import fs from "node:fs";
 import { rootScript } from "@/lib/career-ops";
 import { runCoreCli } from "@/lib/core-cli";
-import { markGated, markHeld, pendingInbox } from "@/lib/inbox-pending.mjs";
+import { markGated, markVerdicts, pendingInbox } from "@/lib/inbox-pending.mjs";
+import { listScheduledJobs } from "@/lib/scheduled-jobs";
+import { storedHolds } from "@/lib/scheduled-job-input.mjs";
+import { loadHoldVerdicts } from "@/lib/core/workplace-policy.mjs";
 import { PipelineView } from "@/components/pipeline-view";
 import { pipelineTab } from "@/lib/pipeline-navigation.mjs";
 import { scorePosting } from "@/lib/core/inbox-rank.mjs";
@@ -22,8 +25,18 @@ async function ledgerEntries(): Promise<{ url?: string; state?: string; reason?:
     const entries: unknown = JSON.parse(r.stdout);
     return Array.isArray(entries) ? entries : [];
   } catch (cause) {
-    console.error(`/pipeline: gated and held rows are not marked: ${cause instanceof Error ? cause.message : String(cause)}`);
+    console.error(`/pipeline: gated rows are not marked: ${cause instanceof Error ? cause.message : String(cause)}`);
     return [];
+  }
+}
+
+// One verdict function per scheduled scan's location hold. A hold that cannot be
+// built, or a store that cannot be read, judges nothing: the inbox still lists every posting.
+async function holdVerdicts(): Promise<Awaited<ReturnType<typeof loadHoldVerdicts>>> {
+  try {
+    return await loadHoldVerdicts(storedHolds(listScheduledJobs().jobs));
+  } catch (cause) {
+    return { verdicts: [], problems: [cause instanceof Error ? cause.message : String(cause)] };
   }
 }
 
@@ -37,7 +50,9 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const { inbox, scanDates } = summary;
   const unmarked = pendingInbox(inbox);
   const ledger = onInbox ? await ledgerEntries() : [];
-  const pending = markHeld(markGated(unmarked, ledger), ledger);
+  const { verdicts, problems } = onInbox ? await holdVerdicts() : { verdicts: [], problems: [] };
+  const pending = markVerdicts(markGated(unmarked, ledger), verdicts);
+  const holdProblem = problems.length ? `Location hold: ${problems.join("; ")}. The Inbox judged locations without it.` : null;
   const fitted = onInbox ? withInboxFit(pending) : null;
   const trackerShape = readTrackerShape();
   // Tracker row numbers whose tailored CV is indexed (data/pdf-index.tsv) AND on
@@ -62,7 +77,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
         applications={applications}
         inbox={fitted ? fitted.jobs : null}
         inboxCount={pending.length}
-        inboxFitError={fitted?.error ?? null}
+        inboxFitError={[fitted?.error, holdProblem].filter(Boolean).join("\n") || null}
         scanDates={onInbox ? scanDates : []}
         trackerShape={trackerShape}
         cvRows={cvRows}

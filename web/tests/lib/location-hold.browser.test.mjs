@@ -1,13 +1,15 @@
-// Disposable fictional data root: a held inbox row and an Auto scheduled scan with a location hold.
+// Disposable fictional data root: four pending rows and an Auto scheduled scan with a location hold.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { liveServerSkip } from "../helpers/live-server.mjs";
 import { settled } from "../helpers/streaming.mjs";
 
 const url = process.env.LOCATION_HOLD_TEST_URL;
-test("a held posting keeps its rank in the Inbox, and the job form shows the hold and the source groups", {
-  skip: liveServerSkip("LOCATION_HOLD_TEST_URL"), timeout: 60_000,
-}, async (t) => {
+const options = { skip: liveServerSkip("LOCATION_HOLD_TEST_URL", "LOCATION_HOLD_TEST_ROOT"), timeout: 60_000 };
+const row = (page, company) => page.locator("li:visible").filter({ hasText: company });
+const badge = (page, company) => row(page, company).getByTitle(/Judged from the row's location and title/);
+
+async function open(t) {
   assert.ok(["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname));
   const { chromium } = await import("playwright-core");
   const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -15,13 +17,26 @@ test("a held posting keeps its rank in the Inbox, and the job form shows the hol
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  return { page, errors };
+}
 
+test("every row that is not a fit says why", options, async (t) => {
+  const { page, errors } = await open(t);
   await settled(page, () => page.goto(`${url}/pipeline`));
-  const held = page.locator("li:visible").filter({ hasText: "Fixture Alpha" });
-  await held.getByText("Held: location", { exact: true }).waitFor();
-  assert.equal(await held.getByText("est. 4.2", { exact: true }).count(), 1, "a held row still shows its rank");
-  assert.equal(await page.locator("li:visible").filter({ hasText: "Fixture Beta" }).getByText("Held: location").count(), 0);
+  await row(page, "Fixture Beta").waitFor();
+  assert.equal(await badge(page, "Fixture Beta").count(), 0);
+  assert.equal(await badge(page, "Fixture Gamma").getAttribute("title"),
+    "Remote, and the posting does not say from where. Judged from the row's location and title, not the posting text.");
+  assert.equal(await badge(page, "Fixture Gamma").textContent(), "Review location: Remote, and the posting does not say from where.");
+  assert.equal(await badge(page, "Fixture Delta").textContent(), "Review location: The posting gives no location.");
+  assert.equal(await badge(page, "Fixture Alpha").textContent(), "Elsewhere: On-site or hybrid outside your home area.");
+  assert.equal(await row(page, "Fixture Alpha").getByText("est. 4.2", { exact: true }).count(), 1, "the row keeps its rank");
+  assert.equal(await page.getByText("Held: location").count(), 0);
+  assert.deepEqual(errors, []);
+});
 
+test("the job form shows the hold and the source groups", options, async (t) => {
+  const { page, errors } = await open(t);
   await settled(page, () => page.goto(`${url}/scheduled-scans`));
   await page.getByText("other locations held").waitFor();
   await page.getByText("Groups: weekly", { exact: true }).waitFor();

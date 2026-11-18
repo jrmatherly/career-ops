@@ -1,19 +1,28 @@
 // Prints a new disposable, fictional data root for location-hold.browser.test.mjs:
-// one ranked inbox row the ledger marks held-location, and one Auto scheduled scan with a hold.
+// four pending rows, one per verdict the Inbox shows, a ledger row marking one held-location, and one Auto scheduled scan with a hold.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "career-ops-location-hold-"));
 const HELD = "https://example.com/fixture-held";
 const NOW = "2026-11-08T15:00:00.000Z";
 const JOB = "11111111-1111-4111-8111-111111111111";
 fs.mkdirSync(path.join(root, "data"));
+// Marks the root as one the inbox routes may write to, as inbox-undo.mjs does.
+fs.writeFileSync(path.join(root, ".inbox-undo-fixture"), "fictional-only\n");
+for (const file of ["pipeline-lock.mjs", "lib/dir-lock.mjs"]) {
+  fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+  fs.copyFileSync(fileURLToPath(new URL(`../../../${file}`, import.meta.url)), path.join(root, file));
+}
 fs.writeFileSync(path.join(root, "data/pipeline.md"), `# Fictional inbox
 
 ## Pending
 - [ ] ${HELD} | Fixture Alpha | Platform Lead | Metropolis, NY | rank: 4.2/5 — fixture
 - [ ] https://example.com/fixture-plain | Fixture Beta | Designer | Springfield
+- [ ] https://example.com/fixture-remote | Fixture Gamma | Engineer | Remote
+- [ ] https://example.com/fixture-blank | Fixture Delta | Analyst
 `);
 fs.writeFileSync(path.join(root, "data/evaluate-queue.tsv"), [
   "url\tat\tjobId\trunId\trank\treason\tstate\tsource",
