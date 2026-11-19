@@ -1090,6 +1090,12 @@ function renderMarkdown(payload, template) {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
 
+// A template with no grid gets the competencies as a Skills row, so a parser still reads them.
+// A locked Skills section must match cv.md, so it takes no fold.
+function foldIntoSkills(payload, hasGrid) {
+  return hasGrid || readLockedSections(PROFILE_PATH, sectionKey).includes('skills') ? payload : foldCompetencies(payload).payload;
+}
+
 async function runMarkdown(args) {
   const outIdx = args.indexOf('--markdown');
   const outputPath = args[outIdx + 1];
@@ -1137,7 +1143,7 @@ async function runMarkdown(args) {
     process.exit(1);
   }
   const template = await readFile(templatePath, 'utf-8');
-  if (!template.includes('{{SECTION_COMPETENCIES}}')) payload = foldCompetencies(payload).payload;
+  payload = foldIntoSkills(payload, template.includes('{{SECTION_COMPETENCIES}}'));
   warnings.push(...templateSlotWarnings(payload, template, markdownSectionSlots(), basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
   await mkdir(dirname(absOutput), { recursive: true });
@@ -1229,11 +1235,7 @@ async function main() {
   }
 
   const template = await readFile(templatePath, 'utf-8');
-  // A template with no grid gets the competencies as a Skills row, so a parser still reads them.
-  // A locked Skills section must match cv.md, so it takes no fold.
-  if (!template.includes('{{COMPETENCIES}}') && !readLockedSections(PROFILE_PATH, sectionKey).includes('skills')) {
-    payload = foldCompetencies(payload).payload;
-  }
+  payload = foldIntoSkills(payload, template.includes('{{COMPETENCIES}}'));
   warnings.push(...templateSlotWarnings(payload, template, HTML_SECTION_SLOTS, basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
 

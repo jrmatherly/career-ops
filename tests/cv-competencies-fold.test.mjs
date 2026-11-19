@@ -65,4 +65,13 @@ test('a locked Skills section is not folded into, so the build passes and warns 
   const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, join(ROOT, 'templates/dense/cv-template.dense.html')], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(root) });
   assert.equal(r.status, 0, r.stderr);
   assert.ok(JSON.parse(r.stdout).warnings.some((w) => /competenc/i.test(w)), r.stdout);
+
+  const mdOutput = join(root, 'out.md');
+  const md = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', mdOutput, join(ROOT, 'templates/dense/cv-template.dense.html')], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(root) });
+  assert.equal(md.status, 0, md.stderr);
+  const skills = readFileSync(mdOutput, 'utf8').split(/^## Skills$/m)[1] ?? '';
+  assert.ok(skills.includes(fixture.skills[0].category), skills);
+  const onlyCompetencies = fixture.competencies.filter((c) => !JSON.stringify(fixture.skills).includes(c));
+  assert.ok(onlyCompetencies.length > 0);
+  for (const c of onlyCompetencies) assert.ok(!skills.includes(c), `folded into a locked Skills section: ${c}`);
 });
