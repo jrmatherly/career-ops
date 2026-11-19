@@ -298,3 +298,93 @@ test("a payload the title check cannot read stops the render", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+async function inDataRoot(prefix, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  const saved = { root: process.env.CAREER_OPS_ROOT, profile: process.env.CAREER_OPS_PROFILE };
+  process.env.CAREER_OPS_ROOT = dir;
+  delete process.env.CAREER_OPS_PROFILE;
+  try {
+    writeFileSync(path.join(dir, "cv.md"), CV_MD);
+    return await fn(dir);
+  } finally {
+    if (saved.root === undefined) delete process.env.CAREER_OPS_ROOT;
+    else process.env.CAREER_OPS_ROOT = saved.root;
+    if (saved.profile !== undefined) process.env.CAREER_OPS_PROFILE = saved.profile;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function withVolunteer() {
+  return { ...payload(), volunteer: [{ org: "Example Food Bank", dates: "2019 - 2024", description: "Sorted donations." }] };
+}
+
+test("the builder's warnings reach the result", () => inDataRoot("cv-builder-warn-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: withVolunteer(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/cv-template.compact.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 1,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.ok(result.warnings.some((w) => /^volunteer: cv-template\.compact\.html has no volunteer section/.test(w)), result.warnings.join("\n"));
+}));
+
+test("a CV over the page limit is built in dense with the kept build's warnings only", () => inDataRoot("cv-dense-fallback-", async (dir) => {
+  const counted = [];
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: withVolunteer(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/cv-template.compact.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async (html) => { counted.push(html); return 3; },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(counted.length, 1);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.match(result.html, /Example Food Bank/);
+  assert.ok(result.warnings.includes('The CV ran to 3 pages in the "cv-template.compact.html" template, so it was built in the dense template instead.'), result.warnings.join("\n"));
+  assert.equal(result.warnings.some((w) => w.startsWith("volunteer:")), false, "the discarded build's slot warning is dropped");
+}));
+
+test("a dense rebuild that fails keeps the first build and warns", (t) => inDataRoot("cv-dense-fail-", async (dir) => {
+  const realRead = fs.readFileSync;
+  t.mock.method(fs, "readFileSync", (file, ...rest) => {
+    if (String(file).endsWith("cv.dense.html")) throw Object.assign(new Error("EIO: i/o error"), { code: "EIO" });
+    return realRead(file, ...rest);
+  });
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 3,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.doesNotMatch(result.html, /--font-size: 9\.5pt/);
+  assert.match(result.html, /Jane Doe/);
+  assert.ok(result.warnings.some((w) => w.includes("could not be rebuilt in the dense template") && w.includes("i/o error")), result.warnings.join("\n"));
+}));
+
+test("a CV built in dense is not measured or rebuilt", () => inDataRoot("cv-dense-chosen-", async (dir) => {
+  let counted = 0;
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/dense/cv-template.dense.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => { counted += 1; return 3; },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(counted, 0);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.equal(result.warnings.some((w) => w.includes("dense template")), false);
+}));

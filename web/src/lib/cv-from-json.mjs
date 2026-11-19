@@ -5,7 +5,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { cvTemplateAbsolute } from "./run-prompts.mjs";
 import { atsPdfPath } from "./apply/ats-pdf.mjs";
-import { PAGE_FORMATS } from "./page-formats.mjs";
+import { DEFAULT_PAGE_FORMAT, PAGE_FORMATS } from "./page-formats.mjs";
+import { chooseFittingTemplate, countCvPages } from "./cv-fit.mjs";
+import { readPageBudget } from "./core/page-budget.mjs";
+import { getProfilePath } from "./core/profile-path.mjs";
 
 async function loadCore(coreRoot, fileName) {
   const href = pathToFileURL(path.join(coreRoot, fileName)).href;
@@ -155,6 +158,7 @@ function structureWarnings(structure) {
  * @param {string} args.htmlPath
  * @param {string} args.finalPdf
  * @param {boolean} [args.ats]
+ * @param {(html: string) => Promise<number|null>} [args.countPages] Defaults to an isolated render (cv-fit.mjs).
  * @returns {Promise<{ok: true, html: string, warnings: string[], ats: {html: string, finalPdf: string}|null, scratchDir?: string} | {ok: false, error: string}>}
  */
 export async function materializeTailoredCv({
@@ -167,6 +171,7 @@ export async function materializeTailoredCv({
   htmlPath,
   finalPdf,
   ats = false,
+  countPages,
 }) {
   if (envelope?.kind === "html" && typeof envelope.html === "string") {
     return { ok: true, html: envelope.html, warnings: [], ats: null };
@@ -214,27 +219,47 @@ export async function materializeTailoredCv({
   try {
     fs.writeFileSync(scratch.json, JSON.stringify(payload));
     const template = cvTemplateAbsolute({ cvTemplate, codeRoot: coreRoot, userTemplatesDir, dataRoot });
-    const built = await runNode(dataRoot, [
-      path.join(coreRoot, "build-cv-html.mjs"),
-      scratch.json,
-      scratch.html,
-      template,
-    ]);
-    if (!built.ok) {
-      const detail = built.stderr || "build-cv-html.mjs failed.";
-      return { ok: false, error: `Could not build the tailored CV. ${detail}` };
-    }
-
-    let html;
+    const builds = new Map();
+    const build = async (templatePath) => {
+      const file = templatePath === template ? scratch.html : path.join(scratch.dir, "cv.dense.html");
+      const built = await runNode(dataRoot, [path.join(coreRoot, "build-cv-html.mjs"), scratch.json, file, templatePath]);
+      if (!built.ok) throw new Error(`Could not build the tailored CV. ${built.stderr || "build-cv-html.mjs failed."}`);
+      let html;
+      try {
+        html = fs.readFileSync(file, "utf8");
+      } catch (err) {
+        throw new Error(`The tailored CV HTML was not written: ${err.message}`);
+      }
+      builds.set(templatePath, { file, warnings: builderWarnings(built.stdout) });
+      return html;
+    };
+    const format = PAGE_FORMATS.has(payload.page_format) ? payload.page_format : DEFAULT_PAGE_FORMAT;
+    let chosen;
     try {
-      html = fs.readFileSync(scratch.html, "utf8");
+      chosen = await chooseFittingTemplate({
+        template,
+        denseTemplate: await resolveDenseTemplate(coreRoot, template),
+        maxPages: (await readPageBudget(coreRoot, dataRoot)).maxPages,
+        build,
+        countPages: countPages ?? ((html) => countCvPages({ html, format, coreRoot, profilePath: getProfilePath(dataRoot) })),
+      });
     } catch (err) {
-      return { ok: false, error: `The tailored CV HTML was not written: ${err.message}` };
+      return { ok: false, error: err.message };
+    }
+    const { html } = chosen;
+    const kept = builds.get(chosen.template);
+    warnings.push(...kept.warnings);
+    if (chosen.fallback) {
+      const { pages, from } = chosen.fallback;
+      warnings.push(`The CV ran to ${pages} pages in the "${path.basename(from)}" template, so it was built in the dense template instead.`);
+    }
+    if (chosen.fallbackError) {
+      warnings.push(`The CV is over the page limit and could not be rebuilt in the dense template, so it was kept as built. ${chosen.fallbackError}`);
     }
 
     const report = reportPath(dataRoot, reportFile);
     if (report && fs.existsSync(/* turbopackIgnore: true */ report)) {
-      warnings.push(...await keywordWarnings(coreRoot, dataRoot, report, scratch.html));
+      warnings.push(...await keywordWarnings(coreRoot, dataRoot, report, kept.file));
     }
 
     const atsVariant = ats === true
@@ -248,6 +273,26 @@ export async function materializeTailoredCv({
     return { ok: true, html, warnings, ats: atsVariant, scratchDir: keepScratch ? scratch.dir : undefined };
   } finally {
     if (!keepScratch) fs.rmSync(scratch.dir, { recursive: true, force: true });
+  }
+}
+
+// Returns `template` itself when it already is the dense one, so chooseFittingTemplate does not rebuild it.
+async function resolveDenseTemplate(coreRoot, template) {
+  try {
+    const templates = await loadCore(coreRoot, "cv-templates.mjs");
+    const dense = path.resolve(templates.resolveTemplate("cv", "dense", { dir: path.join(coreRoot, "templates") }));
+    return dense === path.resolve(template) ? template : dense;
+  } catch {
+    return null;
+  }
+}
+
+function builderWarnings(stdout) {
+  try {
+    const report = JSON.parse(stdout.slice(stdout.indexOf("{")));
+    return Array.isArray(report.warnings) ? report.warnings.map(String) : [];
+  } catch {
+    return [];
   }
 }
 
