@@ -842,6 +842,7 @@ test("the pdf prompt states the page limit and the section rules", () => {
   assert.match(p, /must fit 2 pages/);
   assert.match(p, /Copy every section of cv\.md into the payload, Volunteer included/);
   assert.match(p, /Do not add a skills category cv\.md does not have/);
+  assert.match(p, /Never shorten a section the profile's cv\.locked_sections names/);
 });
 
 test("a one-page limit reads in the singular", () => {
