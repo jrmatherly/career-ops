@@ -305,7 +305,7 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
 
 **The key names above are enforced, not suggestions (#3523).** Every list section (`experience`, `projects`, `education`, `certifications`, `awards`, `skills`, `volunteer`) is rendered from exactly the keys listed in this table. The payload root must be an object. Before rendering, `build-cv-html.mjs` validates each entry:
 
-- **Missing or blank required field → hard error, non-zero exit, no HTML written.** Required: `company` + `role` for experience, `name` for projects, `title` for education, certifications and awards, `items` for skills (a non-blank string or a non-empty array of them; `category` stays optional).
+- **Missing or blank required field → hard error, non-zero exit, no HTML written.** Required: `company` + `role` for experience, `name` for projects, `title` for education, certifications and awards, `org` for volunteer, `items` for skills (a non-blank string or a non-empty array of them; `category` stays optional).
 - **A key no builder reads → warning on stderr and in the report's `warnings[]`;** the build proceeds and the key is ignored.
 - **A top-level section name the builder does not read → warning**, naming the nearest known key. A payload with `educations` instead of `education` used to validate clean and drop the section silently; it now says so.
 - **A populated section the chosen template has no slot for → warning**, naming the template. Of the shipped templates only `cv-template.html` renders `interests`, and the ATS and `zh-minimal` templates have no `consent` footer; pick a template that has the section, or leave it out.

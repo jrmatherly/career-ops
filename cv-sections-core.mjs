@@ -44,7 +44,7 @@
 //
 // Skills is the LAST section in most shipped templates, which makes it one
 // optional section that may have no following section marker to stop at
-// (Volunteer, which follows Skills in the base and ATS templates, is the other,
+// (Volunteer, which follows Skills in the templates that have it, is the other,
 // and its pattern takes the same boundary for the same reason). Given
 // the shared `…|$` boundary the others use, stripping an empty trailing Skills
 // section falls through to true end-of-file and takes the closing

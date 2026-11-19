@@ -8,7 +8,7 @@ import { getProfilePath } from "./profile-path.mjs";
  * loads its module, because Turbopack refuses a static import from outside web/.
  *
  * Never throws. A core that cannot be loaded, or a profile without a usable
- * `cv.max_pages`, reads as the core's default of 2.
+ * `cv.max_pages`, falls back to 2.
  *
  * @param {string} coreRoot Absolute path to the career-ops code checkout.
  * @param {string} dataRoot Absolute data root (careerOpsRoot()).
