@@ -53,7 +53,7 @@ import { stripEmptySections, isEmptySection, isEmptyRenderedSection, stripEmptyR
 
 console.log('\ncv-sections-core.mjs — optional sections leave no bare header');
 
-const EMPTY = { summary: '', competencies: [], experience: [], projects: [], education: [], certifications: [], awards: [], interests: [], skills: [] };
+const EMPTY = { summary: '', competencies: [], experience: [], projects: [], education: [], certifications: [], awards: [], interests: [], skills: [], volunteer: [] };
 const FULL = {
   summary: 'Summary.',
   competencies: ['Tag'],
@@ -64,6 +64,7 @@ const FULL = {
   awards: [{ title: 'A' }],
   interests: ['Chess'],
   skills: [{ category: 'S', items: 'x' }],
+  volunteer: [{ org: 'V' }],
 };
 
 function check(label, actual, expected) {
@@ -152,6 +153,9 @@ for (const { file, format, after, hasCertifications, hasCompetencies, hasInteres
     check(`${name}: empty payload removes the interests block`, stripped.includes(interestsMarker), false);
   }
   check(`${name}: empty payload removes the skills block`, stripped.includes(skillsMarker), false);
+  if (template.includes('<!-- VOLUNTEER -->')) {
+    check(`${name}: empty payload removes the volunteer block`, stripped.includes('<!-- VOLUNTEER -->'), false);
+  }
   check(`${name}: empty payload removes the work-experience block`, stripped.includes(experienceMarker), false);
   check(`${name}: the trailing sentinel survives`, stripped.includes(after), true);
   check(`${name}: the closing document skeleton survives`, stripped.trimEnd().endsWith(closingSkeleton), true);
@@ -370,12 +374,14 @@ for (const { file, format, after, hasCertifications, hasCompetencies, hasInteres
   // so the two can never drift into a weaker substring of each other.
   const noSentinel = template.replace(after, '');
   check(`${name}: fixture actually dropped the sentinel`, noSentinel.includes(after), false);
-  const strippedNoSentinel = stripEmptySections(noSentinel, { ...FULL, skills: [] }, format);
-  check(`${name}: no sentinel + empty skills leaves the template untouched (fail-safe)`,
+  // The fail-safe belongs to whichever section is last: Volunteer where the template has it.
+  const last = template.includes('<!-- VOLUNTEER -->') ? 'volunteer' : 'skills';
+  const strippedNoSentinel = stripEmptySections(noSentinel, { ...FULL, [last]: [] }, format);
+  check(`${name}: no sentinel + empty ${last} leaves the template untouched (fail-safe)`,
     strippedNoSentinel === noSentinel, true);
-  check(`${name}: no sentinel + empty skills keeps the closing document skeleton`,
+  check(`${name}: no sentinel + empty ${last} keeps the closing document skeleton`,
     strippedNoSentinel.trimEnd().endsWith(closingSkeleton), true);
-  check(`${name}: no sentinel + empty skills keeps {{EXPERIENCE}}`,
+  check(`${name}: no sentinel + empty ${last} keeps {{EXPERIENCE}}`,
     strippedNoSentinel.includes('{{EXPERIENCE}}'), true);
 }
 

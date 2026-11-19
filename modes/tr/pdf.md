@@ -17,7 +17,7 @@
 11. JD gereksinimlerinden yetkinlik ızgarasını (competency grid) oluştur (6-8 anahtar kelime öbeği).
 12. Anahtar kelimeleri mevcut başarılara doğal bir şekilde enjekte et (ASLA yeni bir şey uydurma).
 13. `modes/heuristics/recruiter-side.md` içerisindeki altı saniyelik netlik kuralını (six-second clarity gate) uygula: üstteki üçte birlik kısım; hedef rolü, en güçlü uyumu ve kanıtı apaçık belli etmelidir.
-14. Şablon (template) + kişiselleştirilmiş içerik kullanarak tam HTML oluştur.
+14. Şablon (template) + kişiselleştirilmiş içerik kullanarak tam HTML oluştur. `cv.md` dosyasındaki her bölümü, Gönüllülük (Volunteer) dahil, CV'ye taşı; hiçbir bölümü atlama.
 15. `config/profile.yml` dosyasından `name` değerini ve JD'den şirket adını oku → kabuk komut enjeksiyonunu ve geçersiz dosya adlarını önlemek için her ikisini de yalnızca alfanümerik karakterler ve kısa çizgi (`[a-z0-9-]+`) içerecek şekilde küçük harfe (kebab-case) dönüştürerek sanitize et (örn. "John Doe" → `{candidate}`, "Acme Corp." → `{company}`).
 16. HTML'i `output/cv-{candidate}-{company}.html` dosyasına yaz (geçici - temp - bir dizine DEĞİL — kaydedilen HTML, kontrol panelindeki `D` kısayol tuşunun yeniden oluşturma yaparken kullandığı asıl kaynaktır; bu nedenle geçici dizin temizliğinden sağ çıkmalıdır).
 17. Yürüt (Execute): Sanitize edilmiş her iki dosya adı parçasını kullanarak çalıştır: `node generate-pdf.mjs output/cv-{candidate}-{company}.html output/cv-{candidate}-{company}-{YYYY-MM-DD}.pdf --format={letter|a4} --report={report number}` — buradaki `{report number}`, takipçi (tracker) tablosundaki `#` sütunu DEĞİL, rapor dosya adı/bağlantısındaki NNN'dir (örn. `reports/008-acme-….md` için `008`). Başvurunun bir raporu varsa (veya olacaksa) bunu aktar; kontrol panelinin doğrudan aynı PDF'i açıp yeniden oluşturabilmesi için PDF↔rapor bağlantısını `data/pdf-index.tsv` içine kaydeder. Yalnızca takipçi girişi olmayan tek seferlik (one-off) CV'ler için bu argümanı dahil etme.
@@ -61,6 +61,7 @@
 5. Projects (en alakalı ilk 3-4 proje)
 6. Education & Certifications
 7. Skills (diller + teknik yetenekler)
+8. Volunteer Experience
 
 ## Anahtar kelime ekleme stratejisi (etik, gerçeğe dayalı)
 
@@ -102,6 +103,8 @@ Meşru (legitimate) yeniden formüle etme örnekleri:
 | `{{CERTIFICATIONS}}` | Sertifikalar (Certifications) HTML'i |
 | `{{SECTION_SKILLS}}` | Skills |
 | `{{SKILLS}}` | Yetenekler (Skills) HTML'i |
+| `{{SECTION_VOLUNTEER}}` | Volunteer Experience |
+| `{{VOLUNTEER}}` | Gönüllülük (Volunteer) HTML'i; payload anahtarı `volunteer[]`: `org` (**zorunlu**), `location`, `dates`, `description`. `cv.md` dosyasındaki Volunteer bölümünü olduğu gibi kopyala. Asla uyarlama ve asla çıkarma. |
 
 ### Profil fotoğrafı (isteğe bağlı, pazara özel)
 

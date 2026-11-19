@@ -77,6 +77,7 @@ const DEFAULT_SECTION_TITLES = {
   awards: 'Awards & Honors',
   interests: 'Interests',
   skills: 'Skills',
+  volunteer: 'Volunteer Experience',
 };
 
 // Escape user text for HTML text/attribute context. Covers the five characters
@@ -635,6 +636,26 @@ function buildEducation(entries, partial) {
   }).join('\n  ');
 }
 
+// Volunteer reuses the education markup and classes, so every template styles it
+// without new CSS. No partial: no shipped pack has a volunteer section file.
+function buildVolunteer(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return '';
+  return entries.filter(e => hasRequiredFields(e, 'volunteer', 'html')).map(e => {
+    const location = e.location
+      ? `\n    <div class="edu-location">${escapeHtml(e.location)}</div>`
+      : '';
+    const desc = e.description
+      ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
+      : '';
+    return withResumePath(`<div class="edu-item">
+    <div class="edu-header">
+      <div class="edu-title">${escapeHtml(e.org)}</div>
+      <div class="edu-year">${escapeHtml(e.dates || '')}</div>
+    </div>${location}${desc}
+  </div>`, e.path);
+  }).join('\n  ');
+}
+
 function buildCertifications(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
@@ -826,6 +847,8 @@ function renderReport(payload, partials) {
     INTERESTS: buildInterests(payload.interests),
     SECTION_SKILLS: escapeHtml(sectionTitles.skills),
     SKILLS: buildSkills(payload.skills, partials.get('skills')),
+    SECTION_VOLUNTEER: escapeHtml(sectionTitles.volunteer),
+    VOLUNTEER: buildVolunteer(payload.volunteer),
     CONSENT: escapeHtml((payload.consent || '').trim()),
   };
   return { substitutions, candidate };
@@ -959,7 +982,7 @@ function mdUrl(url) {
 const HTML_SECTION_SLOTS = {
   summary: 'SUMMARY_TEXT', competencies: 'COMPETENCIES', experience: 'EXPERIENCE',
   projects: 'PROJECTS', education: 'EDUCATION', certifications: 'CERTIFICATIONS',
-  awards: 'AWARDS', interests: 'INTERESTS', skills: 'SKILLS', consent: 'CONSENT',
+  awards: 'AWARDS', interests: 'INTERESTS', skills: 'SKILLS', volunteer: 'VOLUNTEER', consent: 'CONSENT',
 };
 function markdownSectionSlots() {
   return {
@@ -1050,6 +1073,14 @@ function renderMarkdown(payload, template) {
   const skills = list(payload.skills).filter(c => hasRequiredFields(c, 'skills', 'html')).map(c =>
     `- ${mdLine(c.category) ? `**${mdLine(c.category)}:** ` : ''}${mdLine(joinItems(c.items))}`);
   section('skills', skills.length ? [...skills, ''] : []);
+
+  const vol = [];
+  for (const e of list(payload.volunteer).filter(e => hasRequiredFields(e, 'volunteer', 'html'))) {
+    vol.push(`**${mdLine(e.org)}**${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`, '');
+    if (mdLine(e.location)) vol.push(mdLine(e.location), '');
+    if (mdLine(e.description)) vol.push(mdLine(e.description), '');
+  }
+  section('volunteer', vol);
 
   for (const key of templateSectionOrder(template)) {
     if (bodies.has(key)) out.push(...bodies.get(key));

@@ -444,6 +444,10 @@ const SECTION_ALIASES = new Map([
   ['skills', 'skills'],
   ['technical skills', 'skills'],
   ['interests', 'interests'],
+  ['volunteer', 'volunteer'],
+  ['volunteer experience', 'volunteer'],
+  ['volunteering', 'volunteer'],
+  ['community involvement', 'volunteer'],
   // Polish — the vocabulary documented in modes/pl/README.md, plus the word-order
   // variants that turn up in practice (both "Kompetencje kluczowe" and
   // "Kluczowe kompetencje" are used for the same section).
@@ -637,7 +641,7 @@ function extractSourceSectionOrder(markdown) {
  */
 const CANONICAL_TAILORED_ORDER = [
   'summary', 'competencies', 'experience', 'projects',
-  'education', 'certifications', 'awards', 'interests', 'skills',
+  'education', 'certifications', 'awards', 'interests', 'skills', 'volunteer',
 ];
 const CANONICAL_TAILORED_POSITIONS = new Map(
   CANONICAL_TAILORED_ORDER.map((key, index) => [key, index]),

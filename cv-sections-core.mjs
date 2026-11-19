@@ -42,8 +42,10 @@
 //
 // ── The Skills sentinel: part of the template contract ───────────────────────
 //
-// Skills is the LAST section in every shipped template, which makes it the one
-// optional section that may have no following section marker to stop at. Given
+// Skills is the LAST section in most shipped templates, which makes it one
+// optional section that may have no following section marker to stop at
+// (Volunteer, which follows Skills in the base and ATS templates, is the other,
+// and its pattern takes the same boundary for the same reason). Given
 // the shared `…|$` boundary the others use, stripping an empty trailing Skills
 // section falls through to true end-of-file and takes the closing
 // `</div></body></html>` (`\end{document}` in LaTeX) with it — a truncated,
@@ -135,6 +137,7 @@ const PATTERNS = {
     awards: new RegExp(String.raw`<!--\s+AWARDS\s+-->[\s\S]*?` + HTML_BOUNDARY),
     skills: new RegExp(String.raw`<!--\s+SKILLS\s+-->[\s\S]*?` + HTML_END_SENTINEL),
     interests: new RegExp(String.raw`<!--\s+INTERESTS\s+-->[\s\S]*?` + HTML_BOUNDARY),
+    volunteer: new RegExp(String.raw`<!--\s+VOLUNTEER\s+-->[\s\S]*?` + HTML_END_SENTINEL),
   },
   tex: {
     // The LaTeX banner is `%%%%  Experience  %%%%` — mixed case, and not the
@@ -147,7 +150,7 @@ const PATTERNS = {
   },
 };
 
-export const OPTIONAL_SECTIONS = ['summary', 'competencies', 'experience', 'projects', 'education', 'certifications', 'awards', 'interests', 'skills'];
+export const OPTIONAL_SECTIONS = ['summary', 'competencies', 'experience', 'projects', 'education', 'certifications', 'awards', 'interests', 'skills', 'volunteer'];
 
 // Sections whose payload value is text rather than a list of entries.
 const TEXT_SECTIONS = new Set(['summary']);
