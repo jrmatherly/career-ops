@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.9.0](https://github.com/jrmatherly/career-ops/compare/web-v1.8.0...web-v1.9.0) (2026-11-19)
+
+
+### Features
+
+* **pdf:** fit a tailored CV to two pages with a dense template and a Volunteer section ([9f4635f](https://github.com/jrmatherly/career-ops/commit/9f4635f4b23083fcfdc206a17d00e09453291f60))
+* **templates:** give every shipped CV template a Volunteer section ([b3f78d3](https://github.com/jrmatherly/career-ops/commit/b3f78d3c8980a1261c974e492e88ae54ab74ba1d))
+* **web:** build an over-length CV in the dense template before saving it ([cf01b7e](https://github.com/jrmatherly/career-ops/commit/cf01b7e4afeef67b39d7969ef264db497d0a4c12))
+* **web:** state the page limit and the keep-every-section rule in the pdf prompt ([8dff016](https://github.com/jrmatherly/career-ops/commit/8dff016929af4bc06a8a1d463be02566a9a52bf1))
+
+
+### Bug Fixes
+
+* **pdf:** keep the dense Interests line at body size and a locked Skills section out of the markdown fold ([da2ffc1](https://github.com/jrmatherly/career-ops/commit/da2ffc114e79dafbf42040797957d9bf07f3d65e))
+* **templates:** give the dense template an Interests section and say when the photo is left out ([e157e50](https://github.com/jrmatherly/career-ops/commit/e157e50a78fc52dbf67398de78372c488f012697))
+* **web:** build the ATS variant in dense when dense is the selected template ([cdde930](https://github.com/jrmatherly/career-ops/commit/cdde930d3524a1b36539473fca7a97e3cdbcae46))
+* **web:** count pages with cv.md present and warn when the count fails ([e314bd2](https://github.com/jrmatherly/career-ops/commit/e314bd24becb321746ae79cbff9748e99b17a21c))
+* **web:** exempt locked sections from the shortening order in the pdf prompt ([4e43a3c](https://github.com/jrmatherly/career-ops/commit/4e43a3c15c6219b79b5d25393a469e0df1b889e5))
+* **web:** fit the ATS variant with the styled CV and report a dense build that still overflows ([a1f3579](https://github.com/jrmatherly/career-ops/commit/a1f35793241a55156b5a8ebc723516cf0eea7110))
+
 ## [1.8.0](https://github.com/jrmatherly/career-ops/compare/web-v1.7.1...web-v1.8.0) (2026-11-18)
 
 
