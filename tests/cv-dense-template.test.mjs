@@ -40,7 +40,9 @@ function pageCount(template) {
 }
 
 test('dense passes the ATS lint with no finding', () => {
-  assert.deepEqual(atsLint(densePath, 'cv').findings, []);
+  const lint = atsLint(densePath, 'cv');
+  assert.ok(lint.ok, lint.error);
+  assert.deepEqual(lint.findings, []);
 });
 
 test('no px text size, no letter-spacing, no text-transform, no web font, no space-between', () => {
@@ -89,4 +91,15 @@ test('body text in dense computes to 9.5pt', { skip: browserSkip }, async () => 
 test('every competency reaches the dense CV', () => {
   const { html } = build(fixture, densePath);
   for (const c of fixture.competencies) assert.ok(html.includes(c.replace(/&/g, '&amp;')), c);
+});
+
+test('dense renders Interests, and strips Interests and Volunteer when empty', () => {
+  const withInterests = build({ ...fixture, interests: ['Trail running', 'Chess'] }, densePath).html;
+  assert.ok(withInterests.includes('class="section-title">Interests<'));
+  assert.ok(withInterests.includes('Trail running'));
+  const { volunteer, ...bare } = fixture;
+  const stripped = build(bare, densePath).html;
+  assert.ok(!stripped.includes('class="section-title">Interests<'));
+  assert.ok(!stripped.includes('class="section-title">Volunteer Experience<'));
+  assert.ok(stripped.includes('class="section-title">Skills<'));
 });

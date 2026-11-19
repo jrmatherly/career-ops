@@ -256,6 +256,7 @@ export async function materializeTailoredCv({
       if (typeof densePages === "number" && densePages > maxPages) {
         warnings.push(`The dense build is still ${densePages} pages, over the limit of ${maxPages}. A style font_size above 9.5pt in the profile is one cause.`);
       }
+      if (payload.candidate?.photo) warnings.push("The dense template has no photo, so the photo was left out.");
     }
     if (chosen.unmeasured) {
       warnings.push("The CV's page count could not be measured, so it was not checked against the page limit before saving.");

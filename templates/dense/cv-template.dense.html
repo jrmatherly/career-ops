@@ -105,6 +105,8 @@ sections: experience
   .edu-org { font-weight: 400; }
   .cert-org, .cert-year, .award-org, .award-year { margin-left: 0.4em; }
 
+  .interests-line { font-size: 0.95em; color: #444; }
+
   .skills-grid { display: block; }
   .skill-category { font-weight: 700; }
 
@@ -219,6 +221,12 @@ sections: experience
   <div class="section">
     <div class="section-title">{{SECTION_AWARDS}}</div>
     {{AWARDS}}
+  </div>
+
+  <!-- INTERESTS -->
+  <div class="section">
+    <div class="section-title">{{SECTION_INTERESTS}}</div>
+    <div class="interests-line">{{INTERESTS}}</div>
   </div>
 
   <!-- SKILLS -->

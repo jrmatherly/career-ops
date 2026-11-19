@@ -456,3 +456,22 @@ test("a CV whose page count fails is saved with a warning", () => inDataRoot("cv
   assert.doesNotMatch(result.html, /--font-size: 9\.5pt/);
   assert.ok(result.warnings.includes("The CV's page count could not be measured, so it was not checked against the page limit before saving."), result.warnings.join("\n"));
 }));
+
+test("a fallback to dense says the photo was left out", () => inDataRoot("cv-dense-photo-", async (dir) => {
+  const base = payload();
+  const run = (candidate, pages) => materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: { ...base, candidate }, warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => pages,
+  });
+  const note = "The dense template has no photo, so the photo was left out.";
+  const withPhoto = { ...base.candidate, photo: "https://example.com/photo.png" };
+  const fell = await run(withPhoto, 3);
+  assert.equal(fell.ok, true, fell.error);
+  assert.ok(fell.warnings.includes(note), fell.warnings.join("\n"));
+  assert.equal((await run(withPhoto, 1)).warnings.includes(note), false);
+  assert.equal((await run(base.candidate, 3)).warnings.includes(note), false);
+}));
