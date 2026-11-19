@@ -250,9 +250,23 @@ Review before the push found three defects, all fixed on the branch: a profile w
 
 PR review found more, all fixed on the branch. A locked Skills section no longer takes the competencies fold, so `dense` builds with `cv.locked_sections: [skills]`. The ATS variant is built in `dense` when the styled CV falls back, and the long fixture's ATS variant went from 3 pages to 2. The dense build is counted once, and a count still over the limit is reported with its likely cause, a profile `style.font_size` above 9.5pt. `dense` gained the Interests section, and a fallback with a photo says the photo was left out. A failed page count now logs the renderer's reason. New tests cover the profile's page limit reaching the fit step and the prompt, and Volunteer in the DOCX and markdown exports. A locked Volunteer section now builds, because the entry renders in the order cv.md writes it. The six templates that had no Volunteer slot now carry one after Skills, so a payload with Volunteer keeps it in any shipped template, and their output without Volunteer is unchanged byte for byte.
 
+Live run on the pod, v2.8.0 (web 1.9.0), 2026-11-19. The tailored CV for tracker row 120 was generated once from the web UI, with "CV template" left on the default. The run counted 3 pages in the base template, rebuilt in `dense`, showed the fallback warning and finished with a PDF. The tracker row now shows the PDF as ready. Measured on that PDF:
+
+| Check | Result |
+|---|---|
+| Pages | 2, Letter, 61 and 38 lines of extracted text |
+| Smallest type | 9.49pt (PyMuPDF span sizes) |
+| Fonts | Liberation Sans regular, bold and italic |
+| Headings | Professional Summary, Work Experience, Education, Skills, Volunteer, each a whole line in `pdftotext -raw` |
+| Roles | 5, each a title line followed directly by `Company, Location \| dates` |
+| Volunteer | Present, with organization, dates and description |
+| Competencies | No grid. A "Core Competencies" row in Skills |
+
+The two overflow drafts from before the change are still beside it in `output/`.
+
 Not known yet:
 
-- What a real parser makes of the `dense` layout. The owner's check (one Workday upload, the Textkernel and Affinda demos) comes after the deploy. Its result belongs here.
-- Whether the writer follows the new prompt rule. One probe run, before this work, kept every bullet.
+- What a real parser makes of the `dense` layout. The owner's check (one Workday upload, the Textkernel and Affinda demos) has not been run. Its result belongs here.
+- Whether the writer follows the new prompt rule. One probe run, before this work, kept every bullet. In the live run the writer's payload still ran to 3 pages in the base template, so the fit came from the fallback.
 
 Left as it is: a Volunteer item with no organization in the resume model is dropped from the payload without a report, as an award, certification or education item missing its required field already is.
