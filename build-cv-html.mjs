@@ -44,6 +44,7 @@ import { validateLockedSections, sectionKey } from './generate-pdf.mjs';
 import { readLockedSections } from './theme-style.mjs';
 import { hasRequiredFields, templateSlotWarnings, validatePayload } from './lib/cv-payload-schema.mjs';
 import { bodyRuns } from './lib/resume/to-payload.mjs';
+import { foldCompetencies } from './ats-payload.mjs';
 import { resolveTrackerPath, resolveWorkspaceRoot } from './tracker-utils.mjs';
 import { PAGE_WIDTHS, resolvePageFormat } from './lib/page-format.mjs';
 import { PARTIAL_SECTIONS, declaredSections, parseMeta } from './lib/template-manifest.mjs';
@@ -1137,6 +1138,7 @@ async function runMarkdown(args) {
     process.exit(1);
   }
   const template = await readFile(templatePath, 'utf-8');
+  if (!template.includes('{{SECTION_COMPETENCIES}}')) payload = foldCompetencies(payload).payload;
   warnings.push(...templateSlotWarnings(payload, template, markdownSectionSlots(), basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
   await mkdir(dirname(absOutput), { recursive: true });
@@ -1228,6 +1230,8 @@ async function main() {
   }
 
   const template = await readFile(templatePath, 'utf-8');
+  // A template with no grid gets the competencies as a Skills row, so a parser still reads them.
+  if (!template.includes('{{COMPETENCIES}}')) payload = foldCompetencies(payload).payload;
   warnings.push(...templateSlotWarnings(payload, template, HTML_SECTION_SLOTS, basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
 
