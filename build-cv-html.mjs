@@ -639,29 +639,33 @@ function buildEducation(entries, partial) {
 
 // Volunteer reuses the education markup and classes, so every template styles it
 // without new CSS. No partial: no shipped pack has a volunteer section file.
-// The location sits in the title so the text reads in cv.md's order (org,
-// location, dates, description), which a locked Volunteer section compares.
 // A role is the title line, as in the dense experience entry, so a parser reads
-// it as the job title, and the location moves beside the dates: with a role,
-// cv.md writes an `### org — location` heading, and the fact gate would not
-// find "org, location" there as one run. `cvOrder` (a locked section) keeps
-// cv.md's order: organization, location, role, dates.
+// it as the job title. Once any entry has a role, cv.md writes every entry
+// under an `### org — location` heading, where the fact gate would not find
+// "org, location" as one run, so the organization prints alone and the location
+// moves beside the dates. With no role anywhere the title is "org, location".
+// `cvOrder` (a locked section) keeps cv.md's order: org, location, role, dates.
 function buildVolunteer(entries, cvOrder = false) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
+  const roleOf = (e) => (typeof e.role === 'string' ? e.role.trim() : '');
   const row = (cls, text, year) => `<div class="edu-header">
       <div class="${cls}">${escapeHtml(text)}</div>${year === null ? '' : `
       <div class="edu-year">${escapeHtml(year)}</div>`}
     </div>`;
-  return entries.filter(e => hasRequiredFields(e, 'volunteer', 'html')).map(e => {
-    const role = typeof e.role === 'string' ? e.role.trim() : '';
+  const shown = entries.filter(e => hasRequiredFields(e, 'volunteer', 'html'));
+  const anyRole = shown.some(roleOf);
+  return shown.map(e => {
+    const role = roleOf(e);
     const dates = e.dates || '';
+    const where = [e.location, dates].filter(Boolean).join(' | ');
     const desc = e.description
       ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
       : '';
     let rows;
-    if (!role) rows = row('edu-title', e.location ? `${e.org}, ${e.location}` : e.org, dates);
+    if (!anyRole) rows = row('edu-title', e.location ? `${e.org}, ${e.location}` : e.org, dates);
+    else if (!role) rows = row('edu-title', e.org, where);
     else if (cvOrder) rows = `${row('edu-org', e.org, e.location || null)}\n    ${row('edu-title', role, dates)}`;
-    else rows = `${row('edu-title', role, null)}\n    ${row('edu-org', e.org, [e.location, dates].filter(Boolean).join(' | '))}`;
+    else rows = `${row('edu-title', role, null)}\n    ${row('edu-org', e.org, where)}`;
     return withResumePath(`<div class="edu-item">
     ${rows}${desc}
   </div>`, e.path);

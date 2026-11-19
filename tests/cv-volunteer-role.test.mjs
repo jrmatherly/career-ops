@@ -128,13 +128,19 @@ function factCheck(html, cvMd) {
   return spawnSync(process.execPath, ['verify-cv-facts.mjs', htmlFile, '--source', source, '--json'], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(dir) });
 }
 
+// The fixture's employer is not in the cv.md, so the verdict blocks either way: read the facts it names.
+function unsupportedVolunteerFacts(html, cvMd) {
+  const r = factCheck(html, cvMd);
+  const report = JSON.parse(r.stdout);
+  return report.unsupportedFacts.filter((f) => f.kind === 'education').map((f) => f.value);
+}
+
 test('the fact gate passes a built entry with a role and a location against the cv.md the model writes', () => {
   const data = withStoredRole();
   const cvMd = resumeToCvMarkdown(data);
   const payload = { ...ROLELESS.payload, volunteer: resumeToPayload(data).payload.volunteer };
   assert.equal(payload.volunteer[0].location, 'Springfield, ST');
-  const r = factCheck(build(payload, { template: DENSE }), cvMd);
-  assert.doesNotMatch(r.stdout, /sample nonprofit|it support volunteer/i, r.stdout);
+  assert.deepEqual(unsupportedVolunteerFacts(build(payload, { template: DENSE }), cvMd), []);
 });
 
 test('a role on one of several items writes every item as an entry and round-trips', () => {
@@ -163,4 +169,13 @@ test('a role is escaped in the HTML, and a blank one builds the role-less entry'
   const { role, ...roleless } = entry;
   const blank = build({ ...withRole, volunteer: [{ ...entry, role: '   ' }] }, { template: DENSE });
   assert.equal(volunteerHtml(blank), volunteerHtml(build({ ...withRole, volunteer: [roleless] }, { template: DENSE })));
+});
+
+test('a role-less entry beside one with a role passes the fact gate with its location', () => {
+  const { data } = absorb(`${LIST_MD}- **Other Org**, Shelbyville, ST (2020)\n`, null);
+  data.sections.volunteer.items[0].position = ROLE;
+  const payload = { ...ROLELESS.payload, volunteer: resumeToPayload(data).payload.volunteer };
+  const html = build(payload, { template: DENSE });
+  assert.match(volunteerHtml(html), /<div class="edu-title">Other Org<\/div>\s*<div class="edu-year">Shelbyville, ST \| 2020<\/div>/);
+  assert.deepEqual(unsupportedVolunteerFacts(html, resumeToCvMarkdown(data)), []);
 });

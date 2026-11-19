@@ -266,7 +266,24 @@ The two overflow drafts from before the change are still beside it in `output/`.
 
 Not known yet:
 
-- What a real parser makes of the `dense` layout. The owner's check (one Workday upload, the Textkernel and Affinda demos) has not been run. Its result belongs here.
+- What Workday and Textkernel make of the `dense` layout. Neither has been run.
+
+Affinda's free parser, run by the owner on the live `dense` PDF on 2026-11-19:
+
+| Field | Result |
+|---|---|
+| Name, email, phone, city, summary | Correct |
+| Employer, title and location, all five roles | Correct |
+| Dates | Wrong on four of five roles: each read "2020 – Present". Every role's location in the owner's data ended "(Remote since 2020)", and that is the likely cause. The location text was corrected in the data the same day. A second parse has not been run, so the cause is not confirmed. |
+| Total experience | 11.7 years against about 20, which follows from the dates |
+| Volunteer | Filed as a sixth job titled "Volunteer": the entry had no role, so the section heading became the title. A volunteer entry now takes a role that prints as its title line. |
+| Education | School and dates correct. The degree text lost its closing parenthesis. |
+| Skills | 139 entries, many of them fragments of bullet prose. No template change affects that. |
+
+No template change was made for the dates. Role 2 parsed correctly from the same layout.
+
+Still not known:
+
 - Whether the writer follows the new prompt rule. One probe run, before this work, kept every bullet. In the live run the writer's payload still ran to 3 pages in the base template, so the fit came from the fallback.
 
 Left as it is: a Volunteer item with no organization in the resume model is dropped from the payload without a report, as an award, certification or education item missing its required field already is.

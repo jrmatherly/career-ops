@@ -26,7 +26,7 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/import/date.mjs` from `packages/import/src/date.ts` (PR-03)
 - `lib/resume/import/html.mjs` from `packages/import/src/html.ts`; descriptions are built with `lib/resume/to-cv-md.mjs`'s `pHtml`/`liHtml` so an import round-trips through `absorb` unchanged (PR-03)
 - `lib/resume/import/level.mjs` from `packages/import/src/level.ts` (PR-03)
-- `lib/resume/import/plain-text.mjs` from `packages/import/src/plain-text.ts`; a volunteer item gets a blank `position` (PR-03)
+- `lib/resume/import/plain-text.mjs` from `packages/import/src/plain-text.ts` (PR-03)
 - `lib/resume/import/docx-text.mjs` from `packages/import/src/docx-text.ts` (PR-03)
 - `lib/resume/import/json-resume.mjs` from `packages/import/src/json-resume.tsx`; the network icon lookup is dropped, and a volunteer entry's `position` is read (PR-03)
 - `lib/resume/import/linkedin.mjs` from `packages/import/src/linkedin.ts` (PR-03)
