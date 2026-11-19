@@ -106,6 +106,9 @@ to its run.
 
 Every push to `main` rebuilds the image. `docker-image.yml` has no path filter
 on push, and a pull request that touches image inputs builds without pushing.
+The server and publish images are also copied to Docker Hub under the same
+digest (`DOCKER.md`, "Docker Hub mirror"), so a cluster that cannot reach GHCR
+well can pin the same `sha256:` at `docker.io` instead.
 Renovate, configured in the cluster manifests repository, moves the image
 digest on its own schedule. The `Recreate` rollout
 stops the pod, and `web/server.mjs` has no signal handler, so an evaluate, a

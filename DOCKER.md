@@ -40,6 +40,38 @@ building it. `./cops rebuild` still builds locally. The base image is
 Microsoft's Playwright image, pinned by digest in both the root and the
 `deploy/` Dockerfiles.
 
+### Docker Hub mirror
+
+`career-ops-server` and `career-ops-publish` are also copied to Docker Hub, as
+`docker.io/<namespace>/career-ops-server` and
+`docker.io/<namespace>/career-ops-publish`, with the same tags. The copy is by
+digest, so an image has the same `sha256:` on both registries and a pin moves
+from one to the other by changing the host and namespace only.
+
+GHCR is the primary. The copy runs after the GHCR push and cannot fail the
+job: a failed copy shows as a warning on the run, and re-running the job
+retries it. Nothing is copied on a pull request.
+
+The mirror is off until it is configured. It needs, once:
+
+1. The two repositories on Docker Hub, created by hand so their visibility is
+   a choice and the first copy cannot fail on a missing repository.
+2. A Docker Hub access token with read and write scope.
+3. In this repository's Actions settings: the variables `DOCKERHUB_NAMESPACE`
+   (the account or organization the images live under) and
+   `DOCKERHUB_USERNAME` (the account the token belongs to), and the secret
+   `DOCKERHUB_TOKEN`.
+
+```bash
+gh variable set DOCKERHUB_NAMESPACE --body <namespace>
+gh variable set DOCKERHUB_USERNAME --body <username>
+gh secret set DOCKERHUB_TOKEN
+```
+
+`gh secret set` reads the token from a prompt, so it does not land in the
+shell history. To copy an image that was published before the mirror existed,
+run the workflow by hand on `main`.
+
 ## Prerequisites
 
 - Docker Engine 24+ with the Compose plugin (`docker compose version`)
