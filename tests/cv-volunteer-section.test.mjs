@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sectionKey } from '../generate-pdf.mjs';
+import { describeSpawn, exitedNonZero } from './helpers/describe-spawn.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const fixture = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/cv-long-single-employer.json'), 'utf8'));
@@ -36,7 +37,7 @@ function build(payload, template) {
   const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8' });
   let report = null;
   try { report = JSON.parse(r.stdout); } catch { /* a failed build prints no report */ }
-  return { status: r.status, html: r.status === 0 ? readFileSync(output, 'utf8') : '', report, stderr: r.stderr, output };
+  return { status: r.status, html: r.status === 0 ? readFileSync(output, 'utf8') : '', report, stderr: r.stderr, output, spawn: r };
 }
 
 test('volunteer renders under its own heading after Skills in the base template', () => {
@@ -62,7 +63,7 @@ test('a template without the slot warns and names the template', () => {
 
 test('a volunteer entry without org fails the build', () => {
   const r = build({ ...fixture, volunteer: [{ description: 'x' }] });
-  assert.notEqual(r.status, 0);
+  assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'a volunteer entry without org must fail the build'));
   assert.match(r.stderr, /volunteer/i);
 });
 
