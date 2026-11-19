@@ -1231,7 +1231,10 @@ async function main() {
 
   const template = await readFile(templatePath, 'utf-8');
   // A template with no grid gets the competencies as a Skills row, so a parser still reads them.
-  if (!template.includes('{{COMPETENCIES}}')) payload = foldCompetencies(payload).payload;
+  // A locked Skills section must match cv.md, so it takes no fold.
+  if (!template.includes('{{COMPETENCIES}}') && !readLockedSections(PROFILE_PATH, sectionKey).includes('skills')) {
+    payload = foldCompetencies(payload).payload;
+  }
   warnings.push(...templateSlotWarnings(payload, template, HTML_SECTION_SLOTS, basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
 

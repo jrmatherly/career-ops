@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,4 +49,19 @@ test('--markdown moves competencies into Skills when the template has no compete
   const md = readFileSync(output, 'utf8');
   for (const c of fixture.competencies) assert.ok(md.includes(c), c);
   assert.ok(!JSON.parse(r.stdout).warnings.some((w) => /competenc/i.test(w)), r.stdout);
+});
+
+test('a locked Skills section is not folded into, so the build passes and warns about competencies', () => {
+  const root = mkdtempSync(join(dir, 'locked-'));
+  mkdirSync(join(root, 'config'));
+  writeFileSync(join(root, 'config', 'profile.yml'), 'cv:\n  locked_sections: [skills]\n');
+  writeFileSync(join(root, 'cv.md'), `# Sample\n\n## Skills\n\n${fixture.skills.map((s) => `- **${s.category}:** ${s.items}`).join('\n')}\n`);
+  const input = join(root, 'in.json');
+  const output = join(root, 'out.html');
+  writeFileSync(input, JSON.stringify(fixture));
+  const env = { ...process.env, CAREER_OPS_ROOT: root };
+  delete env.CAREER_OPS_PROFILE;
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, join(ROOT, 'templates/dense/cv-template.dense.html')], { cwd: ROOT, encoding: 'utf8', env });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(JSON.parse(r.stdout).warnings.some((w) => /competenc/i.test(w)), r.stdout);
 });
