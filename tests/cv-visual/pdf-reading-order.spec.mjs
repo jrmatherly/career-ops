@@ -66,3 +66,26 @@ test('modern CV headings precede their section bodies in the PDF text stream', a
   const text = await rawPdfText(page, fillTemplate('cv-template.modern.html', values));
   expectInOrder(text, markers);
 });
+
+test('dense CV reads as one complete line pair per role and whole-line headings', async ({ page }) => {
+  const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/cv-long-single-employer.json'), 'utf8'));
+  const dir = mkdtempSync(join(tmpdir(), 'career-ops-dense-order-'));
+  let html;
+  try {
+    writeFileSync(join(dir, 'in.json'), JSON.stringify(fixture));
+    execFileSync(process.execPath, ['build-cv-html.mjs', join(dir, 'in.json'), join(dir, 'out.html'), 'templates/dense/cv-template.dense.html'], { cwd: root });
+    html = readFileSync(join(dir, 'out.html'), 'utf8');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const lines = (await rawPdfText(page, html)).split('\n').map((line) => line.trim());
+  for (const job of fixture.experience) {
+    // From the Work Experience heading on: the header's title line can equal a role.
+    const at = lines.indexOf(job.role, lines.indexOf('Work Experience'));
+    expect(at, job.role).toBeGreaterThanOrEqual(0);
+    expect(lines[at + 1]).toBe(`${job.company}, ${job.location} | ${job.dates}`);
+  }
+  for (const heading of ['Professional Summary', 'Work Experience', 'Education', 'Skills', 'Volunteer Experience']) {
+    expect(lines, heading).toContain(heading);
+  }
+});

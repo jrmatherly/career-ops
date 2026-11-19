@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<!-- career-ops-template
+name: Dense
+version: 1.0.0
+sections: experience
+-->
+<html lang="{{LANG}}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{NAME}} — CV</title>
+<style>
+  :root {
+    --font-family: "Liberation Sans", "Helvetica Neue", Arial, "DejaVu Sans", "Arial Unicode MS", sans-serif;
+    --font-size: 9.5pt;
+    --line-height: 1.15;
+    --page-margin: 0.5in;
+    --section-gap: 6pt;
+    --item-gap: 7pt;
+    --job-break-inside: avoid;
+    --project-break-inside: auto;
+  }
+  @page { margin: var(--page-margin); }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "clig" 0, "dlig" 0;
+  }
+
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    line-height: var(--line-height, 1.15);
+    color: var(--text-color, #1a1a1a);
+    background: var(--background-color, #ffffff);
+  }
+
+  .page {
+    width: 100%;
+    max-width: {{PAGE_WIDTH}};
+    margin: 0 auto;
+  }
+
+  .header { margin-bottom: var(--section-gap, 6pt); }
+
+  .header h1 {
+    font-family: var(--heading-font-family, var(--font-family));
+    font-size: 1.9em;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .header-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-top: 2pt;
+  }
+
+  .contact-row {
+    font-size: 1em;
+    margin-top: 2pt;
+    color: #444;
+  }
+
+  .contact-row a { color: #444; text-decoration: none; }
+
+  /* No-break space before the bar so a wrap never opens a line with it (tests/template-contact-row.test.mjs). */
+  .contact-row > *:not(:last-child)::after {
+    content: "\00a0|";
+    margin-inline: 3pt;
+  }
+
+  a { white-space: nowrap; }
+
+  .section { margin-bottom: var(--section-gap, 6pt); }
+
+  .section-title {
+    font-family: var(--heading-font-family, var(--font-family));
+    font-size: var(--heading-font-size, 1.1em);
+    font-weight: 700;
+    border-bottom: 1px solid #555;
+    margin-bottom: 3pt;
+    padding-bottom: 1pt;
+  }
+
+  .job, .project { margin-bottom: var(--item-gap, 7pt); }
+  .job-role, .project-title, .edu-title { font-weight: 700; }
+  .job-company { font-weight: 600; }
+  .job-context { font-style: italic; }
+  .job ul { padding-left: 1.4em; margin-top: 1pt; }
+  .job li { margin-bottom: 1pt; }
+
+  .project-badge { margin-left: 0.4em; }
+  .project-tech { color: #444; }
+
+  .edu-item, .cert-item, .award-item { margin-bottom: 2pt; }
+  .edu-org { font-weight: 400; }
+  .cert-org, .cert-year, .award-org, .award-year { margin-left: 0.4em; }
+
+  .skills-grid { display: block; }
+  .skill-category { font-weight: 700; }
+
+  .cv-consent { margin-top: var(--section-gap, 6pt); color: #555; }
+
+  .header,
+  .edu-item,
+  .cert-item,
+  .skill-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .job {
+    page-break-inside: var(--job-break-inside, avoid);
+    break-inside: var(--job-break-inside, avoid);
+  }
+
+  .project {
+    page-break-inside: var(--project-break-inside, auto);
+    break-inside: var(--project-break-inside, auto);
+  }
+
+  .section-title,
+  .job-role,
+  .job-meta,
+  .project-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .project-tech {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  html[lang="ar"] body {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+  }
+
+  html[lang="ja"] body {
+    font-family: var(--font-family), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic",
+      "Noto Sans CJK JP", "Noto Sans JP", Meiryo, "MS PGothic", sans-serif;
+  }
+
+  html[lang="zh-CN"] body,
+  html[lang="zh"] body {
+    font-family: var(--font-family), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+      "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+  }
+
+  html[lang="ko"] body {
+    font-family: var(--font-family), "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR",
+      "Noto Sans KR", "Nanum Gothic", sans-serif;
+  }
+
+  html[lang="zh-TW"] body {
+    font-family: var(--font-family), "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC",
+      "Noto Sans TC", "Source Han Sans TC", sans-serif;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>{{NAME}}</h1>
+    {{TITLE_BLOCK}}
+    <div class="contact-row">
+      <a href="tel:{{PHONE}}">{{PHONE}}</a>
+      <a href="mailto:{{EMAIL}}">{{EMAIL}}</a>
+      <a href="{{LINKEDIN_URL}}">{{LINKEDIN_DISPLAY}}</a>
+      <a href="{{PORTFOLIO_URL}}">{{PORTFOLIO_DISPLAY}}</a>
+      <span>{{LOCATION}}</span>
+    </div>
+  </div>
+
+  <!-- PROFESSIONAL SUMMARY -->
+  <div class="section">
+    <div class="section-title">{{SECTION_SUMMARY}}</div>
+    <div class="summary-text">{{SUMMARY_TEXT}}</div>
+  </div>
+
+  <!-- WORK EXPERIENCE -->
+  <div class="section">
+    <div class="section-title">{{SECTION_EXPERIENCE}}</div>
+    {{EXPERIENCE}}
+  </div>
+
+  <!-- PROJECTS -->
+  <div class="section">
+    <div class="section-title">{{SECTION_PROJECTS}}</div>
+    {{PROJECTS}}
+  </div>
+
+  <!-- EDUCATION -->
+  <div class="section">
+    <div class="section-title">{{SECTION_EDUCATION}}</div>
+    {{EDUCATION}}
+  </div>
+
+  <!-- CERTIFICATIONS -->
+  <div class="section">
+    <div class="section-title">{{SECTION_CERTIFICATIONS}}</div>
+    {{CERTIFICATIONS}}
+  </div>
+
+  <!-- AWARDS -->
+  <div class="section">
+    <div class="section-title">{{SECTION_AWARDS}}</div>
+    {{AWARDS}}
+  </div>
+
+  <!-- SKILLS -->
+  <div class="section">
+    <div class="section-title">{{SECTION_SKILLS}}</div>
+    {{SKILLS}}
+  </div>
+
+  <!-- VOLUNTEER -->
+  <div class="section">
+    <div class="section-title">{{SECTION_VOLUNTEER}}</div>
+    {{VOLUNTEER}}
+  </div>
+
+  <!-- END -->
+
+  <div class="cv-consent">{{CONSENT}}</div>
+
+</div>
+</body>
+</html>

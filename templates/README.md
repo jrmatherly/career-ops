@@ -57,7 +57,7 @@ The summary strip follows the same rule. It stops at the next section marker, so
 
 ### Named CV templates
 
-Six flat alternatives to the base design (plus the `ats` pack, see "Template packs"), discovered by filename (`cv-template.<name>.html`) and resolved by `cv-templates.mjs`:
+Six flat alternatives to the base design (plus the `ats` pack, see "Template packs", and the `dense` pack listed below), discovered by filename (`cv-template.<name>.html`) and resolved by `cv-templates.mjs`:
 
 | Name | Design | Suits |
 |------|--------|-------|
@@ -67,6 +67,7 @@ Six flat alternatives to the base design (plus the `ats` pack, see "Template pac
 | `leadership` | Executive hybrid: short leadership summary, competencies block ahead of the chronology | Senior and leadership applications |
 | `jake` | HTML port of the widely used "Jake's Resume" LaTeX layout: two-row job headers, full-width ruled headings | Engineering roles expecting the familiar format |
 | `zh-minimal` | Chinese Minimal: plain single-column layout for Chinese-language CVs | Roles in the Chinese market |
+| `dense` | Pack in `templates/dense/`: 9.5pt body, every size in `em` from `--font-size`, each role a title line then one employer, location and dates line, competencies folded into Skills | Fitting a long history onto two pages without type below 9.5pt |
 
 Pick one for a single CV, or set a default in `config/profile.yml`:
 

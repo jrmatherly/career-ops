@@ -566,6 +566,7 @@ Plan: `docs/superpowers/plans/2026-11-19-cv-two-page-ats-fit.md`. Spec: `docs/su
 | `build-cv-html.mjs` warns and drops `competencies` when the template has no `{{COMPETENCIES}}` slot | `main()` and `runMarkdown()` replace the payload with `foldCompetencies(payload).payload` (from `ats-payload.mjs`) after `validatePayload` and before `templateSlotWarnings` when the template has no competencies slot, so the tags become a Skills row | landed 2026-11-19 | ADAPT. Keep the two fold lines and the import. Pinned by `tests/cv-competencies-fold.test.mjs`. |
 | none | `tests/cv-competencies-fold.test.mjs` | landed 2026-11-19 | KEEP. |
 | none | `tests/cv-volunteer-section.test.mjs`, `tests/fixtures/cv-long-single-employer.json`, `tests/fixtures/cv-volunteer-source.md` | landed 2026-11-19 | KEEP. Synthetic fixtures; the long payload is shaped like the three-page case in the spec. |
+| none | `templates/dense/` (`cv-template.dense.html` and `sections/experience.html`): a 9.5pt pack, every size in `em` from `--font-size`, each role a title line then one `company, location \| dates` line, no competencies slot so the fold applies; a `dense` row in `lib/resume/template-layouts.mjs` and in the named-templates table of `templates/README.md` | landed 2026-11-19 | KEEP (fork-owned pack). Pinned by `tests/cv-dense-template.test.mjs` (2 pages dense, 3 base, 9.5pt computed), the dense reading-order case in `tests/cv-visual/pdf-reading-order.spec.mjs`, and its `tests/cv-visual/baselines.json` entries and `tests/cv-visual/__screenshots__/` pages. |
 
 ## Decision log template
 
