@@ -834,3 +834,20 @@ test("buildPrompt: prefetched text wins over a closure note, and neither changes
   const plain = buildPrompt({ kind: "evaluate", input: PREFETCH_URL, memory: "", today: "2026-08-04", closedEvidence: null });
   assert.match(plain, /Use WebFetch to read the posting/);
 });
+
+const pdfArgs = { kind: "pdf", input: "7", memory: "", today: "2026-11-19", codeRoot: "/x", reportFile: "reports/7-a.md" };
+
+test("the pdf prompt states the page limit and the section rules", () => {
+  const p = buildPrompt({ ...pdfArgs, maxPages: 2 });
+  assert.match(p, /must fit 2 pages/);
+  assert.match(p, /Copy every section of cv\.md into the payload, Volunteer included/);
+  assert.match(p, /Do not add a skills category cv\.md does not have/);
+});
+
+test("a one-page limit reads in the singular", () => {
+  assert.match(buildPrompt({ ...pdfArgs, maxPages: 1 }), /must fit 1 page\b/);
+});
+
+test("the limit defaults to 2 pages", () => {
+  assert.match(buildPrompt(pdfArgs), /must fit 2 pages/);
+});
