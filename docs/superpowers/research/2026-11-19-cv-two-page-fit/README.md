@@ -1,6 +1,6 @@
 # Making a generated CV fit two pages
 
-Research from 2026-11-19, run against `main` at `1abc6d1a` and the pod on v2.7.1. The plan that came out of it is [`2026-11-19-cv-two-page-ats-fit.md`](../../plans/2026-11-19-cv-two-page-ats-fit.md). Sections are in the order the work happened, and later sections correct earlier ones: where they disagree, the later section and the Decisions table at the end hold.
+Research from 2026-11-19, run against `main` at `1abc6d1a` and the pod on v2.7.1. The plan that came out of it is [`2026-11-19-cv-two-page-ats-fit.md`](../../plans/completed/2026-11-19-cv-two-page-ats-fit.md). Sections are in the order the work happened, and later sections correct earlier ones: where they disagree, the later section and the Decisions table at the end hold.
 
 ## Goal
 
@@ -224,3 +224,33 @@ What this means for the template:
 - A real parser. No layout here has been run through Textkernel, RChilli or a Workday upload. The plan ends with that check, run by the owner.
 - DOCX output. Both vendors prefer it and `lib/resume/export/docx.mjs` exists, but how its layout parses is untested.
 - Whether ATS parsers read `compact`'s two-column label layout as well as the base layout.
+
+## Outcome (2026-11-19)
+
+Built on branch `feat/cv-dense-template` from the plan, all six tasks.
+
+What shipped:
+
+- A `volunteer[]` payload section, rendered after Skills in the base, ATS and `dense` templates. The six other shipped templates warn and name themselves when a payload carries it.
+- A template with no competencies slot gets the competencies as a Skills row, in the HTML and the markdown build.
+- `templates/dense/`: 9.5pt body type, line height 1.15, 0.5in margins, one entry per role with the title on one line and employer, location and dates on the next.
+- The web run counts the pages of the built CV in an isolated render. Over the limit, it rebuilds once in `dense` and says so. When the count or the rebuild fails, it keeps the first build and warns.
+- The pdf prompt states the page limit and the keep-every-section rule.
+
+Measured on `tests/fixtures/cv-long-single-employer.json` (1,195 words, five roles at one employer, Volunteer and eight competencies):
+
+| Where | Base | `dense` | Lines on page 2 in `dense` |
+|---|---|---|---|
+| macOS, local fonts | 3 pages | 2 pages | 44 |
+| `career-ops-server` image with the branch's code, Liberation Sans | 3 pages | 2 pages | 45 |
+
+`dense` body text computes to 12.667px in Chromium, which is 9.5pt. The type size in the server-image PDF itself was not measured.
+
+Review before the push found three defects, all fixed on the branch: a profile with `cv.locked_sections` made the page count fail, because the isolated render had no `cv.md`; a failed count looked the same as a CV that fits; and three behaviors had no test that failed when they broke.
+
+Not known yet:
+
+- What a real parser makes of the `dense` layout. The owner's check (one Workday upload, the Textkernel and Affinda demos) comes after the deploy. Its result belongs here.
+- Whether the writer follows the new prompt rule. One probe run, before this work, kept every bullet.
+
+Left as it is: a Volunteer item with no organization in the resume model is dropped from the payload without a report, as an award, certification or education item missing its required field already is.

@@ -553,7 +553,7 @@ Plan: `docs/superpowers/plans/completed/2026-11-17-03-provider-location-resoluti
 
 ### Two-page CV fit (2026-11-19)
 
-Plan: `docs/superpowers/plans/2026-11-19-cv-two-page-ats-fit.md`. Spec: `docs/superpowers/research/2026-11-19-cv-two-page-fit/README.md`.
+Plan: `docs/superpowers/plans/completed/2026-11-19-cv-two-page-ats-fit.md`. Spec: `docs/superpowers/research/2026-11-19-cv-two-page-fit/README.md`.
 
 | Upstream | Ours | Status | Notes |
 | --- | --- | --- | --- |
