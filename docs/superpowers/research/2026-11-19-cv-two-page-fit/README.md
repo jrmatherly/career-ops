@@ -231,7 +231,7 @@ Built on branch `feat/cv-dense-template` from the plan, all six tasks.
 
 What shipped:
 
-- A `volunteer[]` payload section, rendered after Skills in the base, ATS and `dense` templates. The six other shipped templates warn and name themselves when a payload carries it.
+- A `volunteer[]` payload section, rendered after Skills in every shipped CV template.
 - A template with no competencies slot gets the competencies as a Skills row, in the HTML and the markdown build.
 - `templates/dense/`: 9.5pt body type, line height 1.15, 0.5in margins, one entry per role with the title on one line and employer, location and dates on the next.
 - The web run counts the pages of the built CV in an isolated render. Over the limit, it rebuilds once in `dense` and says so. When the count or the rebuild fails, it keeps the first build and warns.
@@ -248,7 +248,7 @@ Measured on `tests/fixtures/cv-long-single-employer.json` (1,195 words, five rol
 
 Review before the push found three defects, all fixed on the branch: a profile with `cv.locked_sections` made the page count fail, because the isolated render had no `cv.md`; a failed count looked the same as a CV that fits; and three behaviors had no test that failed when they broke.
 
-PR review found more, all fixed on the branch. A locked Skills section no longer takes the competencies fold, so `dense` builds with `cv.locked_sections: [skills]`. The ATS variant is built in `dense` when the styled CV falls back, and the long fixture's ATS variant went from 3 pages to 2. The dense build is counted once, and a count still over the limit is reported with its likely cause, a profile `style.font_size` above 9.5pt. `dense` gained the Interests section, and a fallback with a photo says the photo was left out. A failed page count now logs the renderer's reason. New tests cover the profile's page limit reaching the fit step and the prompt, and Volunteer in the DOCX and markdown exports. A locked Volunteer section now builds, because the entry renders in the order cv.md writes it.
+PR review found more, all fixed on the branch. A locked Skills section no longer takes the competencies fold, so `dense` builds with `cv.locked_sections: [skills]`. The ATS variant is built in `dense` when the styled CV falls back, and the long fixture's ATS variant went from 3 pages to 2. The dense build is counted once, and a count still over the limit is reported with its likely cause, a profile `style.font_size` above 9.5pt. `dense` gained the Interests section, and a fallback with a photo says the photo was left out. A failed page count now logs the renderer's reason. New tests cover the profile's page limit reaching the fit step and the prompt, and Volunteer in the DOCX and markdown exports. A locked Volunteer section now builds, because the entry renders in the order cv.md writes it. The six templates that had no Volunteer slot now carry one after Skills, so a payload with Volunteer keeps it in any shipped template, and their output without Volunteer is unchanged byte for byte.
 
 Not known yet:
 
