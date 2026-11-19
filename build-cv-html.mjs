@@ -639,20 +639,20 @@ function buildEducation(entries, partial) {
 
 // Volunteer reuses the education markup and classes, so every template styles it
 // without new CSS. No partial: no shipped pack has a volunteer section file.
+// The location sits in the title so the text reads in cv.md's order (org,
+// location, dates, description), which a locked Volunteer section compares.
 function buildVolunteer(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   return entries.filter(e => hasRequiredFields(e, 'volunteer', 'html')).map(e => {
-    const location = e.location
-      ? `\n    <div class="edu-location">${escapeHtml(e.location)}</div>`
-      : '';
+    const title = e.location ? `${e.org}, ${e.location}` : e.org;
     const desc = e.description
       ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
       : '';
     return withResumePath(`<div class="edu-item">
     <div class="edu-header">
-      <div class="edu-title">${escapeHtml(e.org)}</div>
+      <div class="edu-title">${escapeHtml(title)}</div>
       <div class="edu-year">${escapeHtml(e.dates || '')}</div>
-    </div>${location}${desc}
+    </div>${desc}
   </div>`, e.path);
   }).join('\n  ');
 }
@@ -1077,8 +1077,7 @@ function renderMarkdown(payload, template) {
 
   const vol = [];
   for (const e of list(payload.volunteer).filter(e => hasRequiredFields(e, 'volunteer', 'html'))) {
-    vol.push(`**${mdLine(e.org)}**${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`, '');
-    if (mdLine(e.location)) vol.push(mdLine(e.location), '');
+    vol.push(`**${mdLine(e.org)}**${mdLine(e.location) ? `, ${mdLine(e.location)}` : ''}${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`, '');
     if (mdLine(e.description)) vol.push(mdLine(e.description), '');
   }
   section('volunteer', vol);

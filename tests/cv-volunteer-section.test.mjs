@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,11 +33,12 @@ const dir = mkdtempSync(join(tmpdir(), 'cv-volunteer-'));
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 let n = 0;
 
-function build(payload, template) {
+function build(payload, template, root) {
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.html`);
   writeFileSync(input, JSON.stringify(payload));
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8' });
+  const env = root ? { ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' } : process.env;
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8', env });
   let report = null;
   try { report = JSON.parse(r.stdout); } catch { /* a failed build prints no report */ }
   return { status: r.status, html: r.status === 0 ? readFileSync(output, 'utf8') : '', report, stderr: r.stderr, output, spawn: r };
@@ -70,6 +71,18 @@ test('a volunteer entry without org fails the build', () => {
   const r = build({ ...fixture, volunteer: [{ description: 'x' }] });
   assert.ok(exitedNonZero(r.spawn), describeSpawn(r.spawn, 'a volunteer entry without org must fail the build'));
   assert.match(r.stderr, /volunteer/i);
+});
+
+test('a locked Volunteer section copied from cv.md builds', () => {
+  const root = join(dir, 'locked-root');
+  mkdirSync(join(root, 'config'), { recursive: true });
+  writeFileSync(join(root, 'config', 'profile.yml'), 'cv:\n  locked_sections: [volunteer]\n');
+  const [entry] = smallPayload.volunteer;
+  writeFileSync(join(root, 'cv.md'), `# Sample Candidate\n\n## Volunteer\n\n- **${entry.org}**, ${entry.location} (${entry.dates}) -- ${entry.description}\n`);
+  for (const template of [undefined, 'templates/ats/cv-template.ats.html', 'templates/dense/cv-template.dense.html']) {
+    const r = build(smallPayload, template, root);
+    assert.equal(r.status, 0, `${template ?? 'base'}: ${r.stderr}`);
+  }
 });
 
 test('cv.md volunteer headings map to the volunteer section key', () => {
