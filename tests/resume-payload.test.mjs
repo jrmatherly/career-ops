@@ -51,7 +51,8 @@ test("hide: ['skills'] drops the section", () => {
 
 test('unmapped lists the slotless sections', () => {
   const { unmapped } = resumeToPayload(sample());
-  assert.deepEqual([...unmapped].sort(), ['languages', 'publications', 'references', 'volunteer']);
+  assert.deepEqual([...unmapped].sort(), ['languages', 'publications', 'references']);
+  assert.equal(resumeToPayload(sample()).payload.volunteer[0].org, sample().sections.volunteer.items[0].organization);
   assert.deepEqual(resumeToPayload(sample(), { hide: ['languages'] }).unmapped.includes('languages'), false);
 });
 
@@ -93,7 +94,7 @@ test('build-cv-html emits each path as data-resume-path, and the same render wit
       return readFileSync(output, 'utf8');
     };
     const { payload } = resumeToPayload(sample());
-    const expected = [payload.candidate.path, ...['experience', 'projects', 'education', 'certifications', 'awards', 'skills'].flatMap((k) => payload[k].map((e) => e.path))].sort();
+    const expected = [payload.candidate.path, ...['experience', 'projects', 'education', 'certifications', 'awards', 'skills', 'volunteer'].flatMap((k) => payload[k].map((e) => e.path))].sort();
     const strip = (o) => JSON.parse(JSON.stringify(o, (k, v) => (k === 'path' ? undefined : v)));
     for (const [label, template] of [['partials', shipped], ['built-in', bare]]) {
       const html = render(payload, `with-${label}`, template);

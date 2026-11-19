@@ -85,7 +85,7 @@ Run `npm run jd:similarity -- {bundle-root}/jd/current.md {bundle-root}/jd/previ
 17b. Run the structure check against the payload: `node verify-cv-structure.mjs /tmp/cv-{candidate}[-{report}]-{company}.json`
     - This is a warning, not a hard gate, before HTML is even built. `verify-cv-facts.mjs` (step 19) blocks *fabrication* — a claim absent from cv.md; this check flags the opposite failure, which fabrication-checking cannot see: cv.md content silently *lost* or *reordered* while tailoring. It catches an experience entry's company descriptor (`"Austin, TX · Series B fintech"`) getting dropped down to a bare city/state, and an experience entry (most often the Career Break) rendered out of cv.md's own chronological order.
     - It recognizes `## Experience`, `## Work Experience`, `## Professional Experience`, `## Employment History` and `## Work History` sections whose `### Company {—|–|--|-} Location[ · descriptor]` headers use an em dash, en dash, double hyphen, or single hyphen, written plain or as Pandoc Markdown (`## **[Experience]{.smallcaps}**`, `### **Co** --- City`); a `cv.md` written another way reports `UNVERIFIED`, not a violation. If it warns of a real finding, use judgment: fix the payload to match cv.md's descriptor text and entry order if the loss was unintentional, or proceed if it was a deliberate tailoring choice (e.g. the descriptor genuinely doesn't fit this JD). A structural pass, warn, or `UNVERIFIED` result always exits 0 and never blocks step 18 — but a CLI/input error (a missing or unreadable payload/source file, invalid JSON, or a malformed payload shape) exits 1, meaning the check itself failed to run; fix the invocation rather than treating that as just another warning.
-    - This checks structure only (order, descriptor presence) — it does not check every field cv.md carries (e.g. skills-category selection or education descriptions are a judgment call per role, not a hard gate). Still diff the full payload against cv.md's actual content once before building the HTML: carry over every skills category unless there's a specific reason to drop one for the role, and keep education `description` text rather than compressing entries to bare title/org/year.
+    - This checks structure only (order, descriptor presence) — it does not check every field cv.md carries (e.g. skills-category selection or education descriptions are a judgment call per role, not a hard gate). Still diff the full payload against cv.md's actual content once before building the HTML: carry over every section `cv.md` has, Volunteer included; carry over every skills category unless there's a specific reason to drop one for the role, and keep education `description` text rather than compressing entries to bare title/org/year.
     - When `data/resume.json` exists, also run `node resume.mjs check --json` and report its findings as advisory, never as a gate. It reads the resume model (absorbing `cv.md` first, exit 3 while that absorb is not lossless), not the payload, and reports the 23 Reactive Resume Check rules and career-ops's two bullet rules by `id`, `severity` and `path`: contact details, dates that will not parse or run backwards, layout and typography, section headings, experience entries without a description, bullets that open with a duty or run long. Show the user each `error` finding and the score; `warning` and `info` findings go in one line each. It exits 0 whatever it finds. Skip this line silently when `data/resume.json` does not exist.
 18. Run `node build-cv-html.mjs /tmp/cv-{candidate}[-{report}]-{company}.json {html-path} {template}`, where `{html-path}` is the active bundle's `cv/tailored/vNNN/cv.html` or `output/cv-{candidate}-{report}-{company}.html` for a one-off CV (omit `-{report}` only when no report number exists at all, never for a batch or parallel run), and `{template}` is the path printed by **Selecting the template** below (omit it to use the base template). The script owns every tag, CSS class, and HTML escaping. Keep the HTML outside temporary storage because the dashboard's `D` hotkey regenerates from it.
 19. Run the fact gate against the generated HTML: `node verify-cv-facts.mjs {html-path}`
@@ -178,6 +178,7 @@ The `ats` mode also has an earlier, **payload**-level stage (`ats-payload.mjs`),
 5. Projects (top 3-4 most relevant)
 6. Education & Certifications
 7. Skills (languages + technical)
+8. Volunteer Experience
 
 ## Keyword injection strategy (ethical, truth-based)
 
@@ -234,7 +235,8 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
     "education": "Education",
     "certifications": "Certifications",
     "awards": "Awards & Honors",
-    "skills": "Skills"
+    "skills": "Skills",
+    "volunteer": "Volunteer Experience"
   },
   "summary": "Personalized summary in the JD's own terms (honest vs cv.md).",
   "competencies": ["RAG Pipelines", "LLMOps", "Kubernetes & Docker"],
@@ -263,6 +265,9 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
   "skills": [
     { "category": "Languages", "items": "Python, JavaScript, C++" },
     { "category": "Frameworks", "items": ["FastAPI", "React", "PyTorch"] }
+  ],
+  "volunteer": [
+    { "org": "Organization Name", "location": "City, ST", "dates": "2023 - Present", "description": "What the role involves." }
   ]
 }
 ```
@@ -293,16 +298,17 @@ Write a JSON file with this structure, then run `node build-cv-html.mjs <input.j
 | `certifications[]` | object | `title`, `org`, `year`. |
 | `awards[]` | object | `title` (award name), `org` (issuing body, optional), `year` (optional). Optional section — omit the key or pass `[]` and the whole block is dropped, header included. Use it for competitive or academic distinctions (olympiad medals, hackathon wins, dean's list) that carry more signal than a thin experience section. |
 | `skills[]` | object | `items` (**required**): a non-blank comma-separated string, or a non-empty array of non-blank strings — every element must be text, since the builder joins the whole array. `category` (optional): omitted, the line renders without its prefix. |
+| `volunteer[]` | object | `org` (**required**), `location`, `dates`, `description`. Copy the Volunteer section of `cv.md` as it stands. Never tailor it and never drop it. |
 | `consent` | string | Opt-in GDPR/RODO consent footer text. Empty/absent emits **no visible footer** (the `.cv-consent:empty { display: none }` CSS rule hides the empty div and its border-top), so existing CVs are unchanged. Mirrors the `{{PHOTO}}` opt-in slot pattern (#264). |
 
 `build-cv-html.mjs` errors out (non-zero exit) if any template placeholder is left unresolved, so a malformed payload fails loudly instead of shipping a broken CV. Run `node build-cv-html.mjs --test` for a self-test render.
 
-**The key names above are enforced, not suggestions (#3523).** Every list section (`experience`, `projects`, `education`, `certifications`, `awards`, `skills`) is rendered from exactly the keys listed in this table. The payload root must be an object. Before rendering, `build-cv-html.mjs` validates each entry:
+**The key names above are enforced, not suggestions (#3523).** Every list section (`experience`, `projects`, `education`, `certifications`, `awards`, `skills`, `volunteer`) is rendered from exactly the keys listed in this table. The payload root must be an object. Before rendering, `build-cv-html.mjs` validates each entry:
 
-- **Missing or blank required field → hard error, non-zero exit, no HTML written.** Required: `company` + `role` for experience, `name` for projects, `title` for education, certifications and awards, `items` for skills (a non-blank string or a non-empty array of them; `category` stays optional).
+- **Missing or blank required field → hard error, non-zero exit, no HTML written.** Required: `company` + `role` for experience, `name` for projects, `title` for education, certifications and awards, `org` for volunteer, `items` for skills (a non-blank string or a non-empty array of them; `category` stays optional).
 - **A key no builder reads → warning on stderr and in the report's `warnings[]`;** the build proceeds and the key is ignored.
 - **A top-level section name the builder does not read → warning**, naming the nearest known key. A payload with `educations` instead of `education` used to validate clean and drop the section silently; it now says so.
-- **A populated section the chosen template has no slot for → warning**, naming the template. Of the shipped templates only `cv-template.html` renders `interests`, and the ATS and `zh-minimal` templates have no `consent` footer; pick a template that has the section, or leave it out.
+- **A populated section the chosen template has no slot for → warning**, naming the template. Of the shipped templates only `cv-template.html` and `dense` render `interests`, and the ATS and `zh-minimal` templates have no `consent` footer; pick a template that has the section, or leave it out.
 
 Do **not** substitute the LaTeX builder's vocabulary — `institution`/`degree`/`dates`/`coursework` is the `modes/latex.md` education schema, **not** this one — nor `employer` for a company or `name` for a certification. Such an entry used to render as an empty block while the report still said `"valid": true`, and CVs went out with no education section at all. It is now rejected by name. When in doubt, check `counts.educationEntries` (and its siblings) in the JSON report: a zero there means the section is empty in the PDF.
 

@@ -102,7 +102,9 @@ for (const template of templates) {
         expect.soft(geometry.overflowing).toEqual([]);
         expect.soft(geometry.clipped).toEqual([]);
         expect.soft(geometry.photoOverlap).toBe(false);
-        expect.soft(geometry.headings).toBeGreaterThanOrEqual(7);
+        // A template with no competencies slot folds them into Skills, so it has one heading fewer.
+        const hasCompetencies = readFileSync(template.path, 'utf8').includes('{{COMPETENCIES}}');
+        expect.soft(geometry.headings).toBeGreaterThanOrEqual(hasCompetencies ? 7 : 6);
         expect.soft(photoVisible).toBe(true);
         expect.soft(photoCount).toBe(fixture.withPhoto && supportsPhoto ? 1 : 0);
         // A count of two pages must not bless a header-only first page when

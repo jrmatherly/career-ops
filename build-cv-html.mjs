@@ -44,6 +44,7 @@ import { validateLockedSections, sectionKey } from './generate-pdf.mjs';
 import { readLockedSections } from './theme-style.mjs';
 import { hasRequiredFields, templateSlotWarnings, validatePayload } from './lib/cv-payload-schema.mjs';
 import { bodyRuns } from './lib/resume/to-payload.mjs';
+import { foldCompetencies } from './ats-payload.mjs';
 import { resolveTrackerPath, resolveWorkspaceRoot } from './tracker-utils.mjs';
 import { PAGE_WIDTHS, resolvePageFormat } from './lib/page-format.mjs';
 import { PARTIAL_SECTIONS, declaredSections, parseMeta } from './lib/template-manifest.mjs';
@@ -77,6 +78,7 @@ const DEFAULT_SECTION_TITLES = {
   awards: 'Awards & Honors',
   interests: 'Interests',
   skills: 'Skills',
+  volunteer: 'Volunteer Experience',
 };
 
 // Escape user text for HTML text/attribute context. Covers the five characters
@@ -635,6 +637,26 @@ function buildEducation(entries, partial) {
   }).join('\n  ');
 }
 
+// Volunteer reuses the education markup and classes, so every template styles it
+// without new CSS. No partial: no shipped pack has a volunteer section file.
+// The location sits in the title so the text reads in cv.md's order (org,
+// location, dates, description), which a locked Volunteer section compares.
+function buildVolunteer(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return '';
+  return entries.filter(e => hasRequiredFields(e, 'volunteer', 'html')).map(e => {
+    const title = e.location ? `${e.org}, ${e.location}` : e.org;
+    const desc = e.description
+      ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
+      : '';
+    return withResumePath(`<div class="edu-item">
+    <div class="edu-header">
+      <div class="edu-title">${escapeHtml(title)}</div>
+      <div class="edu-year">${escapeHtml(e.dates || '')}</div>
+    </div>${desc}
+  </div>`, e.path);
+  }).join('\n  ');
+}
+
 function buildCertifications(entries, partial) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
   if (!partial) {
@@ -826,6 +848,8 @@ function renderReport(payload, partials) {
     INTERESTS: buildInterests(payload.interests),
     SECTION_SKILLS: escapeHtml(sectionTitles.skills),
     SKILLS: buildSkills(payload.skills, partials.get('skills')),
+    SECTION_VOLUNTEER: escapeHtml(sectionTitles.volunteer),
+    VOLUNTEER: buildVolunteer(payload.volunteer),
     CONSENT: escapeHtml((payload.consent || '').trim()),
   };
   return { substitutions, candidate };
@@ -959,7 +983,7 @@ function mdUrl(url) {
 const HTML_SECTION_SLOTS = {
   summary: 'SUMMARY_TEXT', competencies: 'COMPETENCIES', experience: 'EXPERIENCE',
   projects: 'PROJECTS', education: 'EDUCATION', certifications: 'CERTIFICATIONS',
-  awards: 'AWARDS', interests: 'INTERESTS', skills: 'SKILLS', consent: 'CONSENT',
+  awards: 'AWARDS', interests: 'INTERESTS', skills: 'SKILLS', volunteer: 'VOLUNTEER', consent: 'CONSENT',
 };
 function markdownSectionSlots() {
   return {
@@ -1051,12 +1075,25 @@ function renderMarkdown(payload, template) {
     `- ${mdLine(c.category) ? `**${mdLine(c.category)}:** ` : ''}${mdLine(joinItems(c.items))}`);
   section('skills', skills.length ? [...skills, ''] : []);
 
+  const vol = [];
+  for (const e of list(payload.volunteer).filter(e => hasRequiredFields(e, 'volunteer', 'html'))) {
+    vol.push(`**${mdLine(e.org)}**${mdLine(e.location) ? `, ${mdLine(e.location)}` : ''}${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`, '');
+    if (mdLine(e.description)) vol.push(mdLine(e.description), '');
+  }
+  section('volunteer', vol);
+
   for (const key of templateSectionOrder(template)) {
     if (bodies.has(key)) out.push(...bodies.get(key));
   }
   // The GDPR/RODO consent footer, where the template carries one (as the HTML does).
   if (template.includes('{{CONSENT}}') && mdLine(payload.consent)) out.push('---', '', mdLine(payload.consent), '');
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+}
+
+// A template with no grid gets the competencies as a Skills row, so a parser still reads them.
+// A locked Skills section must match cv.md, so it takes no fold.
+function foldIntoSkills(payload, hasGrid) {
+  return hasGrid || readLockedSections(PROFILE_PATH, sectionKey).includes('skills') ? payload : foldCompetencies(payload).payload;
 }
 
 async function runMarkdown(args) {
@@ -1106,6 +1143,7 @@ async function runMarkdown(args) {
     process.exit(1);
   }
   const template = await readFile(templatePath, 'utf-8');
+  payload = foldIntoSkills(payload, template.includes('{{SECTION_COMPETENCIES}}'));
   warnings.push(...templateSlotWarnings(payload, template, markdownSectionSlots(), basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
   await mkdir(dirname(absOutput), { recursive: true });
@@ -1197,6 +1235,7 @@ async function main() {
   }
 
   const template = await readFile(templatePath, 'utf-8');
+  payload = foldIntoSkills(payload, template.includes('{{COMPETENCIES}}'));
   warnings.push(...templateSlotWarnings(payload, template, HTML_SECTION_SLOTS, basename(templatePath)));
   for (const message of warnings) console.error(`Warning: ${message}`);
 

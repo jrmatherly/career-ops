@@ -298,3 +298,201 @@ test("a payload the title check cannot read stops the render", async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+async function inDataRoot(prefix, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  const saved = { root: process.env.CAREER_OPS_ROOT, profile: process.env.CAREER_OPS_PROFILE };
+  process.env.CAREER_OPS_ROOT = dir;
+  delete process.env.CAREER_OPS_PROFILE;
+  try {
+    writeFileSync(path.join(dir, "cv.md"), CV_MD);
+    return await fn(dir);
+  } finally {
+    if (saved.root === undefined) delete process.env.CAREER_OPS_ROOT;
+    else process.env.CAREER_OPS_ROOT = saved.root;
+    if (saved.profile !== undefined) process.env.CAREER_OPS_PROFILE = saved.profile;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// compact has no {{INTERESTS}} slot, so the interests entry draws a builder slot warning there.
+function withSlotGap() {
+  return { ...payload(), interests: ["Chess"], volunteer: [{ org: "Example Food Bank", dates: "2019 - 2024", description: "Sorted donations." }] };
+}
+
+test("the builder's warnings reach the result", () => inDataRoot("cv-builder-warn-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: withSlotGap(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/cv-template.compact.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 1,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.ok(result.warnings.some((w) => /^interests: cv-template\.compact\.html has no interests section/.test(w)), result.warnings.join("\n"));
+}));
+
+test("a CV over the page limit is built in dense with the kept build's warnings only", () => inDataRoot("cv-dense-fallback-", async (dir) => {
+  const counted = [];
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: withSlotGap(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/cv-template.compact.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async (html) => { counted.push(html); return 3; },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(counted.length, 2);
+  assert.match(counted[1], /--font-size: 9\.5pt/, "the second count is the dense build");
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.match(result.html, /Example Food Bank/);
+  assert.ok(result.warnings.includes('The CV ran to 3 pages in the "cv-template.compact.html" template, so it was built in the dense template instead.'), result.warnings.join("\n"));
+  assert.ok(result.warnings.includes("The dense build is still 3 pages, over the limit of 2. A style font_size above 9.5pt in the profile is one cause."), result.warnings.join("\n"));
+  assert.equal(result.warnings.some((w) => w.startsWith("interests:")), false, "the discarded build's slot warning is dropped");
+}));
+
+test("a dense build within the limit adds no overflow warning", () => inDataRoot("cv-dense-fits-", async (dir) => {
+  const pages = [3, 2];
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => pages.shift(),
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.equal(result.warnings.some((w) => w.startsWith("The dense build is still")), false, result.warnings.join("\n"));
+}));
+
+test("the profile's page limit decides the fallback", () => inDataRoot("cv-max-pages-", async (dir) => {
+  mkdirSync(path.join(dir, "config"));
+  writeFileSync(path.join(dir, "config", "profile.yml"), "cv:\n  max_pages: 1\n");
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 2,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.ok(result.warnings.some((w) => w.startsWith("The CV ran to 2 pages")), result.warnings.join("\n"));
+}));
+
+for (const [pages, pack] of [[3, /--font-size: 9\.5pt/], [1, /--font-size: 11px/]]) {
+  test(`the ATS variant is built in ${pages > 2 ? "dense when the styled CV fell back" : "the ats pack when it fits"}`, () => inDataRoot("cv-ats-fit-", async (dir) => {
+    const result = await materializeTailoredCv({
+      envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+      coreRoot: CORE,
+      dataRoot: dir,
+      htmlPath: path.join(dir, "cv.html"),
+      finalPdf: path.join(dir, "out.pdf"),
+      ats: true,
+      countPages: async () => pages,
+    });
+    try {
+      assert.equal(result.ok, true, result.error);
+      assert.ok(result.ats, result.warnings.join("\n"));
+      assert.match(readFileSync(result.ats.html, "utf8"), pack);
+    } finally {
+      if (result.scratchDir) rmSync(result.scratchDir, { recursive: true, force: true });
+    }
+  }));
+}
+
+test("the ATS variant is built in dense when dense is the chosen template", () => inDataRoot("cv-ats-dense-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/dense/cv-template.dense.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    ats: true,
+    countPages: async () => 1,
+  });
+  try {
+    assert.equal(result.ok, true, result.error);
+    assert.ok(result.ats, result.warnings.join("\n"));
+    assert.match(readFileSync(result.ats.html, "utf8"), /--font-size: 9\.5pt/);
+  } finally {
+    if (result.scratchDir) rmSync(result.scratchDir, { recursive: true, force: true });
+  }
+}));
+
+test("a dense rebuild that fails keeps the first build and warns", (t) => inDataRoot("cv-dense-fail-", async (dir) => {
+  const realRead = fs.readFileSync;
+  t.mock.method(fs, "readFileSync", (file, ...rest) => {
+    if (String(file).endsWith("cv.dense.html")) throw Object.assign(new Error("EIO: i/o error"), { code: "EIO" });
+    return realRead(file, ...rest);
+  });
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 3,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.doesNotMatch(result.html, /--font-size: 9\.5pt/);
+  assert.match(result.html, /Jane Doe/);
+  assert.ok(result.warnings.some((w) => w.includes("could not be rebuilt in the dense template") && w.includes("i/o error")), result.warnings.join("\n"));
+}));
+
+test("a CV built in dense is not measured or rebuilt", () => inDataRoot("cv-dense-chosen-", async (dir) => {
+  let counted = 0;
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/dense/cv-template.dense.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => { counted += 1; return 3; },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(counted, 0);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.equal(result.warnings.some((w) => w.includes("dense template")), false);
+}));
+
+test("a CV whose page count fails is saved with a warning", () => inDataRoot("cv-unmeasured-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => null,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.doesNotMatch(result.html, /--font-size: 9\.5pt/);
+  assert.ok(result.warnings.includes("The CV's page count could not be measured, so it was not checked against the page limit before saving."), result.warnings.join("\n"));
+}));
+
+test("a fallback to dense says the photo was left out", () => inDataRoot("cv-dense-photo-", async (dir) => {
+  const base = payload();
+  const run = (candidate, pages) => materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: { ...base, candidate }, warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => pages,
+  });
+  const note = "The dense template has no photo, so the photo was left out.";
+  const withPhoto = { ...base.candidate, photo: "https://example.com/photo.png" };
+  const fell = await run(withPhoto, 3);
+  assert.equal(fell.ok, true, fell.error);
+  assert.ok(fell.warnings.includes(note), fell.warnings.join("\n"));
+  assert.equal((await run(withPhoto, 1)).warnings.includes(note), false);
+  assert.equal((await run(base.candidate, 3)).warnings.includes(note), false);
+}));

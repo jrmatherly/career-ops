@@ -30,6 +30,7 @@ import { claudeCliArgs, readFenceArgs } from "@/lib/claude-invocation.mjs";
 import { resolveCvTemplate, resolveUserTemplatesDir } from "@/lib/core/cv-template.mjs";
 import { getProfilePath, profileRef } from "@/lib/core/profile-path.mjs";
 import { readPageFormatSetting, resolveRenderPageFormat, type PageFormatSetting } from "@/lib/core/page-format.mjs";
+import { readPageBudget } from "@/lib/core/page-budget.mjs";
 import { acquireTrackerWrite, releaseTrackerWrite } from "@/lib/core/run-registry";
 import { createRunFinalizer } from "@/lib/run-finalizer.mjs";
 import { readJsonObject } from "@/lib/json-body";
@@ -318,6 +319,7 @@ export async function POST(req: Request) {
   const pageFormat: PageFormatSetting | undefined = dataRoot
     ? await readPageFormatSetting(codeRoot, getProfilePath(dataRoot))
     : undefined;
+  const pageBudget = dataRoot ? await readPageBudget(codeRoot, dataRoot) : undefined;
 
   // The Inbox and the scheduled drain can both start an evaluation of one
   // posting; a second would reserve a second report number for it.
@@ -372,6 +374,7 @@ export async function POST(req: Request) {
       cvTemplate,
       userTemplatesDir,
       pageFormat,
+      maxPages: pageBudget?.maxPages,
       // The worker's cwd is the data root; modes, templates and scripts live in the checkout.
       codeRoot,
       reportFile: pdfPaths?.reportFile ?? (coverRequest?.ok ? coverRequest.reportFile : undefined),

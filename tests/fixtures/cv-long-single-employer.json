@@ -1,0 +1,105 @@
+{
+  "lang": "en",
+  "page_format": "letter",
+  "candidate": {
+    "name": "Sample Candidate",
+    "title": "Director, Platform Engineering",
+    "email": "candidate@example.com",
+    "phone": "+1 555 010 0000",
+    "location": "Springfield, ST",
+    "linkedin": { "url": "https://linkedin.com/in/sample-candidate", "display": "linkedin.com/in/sample-candidate" }
+  },
+  "summary": "Platform engineering leader with fifteen years at one retail group, moving from hands-on infrastructure work to running a forty-person organization that serves three hundred product engineers. Builds internal developer platforms that shorten the path from commit to production, and measures them by lead time, change failure rate and the hours engineers stop spending on toil. Has led cloud migrations, a Kubernetes consolidation, an observability rebuild and a cost program that returned millions to the business without slowing delivery. Hires and grows managers, writes the strategy documents leadership signs, and stays close enough to the code to review designs, debug outages and pair with new engineers in their first month.",
+  "competencies": [
+    "Platform Strategy",
+    "Kubernetes & Containers",
+    "Cloud Cost Management",
+    "Observability",
+    "Incident Leadership",
+    "Developer Experience",
+    "Engineering Hiring",
+    "Infrastructure as Code"
+  ],
+  "experience": [
+    {
+      "company": "Example Retail Group",
+      "role": "Director, Platform Engineering",
+      "location": "Springfield, ST (Remote since 2020)",
+      "dates": "Jul 2021 - Present",
+      "context": "Leads five teams and forty engineers who own the shared platform behind every customer-facing and internal product, from build pipelines to production clusters and the tools engineers use every day.",
+      "bullets": [
+        "Set the three-year platform strategy and won funding for it, consolidating eleven deployment paths into one paved road that now carries ninety percent of production changes and cut median lead time from nine days to under one day for every product team and kept it there through every audit since.",
+        "Moved four hundred services from virtual machines onto a shared Kubernetes fleet across two regions, keeping checkout available through the peak season and retiring two data centers a full year ahead of the lease end date in two quarters.",
+        "Built a cost program with finance that tagged every workload, gave each team a monthly bill and a target, and reduced cloud spend by a fifth while traffic grew by a third over the same two years of steady growth with no price increase.",
+        "Replaced three monitoring tools with one observability stack based on open standards, so every service ships traces, metrics and logs by default and the median time to find a failing dependency dropped below ten minutes during live incidents on the first try.",
+        "Rebuilt the incident process around a single on-call tool, written runbooks and blameless reviews, cutting repeat incidents by half and bringing the customer-facing error budget back within target for six straight quarters across every region as measured by support tickets.",
+        "Grew the organization from eighteen to forty engineers, hired four managers, and wrote the career ladder the wider engineering group adopted, with promotion rates and retention both above the company average in each year since the change by a wide margin.",
+        "Started a developer experience team that measures onboarding time and build speed each quarter, and brought a new engineer's first production change down from three weeks to two days with templates, golden paths and a guided setup for every new hire.",
+        "Led the security partnership that moved secrets into a managed vault, signed every container image and gated deployments on policy checks, closing the audit findings that had stayed open for two earlier review cycles with the auditors that same year.",
+        "Presents platform results to the executive team each quarter and keeps a public roadmap that product teams vote on, which turned platform requests from escalations into a planned, visible queue with dates the product teams now trust every three months."
+      ]
+    },
+    {
+      "company": "Example Retail Group",
+      "role": "Senior Engineering Manager, Infrastructure",
+      "location": "Springfield, ST (Remote since 2020)",
+      "dates": "Mar 2018 - Jun 2021",
+      "bullets": [
+        "Managed three infrastructure teams through the move to public cloud, writing the landing zone design, the network plan and the migration order that took two hundred applications across in eighteen months without a major outage or data loss on schedule.",
+        "Introduced infrastructure as code for every environment, with reviewed modules and automated drift checks, which ended manual console changes and let teams create a compliant new environment in an hour instead of the month it took before through peak season.",
+        "Ran the capacity plan for the busiest shopping weeks, load testing the full checkout path each autumn and adding autoscaling rules that held response times steady at four times normal traffic for three busy seasons in a row as planned.",
+        "Coached six engineers into senior and staff roles and set up a weekly design review that every infrastructure change above a size threshold now passes, catching cost and reliability problems well before they reached production systems two years running.",
+        "Negotiated the cloud provider contract with procurement, combining committed spend with reserved capacity in a way that saved a large share of the first-year bill and funded two extra engineers for the eighteen-month migration effort in the first year."
+      ]
+    },
+    {
+      "company": "Example Retail Group",
+      "role": "Engineering Manager, Site Reliability",
+      "location": "Springfield, ST (Remote since 2020)",
+      "dates": "Jan 2015 - Feb 2018",
+      "bullets": [
+        "Founded the site reliability team, defined service level objectives with each product owner, and published a weekly reliability report that leadership used to decide when feature work paused for stability fixes, repairs and paying down debt on every product team.",
+        "Automated the most common recovery steps into tested scripts and chat commands, which removed two thirds of the overnight pages and let the on-call rotation grow from three people to eight without anyone burning out, quitting or leaving the team for good.",
+        "Moved the order database to a replicated cluster with automatic failover and point-in-time recovery, then ran quarterly restore drills that proved a full recovery inside the one-hour target the business had set for that system with time to spare before the deadline."
+      ]
+    },
+    {
+      "company": "Example Retail Group",
+      "role": "Senior Systems Engineer",
+      "location": "Springfield, ST (Remote since 2020)",
+      "dates": "Jun 2011 - Dec 2014"
+    },
+    {
+      "company": "Example Retail Group",
+      "role": "Systems Engineer",
+      "location": "Springfield, ST (Remote since 2020)",
+      "dates": "Aug 2009 - May 2011"
+    }
+  ],
+  "education": [
+    {
+      "title": "B.S. Computer Science",
+      "org": "Sample State University",
+      "location": "Springfield, ST",
+      "year": "2009",
+      "description": "Coursework in operating systems, computer networks and distributed systems, with a senior project on fault-tolerant storage."
+    }
+  ],
+  "skills": [
+    { "category": "Cloud Platforms", "items": "Amazon Web Services, Google Cloud, Microsoft Azure, landing zones, account vending, network design, identity federation, cost allocation and reserved capacity planning across business units and multi-account guardrails" },
+    { "category": "Containers and Orchestration", "items": "Kubernetes, Helm, Argo CD, service mesh, cluster autoscaling, multi-region fleets, container image signing, admission policy and runtime security controls and node pool tuning" },
+    { "category": "Infrastructure as Code", "items": "Terraform, Pulumi, Ansible, reviewed module libraries, drift detection, policy as code, environment templates and self-service provisioning workflows for product teams and state management" },
+    { "category": "Observability", "items": "OpenTelemetry, Prometheus, Grafana, distributed tracing, log pipelines, service level objectives, error budgets, alert tuning, on-call dashboards and reporting standards and synthetic checks" },
+    { "category": "Delivery and CI/CD", "items": "GitHub Actions, Jenkins, trunk-based development, progressive delivery, feature flags, canary analysis, build caching, artifact storage and release automation and rollback plans" },
+    { "category": "Reliability", "items": "Incident command, blameless reviews, runbooks, chaos testing, capacity planning, load testing, database failover, backup and restore drills, game days and postmortem tracking" },
+    { "category": "Languages", "items": "Go, Python, Bash, TypeScript, SQL, and enough Java to read and review application code during incidents, outages and design reviews" },
+    { "category": "Leadership", "items": "Hiring, career ladders, manager coaching, quarterly planning, budget ownership, vendor negotiation, executive reporting and cross-team roadmaps with product leadership" }
+  ],
+  "volunteer": [
+    {
+      "org": "Sample Nonprofit",
+      "dates": "2023 - Present",
+      "description": "Mentors early-career engineers each month and runs a yearly workshop that teaches high school students how websites and cloud services work."
+    }
+  ]
+}
