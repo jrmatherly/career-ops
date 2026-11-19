@@ -235,11 +235,12 @@ export async function materializeTailoredCv({
     };
     const format = PAGE_FORMATS.has(payload.page_format) ? payload.page_format : DEFAULT_PAGE_FORMAT;
     const { maxPages } = await readPageBudget(coreRoot, dataRoot);
+    const denseTemplate = await resolveDenseTemplate(coreRoot, template);
     let chosen;
     try {
       chosen = await chooseFittingTemplate({
         template,
-        denseTemplate: await resolveDenseTemplate(coreRoot, template),
+        denseTemplate,
         maxPages,
         build,
         countPages: countPages ?? ((html) => countCvPages({ html, format, coreRoot, profilePath: getProfilePath(dataRoot), cvPath })),
@@ -271,7 +272,7 @@ export async function materializeTailoredCv({
     }
 
     const atsVariant = ats === true
-      ? await buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings, template: chosen.fallback ? chosen.template : null })
+      ? await buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings, template: chosen.template === denseTemplate ? denseTemplate : null })
       : null;
     // The route saves htmlPath once the client is still connected. Writing it
     // here would publish a CV the route then drops on disconnect.
@@ -338,7 +339,7 @@ async function keywordWarnings(coreRoot, dataRoot, report, htmlPath) {
   }
 }
 
-// `template` replaces the ats pack when the styled CV fell back to dense, so the
+// `template` replaces the ats pack when the styled CV is built in dense, so the
 // file Apply uploads fits the same page limit. dense passes atsLint.
 async function buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings, template }) {
   let atsTemplate = template;

@@ -406,6 +406,26 @@ for (const [pages, pack] of [[3, /--font-size: 9\.5pt/], [1, /--font-size: 11px/
   }));
 }
 
+test("the ATS variant is built in dense when dense is the chosen template", () => inDataRoot("cv-ats-dense-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    cvTemplate: "templates/dense/cv-template.dense.html",
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    ats: true,
+    countPages: async () => 1,
+  });
+  try {
+    assert.equal(result.ok, true, result.error);
+    assert.ok(result.ats, result.warnings.join("\n"));
+    assert.match(readFileSync(result.ats.html, "utf8"), /--font-size: 9\.5pt/);
+  } finally {
+    if (result.scratchDir) rmSync(result.scratchDir, { recursive: true, force: true });
+  }
+}));
+
 test("a dense rebuild that fails keeps the first build and warns", (t) => inDataRoot("cv-dense-fail-", async (dir) => {
   const realRead = fs.readFileSync;
   t.mock.method(fs, "readFileSync", (file, ...rest) => {
