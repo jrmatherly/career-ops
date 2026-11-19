@@ -220,7 +220,9 @@ test("countCvPages measures a CV whose profile locks a section", { skip: !toolRe
       skills: [],
     };
     writeFileSync(path.join(dir, "cv.json"), JSON.stringify(payload));
-    const built = spawnSync(process.execPath, [path.join(CORE, "build-cv-html.mjs"), path.join(dir, "cv.json"), path.join(dir, "cv.html")], { cwd: CORE, encoding: "utf8" });
+    const built = spawnSync(process.execPath, [path.join(CORE, "build-cv-html.mjs"), path.join(dir, "cv.json"), path.join(dir, "cv.html")], {
+      cwd: CORE, encoding: "utf8", env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_PROFILE: profilePath, CAREER_OPS_DATA_DIR: "", CAREER_OPS_TRACKER: "" },
+    });
     assert.equal(built.status, 0, built.stderr);
     const html = readFileSync(path.join(dir, "cv.html"), "utf8");
     assert.equal(await countCvPages({ html, format: "letter", coreRoot: CORE, profilePath, cvPath }), 1);

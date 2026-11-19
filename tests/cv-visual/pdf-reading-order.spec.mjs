@@ -73,7 +73,9 @@ test('dense CV reads as one complete line pair per role and whole-line headings'
   let html;
   try {
     writeFileSync(join(dir, 'in.json'), JSON.stringify(fixture));
-    execFileSync(process.execPath, ['build-cv-html.mjs', join(dir, 'in.json'), join(dir, 'out.html'), 'templates/dense/cv-template.dense.html'], { cwd: root });
+    execFileSync(process.execPath, ['build-cv-html.mjs', join(dir, 'in.json'), join(dir, 'out.html'), 'templates/dense/cv-template.dense.html'], {
+      cwd: root, env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' },
+    });
     html = readFileSync(join(dir, 'out.html'), 'utf8');
   } finally {
     rmSync(dir, { recursive: true, force: true });

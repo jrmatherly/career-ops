@@ -16,11 +16,14 @@ const slotlessPath = join(dir, 'slotless.html');
 writeFileSync(slotlessPath, SLOTLESS);
 let n = 0;
 
+// The build runs in a temp data root so a developer's own profile or templates cannot change it.
+const isolatedEnv = (root) => ({ ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' });
+
 function build(payload, template) {
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.html`);
   writeFileSync(input, JSON.stringify(payload));
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(dir) });
   assert.equal(r.status, 0, r.stderr);
   return { html: readFileSync(output, 'utf8'), report: JSON.parse(r.stdout) };
 }
@@ -44,7 +47,7 @@ test('--markdown moves competencies into Skills when the template has no compete
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.md`);
   writeFileSync(input, JSON.stringify(fixture));
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output, slotlessPath], { cwd: ROOT, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output, slotlessPath], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(dir) });
   assert.equal(r.status, 0, r.stderr);
   const md = readFileSync(output, 'utf8');
   for (const c of fixture.competencies) assert.ok(md.includes(c), c);
@@ -59,9 +62,7 @@ test('a locked Skills section is not folded into, so the build passes and warns 
   const input = join(root, 'in.json');
   const output = join(root, 'out.html');
   writeFileSync(input, JSON.stringify(fixture));
-  const env = { ...process.env, CAREER_OPS_ROOT: root };
-  delete env.CAREER_OPS_PROFILE;
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, join(ROOT, 'templates/dense/cv-template.dense.html')], { cwd: ROOT, encoding: 'utf8', env });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, join(ROOT, 'templates/dense/cv-template.dense.html')], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(root) });
   assert.equal(r.status, 0, r.stderr);
   assert.ok(JSON.parse(r.stdout).warnings.some((w) => /competenc/i.test(w)), r.stdout);
 });

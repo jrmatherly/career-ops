@@ -33,12 +33,14 @@ const dir = mkdtempSync(join(tmpdir(), 'cv-volunteer-'));
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 let n = 0;
 
-function build(payload, template, root) {
+// The build runs in a temp data root so a developer's own profile or templates cannot change it.
+const isolatedEnv = (root) => ({ ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' });
+
+function build(payload, template, root = dir) {
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.html`);
   writeFileSync(input, JSON.stringify(payload));
-  const env = root ? { ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' } : process.env;
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8', env });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(root) });
   let report = null;
   try { report = JSON.parse(r.stdout); } catch { /* a failed build prints no report */ }
   return { status: r.status, html: r.status === 0 ? readFileSync(output, 'utf8') : '', report, stderr: r.stderr, output, spawn: r };
@@ -112,7 +114,7 @@ test('the markdown build carries the volunteer entry', () => {
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.md`);
   writeFileSync(input, JSON.stringify(fixture));
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output], { cwd: ROOT, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(dir) });
   assert.equal(r.status, 0, r.stderr);
   const md = readFileSync(output, 'utf8');
   assert.ok(md.includes('Sample Nonprofit'));

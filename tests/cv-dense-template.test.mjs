@@ -11,7 +11,8 @@ import { toolRequired } from './required-tools.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const fixture = JSON.parse(readFileSync(join(ROOT, 'tests/fixtures/cv-long-single-employer.json'), 'utf8'));
-const densePath = resolveTemplate('cv', 'dense');
+// The shipped pack only: naming the templates dir leaves out a developer's data/templates.
+const densePath = resolveTemplate('cv', 'dense', { dir: join(ROOT, 'templates') });
 const CAN_RENDER = await chromium.launch({ headless: true }).then((b) => b.close().then(() => true), () => false);
 const browserSkip = !toolRequired('browser') && !CAN_RENDER && 'Chromium cannot launch';
 
@@ -19,11 +20,14 @@ const dir = mkdtempSync(join(tmpdir(), 'cv-dense-'));
 process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
 let n = 0;
 
+// The build runs in a temp data root so a developer's own profile or templates cannot change it.
+const isolatedEnv = (root) => ({ ...process.env, CAREER_OPS_ROOT: root, CAREER_OPS_DATA_DIR: '', CAREER_OPS_PROFILE: '', CAREER_OPS_TRACKER: '' });
+
 function build(payload, template) {
   const input = join(dir, `in-${++n}.json`);
   const output = join(dir, `out-${n}.html`);
   writeFileSync(input, JSON.stringify(payload));
-  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, output, ...(template ? [template] : [])], { cwd: ROOT, encoding: 'utf8', env: isolatedEnv(dir) });
   assert.equal(r.status, 0, r.stderr);
   return { html: readFileSync(output, 'utf8'), output };
 }
@@ -32,7 +36,7 @@ function build(payload, template) {
 function pageCount(template) {
   const { output } = build(fixture, template);
   const r = spawnSync(process.execPath, ['generate-pdf.mjs', output, output.replace(/\.html$/, '.pdf'), '--max-pages=99', '--skip-fact-check'], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, CAREER_OPS_ROOT: dir, CAREER_OPS_PDF_SHARED: '' }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...isolatedEnv(dir), CAREER_OPS_PDF_SHARED: '' }, timeout: 60_000,
   });
   const m = /Pages: (\d+)/.exec(r.stdout);
   assert.ok(m, r.stdout + r.stderr);
