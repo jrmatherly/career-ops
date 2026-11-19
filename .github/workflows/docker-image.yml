@@ -19,6 +19,16 @@ name: "🐳 Docker images"
 # (`career-ops-vX.Y.Z`, cut by release.yml) both the tag itself and the bare `X.Y.Z`.
 # The first push creates each package as private; make them public in the
 # package settings once, or every pull needs a token.
+#
+# Docker Hub mirror: the two images the cluster deploys (`mirror: true` in the
+# matrix) are also copied to docker.io/<DOCKERHUB_NAMESPACE>/<name> with the
+# same tags. The copy is by digest, so both registries serve the same image
+# under the same `sha256:` and a pin moves between them by changing the host.
+# GHCR stays the primary: the copy runs after the push and may fail without
+# failing the job. It is skipped until the repository variable
+# DOCKERHUB_NAMESPACE is set. It also needs the variable DOCKERHUB_USERNAME and
+# the secret DOCKERHUB_TOKEN (an access token with read and write scope), and
+# the two repositories should already exist on Docker Hub.
 
 on:
   push:
@@ -67,10 +77,12 @@ jobs:
             context: .
             file: deploy/Dockerfile
             platforms: linux/amd64
+            mirror: true
           - name: "career-ops-publish"
             context: publish
             file: publish/Dockerfile
             platforms: linux/amd64
+            mirror: true
     steps:
       - name: "⬇️ Checkout"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,6 +116,7 @@ jobs:
             type=ref,event=tag
             type=match,pattern=career-ops-v(.*),group=1
       - name: "🚀 Build and push"
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
@@ -116,3 +129,28 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,scope=${{ matrix.name }},mode=max
+      - name: "🔐 Log in to Docker Hub"
+        id: hub-login
+        if: github.event_name != 'pull_request' && matrix.mirror && vars.DOCKERHUB_NAMESPACE != ''
+        continue-on-error: true
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: "🪞 Mirror to Docker Hub"
+        id: hub-mirror
+        if: steps.hub-login.outcome == 'success'
+        continue-on-error: true
+        env:
+          SOURCE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          TARGET: docker.io/${{ vars.DOCKERHUB_NAMESPACE }}/${{ matrix.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          args=()
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args+=(--tag "${TARGET}:${tag##*:}")
+          done <<< "$TAGS"
+          docker buildx imagetools create "${args[@]}" "$SOURCE"
+      - name: "⚠️ Report a failed mirror"
+        if: steps.hub-login.outcome == 'failure' || steps.hub-mirror.outcome == 'failure'
+        run: echo "::warning title=Docker Hub mirror::${{ matrix.name }} was pushed to GHCR but not copied to Docker Hub. Re-run this job to retry the copy."
