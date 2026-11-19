@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.8.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.7.1...career-ops-v2.8.0) (2026-11-19)
+
+
+### Features
+
+* **pdf:** fit a tailored CV to two pages with a dense template and a Volunteer section ([9f4635f](https://github.com/jrmatherly/career-ops/commit/9f4635f4b23083fcfdc206a17d00e09453291f60))
+* **pdf:** fold competencies into Skills for a template without the slot ([f27999d](https://github.com/jrmatherly/career-ops/commit/f27999d601c0a85aabf45af5f9a5163b4c2a65c4))
+* **pdf:** render a Volunteer section from the payload ([fad264f](https://github.com/jrmatherly/career-ops/commit/fad264fe293594b0ca7f98e143dd0be8b757035c))
+* **templates:** add a dense 9.5pt template that keeps each role a complete record ([94d7e72](https://github.com/jrmatherly/career-ops/commit/94d7e72100b77ac089a47478c835dbec725d28b0))
+* **templates:** give every shipped CV template a Volunteer section ([b3f78d3](https://github.com/jrmatherly/career-ops/commit/b3f78d3c8980a1261c974e492e88ae54ab74ba1d))
+* **web:** state the page limit and the keep-every-section rule in the pdf prompt ([8dff016](https://github.com/jrmatherly/career-ops/commit/8dff016929af4bc06a8a1d463be02566a9a52bf1))
+
+
+### Bug Fixes
+
+* **pdf:** keep a locked Skills section out of the competencies fold ([c723b21](https://github.com/jrmatherly/career-ops/commit/c723b214930d5b92b867d88c334bb986822d14ec))
+* **pdf:** keep the dense Interests line at body size and a locked Skills section out of the markdown fold ([da2ffc1](https://github.com/jrmatherly/career-ops/commit/da2ffc114e79dafbf42040797957d9bf07f3d65e))
+* **pdf:** render a Volunteer entry in the order cv.md writes it, so a locked section builds ([bef644f](https://github.com/jrmatherly/career-ops/commit/bef644fa9a4dcce3201aed95b3295154137dfc8f))
+* **templates:** give the dense template an Interests section and say when the photo is left out ([e157e50](https://github.com/jrmatherly/career-ops/commit/e157e50a78fc52dbf67398de78372c488f012697))
+* **web:** build the ATS variant in dense when dense is the selected template ([cdde930](https://github.com/jrmatherly/career-ops/commit/cdde930d3524a1b36539473fca7a97e3cdbcae46))
+
 ## [2.7.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.7.0...career-ops-v2.7.1) (2026-11-19)
 
 
