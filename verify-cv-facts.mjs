@@ -1388,10 +1388,27 @@ export function structuredFieldClaims(text) {
  * phrase of more than one plain word warns instead. Lowercase items are left
  * alone. A LaTeX skills row is read the same way as an HTML skill item.
  *
+ * A comma inside a bracket splits too, so the last name of "Cloud (Azure,
+ * AKS)" arrives as "AKS)". The closing bracket it was cut away from is
+ * dropped before the name is compared. Nothing else about the split changes:
+ * the piece that holds the opening bracket ("Cloud (Azure") is still not
+ * tool-shaped and is still left alone.
+ *
  * @param {string} text generated HTML or LaTeX
  * @returns {{kind: string, value: string, blocking: boolean}[]}
  */
 const LATEX_SKILL_ROW_RE = /^\s*(?:\\textbf\{(?:[^{}]|\{[^{}]*\})*\}\{: \})?\{((?:[^{}]|\{[^{}]*\})*)\}\s*\\\\/gm;
+
+/** Drop each closing bracket at the end of a token whose opener is not in the token. */
+function dropDanglingClosers(token) {
+  let value = token;
+  for (;;) {
+    const closer = value.at(-1);
+    const opener = closer === ')' ? '(' : closer === ']' ? '[' : '';
+    if (!opener || value.split(opener).length >= value.split(closer).length) return value;
+    value = value.slice(0, -1).trimEnd();
+  }
+}
 
 function skillTokens(text) {
   const tokens = [];
@@ -1416,7 +1433,8 @@ function plainLatexSkillText(value) {
 }
 
 function pushSkillTokens(claims, seen, text) {
-  for (const trimmed of skillTokens(text)) {
+  for (const token of skillTokens(text)) {
+    const trimmed = dropDanglingClosers(token);
     if (!looksToolShaped(trimmed)) continue;
     const value = normalizeFact(trimmed);
     if (!value || seen.has(value)) continue;
