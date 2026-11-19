@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chooseFittingTemplate, countCvPages } from "../../src/lib/cv-fit.mjs";
@@ -46,12 +48,13 @@ test("dense as the chosen template is never rebuilt", async () => {
   assert.equal(chosen.fallback, null);
 });
 
-test("an unmeasurable CV keeps its template", async () => {
+test("an unmeasurable CV keeps its template and says it was not measured", async () => {
   const r = recorder({ base: null });
   const chosen = await chooseFittingTemplate({ template: "base", denseTemplate: "dense", maxPages: 2, build: r.build, countPages: r.countPages });
   assert.deepEqual(r.builds, ["base"]);
   assert.equal(chosen.template, "base");
   assert.equal(chosen.fallback, null);
+  assert.equal(chosen.unmeasured, true);
 });
 
 test("a CV over the limit in dense is returned in dense", async () => {
@@ -171,6 +174,37 @@ test("readPageBudget reads cv.max_pages and defaults to 2", async () => {
     assert.deepEqual(await readPageBudget(path.join(dir, "no-core"), dir), { maxPages: 2 });
   } finally {
     if (saved !== undefined) process.env.CAREER_OPS_PROFILE = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const { chromium } = createRequire(path.join(CORE, "package.json"))("playwright");
+const CAN_RENDER = await chromium.launch({ headless: true }).then((b) => b.close().then(() => true), () => false);
+
+test("countCvPages measures a CV whose profile locks a section", { skip: !CAN_RENDER && "Chromium cannot launch" }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "cv-fit-locked-"));
+  try {
+    mkdirSync(path.join(dir, "config"));
+    const profilePath = path.join(dir, "config", "profile.yml");
+    writeFileSync(profilePath, "cv:\n  locked_sections: [summary]\n");
+    const cvPath = path.join(dir, "cv.md");
+    writeFileSync(cvPath, "## Professional Summary\n\nAnalyst who ships the weekly report.\n");
+    const payload = {
+      lang: "en",
+      page_format: "letter",
+      candidate: { name: "Jane Doe", title: "Analyst", email: "jane.example", location: "Example City" },
+      summary: "Analyst who ships the weekly report.",
+      competencies: ["Reporting"],
+      experience: [{ company: "Globex", role: "Analyst", location: "Remote", dates: "2020 - 2024", bullets: ["Shipped the weekly report"] }],
+      education: [],
+      skills: [],
+    };
+    writeFileSync(path.join(dir, "cv.json"), JSON.stringify(payload));
+    const built = spawnSync(process.execPath, [path.join(CORE, "build-cv-html.mjs"), path.join(dir, "cv.json"), path.join(dir, "cv.html")], { cwd: CORE, encoding: "utf8" });
+    assert.equal(built.status, 0, built.stderr);
+    const html = readFileSync(path.join(dir, "cv.html"), "utf8");
+    assert.equal(await countCvPages({ html, format: "letter", coreRoot: CORE, profilePath, cvPath }), 1);
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });

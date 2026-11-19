@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -12,18 +12,21 @@ const ROOT_ENV = ["CAREER_OPS_ROOT", "CAREER_OPS_DATA_DIR", "CAREER_OPS_TRACKER"
  *
  * generate-pdf.mjs records every render in its data root's pdf-index.tsv, so the
  * render runs with its data root set to a fresh temp directory, removed before
- * this returns, as renderMasterPdf does. The profile is only read.
+ * this returns, as renderMasterPdf does. The profile is only read. cv.md is
+ * copied in when given, because the render checks the profile's locked sections
+ * against it and fails without it.
  *
- * @param {{ html: string, format: "letter"|"a4", coreRoot: string, profilePath?: string,
+ * @param {{ html: string, format: "letter"|"a4", coreRoot: string, profilePath?: string, cvPath?: string,
  *   spawnFn?: Function, execPath?: string, timeoutMs?: number }} args
  * @returns {Promise<number | null>} null when it cannot be measured. Never rejects.
  */
-export async function countCvPages({ html, format, coreRoot, profilePath, spawnFn = spawn, execPath = process.execPath, timeoutMs = 120_000 }) {
+export async function countCvPages({ html, format, coreRoot, profilePath, cvPath, spawnFn = spawn, execPath = process.execPath, timeoutMs = 120_000 }) {
   let dir;
   try {
     dir = await mkdtemp(path.join(os.tmpdir(), "cv-fit-"));
     const htmlFile = path.join(dir, "cv.html");
     await writeFile(htmlFile, html, "utf8");
+    if (cvPath) await copyFile(cvPath, path.join(dir, "cv.md")).catch(() => {});
     const env = { ...process.env };
     for (const key of ROOT_ENV) delete env[key];
     const stdout = await new Promise((resolve) => {
@@ -61,20 +64,22 @@ export async function countCvPages({ html, format, coreRoot, profilePath, spawnF
 /**
  * Build in `template`; when that runs over `maxPages`, build once more in
  * `denseTemplate`. The dense build is not measured: an overflow there is
- * reported by the normal render, and type never shrinks below dense.
+ * reported by the normal render, and type never shrinks below dense. A first
+ * build that cannot be measured is kept and marked `unmeasured`.
  *
  * A failing first build rejects. A failing dense build keeps the first build
  * and names the failure in `fallbackError`, so the user still gets a CV.
  *
  * @param {{ template: string, denseTemplate: string|null, maxPages: number,
  *   build: (template: string) => Promise<string>, countPages: (html: string) => Promise<number|null> }} args
- * @returns {Promise<{ template: string, html: string, fallback: null | { from: string, pages: number }, fallbackError?: string }>}
+ * @returns {Promise<{ template: string, html: string, fallback: null | { from: string, pages: number }, fallbackError?: string, unmeasured?: true }>}
  */
 export async function chooseFittingTemplate({ template, denseTemplate, maxPages, build, countPages }) {
   const html = await build(template);
   if (!denseTemplate || template === denseTemplate) return { template, html, fallback: null };
   const pages = await countPages(html);
-  if (pages === null || pages <= maxPages) return { template, html, fallback: null };
+  if (pages === null) return { template, html, fallback: null, unmeasured: true };
+  if (pages <= maxPages) return { template, html, fallback: null };
   try {
     return { template: denseTemplate, html: await build(denseTemplate), fallback: { from: template, pages } };
   } catch (err) {

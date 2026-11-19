@@ -241,7 +241,7 @@ export async function materializeTailoredCv({
         denseTemplate: await resolveDenseTemplate(coreRoot, template),
         maxPages: (await readPageBudget(coreRoot, dataRoot)).maxPages,
         build,
-        countPages: countPages ?? ((html) => countCvPages({ html, format, coreRoot, profilePath: getProfilePath(dataRoot) })),
+        countPages: countPages ?? ((html) => countCvPages({ html, format, coreRoot, profilePath: getProfilePath(dataRoot), cvPath })),
       });
     } catch (err) {
       return { ok: false, error: err.message };
@@ -252,6 +252,9 @@ export async function materializeTailoredCv({
     if (chosen.fallback) {
       const { pages, from } = chosen.fallback;
       warnings.push(`The CV ran to ${pages} pages in the "${path.basename(from)}" template, so it was built in the dense template instead.`);
+    }
+    if (chosen.unmeasured) {
+      warnings.push("The CV's page count could not be measured, so it was not checked against the page limit before saving.");
     }
     if (chosen.fallbackError) {
       warnings.push(`The CV is over the page limit and could not be rebuilt in the dense template, so it was kept as built. ${chosen.fallbackError}`);

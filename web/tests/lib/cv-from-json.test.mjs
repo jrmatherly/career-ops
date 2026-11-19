@@ -388,3 +388,17 @@ test("a CV built in dense is not measured or rebuilt", () => inDataRoot("cv-dens
   assert.match(result.html, /--font-size: 9\.5pt/);
   assert.equal(result.warnings.some((w) => w.includes("dense template")), false);
 }));
+
+test("a CV whose page count fails is saved with a warning", () => inDataRoot("cv-unmeasured-", async (dir) => {
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => null,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.doesNotMatch(result.html, /--font-size: 9\.5pt/);
+  assert.ok(result.warnings.includes("The CV's page count could not be measured, so it was not checked against the page limit before saving."), result.warnings.join("\n"));
+}));
