@@ -5,6 +5,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { strFromU8, unzipSync } from 'fflate';
+import { payloadToDocx } from '../lib/resume/export/docx.mjs';
 import { voiceIssues } from '../cv-voice.mjs';
 import { sectionKey } from '../generate-pdf.mjs';
 import { describeSpawn, exitedNonZero } from './helpers/describe-spawn.mjs';
@@ -50,7 +52,9 @@ test('volunteer renders under its own heading after Skills in the base template'
 
 test('no volunteer key leaves no Volunteer heading', () => {
   const { volunteer, ...rest } = fixture;
-  assert.doesNotMatch(build(rest).html, /Volunteer Experience/);
+  const r = build(rest);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.html, /Volunteer Experience/);
 });
 
 test('the ATS pack renders volunteer too', () => {
@@ -83,4 +87,21 @@ test('volunteer text backed by cv.md passes the voice gate', () => {
   const { html, status, stderr } = build(smallPayload);
   assert.equal(status, 0, stderr);
   assert.deepEqual(voiceIssues(html, readFileSync(join(ROOT, 'tests/fixtures/cv-volunteer-source.md'), 'utf8')), []);
+});
+
+test('the DOCX export carries the volunteer org, dates and description', async () => {
+  const xml = strFromU8(unzipSync(new Uint8Array(await payloadToDocx(smallPayload)))['word/document.xml']);
+  const [entry] = smallPayload.volunteer;
+  for (const value of [entry.org, entry.dates, entry.description]) assert.ok(xml.includes(value), value);
+});
+
+test('the markdown build carries the volunteer entry', () => {
+  const input = join(dir, `in-${++n}.json`);
+  const output = join(dir, `out-${n}.md`);
+  writeFileSync(input, JSON.stringify(fixture));
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const md = readFileSync(output, 'utf8');
+  assert.ok(md.includes('Sample Nonprofit'));
+  assert.ok(md.includes('2023 - Present'));
 });

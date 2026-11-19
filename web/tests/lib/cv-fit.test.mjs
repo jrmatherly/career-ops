@@ -9,6 +9,7 @@ import path from "node:path";
 import { chooseFittingTemplate, countCvPages } from "../../src/lib/cv-fit.mjs";
 import { readPageBudget } from "../../src/lib/core/page-budget.mjs";
 import { fileURLToPath } from "node:url";
+import { toolRequired } from "../../../tests/required-tools.mjs";
 
 const CORE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -200,7 +201,7 @@ test("readPageBudget reads cv.max_pages and defaults to 2", async () => {
 const { chromium } = createRequire(path.join(CORE, "package.json"))("playwright");
 const CAN_RENDER = await chromium.launch({ headless: true }).then((b) => b.close().then(() => true), () => false);
 
-test("countCvPages measures a CV whose profile locks a section", { skip: !CAN_RENDER && "Chromium cannot launch" }, async () => {
+test("countCvPages measures a CV whose profile locks a section", { skip: !toolRequired("browser") && !CAN_RENDER && "Chromium cannot launch" }, async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "cv-fit-locked-"));
   try {
     mkdirSync(path.join(dir, "config"));

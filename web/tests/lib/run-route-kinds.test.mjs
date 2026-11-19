@@ -448,3 +448,16 @@ VERDICT: 4.1/5
   assert.match(tracker, /\| Fictional Co \| Platform Engineer \|.*posted: 2026-11-01/);
   assert.equal(isTrackerWriting(), false, "the token is released after persist");
 });
+
+test("a pdf run tells the CLI the profile's page limit", POSIX_ROOT, async (t) => {
+  const root = fixtureRoot(t, undefined, { codeRoot: "checkout" });
+  fs.mkdirSync(path.join(root, "reports"));
+  fs.writeFileSync(path.join(root, "reports", "094-fictional-co-2026-11-12.md"), "# Evaluation: Fictional Co — Platform Engineer\n");
+  fs.mkdirSync(path.join(root, "config"));
+  fs.writeFileSync(path.join(root, "config", "profile.yml"), "cv:\n  max_pages: 1\n");
+  const spawned = [];
+  globalThis.__onSpawn = (args) => { spawned.push(args.join("\n")); };
+  await (await run({ kind: "pdf", input: "94" })).text();
+  assert.equal(spawned.length, 1);
+  assert.match(spawned[0], /must fit 1 page\b/);
+});
