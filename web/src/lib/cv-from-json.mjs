@@ -234,12 +234,13 @@ export async function materializeTailoredCv({
       return html;
     };
     const format = PAGE_FORMATS.has(payload.page_format) ? payload.page_format : DEFAULT_PAGE_FORMAT;
+    const { maxPages } = await readPageBudget(coreRoot, dataRoot);
     let chosen;
     try {
       chosen = await chooseFittingTemplate({
         template,
         denseTemplate: await resolveDenseTemplate(coreRoot, template),
-        maxPages: (await readPageBudget(coreRoot, dataRoot)).maxPages,
+        maxPages,
         build,
         countPages: countPages ?? ((html) => countCvPages({ html, format, coreRoot, profilePath: getProfilePath(dataRoot), cvPath })),
       });
@@ -250,8 +251,11 @@ export async function materializeTailoredCv({
     const kept = builds.get(chosen.template);
     warnings.push(...kept.warnings);
     if (chosen.fallback) {
-      const { pages, from } = chosen.fallback;
+      const { pages, from, densePages } = chosen.fallback;
       warnings.push(`The CV ran to ${pages} pages in the "${path.basename(from)}" template, so it was built in the dense template instead.`);
+      if (typeof densePages === "number" && densePages > maxPages) {
+        warnings.push(`The dense build is still ${densePages} pages, over the limit of ${maxPages}. A style font_size above 9.5pt in the profile is one cause.`);
+      }
     }
     if (chosen.unmeasured) {
       warnings.push("The CV's page count could not be measured, so it was not checked against the page limit before saving.");
@@ -266,7 +270,7 @@ export async function materializeTailoredCv({
     }
 
     const atsVariant = ats === true
-      ? await buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings })
+      ? await buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings, template: chosen.fallback ? chosen.template : null })
       : null;
     // The route saves htmlPath once the client is still connected. Writing it
     // here would publish a CV the route then drops on disconnect.
@@ -285,7 +289,8 @@ async function resolveDenseTemplate(coreRoot, template) {
     const templates = await loadCore(coreRoot, "cv-templates.mjs");
     const dense = path.resolve(templates.resolveTemplate("cv", "dense", { dir: path.join(coreRoot, "templates") }));
     return dense === path.resolve(template) ? template : dense;
-  } catch {
+  } catch (err) {
+    console.warn(`cv fit: the dense template could not be resolved: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
@@ -332,11 +337,15 @@ async function keywordWarnings(coreRoot, dataRoot, report, htmlPath) {
   }
 }
 
-async function buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings }) {
-  let atsTemplate;
+// `template` replaces the ats pack when the styled CV fell back to dense, so the
+// file Apply uploads fits the same page limit. dense passes atsLint.
+async function buildAtsVariant({ coreRoot, dataRoot, payload, scratch, finalPdf, warnings, template }) {
+  let atsTemplate = template;
   try {
-    const templates = await loadCore(coreRoot, "cv-templates.mjs");
-    atsTemplate = templates.resolveTemplate("cv", "ats", { dir: path.join(coreRoot, "templates") });
+    if (!atsTemplate) {
+      const templates = await loadCore(coreRoot, "cv-templates.mjs");
+      atsTemplate = templates.resolveTemplate("cv", "ats", { dir: path.join(coreRoot, "templates") });
+    }
   } catch (err) {
     warnings.push(`ATS PDF was not created: ${err.message}. Apply will use the styled PDF.`);
     return null;

@@ -345,12 +345,66 @@ test("a CV over the page limit is built in dense with the kept build's warnings 
     countPages: async (html) => { counted.push(html); return 3; },
   });
   assert.equal(result.ok, true, result.error);
-  assert.equal(counted.length, 1);
+  assert.equal(counted.length, 2);
+  assert.match(counted[1], /--font-size: 9\.5pt/, "the second count is the dense build");
   assert.match(result.html, /--font-size: 9\.5pt/);
   assert.match(result.html, /Example Food Bank/);
   assert.ok(result.warnings.includes('The CV ran to 3 pages in the "cv-template.compact.html" template, so it was built in the dense template instead.'), result.warnings.join("\n"));
+  assert.ok(result.warnings.includes("The dense build is still 3 pages, over the limit of 2. A style font_size above 9.5pt in the profile is one cause."), result.warnings.join("\n"));
   assert.equal(result.warnings.some((w) => w.startsWith("volunteer:")), false, "the discarded build's slot warning is dropped");
 }));
+
+test("a dense build within the limit adds no overflow warning", () => inDataRoot("cv-dense-fits-", async (dir) => {
+  const pages = [3, 2];
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => pages.shift(),
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.equal(result.warnings.some((w) => w.startsWith("The dense build is still")), false, result.warnings.join("\n"));
+}));
+
+test("the profile's page limit decides the fallback", () => inDataRoot("cv-max-pages-", async (dir) => {
+  mkdirSync(path.join(dir, "config"));
+  writeFileSync(path.join(dir, "config", "profile.yml"), "cv:\n  max_pages: 1\n");
+  const result = await materializeTailoredCv({
+    envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+    coreRoot: CORE,
+    dataRoot: dir,
+    htmlPath: path.join(dir, "cv.html"),
+    finalPdf: path.join(dir, "out.pdf"),
+    countPages: async () => 2,
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.match(result.html, /--font-size: 9\.5pt/);
+  assert.ok(result.warnings.some((w) => w.startsWith("The CV ran to 2 pages")), result.warnings.join("\n"));
+}));
+
+for (const [pages, pack] of [[3, /--font-size: 9\.5pt/], [1, /--font-size: 11px/]]) {
+  test(`the ATS variant is built in ${pages > 2 ? "dense when the styled CV fell back" : "the ats pack when it fits"}`, () => inDataRoot("cv-ats-fit-", async (dir) => {
+    const result = await materializeTailoredCv({
+      envelope: { ok: true, kind: "json", format: "letter", payload: payload(), warnings: [] },
+      coreRoot: CORE,
+      dataRoot: dir,
+      htmlPath: path.join(dir, "cv.html"),
+      finalPdf: path.join(dir, "out.pdf"),
+      ats: true,
+      countPages: async () => pages,
+    });
+    try {
+      assert.equal(result.ok, true, result.error);
+      assert.ok(result.ats, result.warnings.join("\n"));
+      assert.match(readFileSync(result.ats.html, "utf8"), pack);
+    } finally {
+      if (result.scratchDir) rmSync(result.scratchDir, { recursive: true, force: true });
+    }
+  }));
+}
 
 test("a dense rebuild that fails keeps the first build and warns", (t) => inDataRoot("cv-dense-fail-", async (dir) => {
   const realRead = fs.readFileSync;

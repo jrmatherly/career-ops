@@ -38,7 +38,7 @@ test("a CV over the limit is rebuilt once in dense", async () => {
   assert.deepEqual(r.builds, ["base", "dense"]);
   assert.equal(chosen.template, "dense");
   assert.equal(chosen.html, "<html>dense</html>");
-  assert.deepEqual(chosen.fallback, { from: "base", pages: 3 });
+  assert.deepEqual(chosen.fallback, { from: "base", pages: 3, densePages: 2 });
 });
 
 test("dense as the chosen template is never rebuilt", async () => {
@@ -61,9 +61,16 @@ test("a CV over the limit in dense is returned in dense", async () => {
   const r = recorder({ base: 4, dense: 3 });
   const chosen = await chooseFittingTemplate({ template: "base", denseTemplate: "dense", maxPages: 2, build: r.build, countPages: r.countPages });
   assert.deepEqual(r.builds, ["base", "dense"]);
-  assert.equal(r.counted.length, 1);
+  assert.deepEqual(r.counted, ["<html>base</html>", "<html>dense</html>"]);
   assert.equal(chosen.template, "dense");
-  assert.deepEqual(chosen.fallback, { from: "base", pages: 4 });
+  assert.deepEqual(chosen.fallback, { from: "base", pages: 4, densePages: 3 });
+});
+
+test("a dense build that cannot be measured is kept with no page count", async () => {
+  const r = recorder({ base: 3, dense: null });
+  const chosen = await chooseFittingTemplate({ template: "base", denseTemplate: "dense", maxPages: 2, build: r.build, countPages: r.countPages });
+  assert.equal(chosen.template, "dense");
+  assert.deepEqual(chosen.fallback, { from: "base", pages: 3, densePages: null });
 });
 
 test("a dense rebuild that fails keeps the first build and says why", async () => {
@@ -98,16 +105,18 @@ test("a first build that fails is not retried in dense", async () => {
   assert.deepEqual(builds, ["base"]);
 });
 
-function fakeSpawn({ stdout = "", exitCode = 0, hang = false } = {}) {
+function fakeSpawn({ stdout = "", stderr = "", exitCode = 0, hang = false } = {}) {
   const calls = [];
   const spawnFn = (cmd, args, opts) => {
     calls.push({ cmd, args, opts, htmlExisted: existsSync(args[1]) });
     const child = new EventEmitter();
     child.stdout = Object.assign(new EventEmitter(), { setEncoding() {} });
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding() {} });
     child.kill = () => { setImmediate(() => child.emit("close", null, "SIGTERM")); return true; };
     if (!hang) {
       setImmediate(() => {
         if (stdout) child.stdout.emit("data", stdout);
+        if (stderr) child.stderr.emit("data", stderr);
         child.emit("close", exitCode, null);
       });
     }
@@ -151,6 +160,16 @@ test("countCvPages returns null for a failed render and cleans up", async () => 
   const pages = await countCvPages({ html: "<p>cv</p>", format: "letter", coreRoot: "/core", profilePath: "/p.yml", spawnFn, execPath: "node" });
   assert.equal(pages, null);
   assert.equal(existsSync(calls[0].opts.env.CAREER_OPS_ROOT), false);
+});
+
+test("countCvPages logs the end of the renderer's stderr when it returns null", async (t) => {
+  const logged = t.mock.method(console, "warn", () => {});
+  const { spawnFn } = fakeSpawn({ stderr: `${"x".repeat(400)}Chromium failed to launch`, exitCode: 1 });
+  assert.equal(await countCvPages({ html: "<p>cv</p>", format: "letter", coreRoot: "/core", spawnFn, execPath: "node" }), null);
+  assert.equal(logged.mock.callCount(), 1);
+  const line = String(logged.mock.calls[0].arguments[0]);
+  assert.match(line, /Chromium failed to launch$/);
+  assert.ok(line.length < 400, line);
 });
 
 test("countCvPages returns null for a render that starts and never ends, and cleans up", async () => {

@@ -29,6 +29,8 @@ export async function countCvPages({ html, format, coreRoot, profilePath, cvPath
     if (cvPath) await copyFile(cvPath, path.join(dir, "cv.md")).catch(() => {});
     const env = { ...process.env };
     for (const key of ROOT_ENV) delete env[key];
+    let stderr = "";
+    let timedOut = false;
     const stdout = await new Promise((resolve) => {
       const child = spawnFn(execPath, [
         path.join(coreRoot, "generate-pdf.mjs"), htmlFile, path.join(dir, "cv.pdf"),
@@ -36,25 +38,31 @@ export async function countCvPages({ html, format, coreRoot, profilePath, cvPath
       ], {
         cwd: coreRoot,
         windowsHide: true,
-        stdio: ["ignore", "pipe", "ignore"],
+        stdio: ["ignore", "pipe", "pipe"],
         env: { ...env, CAREER_OPS_ROOT: dir, ...(profilePath ? { CAREER_OPS_PROFILE: profilePath } : {}) },
       });
       let out = "";
       let killTimer;
       // SIGTERM first so generate-pdf.mjs can close its browser.
       const timer = setTimeout(() => {
+        timedOut = true;
         child.kill();
         killTimer = setTimeout(() => child.kill("SIGKILL"), 5_000);
       }, timeoutMs);
       const done = (value) => { clearTimeout(timer); clearTimeout(killTimer); resolve(value); };
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk) => { out += chunk; });
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk) => { stderr += chunk; });
       child.on("close", (code) => done(code === 0 ? out : ""));
-      child.on("error", () => done(""));
+      child.on("error", (err) => { stderr += err.message; done(""); });
     });
     const match = /📊 Pages: (\d+)/.exec(stdout);
-    return match ? Number(match[1]) : null;
-  } catch {
+    if (match) return Number(match[1]);
+    console.warn(`cv fit: page count failed: ${timedOut ? "timeout" : stderr.trim().slice(-300) || "no output"}`);
+    return null;
+  } catch (err) {
+    console.warn(`cv fit: page count failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   } finally {
     if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
@@ -63,16 +71,17 @@ export async function countCvPages({ html, format, coreRoot, profilePath, cvPath
 
 /**
  * Build in `template`; when that runs over `maxPages`, build once more in
- * `denseTemplate`. The dense build is not measured: an overflow there is
- * reported by the normal render, and type never shrinks below dense. A first
- * build that cannot be measured is kept and marked `unmeasured`.
+ * `denseTemplate` and count that build once, as `fallback.densePages` (null
+ * when it cannot be measured). The dense build is kept even when it still runs
+ * over, because type never shrinks below dense. A first build that cannot be
+ * measured is kept and marked `unmeasured`.
  *
  * A failing first build rejects. A failing dense build keeps the first build
  * and names the failure in `fallbackError`, so the user still gets a CV.
  *
  * @param {{ template: string, denseTemplate: string|null, maxPages: number,
  *   build: (template: string) => Promise<string>, countPages: (html: string) => Promise<number|null> }} args
- * @returns {Promise<{ template: string, html: string, fallback: null | { from: string, pages: number }, fallbackError?: string, unmeasured?: true }>}
+ * @returns {Promise<{ template: string, html: string, fallback: null | { from: string, pages: number, densePages: number|null }, fallbackError?: string, unmeasured?: true }>}
  */
 export async function chooseFittingTemplate({ template, denseTemplate, maxPages, build, countPages }) {
   const html = await build(template);
@@ -80,9 +89,11 @@ export async function chooseFittingTemplate({ template, denseTemplate, maxPages,
   const pages = await countPages(html);
   if (pages === null) return { template, html, fallback: null, unmeasured: true };
   if (pages <= maxPages) return { template, html, fallback: null };
+  let denseHtml;
   try {
-    return { template: denseTemplate, html: await build(denseTemplate), fallback: { from: template, pages } };
+    denseHtml = await build(denseTemplate);
   } catch (err) {
     return { template, html, fallback: null, fallbackError: err instanceof Error ? err.message : String(err) };
   }
+  return { template: denseTemplate, html: denseHtml, fallback: { from: template, pages, densePages: await countPages(denseHtml) } };
 }
