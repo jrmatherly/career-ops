@@ -69,8 +69,19 @@ gh secret set DOCKERHUB_TOKEN
 ```
 
 `gh secret set` reads the token from a prompt, so it does not land in the
-shell history. To copy an image that was published before the mirror existed,
-run the workflow by hand on `main`.
+shell history.
+
+The workflow copies only the image it has just built. An image published
+before the mirror existed, such as the digest a deployment already pins, is
+copied by hand, after `docker login`:
+
+```bash
+docker buildx imagetools create \
+  --tag docker.io/<namespace>/career-ops-server:<tag> \
+  ghcr.io/jrmatherly/career-ops-server@sha256:<digest>
+```
+
+The digest on Docker Hub is then the same as the one on GHCR.
 
 ## Prerequisites
 
