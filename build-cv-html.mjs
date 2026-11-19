@@ -641,18 +641,29 @@ function buildEducation(entries, partial) {
 // without new CSS. No partial: no shipped pack has a volunteer section file.
 // The location sits in the title so the text reads in cv.md's order (org,
 // location, dates, description), which a locked Volunteer section compares.
-function buildVolunteer(entries) {
+// A role is the title line, as in the dense experience entry, so a parser reads
+// it as the job title, and the location moves beside the dates: with a role,
+// cv.md writes an `### org — location` heading, and the fact gate would not
+// find "org, location" there as one run. `cvOrder` (a locked section) keeps
+// cv.md's order: organization, location, role, dates.
+function buildVolunteer(entries, cvOrder = false) {
   if (!Array.isArray(entries) || entries.length === 0) return '';
+  const row = (cls, text, year) => `<div class="edu-header">
+      <div class="${cls}">${escapeHtml(text)}</div>${year === null ? '' : `
+      <div class="edu-year">${escapeHtml(year)}</div>`}
+    </div>`;
   return entries.filter(e => hasRequiredFields(e, 'volunteer', 'html')).map(e => {
-    const title = e.location ? `${e.org}, ${e.location}` : e.org;
+    const role = typeof e.role === 'string' ? e.role.trim() : '';
+    const dates = e.dates || '';
     const desc = e.description
       ? `\n    <div class="edu-desc">${escapeHtml(e.description)}</div>`
       : '';
+    let rows;
+    if (!role) rows = row('edu-title', e.location ? `${e.org}, ${e.location}` : e.org, dates);
+    else if (cvOrder) rows = `${row('edu-org', e.org, e.location || null)}\n    ${row('edu-title', role, dates)}`;
+    else rows = `${row('edu-title', role, null)}\n    ${row('edu-org', e.org, [e.location, dates].filter(Boolean).join(' | '))}`;
     return withResumePath(`<div class="edu-item">
-    <div class="edu-header">
-      <div class="edu-title">${escapeHtml(title)}</div>
-      <div class="edu-year">${escapeHtml(e.dates || '')}</div>
-    </div>${desc}
+    ${rows}${desc}
   </div>`, e.path);
   }).join('\n  ');
 }
@@ -849,7 +860,7 @@ function renderReport(payload, partials) {
     SECTION_SKILLS: escapeHtml(sectionTitles.skills),
     SKILLS: buildSkills(payload.skills, partials.get('skills')),
     SECTION_VOLUNTEER: escapeHtml(sectionTitles.volunteer),
-    VOLUNTEER: buildVolunteer(payload.volunteer),
+    VOLUNTEER: buildVolunteer(payload.volunteer, readLockedSections(PROFILE_PATH, sectionKey).includes('volunteer')),
     CONSENT: escapeHtml((payload.consent || '').trim()),
   };
   return { substitutions, candidate };
@@ -1077,7 +1088,10 @@ function renderMarkdown(payload, template) {
 
   const vol = [];
   for (const e of list(payload.volunteer).filter(e => hasRequiredFields(e, 'volunteer', 'html'))) {
-    vol.push(`**${mdLine(e.org)}**${mdLine(e.location) ? `, ${mdLine(e.location)}` : ''}${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`, '');
+    const where = `${mdLine(e.location) ? `, ${mdLine(e.location)}` : ''}${mdLine(e.dates) ? ` · ${mdLine(e.dates)}` : ''}`;
+    const role = typeof e.role === 'string' ? mdLine(e.role) : '';
+    if (role) vol.push(`**${role}**`, '', `${mdLine(e.org)}${where}`, '');
+    else vol.push(`**${mdLine(e.org)}**${where}`, '');
     if (mdLine(e.description)) vol.push(mdLine(e.description), '');
   }
   section('volunteer', vol);

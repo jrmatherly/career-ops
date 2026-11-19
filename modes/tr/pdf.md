@@ -104,7 +104,7 @@ Meşru (legitimate) yeniden formüle etme örnekleri:
 | `{{SECTION_SKILLS}}` | Skills |
 | `{{SKILLS}}` | Yetenekler (Skills) HTML'i |
 | `{{SECTION_VOLUNTEER}}` | Volunteer Experience |
-| `{{VOLUNTEER}}` | Gönüllülük (Volunteer) HTML'i; payload anahtarı `volunteer[]`: `org` (**zorunlu**), `location`, `dates`, `description`. `cv.md` dosyasındaki Volunteer bölümünü olduğu gibi kopyala. Asla uyarlama ve asla çıkarma. |
+| `{{VOLUNTEER}}` | Gönüllülük (Volunteer) HTML'i; payload anahtarı `volunteer[]`: `org` (**zorunlu**), `role`, `location`, `dates`, `description`. `role`, `cv.md` dosyasında kuruluş başlığının altındaki kalın satırdır ve girdinin başlık satırı olarak basılır (`cv.locked_sections` bölümü kilitlediğinde kuruluştan sonra); `cv.md` dosyasında yoksa ekleme. `cv.md` dosyasındaki Volunteer bölümünü olduğu gibi kopyala. Asla uyarlama ve asla çıkarma. |
 
 ### Profil fotoğrafı (isteğe bağlı, pazara özel)
 

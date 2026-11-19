@@ -1,0 +1,29 @@
+{
+  "built_from": "main at 79948208, templates/dense/cv-template.dense.html",
+  "payload": {
+    "lang": "en",
+    "candidate": {
+      "name": "Sample Candidate"
+    },
+    "experience": [
+      {
+        "company": "Example Co",
+        "role": "Engineer",
+        "dates": "2020"
+      }
+    ],
+    "volunteer": [
+      {
+        "org": "Sample Nonprofit",
+        "location": "Springfield, ST",
+        "dates": "2023 - Present",
+        "description": "Helps."
+      },
+      {
+        "org": "Other Org"
+      }
+    ]
+  },
+  "html": "<!-- VOLUNTEER -->\n  <div class=\"section\">\n    <div class=\"section-title\">Volunteer Experience</div>\n    <div class=\"edu-item\">\n    <div class=\"edu-header\">\n      <div class=\"edu-title\">Sample Nonprofit, Springfield, ST</div>\n      <div class=\"edu-year\">2023 - Present</div>\n    </div>\n    <div class=\"edu-desc\">Helps.</div>\n  </div>\n  <div class=\"edu-item\">\n    <div class=\"edu-header\">\n      <div class=\"edu-title\">Other Org</div>\n      <div class=\"edu-year\"></div>\n    </div>\n  </div>\n  </div>\n\n  ",
+  "markdown": "## Volunteer Experience\n\n**Sample Nonprofit**, Springfield, ST · 2023 - Present\n\nHelps.\n\n**Other Org**\n"
+}

@@ -98,7 +98,7 @@ Aug 2010 – May 2012
   assert.equal(result.lossless, false);
 });
 
-test('a bold line in a Volunteer entry has no field and is reported', () => {
+test('a bold line in a Volunteer entry is its role and round-trips', () => {
   const md = `${HEADER}## Volunteer
 
 ### Example Food Bank
@@ -106,9 +106,12 @@ test('a bold line in a Volunteer entry has no field and is reported', () => {
 2023 – Present
 `;
   const result = absorb(md, null);
-  assertNoLineDropped(md, result);
-  assert.deepEqual(result.report.unparsed.map((u) => u.text), ['**IT Volunteer**']);
-  assert.equal(result.data.sections.volunteer.items[0].period, '2023 – Present');
+  assert.deepEqual(result.report.unparsed, []);
+  assert.equal(result.lossless, true);
+  const [item] = result.data.sections.volunteer.items;
+  assert.equal(item.position, 'IT Volunteer');
+  assert.equal(item.period, '2023 – Present');
+  assert.equal(resumeToCvMarkdown(result.data), md);
 });
 
 test('a section rewritten as bullets goes back to the list layout', () => {
