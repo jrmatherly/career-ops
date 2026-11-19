@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.7.1](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.7.0...career-ops-v2.7.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **cv:** drop the dangling bracket from a skills-line name before it is compared ([6ae1cf5](https://github.com/jrmatherly/career-ops/commit/6ae1cf51e4c74ae85381ac322309783125f5de27))
+* **cv:** drop the dangling bracket from a skills-line name before it is compared ([e995349](https://github.com/jrmatherly/career-ops/commit/e995349cc6534d0a189feb8790752bebd10bbe7f))
+* **cv:** read a bracketed list on a skills line as separate names ([b94a73f](https://github.com/jrmatherly/career-ops/commit/b94a73fb7e7c8ee7b4e4abd659901cae74ca86bd))
+
 ## [2.7.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.6.1...career-ops-v2.7.0) (2026-11-18)
 
 
