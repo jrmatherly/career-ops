@@ -85,3 +85,8 @@ test('body text in dense computes to 9.5pt', { skip: browserSkip }, async () => 
     await browser.close();
   }
 });
+
+test('every competency reaches the dense CV', () => {
+  const { html } = build(fixture, densePath);
+  for (const c of fixture.competencies) assert.ok(html.includes(c.replace(/&/g, '&amp;')), c);
+});

@@ -39,3 +39,14 @@ test('the fold makes a Skills section when the payload has none', () => {
 test('a template with the slot still renders the grid', () => {
   assert.match(build(fixture).html, /class="competency-tag"/);
 });
+
+test('--markdown moves competencies into Skills when the template has no competencies slot', () => {
+  const input = join(dir, `in-${++n}.json`);
+  const output = join(dir, `out-${n}.md`);
+  writeFileSync(input, JSON.stringify(fixture));
+  const r = spawnSync(process.execPath, ['build-cv-html.mjs', input, '--markdown', output, slotlessPath], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const md = readFileSync(output, 'utf8');
+  for (const c of fixture.competencies) assert.ok(md.includes(c), c);
+  assert.ok(!JSON.parse(r.stdout).warnings.some((w) => /competenc/i.test(w)), r.stdout);
+});

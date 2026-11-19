@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { voiceIssues } from '../cv-voice.mjs';
 import { sectionKey } from '../generate-pdf.mjs';
 import { describeSpawn, exitedNonZero } from './helpers/describe-spawn.mjs';
 
@@ -76,4 +77,10 @@ test('volunteer text backed by cv.md passes the fact gate', () => {
   assert.equal(status, 0, stderr);
   const r = spawnSync(process.execPath, ['verify-cv-facts.mjs', output, '--source', 'tests/fixtures/cv-volunteer-source.md'], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('volunteer text backed by cv.md passes the voice gate', () => {
+  const { html, status, stderr } = build(smallPayload);
+  assert.equal(status, 0, stderr);
+  assert.deepEqual(voiceIssues(html, readFileSync(join(ROOT, 'tests/fixtures/cv-volunteer-source.md'), 'utf8')), []);
 });
