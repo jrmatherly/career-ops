@@ -76,8 +76,8 @@ export const SECTION_TYPES = {
   },
   volunteer: {
     label: "Volunteer",
-    blank: () => ({ organization: "", location: "", period: "", website: website(), description: "" }),
-    fields: [text("organization", "Organization"), text("location", "Location"), text("period", "Period"), WEBSITE, DESCRIPTION],
+    blank: () => ({ organization: "", position: "", location: "", period: "", website: website(), description: "" }),
+    fields: [text("organization", "Organization"), text("position", "Role"), text("location", "Location"), text("period", "Period"), WEBSITE, DESCRIPTION],
   },
   references: {
     label: "References",

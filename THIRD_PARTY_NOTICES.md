@@ -16,7 +16,7 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/vendor/stylesheet.mjs` from `packages/schema/src/resume/stylesheet.ts` (PR-02)
 - `lib/resume/vendor/templates.mjs` from `packages/schema/src/templates.ts` (PR-02)
 - `lib/resume/vendor/dates.mjs` from `packages/schema/src/resume/dates.ts` (PR-02)
-- `lib/resume/vendor/data.mjs` from `packages/schema/src/resume/data.ts` (PR-02)
+- `lib/resume/vendor/data.mjs` from `packages/schema/src/resume/data.ts` (PR-02); `volunteerItemSchema` has a `position` field (default `""`) the clone lacks, written on the `location` line so the line numbers still match
 - `lib/resume/vendor/default.mjs` from `packages/schema/src/resume/default.ts` (PR-02)
 - `lib/resume/vendor/present-labels.json` from `packages/schema/src/resume/present-labels.json`, unchanged (PR-02)
 - `lib/resume/vendor/expected-labels.json` from `packages/schema/src/resume/expected-labels.json`, unchanged (PR-02)
@@ -28,7 +28,7 @@ A vendoring PR adds one line per file: `lib/resume/<file>` from `<path in the cl
 - `lib/resume/import/level.mjs` from `packages/import/src/level.ts` (PR-03)
 - `lib/resume/import/plain-text.mjs` from `packages/import/src/plain-text.ts` (PR-03)
 - `lib/resume/import/docx-text.mjs` from `packages/import/src/docx-text.ts` (PR-03)
-- `lib/resume/import/json-resume.mjs` from `packages/import/src/json-resume.tsx`; the network icon lookup is dropped (PR-03)
+- `lib/resume/import/json-resume.mjs` from `packages/import/src/json-resume.tsx`; the network icon lookup is dropped, and a volunteer entry's `position` is read (PR-03)
 - `lib/resume/import/linkedin.mjs` from `packages/import/src/linkedin.ts` (PR-03)
 - `lib/resume/import/reactive-resume-json.mjs` from `packages/import/src/reactive-resume-json.tsx` (PR-03)
 - `lib/resume/import/detect.mjs` from `apps/web/src/features/resume/import/read-file.ts` lines 32-115 (`detectJsonImportKind` and the magic-byte sniffing), plus the `importResume` dispatcher, which is ours (PR-03)

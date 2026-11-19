@@ -196,3 +196,9 @@ test("the editor reducer keeps save state honest", () => {
   const invalid = editorReducer(loaded, { type: "invalid", message: "x" });
   assert.equal(editorReducer(invalid, { type: "edit", data: d2 }).status.kind, "editing", "an edit clears a validation message");
 });
+
+test("the Volunteer form has a Role field and a blank item that carries it", () => {
+  const { fields, blank } = SECTION_TYPES.volunteer;
+  assert.ok(fields.some((f) => f.key === "position" && f.label === "Role"));
+  assert.equal(blank().position, "");
+});
