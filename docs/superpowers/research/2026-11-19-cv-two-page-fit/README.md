@@ -248,6 +248,8 @@ Measured on `tests/fixtures/cv-long-single-employer.json` (1,195 words, five rol
 
 Review before the push found three defects, all fixed on the branch: a profile with `cv.locked_sections` made the page count fail, because the isolated render had no `cv.md`; a failed count looked the same as a CV that fits; and three behaviors had no test that failed when they broke.
 
+PR review found more, all fixed on the branch. A locked Skills section no longer takes the competencies fold, so `dense` builds with `cv.locked_sections: [skills]`. The ATS variant is built in `dense` when the styled CV falls back, and the long fixture's ATS variant went from 3 pages to 2. The dense build is counted once, and a count still over the limit is reported with its likely cause, a profile `style.font_size` above 9.5pt. `dense` gained the Interests section, and a fallback with a photo says the photo was left out. A failed page count now logs the renderer's reason. New tests cover the profile's page limit reaching the fit step and the prompt, and Volunteer in the DOCX and markdown exports.
+
 Not known yet:
 
 - What a real parser makes of the `dense` layout. The owner's check (one Workday upload, the Textkernel and Affinda demos) comes after the deploy. Its result belongs here.
