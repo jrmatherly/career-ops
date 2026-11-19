@@ -315,13 +315,14 @@ async function inDataRoot(prefix, fn) {
   }
 }
 
-function withVolunteer() {
-  return { ...payload(), volunteer: [{ org: "Example Food Bank", dates: "2019 - 2024", description: "Sorted donations." }] };
+// compact has no {{INTERESTS}} slot, so the interests entry draws a builder slot warning there.
+function withSlotGap() {
+  return { ...payload(), interests: ["Chess"], volunteer: [{ org: "Example Food Bank", dates: "2019 - 2024", description: "Sorted donations." }] };
 }
 
 test("the builder's warnings reach the result", () => inDataRoot("cv-builder-warn-", async (dir) => {
   const result = await materializeTailoredCv({
-    envelope: { ok: true, kind: "json", format: "letter", payload: withVolunteer(), warnings: [] },
+    envelope: { ok: true, kind: "json", format: "letter", payload: withSlotGap(), warnings: [] },
     coreRoot: CORE,
     dataRoot: dir,
     cvTemplate: "templates/cv-template.compact.html",
@@ -330,13 +331,13 @@ test("the builder's warnings reach the result", () => inDataRoot("cv-builder-war
     countPages: async () => 1,
   });
   assert.equal(result.ok, true, result.error);
-  assert.ok(result.warnings.some((w) => /^volunteer: cv-template\.compact\.html has no volunteer section/.test(w)), result.warnings.join("\n"));
+  assert.ok(result.warnings.some((w) => /^interests: cv-template\.compact\.html has no interests section/.test(w)), result.warnings.join("\n"));
 }));
 
 test("a CV over the page limit is built in dense with the kept build's warnings only", () => inDataRoot("cv-dense-fallback-", async (dir) => {
   const counted = [];
   const result = await materializeTailoredCv({
-    envelope: { ok: true, kind: "json", format: "letter", payload: withVolunteer(), warnings: [] },
+    envelope: { ok: true, kind: "json", format: "letter", payload: withSlotGap(), warnings: [] },
     coreRoot: CORE,
     dataRoot: dir,
     cvTemplate: "templates/cv-template.compact.html",
@@ -351,7 +352,7 @@ test("a CV over the page limit is built in dense with the kept build's warnings 
   assert.match(result.html, /Example Food Bank/);
   assert.ok(result.warnings.includes('The CV ran to 3 pages in the "cv-template.compact.html" template, so it was built in the dense template instead.'), result.warnings.join("\n"));
   assert.ok(result.warnings.includes("The dense build is still 3 pages, over the limit of 2. A style font_size above 9.5pt in the profile is one cause."), result.warnings.join("\n"));
-  assert.equal(result.warnings.some((w) => w.startsWith("volunteer:")), false, "the discarded build's slot warning is dropped");
+  assert.equal(result.warnings.some((w) => w.startsWith("interests:")), false, "the discarded build's slot warning is dropped");
 }));
 
 test("a dense build within the limit adds no overflow warning", () => inDataRoot("cv-dense-fits-", async (dir) => {

@@ -9,6 +9,7 @@ import { strFromU8, unzipSync } from 'fflate';
 import { payloadToDocx } from '../lib/resume/export/docx.mjs';
 import { voiceIssues } from '../cv-voice.mjs';
 import { sectionKey } from '../generate-pdf.mjs';
+import { listTemplates } from '../cv-templates.mjs';
 import { describeSpawn, exitedNonZero } from './helpers/describe-spawn.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -65,8 +66,22 @@ test('the ATS pack renders volunteer too', () => {
 });
 
 test('a template without the slot warns and names the template', () => {
-  const { report } = build(fixture, 'templates/cv-template.compact.html');
-  assert.ok(report.warnings.some((w) => /volunteer/i.test(w) && /compact/i.test(w)), JSON.stringify(report.warnings));
+  const template = join(dir, 'cv-template.slotless.html');
+  writeFileSync(template, readFileSync(join(ROOT, 'templates/cv-template.html'), 'utf8').replace(/<!-- VOLUNTEER -->[\s\S]*?(?=<!-- END -->)/, ''));
+  const { report } = build(fixture, template);
+  assert.ok(report.warnings.some((w) => /volunteer/i.test(w) && /slotless/i.test(w)), JSON.stringify(report.warnings));
+});
+
+test('every shipped CV template renders volunteer without a slot warning', () => {
+  const templates = listTemplates('cv', { dir: join(ROOT, 'templates') });
+  assert.ok(templates.length >= 9, templates.map((t) => t.name).join(', '));
+  for (const { name, path } of templates) {
+    const { status, html, report, stderr } = build(fixture, path);
+    assert.equal(status, 0, `${name}: ${stderr}`);
+    assert.match(html, /class="section-title">Volunteer Experience</, name);
+    for (const value of ['Sample Nonprofit', '2023 - Present']) assert.ok(html.includes(value), `${name}: ${value}`);
+    assert.ok(!report.warnings.some((w) => /volunteer/i.test(w)), `${name}: ${JSON.stringify(report.warnings)}`);
+  }
 });
 
 test('a volunteer entry without org fails the build', () => {
