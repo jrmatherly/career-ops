@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.9.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.8.0...career-ops-v2.9.0) (2026-11-19)
+
+
+### Features
+
+* **cv:** give a volunteer entry a role that prints as its title line ([1bec1d6](https://github.com/jrmatherly/career-ops/commit/1bec1d64d2a60af11439f02217494f519effc9de))
+* **cv:** give a volunteer entry a role that prints as its title line ([3e1b83e](https://github.com/jrmatherly/career-ops/commit/3e1b83e3ad774393cd6d773cab911a3faecaa4eb))
+
+
+### Bug Fixes
+
+* **cv:** print a role-less volunteer entry's organization alone once the section has a role ([8b7ecb9](https://github.com/jrmatherly/career-ops/commit/8b7ecb9385c6ef9f34f3c813c59b18c1408b712e))
+
 ## [2.8.0](https://github.com/jrmatherly/career-ops/compare/career-ops-v2.7.1...career-ops-v2.8.0) (2026-11-19)
 
 

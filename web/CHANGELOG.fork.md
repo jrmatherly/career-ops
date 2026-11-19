@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/jrmatherly/career-ops/compare/web-v1.9.0...web-v1.10.0) (2026-11-19)
+
+
+### Features
+
+* **cv:** give a volunteer entry a role that prints as its title line ([1bec1d6](https://github.com/jrmatherly/career-ops/commit/1bec1d64d2a60af11439f02217494f519effc9de))
+* **cv:** give a volunteer entry a role that prints as its title line ([3e1b83e](https://github.com/jrmatherly/career-ops/commit/3e1b83e3ad774393cd6d773cab911a3faecaa4eb))
+
 ## [1.9.0](https://github.com/jrmatherly/career-ops/compare/web-v1.8.0...web-v1.9.0) (2026-11-19)
 
 
