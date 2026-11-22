@@ -287,3 +287,26 @@ Still not known:
 - Whether the writer follows the new prompt rule. One probe run, before this work, kept every bullet. In the live run the writer's payload still ran to 3 pages in the base template, so the fit came from the fallback.
 
 Left as it is: a Volunteer item with no organization in the resume model is dropped from the payload without a report, as an award, certification or education item missing its required field already is.
+
+## Master resume sync, 2026-11-21 and 2026-11-22
+
+The owner's instance was synced to a new master resume on 2026-11-21. Rows marked "carried" come from that session's handoff and were not measured again. Rows marked "measured" were read from the instance on 2026-11-22.
+
+| Item | Value | Label |
+|---|---|---|
+| Source | The owner's master `resume.json`, 93 strings copied verbatim into `cv.md`, `data/resume.json` and `config/profile.yml` | Carried |
+| Volunteer | Removed from the CV. `cv.md` has no Volunteer heading. | Measured |
+| Style | `font_size: "10pt"` and `job_break_inside: "auto"` under `style:` in `config/profile.yml` | Measured |
+| Section order | `cv.sections: [skills, education, certifications, awards]` | Measured |
+| Untailored master, `dense`, 10pt | 2 pages. Page 2 ends at 678pt of 792. | Carried |
+| A tailored CV for one posting, `dense`, 10pt | 2 pages. Page 2 ends at 724pt. | Carried |
+| Master with `job_break_inside: "avoid"` (roles kept whole) | 3 pages | Carried |
+
+So roles must be allowed to split for the master to fit two pages at 10pt, and a tailored CV has about 68pt of room left on page 2.
+
+Still not known:
+
+- What any parser makes of a PDF from the synced data. No parse has been run since the sync, so the date misread above is still unconfirmed.
+- Whether the writer's tailored summary and headline hold to the master's wording. On the one tailored CV made since the sync they did not, and the owner has not yet reviewed it.
+
+The instance has no `pdfinfo`. A page count is taken by copying the PDF out and counting locally.
