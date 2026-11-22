@@ -15,8 +15,12 @@ it for `linux/amd64` on every push to `main`, with provenance and an SBOM.
 - The root dependencies, installed with `npm ci` from `deploy/package-lock.json`.
   Upstream gitignores the root lockfile, so the fork keeps its own copy here.
   After a dependency in the root `package.json` changes, regenerate it from
-  the repo root: `npm install --package-lock-only --ignore-scripts && cp
-  package-lock.json deploy/package-lock.json`.
+  the repo root. The first `cp` starts npm from the tracked copy, not from a
+  root lockfile left in the checkout, so only the changed dependency moves:
+
+  ```bash
+  cp deploy/package-lock.json package-lock.json && npm install --package-lock-only --ignore-scripts && cp package-lock.json deploy/package-lock.json
+  ```
 - `@anthropic-ai/claude-code` installed globally at a pinned version, so
   `claude` is on `PATH`. `DISABLE_AUTOUPDATER=1` keeps it at that version.
 - `tini` as PID 1. `web/server.mjs` spawns the PDF server and the web's

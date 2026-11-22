@@ -27,14 +27,15 @@ check(server.includes('npm --prefix web run build'), 'deploy/Dockerfile runs the
 check(/@anthropic-ai\/claude-code@\d+\.\d+\.\d+/.test(server), 'deploy/Dockerfile pins the Claude CLI version');
 check(/^USER 1000\s*$/m.test(server), 'deploy/Dockerfile runs as USER 1000');
 
-// npm ci refuses a lockfile whose root dependencies differ from package.json, so a mismatch here is a failed image build.
+// npm ci fails the image build only when the lockfile lacks a dependency or pins it outside its range. Any difference fails here, so the lockfile never lags package.json.
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
 const dependencySpecs = (manifest) => JSON.stringify(DEPENDENCY_FIELDS.map((field) => Object.entries(manifest?.[field] ?? {}).sort()));
 const parse = (rel) => { try { return JSON.parse(read(rel)); } catch { return null; } };
 const lockRoot = parse('deploy/package-lock.json')?.packages?.[''];
 check(lockRoot !== undefined && dependencySpecs(lockRoot) === dependencySpecs(parse('package.json')),
-  'deploy/package-lock.json matches package.json (regenerate: npm install --package-lock-only --ignore-scripts && cp package-lock.json deploy/package-lock.json)');
-check(server.includes('COPY deploy/package-lock.json ./package-lock.json') && /^RUN npm ci /m.test(server) && !/^RUN npm install (?!-g )/m.test(server),
+  'deploy/package-lock.json matches package.json (regenerate: cp deploy/package-lock.json package-lock.json && npm install --package-lock-only --ignore-scripts && cp package-lock.json deploy/package-lock.json)');
+// The web install is also an npm ci, so the root one is matched by the COPY right above it and the absent --prefix.
+check(/^COPY deploy\/package-lock\.json \.\/package-lock\.json\r?\nRUN npm ci (?![^\n]*--prefix)/m.test(server) && !/\bnpm\s+(?:install|i|add|update)\b(?!\s+-g\b)/i.test(server),
   'deploy/Dockerfile installs the root packages with npm ci from deploy/package-lock.json');
 check(server.includes('DISABLE_AUTOUPDATER=1'), 'deploy/Dockerfile sets DISABLE_AUTOUPDATER=1');
 check(!server.includes('GO_VERSION') && !/texlive/i.test(server),
