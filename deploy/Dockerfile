@@ -15,9 +15,10 @@ RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code@2.1.319 && rm 
 
 WORKDIR /app
 
-# shortcut: no root package-lock.json (gitignored), so this resolves fresh; switch to npm ci when one lands
+# Upstream gitignores the root lockfile, so the image installs from the fork's own copy.
 COPY package.json ./
-RUN npm install --no-audit --no-fund && rm -rf /root/.npm
+COPY deploy/package-lock.json ./package-lock.json
+RUN npm ci --no-audit --no-fund && rm -rf /root/.npm
 
 COPY web/package.json web/package-lock.json web/
 RUN npm ci --no-audit --no-fund --prefix web && rm -rf /root/.npm

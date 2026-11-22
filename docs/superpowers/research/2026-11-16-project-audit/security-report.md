@@ -45,6 +45,7 @@ No critical finding. Every API route and page goes through one guard, `web/src/p
 8. **The image installs root dependencies without a lockfile.** Low, measured.
    - `deploy/Dockerfile:18-19`, with `package-lock.json` ignored at `.gitignore:258`.
    - **Accepted by the lead, not planned:** upstream ignores the lockfile by policy, and the Dockerfile already marks the shortcut.
+   - **Fixed 2026-11-22 (PR 120):** the image runs `npm ci` from the fork's own `deploy/package-lock.json`.
 9. **The dev container runs as root.** Low, measured.
    - The root `Dockerfile` has no `USER` line.
    - **Accepted by the lead, not planned:** it is an upstream file and an interactive dev image.
